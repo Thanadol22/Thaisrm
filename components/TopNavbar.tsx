@@ -40,7 +40,7 @@ export function TopNavbar() {
 
       {/* Hamburger Dropdown Navigation Menu */}
       {isOpen && (
-        <div className="bg-slate-950/95 backdrop-blur-md border-t border-slate-800 p-3 animate-fade-in shadow-2xl space-y-1">
+        <div className="bg-slate-950/95 backdrop-blur-md border-t border-slate-800 p-3 animate-slide-down shadow-2xl space-y-1">
           {navItems.map((item) => {
             const isActive = pathname === item.path || (pathname === '/' && item.path === '/login');
             const Icon = item.icon;

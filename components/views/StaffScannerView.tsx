@@ -231,14 +231,14 @@ export function StaffScannerView() {
 
               {/* Laser Frame Overlay */}
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                <div className="w-52 h-52 border-2 border-[#4ade80] rounded-3xl relative shadow-[0_0_30px_rgba(74,222,128,0.25)]">
+                <div className="w-52 h-52 border-2 border-[#4ade80] rounded-3xl relative shadow-[0_0_30px_rgba(74,222,128,0.25)] animate-pulse-glow">
                   {/* Animated Scanner Laser */}
-                  <div className="w-full h-0.5 bg-[#4ade80] shadow-[0_0_12px_#4ade80] absolute top-1/4 animate-pulse" />
+                  <div className="w-full h-0.5 bg-[#4ade80] shadow-[0_0_15px_#4ade80] absolute animate-scan-laser" />
                 </div>
               </div>
 
               {isProcessing && (
-                <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center text-xs font-bold text-emerald-400 z-10">
+                <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center text-xs font-bold text-emerald-400 z-10 animate-scale-up">
                   กำลังประมวลผลการเช็คอิน...
                 </div>
               )}
