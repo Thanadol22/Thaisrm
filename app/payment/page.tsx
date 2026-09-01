@@ -1,16 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { LoginView } from '@/components/views/LoginView';
-import { SignupView } from '@/components/views/SignupView';
+import { useRouter } from 'next/navigation';
 import { PaymentView } from '@/components/views/PaymentView';
 import { SlipUploadModal } from '@/components/SlipUploadModal';
 import { ToastNotification } from '@/components/ToastNotification';
 
-export default function Home() {
-  const [activeTab, setActiveTab] = useState<'login' | 'signup' | 'payment'>('login');
-  
-  // Interactive state
+export default function PaymentPage() {
+  const router = useRouter();
   const [copiedBank, setCopiedBank] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
@@ -31,43 +28,18 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col items-center justify-center selection:bg-[#4ade80] selection:text-slate-900 font-sans">
-      
-      {/* Toast Notification Alert */}
       <ToastNotification message={notification} />
-
-      {/* Main Responsive Mobile Viewport Container */}
+      
       <main className="w-full max-w-md min-h-screen bg-[#f6f8fc] shadow-2xl flex flex-col justify-between relative border-x border-slate-200/80">
-        
-        {/* SCREEN 1: WELCOME BACK (SIGN IN) */}
-        {activeTab === 'login' && (
-          <LoginView
-            onNavigateToSignup={() => setActiveTab('signup')}
-            onGoogleSignIn={() => triggerNotification("เข้าสู่ระบบด้วย Google สำเร็จ")}
-          />
-        )}
-
-        {/* SCREEN 2: CREATE ACCOUNT (SIGN UP) */}
-        {activeTab === 'signup' && (
-          <SignupView
-            onNavigateToLogin={() => setActiveTab('login')}
-            onSubmitSignup={() => setActiveTab('payment')}
-            onGoogleSignUp={() => triggerNotification("สมัครสมาชิกด้วย Google สำเร็จ")}
-          />
-        )}
-
-        {/* SCREEN 3: NEW MEMBER PAYMENT */}
-        {activeTab === 'payment' && (
-          <PaymentView
-            onNavigateBack={() => setActiveTab('signup')}
-            onOpenUploadModal={() => setUploadModalOpen(true)}
-            onCopyBank={handleCopyBank}
-            copiedBank={copiedBank}
-            bankAccount={bankAccountNumber}
-          />
-        )}
+        <PaymentView
+          onNavigateBack={() => router.push('/signup')}
+          onOpenUploadModal={() => setUploadModalOpen(true)}
+          onCopyBank={handleCopyBank}
+          copiedBank={copiedBank}
+          bankAccount={bankAccountNumber}
+        />
       </main>
 
-      {/* SLIP UPLOAD MODAL DIALOG */}
       <SlipUploadModal
         isOpen={uploadModalOpen}
         onClose={() => setUploadModalOpen(false)}
