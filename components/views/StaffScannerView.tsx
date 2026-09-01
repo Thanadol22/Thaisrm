@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, QrCode, Search, CheckCircle2, AlertTriangle, XCircle, Flashlight, RefreshCw, Users, ShieldCheck, UserCheck, SwitchCamera, AlertCircle } from 'lucide-react';
+import { Camera, QrCode, Search, CheckCircle2, AlertTriangle, XCircle, Flashlight, RefreshCw, Users, ShieldCheck, UserCheck, SwitchCamera, AlertCircle, Power, Video, VideoOff } from 'lucide-react';
 import { BornIvfLogo } from '@/components/BornIvfLogo';
 
 interface CheckInRecord {
@@ -17,10 +17,9 @@ export function StaffScannerView() {
   const [manualCode, setManualCode] = useState('');
   const [lastScanned, setLastScanned] = useState<CheckInRecord | null>(null);
   const [stats, setStats] = useState({ total: 500, checkedIn: 148 });
-  const [isScanning, setIsScanning] = useState(true);
+  const [isCameraOn, setIsCameraOn] = useState(true);
   const [cameraPermissionError, setCameraPermissionError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
-  const [torchOn, setTorchOn] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const scannerRef = useRef<any>(null);
@@ -91,7 +90,7 @@ export function StaffScannerView() {
       }
     };
 
-    if (isScanning) {
+    if (isCameraOn) {
       startScanner();
     }
 
@@ -103,7 +102,7 @@ export function StaffScannerView() {
           .catch((err: any) => console.error("Error stopping scanner:", err));
       }
     };
-  }, [isScanning, facingMode]);
+  }, [isCameraOn, facingMode]);
 
   // Process Scanned Code
   const handleProcessScan = (decodedText: string) => {
@@ -178,14 +177,30 @@ export function StaffScannerView() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Switch Camera Button */}
+          {/* Camera Power Toggle Button */}
           <button
-            onClick={toggleCameraFacing}
-            className="p-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition"
-            title="สลับกล้อง หน้า/หลัง"
+            onClick={() => setIsCameraOn(!isCameraOn)}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border cursor-pointer active:scale-95 ${
+              isCameraOn
+                ? 'bg-rose-500/20 text-rose-300 border-rose-500/30 hover:bg-rose-500/30'
+                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/30'
+            }`}
+            title={isCameraOn ? "กดเพื่อปิดการทำงานของกล้อง" : "กดเพื่อเปิดการทำงานของกล้อง"}
           >
-            <SwitchCamera className="w-4 h-4" />
+            {isCameraOn ? <VideoOff className="w-3.5 h-3.5" /> : <Video className="w-3.5 h-3.5" />}
+            <span>{isCameraOn ? 'ปิดกล้อง' : 'เปิดกล้อง'}</span>
           </button>
+
+          {/* Switch Camera Button */}
+          {isCameraOn && (
+            <button
+              onClick={toggleCameraFacing}
+              className="p-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer active:scale-95"
+              title="สลับกล้อง หน้า/หลัง"
+            >
+              <SwitchCamera className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -213,13 +228,32 @@ export function StaffScannerView() {
 
         {/* Live Camera Scanner Viewport */}
         <div className="relative rounded-3xl overflow-hidden bg-black border-2 border-slate-700 aspect-square max-h-[320px] mx-auto flex items-center justify-center shadow-2xl">
-          {cameraPermissionError ? (
+          {!isCameraOn ? (
+            /* Standby Screen when Camera is Paused */
+            <div className="text-center p-6 space-y-3 animate-fade-in">
+              <div className="w-14 h-14 rounded-2xl bg-slate-800 text-slate-400 flex items-center justify-center mx-auto border border-slate-700">
+                <VideoOff className="w-7 h-7" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-200">กล้องถูกปิดอยู่ (Camera Standby)</h4>
+                <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+                  กล้องหยุดทำงานเพื่อประหยัดแบตเตอรี่และทรัพยากรเครื่อง
+                </p>
+              </div>
+              <button
+                onClick={() => setIsCameraOn(true)}
+                className="px-5 py-2.5 bg-[#0026b3] hover:bg-blue-600 text-white text-xs font-bold rounded-xl shadow transition cursor-pointer active:scale-95"
+              >
+                เปิดกล้องสแกน
+              </button>
+            </div>
+          ) : cameraPermissionError ? (
             <div className="text-center p-6 space-y-3">
               <AlertCircle className="w-10 h-10 text-rose-400 mx-auto" />
               <p className="text-xs text-rose-200 leading-relaxed max-w-xs">{cameraPermissionError}</p>
               <button
-                onClick={() => setIsScanning(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white rounded-xl border border-slate-600 transition"
+                onClick={() => setIsCameraOn(true)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white rounded-xl border border-slate-600 transition cursor-pointer"
               >
                 ลองเปิดใหม่อีกครั้ง
               </button>
