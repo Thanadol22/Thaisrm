@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, QrCode, Search, CheckCircle2, AlertTriangle, XCircle, Flashlight, RefreshCw, Users, ShieldCheck, UserCheck, SwitchCamera, AlertCircle, Power, Video, VideoOff } from 'lucide-react';
+import { Camera, QrCode, Search, CheckCircle2, AlertTriangle, XCircle, Users, UserCheck, AlertCircle, Video, VideoOff } from 'lucide-react';
 import { BornIvfLogo } from '@/components/BornIvfLogo';
 
 interface CheckInRecord {
@@ -19,7 +19,6 @@ export function StaffScannerView() {
   const [stats, setStats] = useState({ total: 500, checkedIn: 148 });
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [cameraPermissionError, setCameraPermissionError] = useState<string | null>(null);
-  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const scannerRef = useRef<any>(null);
@@ -55,7 +54,7 @@ export function StaffScannerView() {
     }
   };
 
-  // Initialize html5-qrcode real camera scanner
+  // Initialize html5-qrcode real camera scanner (strictly Environment / Back Camera)
   useEffect(() => {
     let html5QrcodeScanner: any = null;
 
@@ -72,8 +71,9 @@ export function StaffScannerView() {
           aspectRatio: 1.0,
         };
 
+        // Strictly set to back camera (environment)
         await html5QrcodeScanner.start(
-          { facingMode: facingMode },
+          { facingMode: 'environment' },
           config,
           (decodedText: string) => {
             if (!isProcessing) {
@@ -102,7 +102,7 @@ export function StaffScannerView() {
           .catch((err: any) => console.error("Error stopping scanner:", err));
       }
     };
-  }, [isCameraOn, facingMode]);
+  }, [isCameraOn]);
 
   // Process Scanned Code
   const handleProcessScan = (decodedText: string) => {
@@ -155,10 +155,6 @@ export function StaffScannerView() {
     setManualCode('');
   };
 
-  const toggleCameraFacing = () => {
-    setFacingMode(prev => (prev === 'environment' ? 'user' : 'environment'));
-  };
-
   return (
     <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[680px] bg-slate-900 text-white font-sans">
       {/* Header Bar */}
@@ -174,33 +170,6 @@ export function StaffScannerView() {
             </div>
             <p className="text-[11px] text-slate-400">Born IVF Association Summit 2026</p>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Camera Power Toggle Button */}
-          <button
-            onClick={() => setIsCameraOn(!isCameraOn)}
-            className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border cursor-pointer active:scale-95 ${
-              isCameraOn
-                ? 'bg-rose-500/20 text-rose-300 border-rose-500/30 hover:bg-rose-500/30'
-                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/30'
-            }`}
-            title={isCameraOn ? "กดเพื่อปิดการทำงานของกล้อง" : "กดเพื่อเปิดการทำงานของกล้อง"}
-          >
-            {isCameraOn ? <VideoOff className="w-3.5 h-3.5" /> : <Video className="w-3.5 h-3.5" />}
-            <span>{isCameraOn ? 'ปิดกล้อง' : 'เปิดกล้อง'}</span>
-          </button>
-
-          {/* Switch Camera Button */}
-          {isCameraOn && (
-            <button
-              onClick={toggleCameraFacing}
-              className="p-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer active:scale-95"
-              title="สลับกล้อง หน้า/หลัง"
-            >
-              <SwitchCamera className="w-4 h-4" />
-            </button>
-          )}
         </div>
       </div>
 
@@ -278,6 +247,21 @@ export function StaffScannerView() {
               )}
             </div>
           )}
+        </div>
+
+        {/* Camera Power Toggle Button (Positioned Directly Under Scanner Frame) */}
+        <div className="pt-1">
+          <button
+            onClick={() => setIsCameraOn(!isCameraOn)}
+            className={`w-full py-3.5 px-4 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 border cursor-pointer active:scale-[0.98] shadow-sm ${
+              isCameraOn
+                ? 'bg-rose-500/20 text-rose-200 border-rose-500/40 hover:bg-rose-500/30'
+                : 'bg-emerald-500/20 text-emerald-200 border-emerald-500/40 hover:bg-emerald-500/30'
+            }`}
+          >
+            {isCameraOn ? <VideoOff className="w-4 h-4 text-rose-400" /> : <Video className="w-4 h-4 text-emerald-400" />}
+            <span>{isCameraOn ? 'ปิดการทำงานของกล้อง' : 'เปิดกล้องสแกน QR Code'}</span>
+          </button>
         </div>
 
         {/* Quick Test Action Buttons for Demo */}
