@@ -81,8 +81,7 @@ export function PaymentView({
           <div className="border-t border-slate-100 pt-3 flex items-baseline justify-between">
             <span className="text-xs font-bold text-slate-600">Total Due Now:</span>
             <div className="text-right">
-              <span className="text-2xl font-black text-slate-900 tracking-tight">$1,000</span>
-              <span className="block text-[10px] text-slate-400 font-medium">(~ 35,000 THB)</span>
+              <span className="text-2xl font-black text-slate-900 tracking-tight">1,000 THB</span>
             </div>
           </div>
         </div>

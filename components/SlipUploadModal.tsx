@@ -65,9 +65,9 @@ export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount }: Sli
         ) : (
           <div className="space-y-5">
             <div>
-              <h3 className="text-xl font-black text-slate-900">แนบหลักฐานการโอนเงิน (Slip)</h3>
+              <h3 className="text-xl font-black text-slate-900">แนบหลักฐานการโอนเงิน</h3>
               <p className="text-xs text-slate-500 mt-1">
-                โอนเงินเข้าบัญชี <span className="font-bold text-[#0026b3]">{bankAccount} (K+)</span> จำนวน 1,000 บาท
+                โอนเงินเข้าบัญชี <span className="font-bold text-[#0026b3]">{bankAccount}</span> <span className="font-bold text-[#00a950]">(ธนาคารกสิกรไทย)</span> จำนวน 1,000 บาท
               </p>
             </div>
 
