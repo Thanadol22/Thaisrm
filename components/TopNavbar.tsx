@@ -19,17 +19,17 @@ export function TopNavbar() {
 
   return (
     <header className="w-full bg-slate-900 text-white sticky top-0 z-40 border-b border-slate-800 shadow-md">
-      <div className="px-4 py-3 flex items-center justify-between">
-        <Link href="/login" onClick={() => setIsOpen(false)} className="flex items-center gap-2.5 hover:opacity-90 transition">
-          <BornIvfLogo className="w-8 h-8 sm:w-9 sm:h-9" />
+      <div className="px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2">
+        <Link href="/login" onClick={() => setIsOpen(false)} className="flex items-center gap-2 hover:opacity-90 transition flex-shrink-0">
+          <BornIvfLogo className="w-8 h-8" />
           <div>
-            <span className="text-sm sm:text-base font-extrabold tracking-wide text-white block leading-tight">THAISRM</span>
-            <span className="text-[10px] sm:text-xs text-slate-400 font-medium block">Meeting Summit 2026</span>
+            <span className="text-sm font-extrabold tracking-wide text-white block leading-tight">THAISRM</span>
+            <span className="text-[10px] text-slate-400 font-medium block whitespace-nowrap">Meeting Summit 2026</span>
           </div>
         </Link>
 
         {/* Tablet & Desktop Inline Navigation Pills */}
-        <nav className="hidden sm:flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 gap-1">
+        <nav className="hidden md:flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 gap-0.5 lg:gap-1 flex-shrink-0">
           {navItems.map((item) => {
             const isActive = pathname === item.path || (pathname === '/' && item.path === '/login');
             const Icon = item.icon;
@@ -37,32 +37,32 @@ export function TopNavbar() {
               <Link
                 key={item.path}
                 href={item.path}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                className={`px-2 py-1.5 lg:px-2.5 rounded-lg text-[11px] lg:text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
                   isActive
                     ? 'bg-[#0026b3] text-white shadow-sm'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{item.label}</span>
+                <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="whitespace-nowrap">{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Mobile Hamburger Toggle Button */}
+        {/* Mobile & Small Tablet Hamburger Toggle Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="sm:hidden w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white flex items-center justify-center transition border border-slate-700/80 cursor-pointer active:scale-95"
+          className="md:hidden w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white flex items-center justify-center transition border border-slate-700/80 cursor-pointer active:scale-95 flex-shrink-0"
           aria-label="Toggle Hamburger Menu"
         >
           {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
       </div>
 
-      {/* Mobile Hamburger Dropdown Navigation Menu */}
+      {/* Mobile & Small Tablet Hamburger Dropdown Navigation Menu */}
       {isOpen && (
-        <div className="sm:hidden bg-slate-950/95 backdrop-blur-md border-t border-slate-800 p-3 animate-slide-down shadow-2xl space-y-1">
+        <div className="md:hidden bg-slate-950/95 backdrop-blur-md border-t border-slate-800 p-3 animate-slide-down shadow-2xl space-y-1">
           {navItems.map((item) => {
             const isActive = pathname === item.path || (pathname === '/' && item.path === '/login');
             const Icon = item.icon;
