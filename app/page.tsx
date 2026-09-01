@@ -1,79 +1,31 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { TopNavbar } from '@/components/TopNavbar';
 import { LoginView } from '@/components/views/LoginView';
-import { SignupView } from '@/components/views/SignupView';
-import { PaymentView } from '@/components/views/PaymentView';
-import { SlipUploadModal } from '@/components/SlipUploadModal';
 import { ToastNotification } from '@/components/ToastNotification';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'login' | 'signup' | 'payment'>('login');
-  
-  // Interactive state
-  const [copiedBank, setCopiedBank] = useState(false);
-  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const router = useRouter();
   const [notification, setNotification] = useState<string | null>(null);
-
-  const bankAccountNumber = "020-8-16398-1";
 
   const triggerNotification = (msg: string) => {
     setNotification(msg);
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const handleCopyBank = () => {
-    navigator.clipboard.writeText(bankAccountNumber);
-    setCopiedBank(true);
-    triggerNotification("คัดลอกเลขบัญชี 020-8-16398-1 เรียบร้อยแล้ว!");
-    setTimeout(() => setCopiedBank(false), 2500);
-  };
-
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col items-center justify-center selection:bg-[#4ade80] selection:text-slate-900 font-sans">
-      
-      {/* Toast Notification Alert */}
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col items-center justify-start selection:bg-[#4ade80] selection:text-slate-900 font-sans">
       <ToastNotification message={notification} />
 
-      {/* Main Responsive Mobile Viewport Container */}
       <main className="w-full max-w-md min-h-screen bg-[#f6f8fc] shadow-2xl flex flex-col justify-between relative border-x border-slate-200/80">
-        
-        {/* SCREEN 1: WELCOME BACK (SIGN IN) */}
-        {activeTab === 'login' && (
-          <LoginView
-            onNavigateToSignup={() => setActiveTab('signup')}
-            onGoogleSignIn={() => triggerNotification("เข้าสู่ระบบด้วย Google สำเร็จ")}
-          />
-        )}
-
-        {/* SCREEN 2: CREATE ACCOUNT (SIGN UP) */}
-        {activeTab === 'signup' && (
-          <SignupView
-            onNavigateToLogin={() => setActiveTab('login')}
-            onSubmitSignup={() => setActiveTab('payment')}
-            onGoogleSignUp={() => triggerNotification("สมัครสมาชิกด้วย Google สำเร็จ")}
-          />
-        )}
-
-        {/* SCREEN 3: NEW MEMBER PAYMENT */}
-        {activeTab === 'payment' && (
-          <PaymentView
-            onNavigateBack={() => setActiveTab('signup')}
-            onOpenUploadModal={() => setUploadModalOpen(true)}
-            onCopyBank={handleCopyBank}
-            copiedBank={copiedBank}
-            bankAccount={bankAccountNumber}
-          />
-        )}
+        <TopNavbar />
+        <LoginView
+          onNavigateToSignup={() => router.push('/signup')}
+          onGoogleSignIn={() => triggerNotification("เข้าสู่ระบบด้วย Google สำเร็จ")}
+        />
       </main>
-
-      {/* SLIP UPLOAD MODAL DIALOG */}
-      <SlipUploadModal
-        isOpen={uploadModalOpen}
-        onClose={() => setUploadModalOpen(false)}
-        onSuccess={() => triggerNotification("อัปโหลดสลิปสำเร็จ! ระบบกำลังยืนยันยอดชำระเงินของคุณ")}
-        bankAccount={bankAccountNumber}
-      />
     </div>
   );
 }
