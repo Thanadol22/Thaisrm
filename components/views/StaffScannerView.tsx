@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Camera, QrCode, Search, CheckCircle2, AlertTriangle, XCircle, Flashlight, RefreshCw, Users, ShieldCheck, UserCheck } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Camera, QrCode, Search, CheckCircle2, AlertTriangle, XCircle, Flashlight, RefreshCw, Users, ShieldCheck, UserCheck, SwitchCamera, AlertCircle } from 'lucide-react';
 import { BornIvfLogo } from '@/components/BornIvfLogo';
 
 interface CheckInRecord {
@@ -16,25 +16,112 @@ interface CheckInRecord {
 export function StaffScannerView() {
   const [manualCode, setManualCode] = useState('');
   const [lastScanned, setLastScanned] = useState<CheckInRecord | null>(null);
-  const [stats, setStats] = useState({ total: 250, checkedIn: 148 });
-  const [cameraActive, setCameraActive] = useState(true);
+  const [stats, setStats] = useState({ total: 500, checkedIn: 148 });
+  const [isScanning, setIsScanning] = useState(true);
+  const [cameraPermissionError, setCameraPermissionError] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [torchOn, setTorchOn] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Demo scan simulation handler
-  const handleSimulateScan = (codeStr?: string) => {
-    const inputCode = codeStr || manualCode || 'TICKET-2026-8891';
-    
-    // Simulate database lookup logic
+  const scannerRef = useRef<any>(null);
+  const readerId = "html5-qr-reader";
+
+  // Web Audio API Beep Generator for Scanner Feedback
+  const playBeepSound = (type: 'success' | 'warning' | 'error') => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      if (type === 'success') {
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // High pitch A5
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.15);
+      } else if (type === 'warning') {
+        osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+      } else {
+        osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.4);
+      }
+    } catch (e) {
+      console.warn("Audio Context Error:", e);
+    }
+  };
+
+  // Initialize html5-qrcode real camera scanner
+  useEffect(() => {
+    let html5QrcodeScanner: any = null;
+
+    const startScanner = async () => {
+      try {
+        setCameraPermissionError(null);
+        const { Html5Qrcode } = await import('html5-qrcode');
+        html5QrcodeScanner = new Html5Qrcode(readerId);
+        scannerRef.current = html5QrcodeScanner;
+
+        const config = {
+          fps: 10,
+          qrbox: { width: 220, height: 220 },
+          aspectRatio: 1.0,
+        };
+
+        await html5QrcodeScanner.start(
+          { facingMode: facingMode },
+          config,
+          (decodedText: string) => {
+            if (!isProcessing) {
+              handleProcessScan(decodedText);
+            }
+          },
+          undefined
+        );
+      } catch (err: any) {
+        console.error("Camera Scanner Error:", err);
+        setCameraPermissionError(
+          "ไม่สามารถเปิดกล้องได้ โปรดตรวจสอบการอนุญาตใช้งานกล้อง (Camera Permission) หรือใช้งานผ่าน HTTPS"
+        );
+      }
+    };
+
+    if (isScanning) {
+      startScanner();
+    }
+
+    return () => {
+      if (scannerRef.current && scannerRef.current.isScanning) {
+        scannerRef.current
+          .stop()
+          .then(() => scannerRef.current.clear())
+          .catch((err: any) => console.error("Error stopping scanner:", err));
+      }
+    };
+  }, [isScanning, facingMode]);
+
+  // Process Scanned Code
+  const handleProcessScan = (decodedText: string) => {
+    setIsProcessing(true);
+    const inputCode = decodedText || 'TICKET-2026-8891';
+
     if (inputCode.includes('DUP') || inputCode === 'TICKET-DUP') {
+      playBeepSound('warning');
       setLastScanned({
         id: 'TICKET-2026-0042',
         name: 'สมชาย ใจดี',
-        ticketType: 'Born Premium Pass (VVIP)',
+        ticketType: 'Born Premium Pass',
         email: 'somchai@example.com',
         checkInTime: '10:15 น.',
         status: 'duplicate'
       });
     } else if (inputCode.includes('ERR')) {
+      playBeepSound('error');
       setLastScanned({
         id: inputCode,
         name: 'ไม่ระบุตัวตน',
@@ -44,6 +131,7 @@ export function StaffScannerView() {
         status: 'invalid'
       });
     } else {
+      playBeepSound('success');
       setLastScanned({
         id: inputCode,
         name: 'ภัทรพล วงศ์สวัสดิ์',
@@ -54,18 +142,33 @@ export function StaffScannerView() {
       });
       setStats(prev => ({ ...prev, checkedIn: Math.min(prev.total, prev.checkedIn + 1) }));
     }
+
+    // Pause for 2 seconds before allowing next scan
+    setTimeout(() => {
+      setIsProcessing(false);
+    }, 2000);
+  };
+
+  const handleManualCheckIn = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!manualCode.trim()) return;
+    handleProcessScan(manualCode.trim());
     setManualCode('');
   };
 
+  const toggleCameraFacing = () => {
+    setFacingMode(prev => (prev === 'environment' ? 'user' : 'environment'));
+  };
+
   return (
-    <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[680px] bg-slate-900 text-white">
+    <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[680px] bg-slate-900 text-white font-sans">
       {/* Header Bar */}
       <div className="bg-slate-950 p-4 border-b border-slate-800 flex items-center justify-between sticky top-0 z-20">
         <div className="flex items-center gap-2.5">
           <BornIvfLogo className="w-8 h-8" />
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-extrabold text-white">ระบบเช็คอินเจ้าหน้าที่</span>
+              <span className="text-sm font-extrabold text-white">ระบบเช็คอินสำหรับเจ้าหน้าที่</span>
               <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
                 Staff Scanner
               </span>
@@ -74,21 +177,22 @@ export function StaffScannerView() {
           </div>
         </div>
 
-        <button
-          onClick={() => setTorchOn(!torchOn)}
-          className={`p-2.5 rounded-xl border transition ${
-            torchOn ? 'bg-amber-400 text-slate-950 border-amber-300' : 'bg-slate-800 text-slate-300 border-slate-700'
-          }`}
-          title="เปิด/ปิดไฟฉาย"
-        >
-          <Flashlight className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Switch Camera Button */}
+          <button
+            onClick={toggleCameraFacing}
+            className="p-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition"
+            title="สลับกล้อง หน้า/หลัง"
+          >
+            <SwitchCamera className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Main Scanner Section */}
       <div className="px-4 py-5 space-y-4 flex-1">
         {/* Real-time Stats Card */}
-        <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-3.5 flex items-center justify-between">
+        <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-3.5 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#0026b3] text-white flex items-center justify-center">
               <Users className="w-5 h-5" />
@@ -107,29 +211,37 @@ export function StaffScannerView() {
           </div>
         </div>
 
-        {/* Camera Viewport Container */}
+        {/* Live Camera Scanner Viewport */}
         <div className="relative rounded-3xl overflow-hidden bg-black border-2 border-slate-700 aspect-square max-h-[320px] mx-auto flex items-center justify-center shadow-2xl">
-          {cameraActive ? (
-            <div className="relative w-full h-full bg-slate-950 flex flex-col items-center justify-center">
-              {/* Simulated Video Stream & Scanner Frame Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-b from-blue-900/10 via-transparent to-blue-900/10" />
-              
-              {/* Target Bounding Box Corners */}
-              <div className="w-52 h-52 border-2 border-[#4ade80] rounded-3xl relative flex items-center justify-center shadow-[0_0_30px_rgba(74,222,128,0.25)]">
-                {/* Scanning Laser Animation */}
-                <div className="w-full h-0.5 bg-[#4ade80] shadow-[0_0_12px_#4ade80] absolute top-1/4 animate-pulse" />
-                
-                <QrCode className="w-16 h-16 text-slate-600/50" />
-              </div>
-
-              <p className="absolute bottom-4 text-xs text-slate-300 font-medium bg-slate-900/80 px-3 py-1.5 rounded-full border border-slate-700">
-                วาง QR Code ของผู้เข้าร่วมในกรอบเพื่อสแกน
-              </p>
+          {cameraPermissionError ? (
+            <div className="text-center p-6 space-y-3">
+              <AlertCircle className="w-10 h-10 text-rose-400 mx-auto" />
+              <p className="text-xs text-rose-200 leading-relaxed max-w-xs">{cameraPermissionError}</p>
+              <button
+                onClick={() => setIsScanning(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white rounded-xl border border-slate-600 transition"
+              >
+                ลองเปิดใหม่อีกครั้ง
+              </button>
             </div>
           ) : (
-            <div className="text-center p-6 space-y-2">
-              <Camera className="w-10 h-10 text-slate-500 mx-auto" />
-              <p className="text-xs text-slate-400">ปิดกล้องอยู่</p>
+            <div className="relative w-full h-full bg-black flex flex-col items-center justify-center overflow-hidden">
+              {/* HTML5 QR Code Real Camera Video Container */}
+              <div id={readerId} className="w-full h-full object-cover overflow-hidden" />
+
+              {/* Laser Frame Overlay */}
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div className="w-52 h-52 border-2 border-[#4ade80] rounded-3xl relative shadow-[0_0_30px_rgba(74,222,128,0.25)]">
+                  {/* Animated Scanner Laser */}
+                  <div className="w-full h-0.5 bg-[#4ade80] shadow-[0_0_12px_#4ade80] absolute top-1/4 animate-pulse" />
+                </div>
+              </div>
+
+              {isProcessing && (
+                <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center text-xs font-bold text-emerald-400 z-10">
+                  กำลังประมวลผลการเช็คอิน...
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -137,15 +249,15 @@ export function StaffScannerView() {
         {/* Quick Test Action Buttons for Demo */}
         <div className="flex gap-2">
           <button
-            onClick={() => handleSimulateScan('TICKET-2026-PASS')}
-            className="flex-1 py-2 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition flex items-center justify-center gap-1.5"
+            onClick={() => handleProcessScan('TICKET-2026-PASS')}
+            className="flex-1 py-2 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>ทดสอบสแกนสำเร็จ</span>
           </button>
           <button
-            onClick={() => handleSimulateScan('TICKET-DUP')}
-            className="flex-1 py-2 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold transition flex items-center justify-center gap-1.5"
+            onClick={() => handleProcessScan('TICKET-DUP')}
+            className="flex-1 py-2 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <AlertTriangle className="w-3.5 h-3.5" />
             <span>ทดสอบสแกนซ้ำ</span>
@@ -174,14 +286,14 @@ export function StaffScannerView() {
                 </div>
               </div>
 
-              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-black/40 border border-white/10">
+              <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-black/40 border border-white/10">
                 {lastScanned.status === 'success' && 'เช็คอินสำเร็จ'}
                 {lastScanned.status === 'duplicate' && 'สแกนซ้ำแล้ว'}
                 {lastScanned.status === 'invalid' && 'ตั๋วไม่ถูกต้อง'}
               </span>
             </div>
 
-            <div className="mt-3 pt-2.5 border-t border-white/10 text-xs flex justify-between opacity-90">
+            <div className="mt-3 pt-2.5 border-t border-white/10 text-xs flex justify-between opacity-90 font-medium">
               <span>รหัส: {lastScanned.id}</span>
               <span>เวลา: {lastScanned.checkInTime}</span>
             </div>
@@ -189,7 +301,7 @@ export function StaffScannerView() {
         )}
 
         {/* Manual Code Search Fallback Input */}
-        <div className="space-y-1.5 pt-1">
+        <form onSubmit={handleManualCheckIn} className="space-y-1.5 pt-1">
           <label className="text-xs font-bold text-slate-400">ค้นหาด้วยชื่อ / รหัสตั๋วแบบ Manual</label>
           <div className="flex gap-2">
             <div className="relative flex-1 bg-slate-800 border border-slate-700 rounded-xl flex items-center px-3">
@@ -203,13 +315,13 @@ export function StaffScannerView() {
               />
             </div>
             <button
-              onClick={() => handleSimulateScan()}
-              className="bg-[#0026b3] hover:bg-blue-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition"
+              type="submit"
+              className="bg-[#0026b3] hover:bg-blue-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer"
             >
               เช็คอิน
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );

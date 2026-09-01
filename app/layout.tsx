@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "THAISRM | Association Event System",
+  title: "THAISRM | Meeting System",
   description: "Event platform for association management, registration, and attendee experience.",
 };
 
