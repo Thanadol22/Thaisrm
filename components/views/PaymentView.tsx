@@ -36,7 +36,7 @@ export function PaymentView({
             {/* Brand Logo & Name */}
             <div className="flex items-center gap-2.5">
               <BornIvfLogo className="w-9 h-9" />
-              <span className="font-bold text-white text-base tracking-wide">Born IVF</span>
+              <span className="font-bold text-white text-base tracking-wide">THAISRM</span>
             </div>
           </div>
 
@@ -55,7 +55,7 @@ export function PaymentView({
         <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-extrabold text-[#0026b3] text-lg tracking-tight">
-              Born Premium Pass
+              THAISRM Premium Pass
             </h3>
             <span className="bg-[#eff4ff] text-[#0026b3] text-[10px] font-black tracking-widest px-3 py-1 rounded-full border border-[#d6e4ff]">
               LIVELONG
@@ -126,7 +126,7 @@ export function PaymentView({
 
         {/* Footer Terms Disclaimer */}
         <p className="text-[11px] text-slate-400 text-center leading-normal px-2 pb-4">
-          By clicking pay now you agree to Born IVF terms of service. Your subscription auto-renews livelong.
+          By clicking pay now you agree to THAISRM terms of service. Your subscription auto-renews livelong.
         </p>
       </div>
     </div>

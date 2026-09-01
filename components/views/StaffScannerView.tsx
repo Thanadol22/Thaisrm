@@ -114,7 +114,7 @@ export function StaffScannerView() {
       setLastScanned({
         id: 'TICKET-2026-0042',
         name: 'สมชาย ใจดี',
-        ticketType: 'Born Premium Pass',
+        ticketType: 'THAISRM Premium Pass',
         email: 'somchai@example.com',
         checkInTime: '10:15 น.',
         status: 'duplicate'
@@ -134,7 +134,7 @@ export function StaffScannerView() {
       setLastScanned({
         id: inputCode,
         name: 'ภัทรพล วงศ์สวัสดิ์',
-        ticketType: 'Born Premium Pass',
+        ticketType: 'THAISRM Premium Pass',
         email: 'phattarapol@example.com',
         checkInTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
         status: 'success'
@@ -168,7 +168,7 @@ export function StaffScannerView() {
                 Staff Scanner
               </span>
             </div>
-            <p className="text-[11px] text-slate-400">Born IVF Association Summit 2026</p>
+            <p className="text-[11px] text-slate-400">THAISRM Association Summit 2026</p>
           </div>
         </div>
       </div>

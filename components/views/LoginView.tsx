@@ -8,9 +8,10 @@ import { GoogleIcon } from '@/components/GoogleIcon';
 interface LoginViewProps {
   onNavigateToSignup: () => void;
   onGoogleSignIn: () => void;
+  onNavigateToStaffScan?: () => void;
 }
 
-export function LoginView({ onNavigateToSignup, onGoogleSignIn }: LoginViewProps) {
+export function LoginView({ onNavigateToSignup, onGoogleSignIn, onNavigateToStaffScan }: LoginViewProps) {
   return (
     <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[640px]">
       {/* Header Blue Card Section */}
@@ -20,8 +21,8 @@ export function LoginView({ onNavigateToSignup, onGoogleSignIn }: LoginViewProps
         <div className="absolute bottom-0 -left-12 w-40 h-40 bg-[#4ade80]/15 rounded-full blur-2xl pointer-events-none" />
 
         <div className="relative z-10">
-          <BornIvfLogo className="w-14 h-14 mb-5" />
-          <p className="text-base font-bold text-white tracking-wide">Born IVF</p>
+          <BornIvfLogo className="w-14 h-14 mb-4" />
+          <p className="text-base font-bold text-white tracking-wide">THAISRM</p>
           <h1 className="text-3xl font-extrabold text-white mt-1.5 tracking-tight">
             Welcome Back
           </h1>

@@ -31,7 +31,7 @@ export function SignupView({ onNavigateToLogin, onSubmitSignup, onGoogleSignUp }
           <p className="text-sm text-blue-100/90 leading-relaxed mt-1.5 font-normal">
             Join us to experience fresh, reliable connectivity.
           </p>
-          <p className="text-sm font-bold text-white mt-2">Born IVF</p>
+          <p className="text-sm font-bold text-white mt-2">THAISRM</p>
         </div>
       </div>
 
