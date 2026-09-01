@@ -18,7 +18,7 @@ export function TopNavbar() {
   ];
 
   return (
-    <header className="w-full max-w-md md:max-w-xl lg:max-w-3xl mx-auto bg-slate-900 text-white sticky top-0 z-40 border-b border-slate-800 shadow-md transition-all duration-300">
+    <header className="w-full bg-slate-900 text-white sticky top-0 z-40 border-b border-slate-800 shadow-md">
       <div className="px-4 py-3 flex items-center justify-between">
         <Link href="/login" onClick={() => setIsOpen(false)} className="flex items-center gap-2.5 hover:opacity-90 transition">
           <BornIvfLogo className="w-8 h-8 sm:w-9 sm:h-9" />
@@ -28,8 +28,8 @@ export function TopNavbar() {
           </div>
         </Link>
 
-        {/* Desktop & Tablet Inline Navigation Pills */}
-        <nav className="hidden md:flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 gap-1">
+        {/* Tablet & Desktop Inline Navigation Pills */}
+        <nav className="hidden sm:flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 gap-1">
           {navItems.map((item) => {
             const isActive = pathname === item.path || (pathname === '/' && item.path === '/login');
             const Icon = item.icon;
@@ -53,7 +53,7 @@ export function TopNavbar() {
         {/* Mobile Hamburger Toggle Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="md:hidden w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white flex items-center justify-center transition border border-slate-700/80 cursor-pointer active:scale-95"
+          className="sm:hidden w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white flex items-center justify-center transition border border-slate-700/80 cursor-pointer active:scale-95"
           aria-label="Toggle Hamburger Menu"
         >
           {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -62,7 +62,7 @@ export function TopNavbar() {
 
       {/* Mobile Hamburger Dropdown Navigation Menu */}
       {isOpen && (
-        <div className="md:hidden bg-slate-950/95 backdrop-blur-md border-t border-slate-800 p-3 animate-slide-down shadow-2xl space-y-1">
+        <div className="sm:hidden bg-slate-950/95 backdrop-blur-md border-t border-slate-800 p-3 animate-slide-down shadow-2xl space-y-1">
           {navItems.map((item) => {
             const isActive = pathname === item.path || (pathname === '/' && item.path === '/login');
             const Icon = item.icon;
