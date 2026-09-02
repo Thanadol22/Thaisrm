@@ -12,8 +12,33 @@ export default function SignupPage() {
   const [notification, setNotification] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  const triggerNotification = (msg: string) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(null), 4000);
+  };
+
   const handleSignupSubmit = () => {
     setShowSuccessModal(true);
+  };
+
+  const handleGoogleSignUp = async () => {
+    try {
+      const response = await fetch('/api/auth/google/url');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+      }
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        triggerNotification('ไม่พบ URL สำหรับสมัครสมาชิกด้วย Google');
+      }
+    } catch (err: any) {
+      console.error('Google Sign Up Error:', err);
+      triggerNotification(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    }
   };
 
   const handleProceedToPayment = () => {
@@ -34,7 +59,7 @@ export default function SignupPage() {
         <SignupView
           onNavigateToLogin={() => router.push('/login')}
           onSubmitSignup={handleSignupSubmit}
-          onGoogleSignUp={handleSignupSubmit}
+          onGoogleSignUp={handleGoogleSignUp}
         />
       </main>
     </div>

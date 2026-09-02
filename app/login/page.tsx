@@ -21,8 +21,7 @@ export default function LoginPage() {
 
   const handleGoogleSignIn = async () => {
     try {
-      const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-      const response = await fetch(`http://${host}:5000/api/auth/google/url`);
+      const response = await fetch('/api/auth/google/url');
       const data = await response.json();
 
       if (!response.ok) {
@@ -33,11 +32,11 @@ export default function LoginPage() {
         // Redirect ผู้ใช้ไปที่ Google Consent Screen (Prompt Select Account)
         window.location.href = data.url;
       } else {
-        setShowSuccessModal(true);
+        triggerNotification('ไม่พบ URL สำหรับเข้าสู่ระบบด้วย Google');
       }
     } catch (err: any) {
       console.error('Google Sign In Error:', err);
-      setShowSuccessModal(true);
+      triggerNotification(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
     }
   };
 
