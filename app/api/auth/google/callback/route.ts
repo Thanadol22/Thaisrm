@@ -19,7 +19,9 @@ export async function GET(req: NextRequest) {
   try {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${origin}/api/auth/google/callback`;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI && !process.env.GOOGLE_REDIRECT_URI.includes('localhost:5000')
+      ? process.env.GOOGLE_REDIRECT_URI
+      : `${origin}/api/auth/google/callback`;
 
     const googleClient = new OAuth2Client(clientId, clientSecret, redirectUri);
     const { tokens } = await googleClient.getToken(code);

@@ -6,7 +6,9 @@ export async function GET(req: NextRequest) {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     const origin = req.nextUrl.origin;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${origin}/api/auth/google/callback`;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI && !process.env.GOOGLE_REDIRECT_URI.includes('localhost:5000')
+      ? process.env.GOOGLE_REDIRECT_URI
+      : `${origin}/api/auth/google/callback`;
 
     if (!clientId || clientId === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
       return NextResponse.json(
