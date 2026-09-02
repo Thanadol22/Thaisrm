@@ -10,7 +10,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Middleware
 app.use(cors({
-  origin: true,
+  origin: FRONTEND_URL,
   credentials: true
 }));
 app.use(express.json());
@@ -82,9 +82,12 @@ app.get('/api/auth/google/callback', async (req, res) => {
     const { sub: googleId, email, name, picture } = payload;
 
     // 3. สร้าง JWT Token สำหรับระบบเราเอง
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET is not configured in .env');
+    }
     const appToken = jwt.sign(
       { googleId, email, name, picture },
-      process.env.JWT_SECRET || 'secret_key',
+      process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
@@ -95,6 +98,26 @@ app.get('/api/auth/google/callback', async (req, res) => {
     console.error('Google Callback Error:', error);
     res.redirect(`${FRONTEND_URL}/login?error=${encodeURIComponent(error.message)}`);
   }
+});
+
+// Staff PIN Verification Endpoint
+app.post('/api/staff/verify-pin', (req, res) => {
+  const { pin } = req.body;
+  const staffPin = process.env.STAFF_PIN;
+
+  if (!pin || typeof pin !== 'string' || pin.length !== 6) {
+    return res.status(400).json({ success: false, error: 'กรุณากรอกรหัสผ่าน 6 หลัก' });
+  }
+
+  if (!staffPin) {
+    return res.status(500).json({ success: false, error: 'ระบบยังไม่ได้ตั้งค่ารหัสเจ้าหน้าที่' });
+  }
+
+  if (pin === staffPin) {
+    return res.json({ success: true });
+  }
+
+  return res.status(401).json({ success: false, error: 'รหัสผ่านไม่ถูกต้อง' });
 });
 
 // Start Server

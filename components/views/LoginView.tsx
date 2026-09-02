@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Shield, Globe, QrCode } from 'lucide-react';
+import { Shield, Globe } from 'lucide-react';
 import { BornIvfLogo } from '@/components/BornIvfLogo';
 import { GoogleIcon } from '@/components/GoogleIcon';
 import { useLanguage } from '@/context/LanguageContext';
@@ -9,10 +9,9 @@ import { useLanguage } from '@/context/LanguageContext';
 interface LoginViewProps {
   onNavigateToSignup: () => void;
   onGoogleSignIn: () => void;
-  onNavigateToStaffScan?: () => void;
 }
 
-export function LoginView({ onNavigateToSignup, onGoogleSignIn, onNavigateToStaffScan }: LoginViewProps) {
+export function LoginView({ onNavigateToSignup, onGoogleSignIn }: LoginViewProps) {
   const { lang, toggleLang, t } = useLanguage();
 
   return (
@@ -81,8 +80,8 @@ export function LoginView({ onNavigateToSignup, onGoogleSignIn, onNavigateToStaf
           </button>
         </div>
 
-        {/* Switch to Sign Up / Staff Scanner */}
-        <div className="text-center pt-8 sm:pt-10 pb-4 space-y-3">
+        {/* Switch to Sign Up */}
+        <div className="text-center pt-8 sm:pt-10 pb-4">
           <p className="text-xs sm:text-sm text-slate-500">
             {t.login.noAccount}{' '}
             <button
@@ -92,17 +91,6 @@ export function LoginView({ onNavigateToSignup, onGoogleSignIn, onNavigateToStaf
               {t.login.signUpLink}
             </button>
           </p>
-          {onNavigateToStaffScan && (
-            <div>
-              <button
-                onClick={onNavigateToStaffScan}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200/80 text-xs font-bold transition cursor-pointer active:scale-95 shadow-2xs"
-              >
-                <QrCode className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{t.nav.staffScan} ({t.nav.staffBadge})</span>
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>

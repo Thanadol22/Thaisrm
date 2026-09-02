@@ -49,7 +49,6 @@ export default function LoginPage() {
         <LoginView
           onNavigateToSignup={() => router.push('/signup')}
           onGoogleSignIn={handleGoogleSignIn}
-          onNavigateToStaffScan={() => router.push('/staff')}
         />
       </main>
     </div>

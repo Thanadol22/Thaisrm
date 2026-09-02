@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import type { Html5Qrcode } from 'html5-qrcode';
 import { Camera, QrCode, Search, CheckCircle2, AlertTriangle, XCircle, Users, UserCheck, AlertCircle, Video, VideoOff, ShieldCheck, Sparkles, Globe, Lock, Delete } from 'lucide-react';
 import { BornIvfLogo } from '@/components/BornIvfLogo';
 import { useLanguage } from '@/context/LanguageContext';
@@ -30,15 +31,22 @@ export function StaffScannerView() {
   const [cameraPermissionError, setCameraPermissionError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const scannerRef = useRef<any>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   const readerId = "html5-qr-reader";
+  const cameraPermErrorRef = useRef<string>('');
 
-  // Check initial authentication state from sessionStorage
+  // Ensure staff session is always cleared on unmount (when navigating to any other page)
   useEffect(() => {
+    // Clear any lingering session on mount to ensure fresh PIN entry
     if (typeof window !== 'undefined') {
-      const isAuthed = sessionStorage.getItem('thaisrm_staff_authed') === 'true';
-      setIsAuthenticated(isAuthed);
+      sessionStorage.removeItem('thaisrm_staff_authed');
     }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('thaisrm_staff_authed');
+      }
+    };
   }, []);
 
   // Web Audio API Beep Generator for Scanner Feedback
@@ -71,21 +79,41 @@ export function StaffScannerView() {
     }
   };
 
-  // Handle PIN verification
-  const handleVerifyPin = (inputPin: string) => {
-    if (inputPin === '111111') {
-      playBeepSound('success');
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('thaisrm_staff_authed', 'true');
+  // Handle PIN verification via Server API
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  const handleVerifyPin = async (inputPin: string) => {
+    setIsVerifying(true);
+    try {
+      const res = await fetch('/api/staff/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: inputPin }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        playBeepSound('success');
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('thaisrm_staff_authed', 'true');
+        }
+        setIsAuthenticated(true);
+        setPinError(false);
+      } else {
+        playBeepSound('error');
+        setPinError(true);
+        setIsShake(true);
+        setPin('');
+        setTimeout(() => setIsShake(false), 500);
       }
-      setIsAuthenticated(true);
-      setPinError(false);
-    } else {
+    } catch {
       playBeepSound('error');
       setPinError(true);
       setIsShake(true);
       setPin('');
       setTimeout(() => setIsShake(false), 500);
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -112,15 +140,20 @@ export function StaffScannerView() {
     setPin('');
   };
 
+  // Keep camera permission error text in sync with language
+  useEffect(() => {
+    cameraPermErrorRef.current = t.staff.cameraPermissionError;
+  }, [t.staff.cameraPermissionError]);
+
   // Initialize html5-qrcode real camera scanner (strictly Environment / Back Camera)
   useEffect(() => {
-    let html5QrcodeScanner: any = null;
+    let html5QrcodeScanner: Html5Qrcode | null = null;
 
     const startScanner = async () => {
       try {
         setCameraPermissionError(null);
-        const { Html5Qrcode } = await import('html5-qrcode');
-        html5QrcodeScanner = new Html5Qrcode(readerId);
+        const { Html5Qrcode: Html5QrcodeClass } = await import('html5-qrcode');
+        html5QrcodeScanner = new Html5QrcodeClass(readerId);
         scannerRef.current = html5QrcodeScanner;
 
         const config = {
@@ -140,11 +173,9 @@ export function StaffScannerView() {
           },
           undefined
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Camera Scanner Error:", err);
-        setCameraPermissionError(
-          t.staff.cameraPermissionError
-        );
+        setCameraPermissionError(cameraPermErrorRef.current);
       }
     };
 
@@ -156,11 +187,11 @@ export function StaffScannerView() {
       if (scannerRef.current && scannerRef.current.isScanning) {
         scannerRef.current
           .stop()
-          .then(() => scannerRef.current.clear())
-          .catch((err: any) => console.error("Error stopping scanner:", err));
+          .then(() => scannerRef.current?.clear())
+          .catch((err: unknown) => console.error("Error stopping scanner:", err));
       }
     };
-  }, [isCameraOn, isAuthenticated, t.staff.cameraPermissionError]);
+  }, [isCameraOn, isAuthenticated]);
 
   // Process Scanned Code
   const handleProcessScan = (decodedText: string) => {
@@ -311,7 +342,7 @@ export function StaffScannerView() {
           {pinError && (
             <div className="flex items-center gap-1.5 text-rose-600 bg-rose-50 border border-rose-200 px-4 py-1.5 rounded-full text-xs font-extrabold animate-bounce my-1">
               <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{t.staff.passcodeIncorrect} (รหัส: 111111)</span>
+              <span>{t.staff.passcodeIncorrect}</span>
             </div>
           )}
 
@@ -330,7 +361,7 @@ export function StaffScannerView() {
               onClick={() => setPin('')}
               className="h-12 sm:h-13 rounded-2xl bg-slate-100 text-slate-600 font-extrabold text-xs hover:bg-slate-200 active:scale-95 transition flex items-center justify-center cursor-pointer"
             >
-              ล้าง (C)
+              {t.staff.clearButton} (C)
             </button>
             <button
               onClick={() => handleKeyPress('0')}
@@ -346,9 +377,11 @@ export function StaffScannerView() {
             </button>
           </div>
 
-          <p className="text-[11px] text-slate-400 font-medium text-center pb-2">
-            ทดสอบเข้าใช้งานด้วยรหัส <span className="font-bold text-[#0026b3]">111111</span>
-          </p>
+          {isVerifying && (
+            <p className="text-[11px] text-[#0026b3] font-bold text-center pb-2 animate-pulse">
+              {t.staff.verifying}
+            </p>
+          )}
         </div>
       </div>
     );

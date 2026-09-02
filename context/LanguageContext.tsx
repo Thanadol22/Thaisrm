@@ -19,12 +19,16 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const saved = localStorage.getItem('thaisrm_lang') as Language;
     if (saved === 'th' || saved === 'en') {
       setLangState(saved);
+      document.documentElement.lang = saved;
     }
   }, []);
 
   const setLang = (newLang: Language) => {
     setLangState(newLang);
-    localStorage.setItem('thaisrm_lang', newLang);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('thaisrm_lang', newLang);
+      document.documentElement.lang = newLang;
+    }
   };
 
   const toggleLang = () => {

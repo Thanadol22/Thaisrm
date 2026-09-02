@@ -19,9 +19,14 @@ export async function GET(req: NextRequest) {
   try {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const jwtSecret = process.env.JWT_SECRET;
     const redirectUri = (process.env.GOOGLE_REDIRECT_URI && !process.env.GOOGLE_REDIRECT_URI.includes('localhost'))
       ? process.env.GOOGLE_REDIRECT_URI
       : `${origin}/api/auth/google/callback`;
+
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET is not configured in .env');
+    }
 
     const googleClient = new OAuth2Client(clientId, clientSecret, redirectUri);
     const { tokens } = await googleClient.getToken(code);
@@ -45,20 +50,40 @@ export async function GET(req: NextRequest) {
 
     const appToken = jwt.sign(
       { googleId, email, name, picture },
-      process.env.JWT_SECRET || 'secret_key',
+      jwtSecret,
       { expiresIn: '7d' }
     );
 
     const state = searchParams.get('state');
-    const userParam = encodeURIComponent(JSON.stringify({ googleId, email, name, picture }));
+    const redirectUrl = state === 'signup'
+      ? `${origin}/signup?autofill=true`
+      : `${origin}/login/callback`;
 
-    if (state === 'signup') {
-      return NextResponse.redirect(`${origin}/signup?token=${appToken}&user=${userParam}&autofill=true`);
-    }
+    const response = NextResponse.redirect(redirectUrl);
 
-    return NextResponse.redirect(`${origin}/login/callback?token=${appToken}&user=${userParam}`);
-  } catch (err: any) {
+    // Set token as httpOnly cookie (secure, not visible in URL)
+    response.cookies.set('thaisrm_token', appToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
+    });
+
+    // Set user data as a regular cookie (readable by client JS for UI display)
+    response.cookies.set('thaisrm_user', JSON.stringify({ googleId, email, name, picture }), {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+      path: '/',
+    });
+
+    return response;
+  } catch (err: unknown) {
     console.error('Google OAuth Callback Error:', err);
-    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(err.message || 'OAuth Verification Failed')}`);
+    const message = err instanceof Error ? err.message : 'OAuth Verification Failed';
+    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(message)}`);
   }
 }
+

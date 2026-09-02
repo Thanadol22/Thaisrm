@@ -177,6 +177,8 @@ export const translations = {
       processingScan: 'กำลังประมวลผลการเช็คอิน...',
       cameraPermissionError: 'ไม่สามารถเปิดกล้องได้ โปรดตรวจสอบการอนุญาตใช้งานกล้อง (Camera Permission) หรือใช้งานผ่าน HTTPS',
       unidentified: 'ไม่ระบุตัวตน',
+      clearButton: 'ล้าง',
+      verifying: 'กำลังตรวจสอบ...',
     }
   },
 
@@ -356,6 +358,8 @@ export const translations = {
       processingScan: 'Processing Check-In...',
       cameraPermissionError: 'Unable to open camera. Please check camera permissions or access via HTTPS.',
       unidentified: 'Unidentified',
+      clearButton: 'Clear',
+      verifying: 'Verifying...',
     }
   }
 };
