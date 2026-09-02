@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BornIvfLogo } from '@/components/BornIvfLogo';
 import { useLanguage } from '@/context/LanguageContext';
-import { LogIn, UserPlus, CreditCard, QrCode, Menu, X, ChevronRight, Globe } from 'lucide-react';
+import { LogIn, UserPlus, CreditCard, QrCode, Menu, X, ChevronRight } from 'lucide-react';
 
 export function TopNavbar() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
-  const { lang, toggleLang, t } = useLanguage();
+  const { t } = useLanguage();
   const navRef = useRef<HTMLDivElement>(null);
 
   // Close mobile drawer when route changes
@@ -52,7 +52,7 @@ export function TopNavbar() {
         >
           <BornIvfLogo className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 transition-transform active:scale-95" />
           <div className="flex flex-col justify-center shrink-0">
-            <span className="hidden min-[480px]:block text-[9px] min-[540px]:text-[10px] font-bold text-blue-300 leading-none truncate max-w-[130px] min-[540px]:max-w-[200px] min-[1080px]:max-w-none">
+            <span className="block text-[9px] min-[360px]:text-[10px] font-bold text-blue-300 leading-none truncate max-w-[140px] min-[360px]:max-w-[190px] min-[440px]:max-w-[260px] sm:max-w-none">
               {t.associationName}
             </span>
             <span className="text-xs sm:text-sm font-black tracking-wider text-white leading-tight">
@@ -89,19 +89,6 @@ export function TopNavbar() {
               );
             })}
           </nav>
-
-          {/* Language Switcher Button */}
-          <button
-            onClick={toggleLang}
-            className="flex items-center gap-1 bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 border border-slate-700/80 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl text-[10px] sm:text-xs font-bold transition cursor-pointer active:scale-95 shrink-0 shadow-sm"
-            title="Switch Language / สลับภาษา"
-            aria-label="Switch language between Thai and English"
-          >
-            <Globe className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-400 shrink-0" />
-            <span className={lang === 'th' ? 'text-white font-black text-blue-300' : 'text-slate-400 font-medium'}>TH</span>
-            <span className="text-slate-600 font-normal text-[9px]">|</span>
-            <span className={lang === 'en' ? 'text-white font-black text-blue-300' : 'text-slate-400 font-medium'}>EN</span>
-          </button>
 
           {/* Mobile & Tablet Hamburger Button */}
           <button
