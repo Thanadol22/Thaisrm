@@ -25,7 +25,7 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+        throw new Error(data.error || t.login.serverError);
       }
 
       if (data.url) {
@@ -33,7 +33,7 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       console.error('Google Sign In Error:', err);
-      triggerNotification(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+      triggerNotification(err.message || t.login.serverError);
     }
   };
 

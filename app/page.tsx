@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { TopNavbar } from '@/components/TopNavbar';
 import { LoginView } from '@/components/views/LoginView';
 import { ToastNotification } from '@/components/ToastNotification';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function Home() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [notification, setNotification] = useState<string | null>(null);
 
   const triggerNotification = (msg: string) => {
@@ -23,7 +25,7 @@ export default function Home() {
         <TopNavbar />
         <LoginView
           onNavigateToSignup={() => router.push('/signup')}
-          onGoogleSignIn={() => triggerNotification("เข้าสู่ระบบด้วย Google สำเร็จ")}
+          onGoogleSignIn={() => triggerNotification(t.login.googleSuccessToast)}
           onNavigateToStaffScan={() => router.push('/staff/scan')}
         />
       </main>

@@ -35,15 +35,15 @@ function CallbackContent() {
         setStatus('success');
       } catch (err) {
         setStatus('error');
-        setErrorMessage('ไม่สามารถอ่านข้อมูลผู้ใช้งานได้');
+        setErrorMessage(t.login.cannotReadUser);
         setTimeout(() => router.push('/login'), 4000);
       }
     } else {
       setStatus('error');
-      setErrorMessage('ไม่พบ Token ยืนยันตัวตน');
+      setErrorMessage(t.login.missingToken);
       setTimeout(() => router.push('/login'), 4000);
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, t.login.cannotReadUser, t.login.missingToken]);
 
   const handleConfirmSuccess = () => {
     router.push('/login');
@@ -54,8 +54,8 @@ function CallbackContent() {
       {status === 'loading' && (
         <>
           <Loader2 className="w-12 h-12 text-[#0026b3] animate-spin mb-2" />
-          <h2 className="text-xl font-bold text-slate-800">กำลังยืนยันตัวตน...</h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">โปรดรอสักครู่ ระบบกำลังประมวลผลการเข้าสู่ระบบ</p>
+          <h2 className="text-xl font-bold text-slate-800">{t.login.verifyingAuth}</h2>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">{t.login.verifyingSubtitle}</p>
         </>
       )}
 
@@ -80,11 +80,11 @@ function CallbackContent() {
           <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-3.5 space-y-2.5 text-left text-xs text-slate-700">
             <div className="flex items-center gap-2.5 text-[#0026b3] font-bold">
               <Mail className="w-4 h-4 shrink-0 text-[#0026b3]" />
-              <span>ส่งข้อมูลไปยัง Email เรียบร้อยแล้ว</span>
+              <span>{t.successModal.emailSent}</span>
             </div>
             <div className="flex items-center gap-2.5 text-slate-600 font-medium">
               <QrCode className="w-4 h-4 shrink-0 text-emerald-600" />
-              <span>ใช้ QR Code ใน Email สแกนผ่านประตูเข้างานประชุม TSRM</span>
+              <span>{t.successModal.qrInstruction}</span>
             </div>
           </div>
 
@@ -102,9 +102,9 @@ function CallbackContent() {
           <div className="w-14 h-14 bg-rose-50 rounded-full flex items-center justify-center mb-2">
             <AlertCircle className="w-8 h-8 text-rose-600" />
           </div>
-          <h2 className="text-xl font-bold text-slate-800">เข้าสู่ระบบไม่สำเร็จ</h2>
+          <h2 className="text-xl font-bold text-slate-800">{t.login.loginFailed}</h2>
           <p className="text-xs sm:text-sm text-rose-500 mt-1">{errorMessage}</p>
-          <p className="text-xs text-slate-400 mt-3">กำลังกลับสู่หน้าเข้าสู่ระบบ...</p>
+          <p className="text-xs text-slate-400 mt-3">{t.login.redirecting}</p>
         </>
       )}
     </div>
@@ -117,7 +117,7 @@ export default function LoginCallbackPage() {
       <Suspense fallback={
         <div className="bg-white p-8 rounded-3xl shadow-xl max-w-sm w-full text-center flex flex-col items-center">
           <Loader2 className="w-12 h-12 text-[#0026b3] animate-spin mb-4" />
-          <h2 className="text-xl font-bold text-slate-800">กำลังโหลด...</h2>
+          <h2 className="text-xl font-bold text-slate-800">Loading...</h2>
         </div>
       }>
         <CallbackContent />

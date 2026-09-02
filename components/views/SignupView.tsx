@@ -477,7 +477,7 @@ export function SignupView({ onNavigateToLogin, onSubmitSignup, onGoogleSignUp }
                       onClick={() => removeEducationRow(row.id)}
                       disabled={educationList.length <= 1}
                       className="text-slate-400 hover:text-red-500 disabled:opacity-30 disabled:hover:text-slate-400 p-1.5 rounded-lg transition shrink-0"
-                      title="ลบแถว"
+                      title={t.signup.deleteRowTitle}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -533,7 +533,7 @@ export function SignupView({ onNavigateToLogin, onSubmitSignup, onGoogleSignUp }
         <div className="relative flex items-center justify-center my-1.5 sm:my-2">
           <div className="border-t border-slate-200 w-full" />
           <span className="bg-[#f6f8fc] px-3 text-xs font-medium text-slate-400 uppercase absolute">
-            หรือ
+            {t.signup.orDivider}
           </span>
         </div>
 
@@ -543,18 +543,18 @@ export function SignupView({ onNavigateToLogin, onSubmitSignup, onGoogleSignUp }
           className="w-full bg-white hover:bg-slate-50 text-slate-800 font-semibold py-3 sm:py-3.5 px-4 sm:px-5 rounded-2xl border border-slate-200 shadow-2xs hover:shadow transition flex items-center justify-center gap-2.5 sm:gap-3 cursor-pointer active:scale-[0.99]"
         >
           <GoogleIcon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-          <span className="text-xs sm:text-sm font-semibold">Sign up with Google</span>
+          <span className="text-xs sm:text-sm font-semibold">{t.signup.googleSignUpButton}</span>
         </button>
 
         {/* Switch to Login */}
         <div className="text-center pt-2 pb-4">
           <p className="text-xs text-slate-500">
-            มีบัญชีสมาชิกอยู่แล้ว?{' '}
+            {t.signup.alreadyHaveAccount}{' '}
             <button
               onClick={onNavigateToLogin}
               className="text-[#0026b3] font-bold hover:underline cursor-pointer ml-1"
             >
-              เข้าสู่ระบบ (Log in)
+              {t.signup.loginLink}
             </button>
           </p>
         </div>

@@ -22,11 +22,13 @@ export const translations = {
       loginTitle: 'เข้าสู่ระบบสำเร็จ',
       message: 'ระบบจะส่ง QR Code ให้ใน email เพื่อใช้เข้าร่วมงาน',
       emailNotice: 'โปรดตรวจสอบกล่องข้อความในอีเมลของท่านเพื่อรับบัตรเข้าร่วมงาน',
+      emailSent: 'ส่งข้อมูลไปยัง Email เรียบร้อยแล้ว',
+      qrInstruction: 'ใช้ QR Code ใน Email สแกนผ่านประตูเข้างานประชุม TSRM',
       confirmButton: 'ตกลง',
       proceedToPaymentButton: 'ไปยังหน้าชำระเงิน',
     },
 
-    // Login View
+    // Login View & Callback
     login: {
       welcomeTitle: 'เข้าสู่ระบบสมาชิก',
       welcomeSubtitle: 'เข้าสู่ระบบเพื่อจัดการข้อมูลสมาชิกและการเข้าร่วมงานสมาคมฯ',
@@ -34,6 +36,15 @@ export const translations = {
       googleSignInButton: 'เข้าสู่ระบบด้วย Google',
       noAccount: 'ยังไม่มีบัญชีสมาชิก?',
       signUpLink: 'สมัครสมาชิก',
+      googleSuccessToast: 'เข้าสู่ระบบด้วย Google สำเร็จ',
+      serverError: 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์',
+      verifyingAuth: 'กำลังยืนยันตัวตน...',
+      verifyingSubtitle: 'โปรดรอสักครู่ ระบบกำลังประมวลผลการเข้าสู่ระบบ',
+      cannotReadUser: 'ไม่สามารถอ่านข้อมูลผู้ใช้งานได้',
+      missingToken: 'ไม่พบ Token ยืนยันตัวตน',
+      loginFailed: 'เข้าสู่ระบบไม่สำเร็จ',
+      redirecting: 'กำลังกลับสู่หน้าเข้าสู่ระบบ...',
+      loading: 'กำลังโหลด...',
     },
 
     // Signup View (ใบสมัคร TSRM Member)
@@ -74,6 +85,7 @@ export const translations = {
       yearHeader: 'ปีที่จบการศึกษา',
       yearPlaceholder: 'เช่น 2565',
       actionHeader: 'จัดการ',
+      deleteRowTitle: 'ลบแถว',
       passwordTitle: 'สร้างรหัสผ่านเข้าสู่ระบบ',
       passwordLabel: 'รหัสผ่าน',
       passwordPlaceholder: 'ความยาวอย่างน้อย 8 ตัวอักษร',
@@ -81,7 +93,7 @@ export const translations = {
       orDivider: 'หรือ',
       googleSignUpButton: 'สมัครสมาชิกด้วย Google',
       alreadyHaveAccount: 'มีบัญชีสมาชิกอยู่แล้ว?',
-      loginLink: 'เข้าสู่ระบบ',
+      loginLink: 'เข้าสู่ระบบ (Log in)',
     },
 
     // Payment View
@@ -100,6 +112,24 @@ export const translations = {
       securityBadge: 'ระบบชำระเงินปลอดภัย ด้วยการเข้ารหัส 256-BIT',
       uploadButton: 'อัปโหลดสลิปการโอนเงิน',
       termsDisclaimer: 'การชำระเงินแสดงว่าท่านยอมรับข้อตกลงและเงื่อนไขของสมาคม TSRM',
+      copyToast: 'คัดลอกเลขบัญชี 020-8-16398-1 เรียบร้อยแล้ว!',
+      uploadSuccessToast: 'อัปโหลดสลิปสำเร็จ! ระบบกำลังยืนยันยอดชำระเงินของคุณ',
+    },
+
+    // Slip Upload Modal
+    slipModal: {
+      modalTitle: 'แนบหลักฐานการโอนเงิน',
+      transferTo: 'โอนเงินเข้าบัญชี',
+      kasikornBank: '(ธนาคารกสิกรไทย)',
+      amountDue: 'จำนวน 1,000 บาท',
+      clickToChange: 'คลิกเพื่อเปลี่ยนรูปสลิป',
+      clickToSelect: 'คลิกที่นี่เพื่อเลือกรูปสลิป',
+      supportedFormats: 'รองรับ JPG, PNG, WEBP (สูงสุด 10MB)',
+      selectFileAlert: 'กรุณาเลือกไฟล์สลิปการโอนเงินก่อนกดอัปโหลด',
+      successTitle: 'อัปโหลดสลิปสำเร็จ!',
+      successSubtitle: 'ระบบได้บันทึกหลักฐานการชำระเงินเรียบร้อยแล้ว ทีมงานกำลังตรวจสอบสิทธิ์ของคุณ',
+      cancelButton: 'ยกเลิก',
+      confirmButton: 'ยืนยันสลิป',
     },
 
     // Staff Scanner View
@@ -129,11 +159,13 @@ export const translations = {
       turnOnCamera: 'เปิดกล้องสแกน',
       retryCamera: 'ลองเปิดใหม่อีกครั้ง',
       processingScan: 'กำลังประมวลผลการเช็คอิน...',
+      cameraPermissionError: 'ไม่สามารถเปิดกล้องได้ โปรดตรวจสอบการอนุญาตใช้งานกล้อง (Camera Permission) หรือใช้งานผ่าน HTTPS',
+      unidentified: 'ไม่ระบุตัวตน',
     }
   },
 
   en: {
-    // Header Branding
+    // Header Branding (Note: associationName remains Thai as specified: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย')
     associationName: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
     brandName: 'THAISRM',
     subtitle: 'Meeting Summit 2026',
@@ -153,11 +185,13 @@ export const translations = {
       loginTitle: 'Login Successful',
       message: 'The system will send a QR Code to your email for event admission.',
       emailNotice: 'Please check your email inbox to receive your event pass.',
+      emailSent: 'Information sent to email successfully',
+      qrInstruction: 'Use QR Code in Email to scan through TSRM conference entrance',
       confirmButton: 'OK',
       proceedToPaymentButton: 'Proceed to Payment',
     },
 
-    // Login View
+    // Login View & Callback
     login: {
       welcomeTitle: 'Welcome Back',
       welcomeSubtitle: 'Sign in to access your member account and event features.',
@@ -165,6 +199,15 @@ export const translations = {
       googleSignInButton: 'Sign in with Google',
       noAccount: "Don't have an account?",
       signUpLink: 'Sign Up',
+      googleSuccessToast: 'Signed in with Google successfully',
+      serverError: 'Server connection error occurred',
+      verifyingAuth: 'Authenticating...',
+      verifyingSubtitle: 'Please wait, processing sign-in authentication',
+      cannotReadUser: 'Unable to parse user data',
+      missingToken: 'Authentication token not found',
+      loginFailed: 'Sign-in Failed',
+      redirecting: 'Redirecting to sign-in page...',
+      loading: 'Loading...',
     },
 
     // Signup View (ใบสมัคร TSRM Member)
@@ -205,6 +248,7 @@ export const translations = {
       yearHeader: 'Graduation Year',
       yearPlaceholder: 'e.g. 2024',
       actionHeader: 'Action',
+      deleteRowTitle: 'Delete row',
       passwordTitle: 'Account Password',
       passwordLabel: 'Password',
       passwordPlaceholder: 'Minimum 8 characters',
@@ -231,6 +275,24 @@ export const translations = {
       securityBadge: 'SECURE 256-BIT ENCRYPTED CHECKOUT',
       uploadButton: 'Upload Payment Slip',
       termsDisclaimer: 'By making payment you agree to THAISRM terms and conditions.',
+      copyToast: 'Bank account number 020-8-16398-1 copied successfully!',
+      uploadSuccessToast: 'Slip uploaded successfully! Verifying your payment status.',
+    },
+
+    // Slip Upload Modal
+    slipModal: {
+      modalTitle: 'Attach Payment Slip',
+      transferTo: 'Transfer payment to account',
+      kasikornBank: '(Kasikornbank)',
+      amountDue: 'Amount: 1,000 THB',
+      clickToChange: 'Click to change slip image',
+      clickToSelect: 'Click here to select slip image',
+      supportedFormats: 'Supports JPG, PNG, WEBP (Max 10MB)',
+      selectFileAlert: 'Please select a payment slip image before uploading',
+      successTitle: 'Slip Uploaded Successfully!',
+      successSubtitle: 'Payment proof saved. Our team is verifying your access.',
+      cancelButton: 'Cancel',
+      confirmButton: 'Confirm Slip',
     },
 
     // Staff Scanner View
@@ -260,6 +322,8 @@ export const translations = {
       turnOnCamera: 'Turn On Camera',
       retryCamera: 'Retry Opening Camera',
       processingScan: 'Processing Check-In...',
+      cameraPermissionError: 'Unable to open camera. Please check camera permissions or access via HTTPS.',
+      unidentified: 'Unidentified',
     }
   }
 };

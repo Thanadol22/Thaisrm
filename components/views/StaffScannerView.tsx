@@ -87,7 +87,7 @@ export function StaffScannerView() {
       } catch (err: any) {
         console.error("Camera Scanner Error:", err);
         setCameraPermissionError(
-          "ไม่สามารถเปิดกล้องได้ โปรดตรวจสอบการอนุญาตใช้งานกล้อง (Camera Permission) หรือใช้งานผ่าน HTTPS"
+          t.staff.cameraPermissionError
         );
       }
     };
@@ -104,7 +104,7 @@ export function StaffScannerView() {
           .catch((err: any) => console.error("Error stopping scanner:", err));
       }
     };
-  }, [isCameraOn]);
+  }, [isCameraOn, t.staff.cameraPermissionError]);
 
   // Process Scanned Code
   const handleProcessScan = (decodedText: string) => {
@@ -118,14 +118,14 @@ export function StaffScannerView() {
         name: 'สมชาย ใจดี',
         ticketType: 'THAISRM Premium Pass',
         email: 'somchai@example.com',
-        checkInTime: '10:15 น.',
+        checkInTime: '10:15',
         status: 'duplicate'
       });
     } else if (inputCode.includes('ERR')) {
       playBeepSound('error');
       setLastScanned({
         id: inputCode,
-        name: 'ไม่ระบุตัวตน',
+        name: t.staff.unidentified,
         ticketType: 'N/A',
         email: 'N/A',
         checkInTime: 'N/A',
@@ -138,7 +138,7 @@ export function StaffScannerView() {
         name: 'ภัทรพล วงศ์สวัสดิ์',
         ticketType: 'THAISRM Premium Pass',
         email: 'phattarapol@example.com',
-        checkInTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+        checkInTime: new Date().toLocaleTimeString(lang === 'th' ? 'th-TH' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
         status: 'success'
       });
       setStats(prev => ({ ...prev, checkedIn: Math.min(prev.total, prev.checkedIn + 1) }));

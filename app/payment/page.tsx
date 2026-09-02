@@ -6,9 +6,11 @@ import { TopNavbar } from '@/components/TopNavbar';
 import { PaymentView } from '@/components/views/PaymentView';
 import { SlipUploadModal } from '@/components/SlipUploadModal';
 import { ToastNotification } from '@/components/ToastNotification';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function PaymentPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [copiedBank, setCopiedBank] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
@@ -23,7 +25,7 @@ export default function PaymentPage() {
   const handleCopyBank = () => {
     navigator.clipboard.writeText(bankAccountNumber);
     setCopiedBank(true);
-    triggerNotification("คัดลอกเลขบัญชี 020-8-16398-1 เรียบร้อยแล้ว!");
+    triggerNotification(t.payment.copyToast);
     setTimeout(() => setCopiedBank(false), 2500);
   };
 
@@ -45,7 +47,7 @@ export default function PaymentPage() {
       <SlipUploadModal
         isOpen={uploadModalOpen}
         onClose={() => setUploadModalOpen(false)}
-        onSuccess={() => triggerNotification("อัปโหลดสลิปสำเร็จ! ระบบกำลังยืนยันยอดชำระเงินของคุณ")}
+        onSuccess={() => triggerNotification(t.payment.uploadSuccessToast)}
         bankAccount={bankAccountNumber}
       />
     </div>

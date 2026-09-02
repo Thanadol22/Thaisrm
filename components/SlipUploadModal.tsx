@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { Upload, CheckCircle2, X } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface SlipUploadModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface SlipUploadModalProps {
 }
 
 export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount }: SlipUploadModalProps) {
+  const { t } = useLanguage();
   const [uploadedSlip, setUploadedSlip] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -30,7 +32,7 @@ export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount }: Sli
 
   const handleConfirmUpload = () => {
     if (!uploadedSlip) {
-      alert("กรุณาเลือกไฟล์สลิปการโอนเงินก่อนกดอัปโหลด");
+      alert(t.slipModal.selectFileAlert);
       return;
     }
     setUploadSuccess(true);
@@ -57,17 +59,17 @@ export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount }: Sli
             <div className="w-16 h-16 bg-[#4ade80]/20 text-[#00a950] rounded-full flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-10 h-10" />
             </div>
-            <h3 className="text-2xl font-black text-slate-900">อัปโหลดสลิปสำเร็จ!</h3>
+            <h3 className="text-2xl font-black text-slate-900">{t.slipModal.successTitle}</h3>
             <p className="text-sm text-slate-600">
-              ระบบได้บันทึกหลักฐานการชำระเงินเรียบร้อยแล้ว ทีมงานกำลังตรวจสอบสิทธิ์ของคุณ
+              {t.slipModal.successSubtitle}
             </p>
           </div>
         ) : (
           <div className="space-y-5">
             <div>
-              <h3 className="text-xl font-black text-slate-900">แนบหลักฐานการโอนเงิน</h3>
+              <h3 className="text-xl font-black text-slate-900">{t.slipModal.modalTitle}</h3>
               <p className="text-xs text-slate-500 mt-1">
-                โอนเงินเข้าบัญชี <span className="font-bold text-[#0026b3]">{bankAccount}</span> <span className="font-bold text-[#00a950]">(ธนาคารกสิกรไทย)</span> จำนวน 1,000 บาท
+                {t.slipModal.transferTo} <span className="font-bold text-[#0026b3]">{bankAccount}</span> <span className="font-bold text-[#00a950]">{t.slipModal.kasikornBank}</span> {t.slipModal.amountDue}
               </p>
             </div>
 
@@ -91,15 +93,15 @@ export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount }: Sli
                     alt="Slip Preview"
                     className="max-h-40 max-w-full rounded-xl object-contain shadow-md mx-auto"
                   />
-                  <span className="text-xs text-[#0026b3] font-bold block">คลิกเพื่อเปลี่ยนรูปสลิป</span>
+                  <span className="text-xs text-[#0026b3] font-bold block">{t.slipModal.clickToChange}</span>
                 </div>
               ) : (
                 <>
                   <div className="w-12 h-12 rounded-2xl bg-blue-100 text-[#0026b3] flex items-center justify-center mb-3">
                     <Upload className="w-6 h-6" />
                   </div>
-                  <p className="text-sm font-bold text-slate-800">คลิกที่นี่เพื่อเลือกรูปสลิป</p>
-                  <p className="text-xs text-slate-400 mt-1">รองรับ JPG, PNG, WEBP (สูงสุด 10MB)</p>
+                  <p className="text-sm font-bold text-slate-800">{t.slipModal.clickToSelect}</p>
+                  <p className="text-xs text-slate-400 mt-1">{t.slipModal.supportedFormats}</p>
                 </>
               )}
             </div>
@@ -109,13 +111,13 @@ export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount }: Sli
                 onClick={onClose}
                 className="w-1/2 py-3.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition"
               >
-                ยกเลิก
+                {t.slipModal.cancelButton}
               </button>
               <button
                 onClick={handleConfirmUpload}
                 className="w-1/2 py-3.5 rounded-xl bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] font-bold text-sm shadow transition"
               >
-                ยืนยันสลิป
+                {t.slipModal.confirmButton}
               </button>
             </div>
           </div>

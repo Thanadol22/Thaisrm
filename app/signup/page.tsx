@@ -6,9 +6,11 @@ import { TopNavbar } from '@/components/TopNavbar';
 import { SignupView } from '@/components/views/SignupView';
 import { ToastNotification } from '@/components/ToastNotification';
 import { RegistrationSuccessModal } from '@/components/RegistrationSuccessModal';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function SignupPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [notification, setNotification] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
@@ -27,7 +29,7 @@ export default function SignupPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+        throw new Error(data.error || t.login.serverError);
       }
 
       if (data.url) {
@@ -35,7 +37,7 @@ export default function SignupPage() {
       }
     } catch (err: any) {
       console.error('Google Sign Up Error:', err);
-      triggerNotification(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+      triggerNotification(err.message || t.login.serverError);
     }
   };
 

@@ -54,11 +54,11 @@ export function RegistrationSuccessModal({
         <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-3.5 space-y-2.5 text-left text-xs text-slate-700">
           <div className="flex items-center gap-2.5 text-[#0026b3] font-bold">
             <Mail className="w-4 h-4 shrink-0 text-[#0026b3]" />
-            <span>ส่งข้อมูลไปยัง Email เรียบร้อยแล้ว</span>
+            <span>{t.successModal.emailSent}</span>
           </div>
           <div className="flex items-center gap-2.5 text-slate-600 font-medium">
             <QrCode className="w-4 h-4 shrink-0 text-emerald-600" />
-            <span>ใช้ QR Code ใน Email สแกนผ่านประตูเข้างานประชุม TSRM</span>
+            <span>{t.successModal.qrInstruction}</span>
           </div>
         </div>
 
