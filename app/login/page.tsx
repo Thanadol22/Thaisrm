@@ -22,7 +22,14 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     try {
       const response = await fetch('/api/auth/google/url');
-      const data = await response.json();
+      const text = await response.text();
+      let data: any = {};
+
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error('กรุณาตรวจสอบว่าสตาร์ทเซิร์ฟเวอร์ Express (npm run server) เรียบร้อยแล้ว');
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
