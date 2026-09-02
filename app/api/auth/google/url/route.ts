@@ -1,31 +1,35 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { OAuth2Client } from 'google-auth-library';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const res = await fetch('http://localhost:5000/api/auth/google/url', { cache: 'no-store' });
-    const text = await res.text();
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const origin = req.nextUrl.origin;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${origin}/api/auth/google/callback`;
 
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
+    if (!clientId || clientId === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
       return NextResponse.json(
-        { error: 'เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง กรุณาตรวจสอบว่าเซิร์ฟเวอร์ Express (http://localhost:5000) สตาร์ทเรียบร้อยแล้ว' },
-        { status: 500 }
+        { error: 'ยังไม่ได้ตั้งค่า GOOGLE_CLIENT_ID ใน Environment Variables' },
+        { status: 400 }
       );
     }
 
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: data.error || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์' },
-        { status: res.status }
-      );
-    }
+    const googleClient = new OAuth2Client(clientId, clientSecret, redirectUri);
+    const url = googleClient.generateAuthUrl({
+      access_type: 'offline',
+      scope: [
+        'https://www.googleapis.com/auth/userinfo.profile',
+        'https://www.googleapis.com/auth/userinfo.email',
+      ],
+      prompt: 'select_account',
+    });
 
-    return NextResponse.json(data);
+    return NextResponse.json({ url });
   } catch (err: any) {
+    console.error('Google Auth URL Error:', err);
     return NextResponse.json(
-      { error: err.message || 'ไม่สามารถเชื่อมต่อ Express Backend (http://localhost:5000) ได้' },
+      { error: err.message || 'เกิดข้อผิดพลาดในการสร้าง Google OAuth URL' },
       { status: 500 }
     );
   }
