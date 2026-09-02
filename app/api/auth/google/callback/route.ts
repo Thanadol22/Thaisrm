@@ -55,9 +55,10 @@ export async function GET(req: NextRequest) {
     );
 
     const state = searchParams.get('state');
+    const userParam = encodeURIComponent(JSON.stringify({ googleId, email, name, picture }));
     const redirectUrl = state === 'signup'
-      ? `${origin}/signup?autofill=true`
-      : `${origin}/login/callback`;
+      ? `${origin}/signup?user=${userParam}&token=${appToken}&autofill=true`
+      : `${origin}/login/callback?user=${userParam}&token=${appToken}`;
 
     const response = NextResponse.redirect(redirectUrl);
 

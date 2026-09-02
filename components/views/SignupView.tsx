@@ -36,6 +36,7 @@ interface SignupViewProps {
   onNavigateToLogin: () => void;
   onSubmitSignup: () => void;
   onGoogleSignUp: () => void;
+  onClearForm?: () => void;
   initialUserData?: { name?: string; email?: string; picture?: string } | null;
 }
 
@@ -50,6 +51,7 @@ export function SignupView({
   onNavigateToLogin, 
   onSubmitSignup, 
   onGoogleSignUp,
+  onClearForm,
   initialUserData
 }: SignupViewProps) {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
@@ -142,6 +144,24 @@ export function SignupView({
     setPhotoPreview(null);
     setConsentChecked(false);
     setCurrentStep(1);
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('user_data');
+        localStorage.removeItem('auth_token');
+        document.cookie = 'thaisrm_user=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+        document.cookie = 'thaisrm_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+        if (window.location.search) {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      } catch (e) {
+        console.error('Failed to clean storage in clearForm:', e);
+      }
+    }
+
+    if (onClearForm) {
+      onClearForm();
+    }
   };
 
   const positionOptions = [

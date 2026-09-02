@@ -45,6 +45,8 @@ app.get('/api/auth/google/url', (req, res) => {
     });
   }
 
+  const from = req.query.from || 'login';
+
   const scopes = [
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/userinfo.email'
@@ -53,7 +55,8 @@ app.get('/api/auth/google/url', (req, res) => {
   const url = googleClient.generateAuthUrl({
     access_type: 'offline',
     scope: scopes,
-    prompt: 'select_account'
+    prompt: 'select_account',
+    state: from
   });
 
   res.json({ url });
@@ -61,7 +64,7 @@ app.get('/api/auth/google/url', (req, res) => {
 
 // Route สำหรับ Callback ที่ Google จะส่ง code กลับมาหลังจากล็อกอินสำเร็จ
 app.get('/api/auth/google/callback', async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query;
 
   if (!code) {
     return res.redirect(`${FRONTEND_URL}/login?error=no_code`);
@@ -93,6 +96,9 @@ app.get('/api/auth/google/callback', async (req, res) => {
 
     // 4. Redirect กลับไปหน้า Frontend พร้อม Token และข้อมูล User
     const userParam = encodeURIComponent(JSON.stringify({ googleId, email, name, picture }));
+    if (state === 'signup') {
+      return res.redirect(`${FRONTEND_URL}/signup?user=${userParam}&token=${appToken}&autofill=true`);
+    }
     res.redirect(`${FRONTEND_URL}/login/callback?token=${appToken}&user=${userParam}`);
   } catch (error) {
     console.error('Google Callback Error:', error);

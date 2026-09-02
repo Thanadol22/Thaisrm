@@ -7,19 +7,36 @@ import { ToastNotification } from '@/components/ToastNotification';
 import { RegistrationSuccessModal } from '@/components/RegistrationSuccessModal';
 import { useLanguage } from '@/context/LanguageContext';
 
+function clearAllUserData() {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem('user_data');
+      localStorage.removeItem('auth_token');
+      document.cookie = 'thaisrm_user=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+      document.cookie = 'thaisrm_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+      if (window.location.search) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch (e) {
+      console.error('Failed to clear user data storage:', e);
+    }
+  }
+}
+
 function SignupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLanguage();
   const [notification, setNotification] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [initialUserData, setInitialUserData] = useState<{ name?: string; email?: string; picture?: string } | null>(null);
 
   const triggerNotification = (msg: string) => {
     setNotification(msg);
     setTimeout(() => setNotification(null), 4000);
   };
 
-  const initialUserData = useMemo(() => {
+  useEffect(() => {
     const userJson = searchParams.get('user');
     const token = searchParams.get('token');
     if (userJson) {
@@ -28,30 +45,23 @@ function SignupContent() {
         if (typeof window !== 'undefined') {
           localStorage.setItem('user_data', JSON.stringify(userData));
           if (token) localStorage.setItem('auth_token', token);
+          window.history.replaceState({}, '', window.location.pathname);
         }
-        return userData;
+        setInitialUserData(userData);
+        triggerNotification(t.signup.googleAutofillSuccessToast);
       } catch (e) {
         console.error('Failed to parse user from query params:', e);
       }
     }
-    return null;
-  }, [searchParams]);
+  }, [searchParams, t.signup.googleAutofillSuccessToast]);
 
-  useEffect(() => {
-    if (initialUserData) {
-      triggerNotification(t.signup.googleAutofillSuccessToast);
-    }
-    return () => {
-      try {
-        localStorage.removeItem('user_data');
-      } catch (e) { }
-    };
-  }, [initialUserData, t.signup.googleAutofillSuccessToast]);
+  const handleClearForm = () => {
+    clearAllUserData();
+    setInitialUserData(null);
+  };
 
   const handleNavigateToLogin = () => {
-    try {
-      localStorage.removeItem('user_data');
-    } catch (e) { }
+    handleClearForm();
     router.push('/login');
   };
 
@@ -90,6 +100,7 @@ function SignupContent() {
           onNavigateToLogin={handleNavigateToLogin}
           onSubmitSignup={handleSignupSubmit}
           onGoogleSignUp={handleGoogleSignUp}
+          onClearForm={handleClearForm}
           initialUserData={initialUserData}
         />
       </main>

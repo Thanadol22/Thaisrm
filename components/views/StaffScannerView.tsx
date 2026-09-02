@@ -20,6 +20,7 @@ export function StaffScannerView() {
   
   // Staff Passcode Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
   const [isShake, setIsShake] = useState(false);
@@ -35,18 +36,15 @@ export function StaffScannerView() {
   const readerId = "html5-qr-reader";
   const cameraPermErrorRef = useRef<string>('');
 
-  // Ensure staff session is always cleared on unmount (when navigating to any other page)
+  // Check saved staff session on mount to keep staff logged in on refresh
   useEffect(() => {
-    // Clear any lingering session on mount to ensure fresh PIN entry
     if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('thaisrm_staff_authed');
-    }
-
-    return () => {
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('thaisrm_staff_authed');
+      const isAuthed = localStorage.getItem('thaisrm_staff_authed') === 'true' || sessionStorage.getItem('thaisrm_staff_authed') === 'true';
+      if (isAuthed) {
+        setIsAuthenticated(true);
       }
-    };
+    }
+    setIsAuthChecking(false);
   }, []);
 
   // Web Audio API Beep Generator for Scanner Feedback
@@ -95,6 +93,7 @@ export function StaffScannerView() {
       if (data.success) {
         playBeepSound('success');
         if (typeof window !== 'undefined') {
+          localStorage.setItem('thaisrm_staff_authed', 'true');
           sessionStorage.setItem('thaisrm_staff_authed', 'true');
         }
         setIsAuthenticated(true);
@@ -134,10 +133,21 @@ export function StaffScannerView() {
 
   const handleLockSystem = () => {
     if (typeof window !== 'undefined') {
+      localStorage.removeItem('thaisrm_staff_authed');
       sessionStorage.removeItem('thaisrm_staff_authed');
     }
     setIsAuthenticated(false);
     setPin('');
+  };
+
+  const handleBackToLogin = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('thaisrm_staff_authed');
+      sessionStorage.removeItem('thaisrm_staff_authed');
+    }
+    setIsAuthenticated(false);
+    setPin('');
+    router.push('/login');
   };
 
   // Keep camera permission error text in sync with language
@@ -244,6 +254,15 @@ export function StaffScannerView() {
     setManualCode('');
   };
 
+  // Avoid UI flicker while checking session/local storage
+  if (isAuthChecking) {
+    return (
+      <div className="flex-1 flex items-center justify-center min-h-[640px]">
+        <div className="w-8 h-8 border-4 border-[#0026b3] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   // Render PIN Passcode Entry Guard Screen if not authenticated
   if (!isAuthenticated) {
     return (
@@ -256,7 +275,7 @@ export function StaffScannerView() {
           <div className="relative z-10 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <div 
-                onClick={() => router.push('/login')}
+                onClick={handleBackToLogin}
                 className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-90 transition"
                 title="กลับสู่หน้าเข้าสู่ระบบ / Back to Login"
               >
@@ -399,7 +418,7 @@ export function StaffScannerView() {
         <div className="relative z-10 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div 
-              onClick={() => router.push('/login')}
+              onClick={handleBackToLogin}
               className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-90 transition"
               title="กลับสู่หน้าเข้าสู่ระบบ / Back to Login"
             >
