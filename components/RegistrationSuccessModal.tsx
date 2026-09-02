@@ -8,12 +8,14 @@ interface RegistrationSuccessModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProceed?: () => void;
+  title?: string;
 }
 
 export function RegistrationSuccessModal({
   isOpen,
   onClose,
   onProceed,
+  title,
 }: RegistrationSuccessModalProps) {
   const { t } = useLanguage();
 
@@ -41,7 +43,7 @@ export function RegistrationSuccessModal({
         {/* Title & Main Notice */}
         <div className="space-y-2">
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            {t.successModal.title}
+            {title || t.successModal.title}
           </h2>
           <p className="text-xs sm:text-sm font-extrabold text-[#0026b3] leading-relaxed px-2">
             {t.successModal.message}

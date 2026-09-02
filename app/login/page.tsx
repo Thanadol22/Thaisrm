@@ -6,9 +6,11 @@ import { TopNavbar } from '@/components/TopNavbar';
 import { LoginView } from '@/components/views/LoginView';
 import { ToastNotification } from '@/components/ToastNotification';
 import { RegistrationSuccessModal } from '@/components/RegistrationSuccessModal';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [notification, setNotification] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
@@ -19,7 +21,8 @@ export default function LoginPage() {
 
   const handleGoogleSignIn = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/auth/google/url');
+      const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+      const response = await fetch(`http://${host}:5000/api/auth/google/url`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -27,7 +30,7 @@ export default function LoginPage() {
       }
 
       if (data.url) {
-        // Redirect ผู้ใช้ไปที่ Google Consent Screen
+        // Redirect ผู้ใช้ไปที่ Google Consent Screen (Prompt Select Account)
         window.location.href = data.url;
       } else {
         setShowSuccessModal(true);
@@ -44,7 +47,7 @@ export default function LoginPage() {
       <RegistrationSuccessModal
         isOpen={showSuccessModal}
         onClose={() => setShowSuccessModal(false)}
-        onProceed={() => router.push('/payment')}
+        title={t.successModal.loginTitle}
       />
 
       <main className="w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl min-h-screen bg-[#f6f8fc] shadow-2xl flex flex-col justify-between relative border-x border-slate-200/80 overflow-hidden transition-all duration-300">

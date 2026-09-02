@@ -10,7 +10,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Middleware
 app.use(cors({
-  origin: FRONTEND_URL,
+  origin: true,
   credentials: true
 }));
 app.use(express.json());
@@ -50,10 +50,14 @@ app.get('/api/auth/google/url', (req, res) => {
     'https://www.googleapis.com/auth/userinfo.email'
   ];
 
+  // Dynamic origin for mobile devices on local Wi-Fi network
+  const origin = req.headers.origin || FRONTEND_URL;
+
   const url = googleClient.generateAuthUrl({
     access_type: 'offline',
     scope: scopes,
-    prompt: 'consent'
+    prompt: 'select_account',
+    state: origin
   });
 
   res.json({ url });
@@ -61,10 +65,11 @@ app.get('/api/auth/google/url', (req, res) => {
 
 // Route สำหรับ Callback ที่ Google จะส่ง code กลับมาหลังจากล็อกอินสำเร็จ
 app.get('/api/auth/google/callback', async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query;
+  const redirectOrigin = state || FRONTEND_URL;
 
   if (!code) {
-    return res.redirect(`${FRONTEND_URL}/login?error=no_code`);
+    return res.redirect(`${redirectOrigin}/login?error=no_code`);
   }
 
   try {
@@ -90,10 +95,10 @@ app.get('/api/auth/google/callback', async (req, res) => {
 
     // 4. Redirect กลับไปหน้า Frontend พร้อม Token และข้อมูล User
     const userParam = encodeURIComponent(JSON.stringify({ googleId, email, name, picture }));
-    res.redirect(`${FRONTEND_URL}/login/callback?token=${appToken}&user=${userParam}`);
+    res.redirect(`${redirectOrigin}/login/callback?token=${appToken}&user=${userParam}`);
   } catch (error) {
     console.error('Google Callback Error:', error);
-    res.redirect(`${FRONTEND_URL}/login?error=${encodeURIComponent(error.message)}`);
+    res.redirect(`${redirectOrigin}/login?error=${encodeURIComponent(error.message)}`);
   }
 });
 

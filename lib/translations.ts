@@ -19,6 +19,7 @@ export const translations = {
     // Success Notification Modal
     successModal: {
       title: 'ลงทะเบียนสำเร็จ',
+      loginTitle: 'เข้าสู่ระบบสำเร็จ',
       message: 'ระบบจะส่ง QR Code ให้ใน email เพื่อใช้เข้าร่วมงาน',
       emailNotice: 'โปรดตรวจสอบกล่องข้อความในอีเมลของท่านเพื่อรับบัตรเข้าร่วมงาน',
       confirmButton: 'ตกลง',
@@ -143,6 +144,7 @@ export const translations = {
     // Success Notification Modal
     successModal: {
       title: 'Registration Successful',
+      loginTitle: 'Login Successful',
       message: 'The system will send a QR Code to your email for event admission.',
       emailNotice: 'Please check your email inbox to receive your event pass.',
       confirmButton: 'OK',
@@ -193,7 +195,7 @@ export const translations = {
       degreeHeader: 'Degree / Qualification',
       degreePlaceholder: 'e.g. B.Sc. / M.D.',
       institutionHeader: 'College / University',
-      institutionPlaceholder: 'e.g. Chulalongkorn University',
+      institutionPlaceholder: 'e.g. 2024',
       yearHeader: 'Graduation Year',
       yearPlaceholder: 'e.g. 2024',
       actionHeader: 'Action',
