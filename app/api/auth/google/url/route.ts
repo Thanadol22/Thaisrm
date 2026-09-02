@@ -17,6 +17,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const from = req.nextUrl.searchParams.get('from') || 'login';
+
     const googleClient = new OAuth2Client(clientId, clientSecret, redirectUri);
     const url = googleClient.generateAuthUrl({
       access_type: 'offline',
@@ -25,6 +27,7 @@ export async function GET(req: NextRequest) {
         'https://www.googleapis.com/auth/userinfo.email',
       ],
       prompt: 'select_account',
+      state: from,
     });
 
     return NextResponse.json({ url });

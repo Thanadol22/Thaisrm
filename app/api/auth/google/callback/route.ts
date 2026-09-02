@@ -49,7 +49,13 @@ export async function GET(req: NextRequest) {
       { expiresIn: '7d' }
     );
 
+    const state = searchParams.get('state');
     const userParam = encodeURIComponent(JSON.stringify({ googleId, email, name, picture }));
+
+    if (state === 'signup') {
+      return NextResponse.redirect(`${origin}/signup?token=${appToken}&user=${userParam}&autofill=true`);
+    }
+
     return NextResponse.redirect(`${origin}/login/callback?token=${appToken}&user=${userParam}`);
   } catch (err: any) {
     console.error('Google OAuth Callback Error:', err);

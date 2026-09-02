@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Shield, Globe } from 'lucide-react';
+import { Shield, Globe, QrCode } from 'lucide-react';
 import { BornIvfLogo } from '@/components/BornIvfLogo';
 import { GoogleIcon } from '@/components/GoogleIcon';
 import { useLanguage } from '@/context/LanguageContext';
@@ -12,7 +12,7 @@ interface LoginViewProps {
   onNavigateToStaffScan?: () => void;
 }
 
-export function LoginView({ onNavigateToSignup, onGoogleSignIn }: LoginViewProps) {
+export function LoginView({ onNavigateToSignup, onGoogleSignIn, onNavigateToStaffScan }: LoginViewProps) {
   const { lang, toggleLang, t } = useLanguage();
 
   return (
@@ -25,8 +25,12 @@ export function LoginView({ onNavigateToSignup, onGoogleSignIn }: LoginViewProps
 
         <div className="relative z-10">
           <div className="flex items-center justify-between gap-3 mb-2">
-            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-              <BornIvfLogo className="w-10 h-10 sm:w-12 sm:h-12 shrink-0" />
+            <div
+              onClick={() => window.location.href = '/login'}
+              className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-90 transition"
+              title="หน้าเข้าสู่ระบบ / Login Page"
+            >
+              <BornIvfLogo className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 group-hover:scale-105 transition-transform" />
               <div className="min-w-0">
                 <span className="text-[10px] sm:text-xs font-bold tracking-wider sm:tracking-widest text-blue-200 uppercase block truncate">
                   {t.associationName}
@@ -77,8 +81,8 @@ export function LoginView({ onNavigateToSignup, onGoogleSignIn }: LoginViewProps
           </button>
         </div>
 
-        {/* Switch to Sign Up */}
-        <div className="text-center pt-8 sm:pt-10 pb-4">
+        {/* Switch to Sign Up / Staff Scanner */}
+        <div className="text-center pt-8 sm:pt-10 pb-4 space-y-3">
           <p className="text-xs sm:text-sm text-slate-500">
             {t.login.noAccount}{' '}
             <button
@@ -88,6 +92,17 @@ export function LoginView({ onNavigateToSignup, onGoogleSignIn }: LoginViewProps
               {t.login.signUpLink}
             </button>
           </p>
+          {onNavigateToStaffScan && (
+            <div>
+              <button
+                onClick={onNavigateToStaffScan}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200/80 text-xs font-bold transition cursor-pointer active:scale-95 shadow-2xs"
+              >
+                <QrCode className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{t.nav.staffScan} ({t.nav.staffBadge})</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TopNavbar } from '@/components/TopNavbar';
 import { PaymentView } from '@/components/views/PaymentView';
 import { SlipUploadModal } from '@/components/SlipUploadModal';
 import { ToastNotification } from '@/components/ToastNotification';
@@ -34,7 +33,6 @@ export default function PaymentPage() {
       <ToastNotification message={notification} />
 
       <main className="w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl min-h-screen bg-[#f6f8fc] shadow-2xl flex flex-col justify-between relative border-x border-slate-200/80 overflow-hidden transition-all duration-300">
-        <TopNavbar />
         <PaymentView
           onNavigateBack={() => router.push('/signup')}
           onOpenUploadModal={() => setUploadModalOpen(true)}

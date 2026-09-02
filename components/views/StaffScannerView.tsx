@@ -1,7 +1,6 @@
-'use client';
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, QrCode, Search, CheckCircle2, AlertTriangle, XCircle, Users, UserCheck, AlertCircle, Video, VideoOff, ShieldCheck, Sparkles, Globe } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Camera, QrCode, Search, CheckCircle2, AlertTriangle, XCircle, Users, UserCheck, AlertCircle, Video, VideoOff, ShieldCheck, Sparkles, Globe, Lock, Delete } from 'lucide-react';
 import { BornIvfLogo } from '@/components/BornIvfLogo';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -15,7 +14,15 @@ interface CheckInRecord {
 }
 
 export function StaffScannerView() {
+  const router = useRouter();
   const { lang, toggleLang, t } = useLanguage();
+  
+  // Staff Passcode Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState(false);
+  const [isShake, setIsShake] = useState(false);
+
   const [manualCode, setManualCode] = useState('');
   const [lastScanned, setLastScanned] = useState<CheckInRecord | null>(null);
   const [stats, setStats] = useState({ total: 500, checkedIn: 148 });
@@ -25,6 +32,14 @@ export function StaffScannerView() {
 
   const scannerRef = useRef<any>(null);
   const readerId = "html5-qr-reader";
+
+  // Check initial authentication state from sessionStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isAuthed = sessionStorage.getItem('thaisrm_staff_authed') === 'true';
+      setIsAuthenticated(isAuthed);
+    }
+  }, []);
 
   // Web Audio API Beep Generator for Scanner Feedback
   const playBeepSound = (type: 'success' | 'warning' | 'error') => {
@@ -54,6 +69,47 @@ export function StaffScannerView() {
     } catch (e) {
       console.warn("Audio Context Error:", e);
     }
+  };
+
+  // Handle PIN verification
+  const handleVerifyPin = (inputPin: string) => {
+    if (inputPin === '111111') {
+      playBeepSound('success');
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('thaisrm_staff_authed', 'true');
+      }
+      setIsAuthenticated(true);
+      setPinError(false);
+    } else {
+      playBeepSound('error');
+      setPinError(true);
+      setIsShake(true);
+      setPin('');
+      setTimeout(() => setIsShake(false), 500);
+    }
+  };
+
+  const handleKeyPress = (num: string) => {
+    if (pin.length >= 6) return;
+    const newPin = pin + num;
+    setPin(newPin);
+    setPinError(false);
+    if (newPin.length === 6) {
+      handleVerifyPin(newPin);
+    }
+  };
+
+  const handleDeletePin = () => {
+    setPin(prev => prev.slice(0, -1));
+    setPinError(false);
+  };
+
+  const handleLockSystem = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('thaisrm_staff_authed');
+    }
+    setIsAuthenticated(false);
+    setPin('');
   };
 
   // Initialize html5-qrcode real camera scanner (strictly Environment / Back Camera)
@@ -92,7 +148,7 @@ export function StaffScannerView() {
       }
     };
 
-    if (isCameraOn) {
+    if (isCameraOn && isAuthenticated) {
       startScanner();
     }
 
@@ -104,7 +160,7 @@ export function StaffScannerView() {
           .catch((err: any) => console.error("Error stopping scanner:", err));
       }
     };
-  }, [isCameraOn, t.staff.cameraPermissionError]);
+  }, [isCameraOn, isAuthenticated, t.staff.cameraPermissionError]);
 
   // Process Scanned Code
   const handleProcessScan = (decodedText: string) => {
@@ -157,6 +213,148 @@ export function StaffScannerView() {
     setManualCode('');
   };
 
+  // Render PIN Passcode Entry Guard Screen if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[640px]">
+        {/* Header Blue Card Section */}
+        <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-5 sm:px-7 pt-6 sm:pt-8 pb-8 sm:pb-10 rounded-b-[32px] sm:rounded-b-[40px] shadow-xl relative overflow-hidden">
+          <div className="absolute -top-12 -right-12 w-48 h-48 bg-[#4ade80]/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 -left-12 w-44 h-44 bg-[#0026b3]/40 rounded-full blur-2xl pointer-events-none" />
+
+          <div className="relative z-10 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div 
+                onClick={() => router.push('/login')}
+                className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-90 transition"
+                title="กลับสู่หน้าเข้าสู่ระบบ / Back to Login"
+              >
+                <BornIvfLogo className="w-8 h-8 sm:w-10 sm:h-10 ring-2 ring-[#4ade80]/40 shadow-sm shrink-0 group-hover:scale-105 transition-transform" />
+                <div className="min-w-0">
+                  <span className="text-[10px] sm:text-xs font-bold text-blue-200 block leading-tight truncate">
+                    {t.associationName}
+                  </span>
+                  <span className="text-xs sm:text-sm font-extrabold text-white block leading-tight tracking-wide truncate">
+                    {t.brandName}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Language Switcher Pill */}
+              <button
+                onClick={toggleLang}
+                className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shrink-0 shadow-2xs"
+              >
+                <Globe className="w-3 h-3 text-blue-200 shrink-0" />
+                <span className={lang === 'th' ? 'text-white font-black' : 'text-blue-200/60'}>TH</span>
+                <span className="text-white/40 font-normal">|</span>
+                <span className={lang === 'en' ? 'text-white font-black' : 'text-blue-200/60'}>EN</span>
+              </button>
+            </div>
+
+            <div className="pt-2 text-center space-y-2">
+              <div className="w-14 h-14 bg-white/10 rounded-2xl backdrop-blur-md border border-white/20 flex items-center justify-center mx-auto shadow-inner">
+                <Lock className="w-7 h-7 text-[#4ade80]" />
+              </div>
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                {t.staff.passcodeTitle}
+              </h1>
+              <p className="text-xs text-blue-100/90 leading-relaxed font-normal max-w-xs mx-auto">
+                {t.staff.passcodeSubtitle}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Body with PIN Input */}
+        <div className="px-5 sm:px-8 py-6 flex-1 flex flex-col justify-between items-center max-w-sm mx-auto w-full">
+          {/* Hidden Input for Desktop Keyboard Typing */}
+          <input
+            type="password"
+            pattern="[0-9]*"
+            inputMode="numeric"
+            maxLength={6}
+            value={pin}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+              setPin(val);
+              setPinError(false);
+              if (val.length === 6) handleVerifyPin(val);
+            }}
+            className="sr-only"
+            autoFocus
+            id="staff-pin-input"
+          />
+
+          {/* 6 Digit Indicators */}
+          <div 
+            onClick={() => document.getElementById('staff-pin-input')?.focus()}
+            className={`flex justify-center gap-2.5 sm:gap-3 my-3 cursor-pointer ${isShake ? 'animate-shake' : ''}`}
+          >
+            {[0, 1, 2, 3, 4, 5].map((index) => (
+              <div
+                key={index}
+                className={`w-10 h-12 sm:w-11 sm:h-13 rounded-2xl border-2 flex items-center justify-center text-xl font-black transition-all duration-200 ${
+                  pin.length > index
+                    ? 'border-[#0026b3] bg-[#0026b3] text-white shadow-md scale-105'
+                    : pin.length === index
+                    ? 'border-[#0026b3] bg-blue-50/80 text-blue-900 animate-pulse'
+                    : 'border-slate-200 bg-white text-slate-400'
+                }`}
+              >
+                {pin.length > index ? '●' : ''}
+              </div>
+            ))}
+          </div>
+
+          {/* Error Feedback */}
+          {pinError && (
+            <div className="flex items-center gap-1.5 text-rose-600 bg-rose-50 border border-rose-200 px-4 py-1.5 rounded-full text-xs font-extrabold animate-bounce my-1">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{t.staff.passcodeIncorrect} (รหัส: 111111)</span>
+            </div>
+          )}
+
+          {/* Numeric Keypad Buttons */}
+          <div className="grid grid-cols-3 gap-2.5 sm:gap-3 w-full max-w-[280px] my-3">
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
+              <button
+                key={num}
+                onClick={() => handleKeyPress(num)}
+                className="h-12 sm:h-13 rounded-2xl bg-white border border-slate-200/90 text-slate-800 font-extrabold text-xl hover:bg-slate-50 active:scale-95 shadow-2xs transition flex items-center justify-center cursor-pointer"
+              >
+                {num}
+              </button>
+            ))}
+            <button
+              onClick={() => setPin('')}
+              className="h-12 sm:h-13 rounded-2xl bg-slate-100 text-slate-600 font-extrabold text-xs hover:bg-slate-200 active:scale-95 transition flex items-center justify-center cursor-pointer"
+            >
+              ล้าง (C)
+            </button>
+            <button
+              onClick={() => handleKeyPress('0')}
+              className="h-12 sm:h-13 rounded-2xl bg-white border border-slate-200/90 text-slate-800 font-extrabold text-xl hover:bg-slate-50 active:scale-95 shadow-2xs transition flex items-center justify-center cursor-pointer"
+            >
+              0
+            </button>
+            <button
+              onClick={handleDeletePin}
+              className="h-12 sm:h-13 rounded-2xl bg-slate-100 text-slate-600 hover:bg-slate-200 active:scale-95 transition flex items-center justify-center cursor-pointer"
+            >
+              <Delete className="w-5 h-5 text-slate-600" />
+            </button>
+          </div>
+
+          <p className="text-[11px] text-slate-400 font-medium text-center pb-2">
+            ทดสอบเข้าใช้งานด้วยรหัส <span className="font-bold text-[#0026b3]">111111</span>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Render Full Authenticated Staff Scanner View
   return (
     <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[640px]">
       {/* Header Blue Card Section with Green Ambient Accent */}
@@ -167,8 +365,12 @@ export function StaffScannerView() {
 
         <div className="relative z-10 space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-              <BornIvfLogo className="w-8 h-8 sm:w-10 sm:h-10 ring-2 ring-[#4ade80]/40 shadow-sm shrink-0" />
+            <div 
+              onClick={() => router.push('/login')}
+              className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-90 transition"
+              title="กลับสู่หน้าเข้าสู่ระบบ / Back to Login"
+            >
+              <BornIvfLogo className="w-8 h-8 sm:w-10 sm:h-10 ring-2 ring-[#4ade80]/40 shadow-sm shrink-0 group-hover:scale-105 transition-transform" />
               <div className="min-w-0">
                 <span className="text-[10px] sm:text-xs font-bold text-blue-200 block leading-tight truncate">
                   {t.associationName}
@@ -190,6 +392,16 @@ export function StaffScannerView() {
                 <span className={lang === 'th' ? 'text-white font-black' : 'text-blue-200/60'}>TH</span>
                 <span className="text-white/40 font-normal">|</span>
                 <span className={lang === 'en' ? 'text-white font-black' : 'text-blue-200/60'}>EN</span>
+              </button>
+
+              {/* Lock System Button */}
+              <button
+                onClick={handleLockSystem}
+                className="flex items-center gap-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold transition cursor-pointer active:scale-95 shrink-0"
+                title="ล็อคระบบเจ้าหน้าที่ / Lock Staff View"
+              >
+                <Lock className="w-3 h-3 text-rose-300 shrink-0" />
+                <span>{t.staff.passcodeLock}</span>
               </button>
 
               {/* Green Accent Badge */}
