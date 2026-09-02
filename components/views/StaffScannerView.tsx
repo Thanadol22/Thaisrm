@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, QrCode, Search, CheckCircle2, AlertTriangle, XCircle, Users, UserCheck, AlertCircle, Video, VideoOff, ShieldCheck, Sparkles } from 'lucide-react';
+import { Camera, QrCode, Search, CheckCircle2, AlertTriangle, XCircle, Users, UserCheck, AlertCircle, Video, VideoOff, ShieldCheck, Sparkles, Globe } from 'lucide-react';
 import { BornIvfLogo } from '@/components/BornIvfLogo';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface CheckInRecord {
   id: string;
@@ -14,6 +15,7 @@ interface CheckInRecord {
 }
 
 export function StaffScannerView() {
+  const { lang, toggleLang, t } = useLanguage();
   const [manualCode, setManualCode] = useState('');
   const [lastScanned, setLastScanned] = useState<CheckInRecord | null>(null);
   const [stats, setStats] = useState({ total: 500, checkedIn: 148 });
@@ -158,62 +160,81 @@ export function StaffScannerView() {
   return (
     <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[640px]">
       {/* Header Blue Card Section with Green Ambient Accent */}
-      <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-7 pt-7 pb-9 rounded-b-[40px] shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-4 sm:px-7 pt-5 sm:pt-7 pb-7 sm:pb-9 rounded-b-[32px] sm:rounded-b-[40px] shadow-xl relative overflow-hidden">
         {/* Glowing Green & Blue Ambient Accents */}
         <div className="absolute -top-12 -right-12 w-48 h-48 bg-[#4ade80]/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 -left-12 w-44 h-44 bg-[#0026b3]/40 rounded-full blur-2xl pointer-events-none" />
 
         <div className="relative z-10 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <BornIvfLogo className="w-10 h-10 ring-2 ring-[#4ade80]/40 shadow-sm" />
-              <div>
-                <span className="text-base font-extrabold text-white block leading-tight tracking-wide">THAISRM</span>
-                <span className="text-xs text-blue-100/90 font-medium">Meeting Summit 2026</span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <BornIvfLogo className="w-8 h-8 sm:w-10 sm:h-10 ring-2 ring-[#4ade80]/40 shadow-sm shrink-0" />
+              <div className="min-w-0">
+                <span className="text-[10px] sm:text-xs font-bold text-blue-200 block leading-tight truncate">
+                  {t.associationName}
+                </span>
+                <span className="text-xs sm:text-sm font-extrabold text-white block leading-tight tracking-wide truncate">
+                  {t.brandName}
+                </span>
               </div>
             </div>
-            {/* Green Accent Badge */}
-            <span className="bg-[#4ade80] text-[#061d08] text-[11px] font-black px-3.5 py-1 rounded-full shadow-sm flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Staff Portal</span>
-            </span>
+            
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Language Switcher Pill */}
+              <button
+                onClick={toggleLang}
+                className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shrink-0 shadow-2xs"
+                title="Switch Language / สลับภาษา"
+              >
+                <Globe className="w-3 h-3 text-blue-200 shrink-0" />
+                <span className={lang === 'th' ? 'text-white font-black' : 'text-blue-200/60'}>TH</span>
+                <span className="text-white/40 font-normal">|</span>
+                <span className={lang === 'en' ? 'text-white font-black' : 'text-blue-200/60'}>EN</span>
+              </button>
+
+              {/* Green Accent Badge */}
+              <span className="bg-[#4ade80] text-[#061d08] text-[10px] sm:text-[11px] font-black px-2.5 sm:px-3 py-1 rounded-full shadow-sm flex items-center gap-1 shrink-0 whitespace-nowrap">
+                <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>{t.staff.badge}</span>
+              </span>
+            </div>
           </div>
 
-          <div className="pt-2">
-            <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-              <span>ระบบเช็คอินสำหรับเจ้าหน้าที่</span>
+          <div className="pt-1 sm:pt-2">
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+              <span>{t.staff.title}</span>
             </h1>
-            <p className="text-xs text-blue-100/90 leading-relaxed mt-1 font-normal">
-              สแกน QR Code ตั๋วผู้เข้าร่วมงานเพื่อยืนยันสิทธิ์และเช็คอินเข้างาน
+            <p className="text-[11px] sm:text-xs text-blue-100/90 leading-relaxed mt-1 font-normal">
+              {t.staff.subtitle}
             </p>
           </div>
         </div>
       </div>
 
       {/* Main Content Body */}
-      <div className="px-6 py-6 space-y-4 flex-1 flex flex-col justify-between">
+      <div className="px-4 sm:px-6 py-4 sm:py-6 space-y-4 flex-1 flex flex-col justify-between">
         <div className="space-y-4">
           {/* Real-time Stats Card with Green/Blue Accent Border */}
-          <div className="bg-gradient-to-r from-blue-50/60 via-white to-emerald-50/50 border-l-4 border-l-[#0026b3] border-y border-r border-slate-200/90 rounded-3xl p-4 flex items-center justify-between shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-[#0026b3] text-white flex items-center justify-center shadow-xs ring-2 ring-[#4ade80]/30">
-                <Users className="w-5 h-5" />
+          <div className="bg-gradient-to-r from-blue-50/60 via-white to-emerald-50/50 border-l-4 border-l-[#0026b3] border-y border-r border-slate-200/90 rounded-2xl sm:rounded-3xl p-3 sm:p-4 flex items-center justify-between gap-2 shadow-sm">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-[#0026b3] text-white flex items-center justify-center shadow-xs ring-2 ring-[#4ade80]/30 shrink-0">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div>
-                <p className="text-xs text-slate-500 font-extrabold">ผู้เข้าร่วมงานทั้งหมด</p>
-                <p className="text-xl font-black text-slate-900">
-                  {stats.checkedIn} <span className="text-xs text-slate-500 font-medium">/ {stats.total} คน</span>
+              <div className="min-w-0">
+                <p className="text-[11px] sm:text-xs text-slate-500 font-extrabold whitespace-nowrap">{t.staff.statsTotal}</p>
+                <p className="text-base sm:text-xl font-black text-slate-900 leading-tight whitespace-nowrap">
+                  {stats.checkedIn} <span className="text-[10px] sm:text-xs text-slate-500 font-medium">/ {stats.total}</span>
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              {/* Ultra Vibrant Animated Neon Green Badge */}
-              <span className="inline-flex items-center gap-2 text-xs font-black text-slate-950 bg-gradient-to-r from-[#4ade80] via-[#22c55e] to-[#4ade80] px-4 py-1.5 rounded-full shadow-[0_0_18px_rgba(74,222,128,0.6)] border border-[#86efac] animate-neon-pulse cursor-default">
-                <span className="relative flex h-2.5 w-2.5">
+            <div className="text-right shrink-0">
+              {/* Ultra Smooth Vibrant Animated Neon Green Badge */}
+              <span className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-black text-slate-950 bg-gradient-to-r from-[#4ade80] via-[#22c55e] to-[#4ade80] px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-[0_0_18px_rgba(74,222,128,0.6)] border border-[#86efac] animate-neon-pulse cursor-default whitespace-nowrap">
+                <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5 shrink-0">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-950 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-slate-950" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-slate-950" />
                 </span>
-                <span>{Math.round((stats.checkedIn / stats.total) * 100)}% เข้างานแล้ว</span>
+                <span className="whitespace-nowrap">{Math.round((stats.checkedIn / stats.total) * 100)}% เข้างานแล้ว</span>
               </span>
             </div>
           </div>
@@ -282,7 +303,7 @@ export function StaffScannerView() {
                 }`}
             >
               {isCameraOn ? <VideoOff className="w-4 h-4 text-rose-600" /> : <Video className="w-4 h-4 text-[#061d08]" />}
-              <span>{isCameraOn ? 'ปิดการทำงานของกล้อง' : 'เปิดกล้องสแกน QR Code'}</span>
+              <span>{isCameraOn ? t.staff.cameraOn : t.staff.cameraOff}</span>
             </button>
           </div>
 
@@ -290,58 +311,58 @@ export function StaffScannerView() {
           <div className="flex gap-2">
             <button
               onClick={() => handleProcessScan('TICKET-2026-PASS')}
-              className="flex-1 py-3 px-3 rounded-2xl bg-[#4ade80]/20 hover:bg-[#4ade80]/30 text-emerald-950 border border-[#4ade80]/50 text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+              className="flex-1 py-2.5 sm:py-3 px-2 sm:px-3 rounded-2xl bg-[#4ade80]/20 hover:bg-[#4ade80]/30 text-emerald-950 border border-[#4ade80]/50 text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer shadow-2xs whitespace-nowrap"
             >
-              <CheckCircle2 className="w-4 h-4 text-emerald-700" />
-              <span>ทดสอบสแกนสำเร็จ</span>
+              <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-700 shrink-0" />
+              <span>{t.staff.statusSuccess}</span>
             </button>
             <button
               onClick={() => handleProcessScan('TICKET-DUP')}
-              className="flex-1 py-3 px-3 rounded-2xl bg-amber-100/80 hover:bg-amber-200/80 text-amber-950 border border-amber-300/90 text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+              className="flex-1 py-2.5 sm:py-3 px-2 sm:px-3 rounded-2xl bg-amber-100/80 hover:bg-amber-200/80 text-amber-950 border border-amber-300/90 text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer shadow-2xs whitespace-nowrap"
             >
-              <AlertTriangle className="w-4 h-4 text-amber-700" />
-              <span>ทดสอบสแกนซ้ำ</span>
+              <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-700 shrink-0" />
+              <span>{t.staff.statusDuplicate}</span>
             </button>
           </div>
 
           {/* Scan Result Feedback Card */}
           {lastScanned && (
             <div
-              className={`rounded-2xl p-4 border animate-scale-up shadow-sm ${lastScanned.status === 'success'
+              className={`rounded-2xl p-3.5 sm:p-4 border animate-scale-up shadow-sm ${lastScanned.status === 'success'
                 ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
                 : lastScanned.status === 'duplicate'
                   ? 'bg-amber-50 border-amber-300 text-amber-950'
                   : 'bg-rose-50 border-rose-300 text-rose-950'
                 }`}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2.5">
-                  {lastScanned.status === 'success' && <UserCheck className="w-6 h-6 text-emerald-600" />}
-                  {lastScanned.status === 'duplicate' && <AlertTriangle className="w-6 h-6 text-amber-600" />}
-                  {lastScanned.status === 'invalid' && <XCircle className="w-6 h-6 text-rose-600" />}
-                  <div>
-                    <h4 className="font-extrabold text-base leading-tight text-slate-900">{lastScanned.name}</h4>
-                    <p className="text-xs text-slate-600 font-medium">{lastScanned.ticketType}</p>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                  {lastScanned.status === 'success' && <UserCheck className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600 shrink-0" />}
+                  {lastScanned.status === 'duplicate' && <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-amber-600 shrink-0" />}
+                  {lastScanned.status === 'invalid' && <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-rose-600 shrink-0" />}
+                  <div className="min-w-0">
+                    <h4 className="font-extrabold text-sm sm:text-base leading-tight text-slate-900 truncate">{lastScanned.name}</h4>
+                    <p className="text-[11px] sm:text-xs text-slate-600 font-medium truncate">{lastScanned.ticketType}</p>
                   </div>
                 </div>
 
                 <span
-                  className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border ${lastScanned.status === 'success'
+                  className={`text-[9px] sm:text-[10px] font-black uppercase px-2 sm:px-2.5 py-0.5 rounded-full border shrink-0 whitespace-nowrap ${lastScanned.status === 'success'
                     ? 'bg-emerald-600 text-white border-emerald-700'
                     : lastScanned.status === 'duplicate'
                       ? 'bg-amber-500 text-white border-amber-600'
                       : 'bg-rose-600 text-white border-rose-700'
                     }`}
                 >
-                  {lastScanned.status === 'success' && 'เช็คอินสำเร็จ'}
-                  {lastScanned.status === 'duplicate' && 'สแกนซ้ำแล้ว'}
-                  {lastScanned.status === 'invalid' && 'ตั๋วไม่ถูกต้อง'}
+                  {lastScanned.status === 'success' && t.staff.statusSuccess}
+                  {lastScanned.status === 'duplicate' && t.staff.statusDuplicate}
+                  {lastScanned.status === 'invalid' && t.staff.statusInvalid}
                 </span>
               </div>
 
-              <div className="mt-3 pt-2.5 border-t border-slate-200/80 text-xs flex justify-between text-slate-600 font-semibold">
-                <span>รหัส: {lastScanned.id}</span>
-                <span>เวลา: {lastScanned.checkInTime}</span>
+              <div className="mt-3 pt-2.5 border-t border-slate-200/80 text-[11px] sm:text-xs flex justify-between text-slate-600 font-semibold gap-2">
+                <span className="truncate">{t.staff.participantName} {lastScanned.name}</span>
+                <span className="shrink-0 whitespace-nowrap">{t.staff.checkInTimeLabel} {lastScanned.checkInTime}</span>
               </div>
             </div>
           )}
@@ -349,23 +370,23 @@ export function StaffScannerView() {
 
         {/* Manual Code Search Fallback Input */}
         <form onSubmit={handleManualCheckIn} className="space-y-1.5 pt-2 pb-2">
-          <label className="text-xs font-extrabold text-slate-600">ค้นหาด้วยชื่อ / รหัสตั๋วแบบ Manual</label>
+          <label className="text-[11px] sm:text-xs font-extrabold text-slate-600 block">{t.staff.manualTitle}</label>
           <div className="flex gap-2">
-            <div className="relative flex-1 bg-white border border-slate-200 focus-within:border-[#0026b3] focus-within:ring-2 focus-within:ring-[#0026b3]/20 rounded-2xl flex items-center px-3.5 shadow-2xs transition">
-              <Search className="w-4 h-4 text-[#0026b3] mr-2" />
+            <div className="relative flex-1 bg-white border border-slate-200 focus-within:border-[#0026b3] focus-within:ring-2 focus-within:ring-[#0026b3]/20 rounded-2xl flex items-center px-3 sm:px-3.5 shadow-2xs transition min-w-0">
+              <Search className="w-4 h-4 text-[#0026b3] mr-2 shrink-0" />
               <input
                 type="text"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
-                placeholder="กรอกรหัสตั๋ว เช่น TICKET-2026"
-                className="bg-transparent w-full text-xs text-slate-800 outline-none py-3 placeholder:text-slate-400 font-medium"
+                placeholder={t.staff.manualPlaceholder}
+                className="bg-transparent w-full text-[11px] sm:text-xs text-slate-800 outline-none py-2.5 sm:py-3 placeholder:text-slate-400 font-medium min-w-0"
               />
             </div>
             <button
               type="submit"
-              className="bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] text-xs font-black px-5 py-3 rounded-2xl transition cursor-pointer active:scale-95 shadow-sm"
+              className="bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] text-[11px] sm:text-xs font-black px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl transition cursor-pointer active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
             >
-              เช็คอิน
+              {t.staff.checkInButton}
             </button>
           </div>
         </form>

@@ -5,25 +5,53 @@ import { useRouter } from 'next/navigation';
 import { TopNavbar } from '@/components/TopNavbar';
 import { LoginView } from '@/components/views/LoginView';
 import { ToastNotification } from '@/components/ToastNotification';
+import { RegistrationSuccessModal } from '@/components/RegistrationSuccessModal';
 
 export default function LoginPage() {
   const router = useRouter();
   const [notification, setNotification] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const triggerNotification = (msg: string) => {
     setNotification(msg);
-    setTimeout(() => setNotification(null), 3000);
+    setTimeout(() => setNotification(null), 4000);
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/google/url');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+      }
+
+      if (data.url) {
+        // Redirect ผู้ใช้ไปที่ Google Consent Screen
+        window.location.href = data.url;
+      } else {
+        setShowSuccessModal(true);
+      }
+    } catch (err: any) {
+      console.error('Google Sign In Error:', err);
+      setShowSuccessModal(true);
+    }
   };
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col items-center justify-start selection:bg-[#4ade80] selection:text-slate-900 font-sans">
       <ToastNotification message={notification} />
+      <RegistrationSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        onProceed={() => router.push('/payment')}
+      />
 
       <main className="w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl min-h-screen bg-[#f6f8fc] shadow-2xl flex flex-col justify-between relative border-x border-slate-200/80 overflow-hidden transition-all duration-300">
         <TopNavbar />
         <LoginView
           onNavigateToSignup={() => router.push('/signup')}
-          onGoogleSignIn={() => triggerNotification("เข้าสู่ระบบด้วย Google สำเร็จ")}
+          onGoogleSignIn={handleGoogleSignIn}
           onNavigateToStaffScan={() => router.push('/staff/scan')}
         />
       </main>
