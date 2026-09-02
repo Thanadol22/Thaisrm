@@ -123,12 +123,18 @@ export const translations = {
       ticketType: 'ประเภทบัตร:',
       emailLabel: 'อีเมล:',
       checkInTimeLabel: 'เวลาเช็คอิน:',
+      checkedInPercent: 'เข้างานแล้ว',
+      cameraStandbyTitle: 'กล้องถูกปิดอยู่',
+      cameraStandbyDesc: 'กล้องหยุดทำงานเพื่อประหยัดแบตเตอรี่และทรัพยากรเครื่อง',
+      turnOnCamera: 'เปิดกล้องสแกน',
+      retryCamera: 'ลองเปิดใหม่อีกครั้ง',
+      processingScan: 'กำลังประมวลผลการเช็คอิน...',
     }
   },
 
   en: {
     // Header Branding
-    associationName: 'Thai Society for Reproductive Medicine',
+    associationName: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
     brandName: 'THAISRM',
     subtitle: 'Meeting Summit 2026',
 
@@ -195,7 +201,7 @@ export const translations = {
       degreeHeader: 'Degree / Qualification',
       degreePlaceholder: 'e.g. B.Sc. / M.D.',
       institutionHeader: 'College / University',
-      institutionPlaceholder: 'e.g. 2024',
+      institutionPlaceholder: 'e.g. Chulalongkorn University',
       yearHeader: 'Graduation Year',
       yearPlaceholder: 'e.g. 2024',
       actionHeader: 'Action',
@@ -248,6 +254,12 @@ export const translations = {
       ticketType: 'Pass Type:',
       emailLabel: 'Email:',
       checkInTimeLabel: 'Check-In Time:',
+      checkedInPercent: 'Attended',
+      cameraStandbyTitle: 'Camera Standby',
+      cameraStandbyDesc: 'Camera paused to save battery and system resources',
+      turnOnCamera: 'Turn On Camera',
+      retryCamera: 'Retry Opening Camera',
+      processingScan: 'Processing Check-In...',
     }
   }
 };

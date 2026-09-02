@@ -234,7 +234,7 @@ export function StaffScannerView() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-950 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-slate-950" />
                 </span>
-                <span className="whitespace-nowrap">{Math.round((stats.checkedIn / stats.total) * 100)}% เข้างานแล้ว</span>
+                <span className="whitespace-nowrap">{Math.round((stats.checkedIn / stats.total) * 100)}% {t.staff.checkedInPercent}</span>
               </span>
             </div>
           </div>
@@ -248,16 +248,16 @@ export function StaffScannerView() {
                   <VideoOff className="w-7 h-7" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-slate-200">กล้องถูกปิดอยู่ (Camera Standby)</h4>
+                  <h4 className="text-sm font-bold text-slate-200">{t.staff.cameraStandbyTitle}</h4>
                   <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
-                    กล้องหยุดทำงานเพื่อประหยัดแบตเตอรี่และทรัพยากรเครื่อง
+                    {t.staff.cameraStandbyDesc}
                   </p>
                 </div>
                 <button
                   onClick={() => setIsCameraOn(true)}
                   className="px-5 py-2.5 bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] text-xs font-black rounded-xl shadow-md transition cursor-pointer active:scale-95"
                 >
-                  เปิดกล้องสแกน
+                  {t.staff.turnOnCamera}
                 </button>
               </div>
             ) : cameraPermissionError ? (
@@ -268,7 +268,7 @@ export function StaffScannerView() {
                   onClick={() => setIsCameraOn(true)}
                   className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white rounded-xl border border-slate-600 transition cursor-pointer"
                 >
-                  ลองเปิดใหม่อีกครั้ง
+                  {t.staff.retryCamera}
                 </button>
               </div>
             ) : (
@@ -285,8 +285,8 @@ export function StaffScannerView() {
                 </div>
 
                 {isProcessing && (
-                  <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center text-xs font-bold text-[#4ade80] z-10 animate-scale-up">
-                    กำลังประมวลผลการเช็คอิน...
+                  <div className="absolute inset-0 bg-[#0026b3]/90 backdrop-blur-xs flex items-center justify-center text-xs font-bold text-[#4ade80] z-10 animate-scale-up">
+                    {t.staff.processingScan}
                   </div>
                 )}
               </div>
