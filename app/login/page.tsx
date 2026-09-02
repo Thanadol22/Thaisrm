@@ -22,24 +22,14 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     try {
       const response = await fetch('/api/auth/google/url');
-      const text = await response.text();
-      let data: any = {};
-
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error('กรุณาตรวจสอบว่าสตาร์ทเซิร์ฟเวอร์ Express (npm run server) เรียบร้อยแล้ว');
-      }
+      const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.error || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
       }
 
       if (data.url) {
-        // Redirect ผู้ใช้ไปที่ Google Consent Screen (Prompt Select Account)
         window.location.href = data.url;
-      } else {
-        triggerNotification('ไม่พบ URL สำหรับเข้าสู่ระบบด้วย Google');
       }
     } catch (err: any) {
       console.error('Google Sign In Error:', err);

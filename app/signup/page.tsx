@@ -24,14 +24,7 @@ export default function SignupPage() {
   const handleGoogleSignUp = async () => {
     try {
       const response = await fetch('/api/auth/google/url');
-      const text = await response.text();
-      let data: any = {};
-
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error('กรุณาตรวจสอบว่าสตาร์ทเซิร์ฟเวอร์ Express (npm run server) เรียบร้อยแล้ว');
-      }
+      const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.error || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
@@ -39,8 +32,6 @@ export default function SignupPage() {
 
       if (data.url) {
         window.location.href = data.url;
-      } else {
-        triggerNotification('ไม่พบ URL สำหรับสมัครสมาชิกด้วย Google');
       }
     } catch (err: any) {
       console.error('Google Sign Up Error:', err);
