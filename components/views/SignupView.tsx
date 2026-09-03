@@ -133,6 +133,28 @@ export function SignupView({
       if (initialUserData.picture) {
         setPhotoPreview(initialUserData.picture);
       }
+    } else if (initialUserData === null) {
+      // Clear form when initialUserData is reset to null
+      setFormData({
+        nameTh: '',
+        nameEn: '',
+        id4Digits: '',
+        mobile: '',
+        email: '',
+        lineId: '',
+        workplace: '',
+        startDate: '',
+        position: '1 RM',
+        positionOther: '',
+        scientistNo: '',
+        password: '',
+      });
+      setEducationList([
+        { id: '1', degree: '', institution: '', year: '' },
+      ]);
+      setPhotoPreview(null);
+      setConsentChecked(false);
+      setCurrentStep(1);
     }
   }, [initialUserData]);
 

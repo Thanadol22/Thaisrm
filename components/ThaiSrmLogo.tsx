@@ -7,6 +7,12 @@ export function ThaiSrmLogo({ className = "w-12 h-12" }: { className?: string })
       <img
         src="/tsrm-logoPNG.png"
         alt="THAISRM Logo"
+        onError={(e) => {
+          if (!e.currentTarget.dataset.fallback) {
+            e.currentTarget.dataset.fallback = 'true';
+            e.currentTarget.src = '/logoPNG.png';
+          }
+        }}
         className="w-full h-full object-contain rounded-xl"
       />
     </div>

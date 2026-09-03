@@ -13,11 +13,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     error: "/login",
   },
   callbacks: {
-    async jwt({ token, profile }) {
-      // On first sign-in, persist Google profile data into the JWT
+    async jwt({ token, user, profile }) {
+      // On first sign-in or subsequent token refreshes, persist Google profile data
+      if (user) {
+        token.googleId = (user as any).id || (profile as any)?.sub || token.googleId;
+        token.picture = user.image || (profile as any)?.picture || token.picture;
+      }
       if (profile) {
-        token.googleId = profile.sub;
-        token.picture = profile.picture;
+        token.googleId = (profile as any).sub;
+        token.picture = (profile as any).picture || token.picture;
       }
       return token;
     },
@@ -25,7 +29,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Expose extra fields on the client-side session object
       if (session.user) {
         (session.user as any).googleId = token.googleId;
-        (session.user as any).picture = token.picture;
+        const userPic = (token.picture as string) || session.user.image || undefined;
+        (session.user as any).picture = userPic;
+        session.user.image = userPic;
       }
       return session;
     },

@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useSession } from 'next-auth/react';
-import { signIn } from 'next-auth/react';
+import { useSession, signIn, signOut } from 'next-auth/react';
 import { SignupView } from '@/components/views/SignupView';
 import { ToastNotification } from '@/components/ToastNotification';
 import { RegistrationSuccessModal } from '@/components/RegistrationSuccessModal';
@@ -23,7 +22,7 @@ function SignupContent() {
     setTimeout(() => setNotification(null), 4000);
   };
 
-  // Auto-fill from NextAuth session when user signs up via Google
+  // Auto-fill from NextAuth session only when active Google session is present
   useEffect(() => {
     if (session?.user) {
       const userData = {
@@ -32,16 +31,30 @@ function SignupContent() {
         picture: (session.user as any).picture || session.user.image || undefined,
       };
       setInitialUserData(userData);
+      try {
+        localStorage.setItem('user_data', JSON.stringify(userData));
+      } catch (e) {
+        console.error('Failed to save user_data', e);
+      }
       triggerNotification(t.signup.googleAutofillSuccessToast);
     }
   }, [session, t.signup.googleAutofillSuccessToast]);
 
-  const handleClearForm = () => {
+  const handleClearForm = async () => {
     setInitialUserData(null);
+    try {
+      localStorage.removeItem('user_data');
+      localStorage.removeItem('auth_token');
+      document.cookie = 'thaisrm_user=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+      document.cookie = 'thaisrm_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+    } catch (e) {}
+    try {
+      await signOut({ redirect: false });
+    } catch (e) {}
   };
 
-  const handleNavigateToLogin = () => {
-    handleClearForm();
+  const handleNavigateToLogin = async () => {
+    await handleClearForm();
     router.push('/login');
   };
 

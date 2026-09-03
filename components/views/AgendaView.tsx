@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
 import {
   Calendar,
   Clock,
@@ -500,12 +501,14 @@ export function AgendaView() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [bookmarks, setBookmarks] = useState<string[]>([]);
   const [showPassModal, setShowPassModal] = useState<boolean>(false);
+  const { data: session } = useSession();
   const [userData, setUserData] = useState<{
     name?: string;
     email?: string;
     picture?: string;
     googleId?: string;
   } | null>(null);
+  const [imgError, setImgError] = useState<boolean>(false);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [scrollProgress, setScrollProgress] = useState<number>(0);
@@ -518,21 +521,42 @@ export function AgendaView() {
     seconds: number;
   }>({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
-  // Load User Data & Saved Bookmarks on Mount
+  // Load User Data & Saved Bookmarks on Mount and Session Changes
   useEffect(() => {
-    try {
-      const storedUser = localStorage.getItem('user_data');
-      if (storedUser) {
-        setUserData(JSON.parse(storedUser));
+    setImgError(false);
+    if (session?.user) {
+      const authUser = {
+        name: session.user.name || undefined,
+        email: session.user.email || undefined,
+        picture: (session.user as any).picture || session.user.image || undefined,
+        googleId: (session.user as any).googleId || undefined,
+      };
+      setUserData(authUser);
+      try {
+        localStorage.setItem('user_data', JSON.stringify(authUser));
+      } catch (e) {
+        console.error('Failed to sync session to localStorage', e);
       }
+    } else {
+      try {
+        const storedUser = localStorage.getItem('user_data');
+        if (storedUser) {
+          setUserData(JSON.parse(storedUser));
+        }
+      } catch (e) {
+        console.error('Failed to load user from localStorage', e);
+      }
+    }
+
+    try {
       const storedBookmarks = localStorage.getItem('tsrm_agenda_bookmarks');
       if (storedBookmarks) {
         setBookmarks(JSON.parse(storedBookmarks));
       }
     } catch (e) {
-      console.error('Failed to load user or bookmarks data', e);
+      console.error('Failed to load bookmarks data', e);
     }
-  }, []);
+  }, [session]);
 
   // Scroll Progress and Scroll-to-Top tracking
   useEffect(() => {
@@ -595,14 +619,14 @@ export function AgendaView() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     try {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user_data');
     } catch (e) {
       console.error('Logout error', e);
     }
-    router.push('/login');
+    await signOut({ callbackUrl: '/login' });
   };
 
   const scrollToTop = () => {
@@ -678,11 +702,14 @@ export function AgendaView() {
           {/* Top User Bar Card */}
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/15 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl hover:border-white/25 transition-all duration-300">
             <div className="flex items-center gap-3.5 min-w-0">
-              {userData?.picture ? (
+              {userData?.picture && !imgError ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={userData.picture}
                   alt={memberDisplayName}
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  onError={() => setImgError(true)}
                   className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border-2 border-[#4ade80] shadow-md object-cover shrink-0 hover:scale-105 transition-transform duration-200"
                 />
               ) : (
@@ -1276,10 +1303,22 @@ export function AgendaView() {
               </div>
 
               {/* Pass Holder Details */}
-              <div className="space-y-0.5 text-center">
-                <p className="text-sm font-black text-white">{memberDisplayName}</p>
-                <p className="text-xs text-blue-200 font-mono">{memberEmail}</p>
-                <p className="text-[11px] text-[#4ade80] font-semibold pt-0.5">{t.agenda.passSeat}</p>
+              <div className="space-y-1 text-center flex flex-col items-center">
+                {userData?.picture && !imgError ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={userData.picture}
+                    alt={memberDisplayName}
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
+                    className="w-10 h-10 rounded-full border-2 border-[#4ade80] shadow-sm object-cover"
+                  />
+                ) : null}
+                <div>
+                  <p className="text-sm font-black text-white">{memberDisplayName}</p>
+                  <p className="text-xs text-blue-200 font-mono">{memberEmail}</p>
+                  <p className="text-[11px] text-[#4ade80] font-semibold pt-0.5">{t.agenda.passSeat}</p>
+                </div>
               </div>
             </div>
 
