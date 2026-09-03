@@ -10,6 +10,7 @@ export const translations = {
     // Top Navigation
     nav: {
       signIn: 'เข้าสู่ระบบ',
+      signOut: 'ออกจากระบบ',
       signUp: 'สมัครสมาชิก',
       payment: 'ชำระเงินและสลิป',
       staffScan: 'สแกนเช็คอิน',
@@ -185,6 +186,106 @@ export const translations = {
       unidentified: 'ไม่ระบุตัวตน',
       clearButton: 'ล้าง',
       verifying: 'กำลังตรวจสอบ...',
+    },
+
+    // Agenda & Event PR View
+    agenda: {
+      pageTitle: 'วาระการประชุมและประชาสัมพันธ์',
+      congressBadge: 'TSRM ANNUAL CONGRESS 2026',
+      congressTitle: 'การประชุมวิชาการประจำปี 2569',
+      congressSubtitle: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (THAISRM)',
+      congressTheme: '“Innovations & Breakthroughs in Reproductive Medicine & Embryology”',
+      eventDate: '15 - 17 ตุลาคม 2569',
+      eventLocation: 'Grand Ballroom ชั้น 22 โรงแรมเซ็นทารา แกรนด์ แอท เซ็นทรัลเวิลด์ กรุงเทพฯ',
+      
+      // Member Bar
+      memberWelcome: 'ยินดีต้อนรับสมาชิก',
+      membershipStatus: 'สถานะสมาชิก: สมบูรณ์ (Verified)',
+      passType: 'THAISRM Congress Full Pass',
+      btnMyPass: 'บัตรเข้างาน (E-Pass QR)',
+      btnDownloadAgenda: 'ดาวน์โหลดสูจิบัตร (PDF)',
+      btnLogout: 'ออกจากระบบ',
+
+      // Countdown
+      countdownTitle: 'นับถอยหลังสู่งานประชุม',
+      days: 'วัน',
+      hours: 'ชั่วโมง',
+      minutes: 'นาที',
+      seconds: 'วินาที',
+
+      // Highlights Bar
+      statDays: '3 วันเต็ม',
+      statDaysSub: 'การบรรยาย & เวิร์กช็อป',
+      statSpeakers: '28+ วิทยากร',
+      statSpeakersSub: 'ผู้เชี่ยวชาญระดับโลก',
+      statCme: '15.5 หน่วยกิต',
+      statCmeSub: 'CME / CPD Credits',
+      statSeats: '500+ ที่นั่ง',
+      statSeatsSub: 'แพทย์และนักวิทยาศาสตร์',
+
+      // Tabs & Filters
+      tabsTitle: 'กำหนดการและวาระการประชุม',
+      day1Tab: 'วันพฤหัสบดี 15 ต.ค.',
+      day1Sub: 'Pre-Congress Workshops',
+      day2Tab: 'วันศุกร์ 16 ต.ค.',
+      day2Sub: 'Main Congress & Plenary',
+      day3Tab: 'วันเสาร์ 17 ต.ค.',
+      day3Sub: 'Advanced Symposia & Gala',
+      
+      filterAll: 'ทั้งหมด',
+      filterKeynote: 'Keynote Plenary',
+      filterEmbryology: 'Embryology & Lab',
+      filterSurgery: 'Clinical & Surgery',
+      filterSymposium: 'Luncheon Symposium',
+
+      // Session UI
+      roomLabel: 'ห้องประชุม',
+      speakerLabel: 'วิทยากร',
+      moderatorLabel: 'ผู้ดำเนินรายการ',
+      addToSchedule: 'บันทึกเข้าตาราง',
+      addedToSchedule: 'บันทึกแล้ว',
+      viewAbstract: 'ดูรายละเอียด / เอกสาร',
+      downloadSlide: 'ดาวน์โหลดสไลด์',
+      liveStreamBadge: 'มีถ่ายทอดสด On-site & Online',
+      cmeBadge: 'รับหน่วยกิต CME',
+
+      // PR Highlights Section
+      prTitle: 'ข่าวสารและข้อมูลสำคัญการประชุม',
+      prSubtitle: 'ประชาสัมพันธ์กิจกรรม สิทธิประโยชน์ และข้อมูลการเดินทางสำหรับผู้เข้าร่วมงาน',
+      
+      cmeTitle: 'หน่วยกิตการศึกษาต่อเนื่อง (CME / CPD)',
+      cmeDesc: 'ผู้เข้าร่วมประชุมสามารถสะสมหน่วยกิตวิชาชีพได้ โดยสแกน QR Code เช็คอินเข้า-ออกตามรอบเวลา',
+      cmeP1: 'แพทยสภา: 15.5 หน่วยกิต CME',
+      cmeP2: 'สภาเทคนิคการแพทย์ (CPD): 12.0 หน่วยกิต',
+      cmeP3: 'สภาการพยาบาล: 10.0 หน่วยกิต CNEU',
+
+      venueTitle: 'สถานที่จัดงานและการเดินทาง',
+      venueDesc: 'ณ โรงแรมเซ็นทารา แกรนด์ แอท เซ็นทรัลเวิลด์ กรุงเทพฯ (BTS สถานีสยาม หรือ ชิดลม ทางเชื่อม Skywalk)',
+      venueParking: 'มีที่จอดรถฟรีสำหรับผู้ร่วมงาน (ประทับตราที่จุดลงทะเบียน)',
+      venueMapBtn: 'เปิด Google Maps',
+
+      dinnerTitle: 'TSRM Gala Dinner & Award Night',
+      dinnerDesc: 'ร่วมงานเลี้ยงสังสรรค์และพิธีมอบรางวัลผลงานวิจัยยอดเยี่ยม ในค่ำคืนวันที่ 16 ตุลาคม 2569 เวลา 18:30 น. ณ Lotus Ballroom',
+      dinnerDressCode: 'Theme: Smart Elegant (โทนสีน้ำเงิน/ทอง)',
+
+      researchTitle: 'การประกวดผลงานวิจัย & Poster Presentation',
+      researchDesc: 'ชมนิทรรศการผลงานวิจัยและร่วมโหวต Popular Vote Poster Presentation บริเวณ Foyer หน้าห้องประชุมใหญ่',
+      
+      supportTitle: 'ศูนย์ประสานงานและสอบถามข้อมูล',
+      supportTel: 'โทร: 02-123-4567 (กองเลขาธิการสมาคม)',
+      supportEmail: 'อีเมล: contact@thaisrm.or.th',
+      supportLine: 'Line Official: @THAISRM',
+
+      // E-Pass Modal
+      passModalTitle: 'บัตรเข้าร่วมงานดิจิทัล (THAISRM E-Pass)',
+      passModalSubtitle: 'โปรดแสดง QR Code นี้แก่เจ้าหน้าที่ ณ จุดลงทะเบียนเพื่อรับสูจิบัตรและป้ายชื่อ',
+      passHolderName: 'ชื่อผู้เข้าร่วมงาน',
+      passNumber: 'Pass No.',
+      passSeat: 'ประเภทบัตร: Full Congress Pass',
+      passSecurityNotice: 'QR Code นี้ผูกกับบัญชีสมาชิกของท่าน ใช้สแกนผ่านจุดเช็คอินของงานประชุม',
+      passCloseBtn: 'ปิดหน้าต่าง',
+      passSaveBtn: 'บันทึกรูปภาพบัตร',
+      passSavedToast: 'บันทึกบัตร E-Pass ลงเครื่องเรียบร้อยแล้ว'
     }
   },
 
@@ -197,6 +298,7 @@ export const translations = {
     // Top Navigation
     nav: {
       signIn: 'Sign In',
+      signOut: 'Sign Out',
       signUp: 'Sign Up',
       payment: 'Payment',
       staffScan: 'Staff Scan',
@@ -372,6 +474,107 @@ export const translations = {
       unidentified: 'Unidentified',
       clearButton: 'Clear',
       verifying: 'Verifying...',
+    },
+
+    // Agenda & Event PR View
+    agenda: {
+      pageTitle: 'Meeting Agenda & Event PR',
+      congressBadge: 'TSRM ANNUAL CONGRESS 2026',
+      congressTitle: 'Annual Scientific Congress 2026',
+      congressSubtitle: 'Thai Subfertility and Reproductive Medicine (THAISRM)',
+      congressTheme: '“Innovations & Breakthroughs in Reproductive Medicine & Embryology”',
+      eventDate: 'October 15 - 17, 2026',
+      eventLocation: 'Grand Ballroom, 22nd Fl., Centara Grand at CentralWorld Bangkok',
+      
+      // Member Bar
+      memberWelcome: 'Welcome, Member',
+      membershipStatus: 'Membership Status: Active (Verified)',
+      passType: 'THAISRM Congress Full Pass',
+      btnMyPass: 'View My E-Pass (QR)',
+      btnDownloadAgenda: 'Download Proceeding (PDF)',
+      btnLogout: 'Sign Out',
+
+      // Countdown
+      countdownTitle: 'Countdown to Congress',
+      days: 'Days',
+      hours: 'Hours',
+      minutes: 'Minutes',
+      seconds: 'Seconds',
+
+      // Highlights Bar
+      statDays: '3 Full Days',
+      statDaysSub: 'Lectures & Workshops',
+      statSpeakers: '28+ Speakers',
+      statSpeakersSub: 'World-Renowned Experts',
+      statCme: '15.5 Credits',
+      statCmeSub: 'CME / CPD Accreditations',
+      statSeats: '500+ Seats',
+      statSeatsSub: 'Physicians & Scientists',
+
+      // Tabs & Filters
+      tabsTitle: 'Conference Program & Schedule',
+      day1Tab: 'Thursday, Oct 15',
+      day1Sub: 'Pre-Congress Workshops',
+      day2Tab: 'Friday, Oct 16',
+      day2Sub: 'Main Congress & Plenary',
+      day3Tab: 'Saturday, Oct 17',
+      day3Sub: 'Advanced Symposia & Gala',
+      
+      filterAll: 'All Sessions',
+      filterKeynote: 'Keynote Plenary',
+      filterEmbryology: 'Embryology & Lab',
+      filterSurgery: 'Clinical & Surgery',
+      filterSymposium: 'Luncheon Symposium',
+
+      // Session UI
+      roomLabel: 'Hall / Room',
+      speakerLabel: 'Speaker',
+      moderatorLabel: 'Moderator',
+      addToSchedule: 'Add to Schedule',
+      addedToSchedule: 'Saved',
+      viewAbstract: 'View Abstract / Handout',
+      downloadSlide: 'Download Slides',
+      liveStreamBadge: 'Hybrid: On-site & Live Stream',
+      cmeBadge: 'CME Eligible',
+
+      // PR Highlights Section
+      prTitle: 'Congress News & Important PR Information',
+      prSubtitle: 'Event announcements, CPD/CME privileges, venue guidance and participant activities',
+      
+      cmeTitle: 'Continuing Professional Education (CME / CPD)',
+      cmeDesc: 'Participants can earn CME/CPD credits by checking in and out with their QR Code pass at session gates.',
+      cmeP1: 'Medical Council of Thailand: 15.5 CME Credits',
+      cmeP2: 'Medical Technology Council (CPD): 12.0 Credits',
+      cmeP3: 'Thailand Nursing & Midwifery Council: 10.0 CNEU',
+
+      venueTitle: 'Venue & Transportation Information',
+      venueDesc: 'Centara Grand & Bangkok Convention Centre at CentralWorld (Direct BTS Siam / Chit Lom skywalk connection)',
+      venueParking: 'Complimentary parking available for registered attendees (Stamp at Registration Desk)',
+      venueMapBtn: 'Open Google Maps',
+
+      dinnerTitle: 'TSRM Gala Dinner & Award Night',
+      dinnerDesc: 'Join us for an evening of celebration, networking, and the Scientific Research Awards ceremony on Oct 16, 2026 at 18:30 in Lotus Ballroom.',
+      dinnerDressCode: 'Theme: Smart Elegant (Royal Blue / Gold)',
+
+      researchTitle: 'Research Competition & Poster Exhibition',
+      researchDesc: 'Explore academic poster presentations and cast your Popular Vote at the Main Foyer area.',
+      
+      supportTitle: 'Congress Secretariat & Helpdesk',
+      supportTel: 'Tel: +66 2 123 4567 (THAISRM Secretariat)',
+      supportEmail: 'Email: contact@thaisrm.or.th',
+      supportLine: 'Line Official: @THAISRM',
+
+      // E-Pass Modal
+      passModalTitle: 'THAISRM Digital Event E-Pass',
+      passModalSubtitle: 'Present this QR code at the registration reception to collect your name badge and congress bag.',
+      passHolderName: 'Attendee Name',
+      passNumber: 'Pass No.',
+      passSeat: 'Pass Type: Full Congress Pass',
+      passSecurityNotice: 'This QR code is uniquely linked to your member registration account.',
+      passCloseBtn: 'Close',
+      passSaveBtn: 'Save E-Pass Image',
+      passSavedToast: 'E-Pass ticket saved to device successfully'
     }
   }
 };
+

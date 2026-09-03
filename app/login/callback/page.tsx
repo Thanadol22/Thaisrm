@@ -46,7 +46,7 @@ function CallbackContent() {
   }, [searchParams, router, t.login.cannotReadUser, t.login.missingToken]);
 
   const handleConfirmSuccess = () => {
-    router.push('/login');
+    router.push('/agenda');
   };
 
   return (

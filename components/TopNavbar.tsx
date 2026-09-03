@@ -2,15 +2,16 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { BornIvfLogo } from '@/components/BornIvfLogo';
 import { useLanguage } from '@/context/LanguageContext';
-import { LogIn, UserPlus, CreditCard, QrCode, Menu, X, ChevronRight } from 'lucide-react';
+import { Calendar, Sparkles, MapPin, Globe, Menu, X, ChevronRight, LogOut, CreditCard } from 'lucide-react';
 
 export function TopNavbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const router = useRouter();
   const pathname = usePathname();
-  const { t } = useLanguage();
+  const { lang, toggleLang, t } = useLanguage();
   const navRef = useRef<HTMLDivElement>(null);
 
   // Close mobile drawer when route changes
@@ -33,67 +34,89 @@ export function TopNavbar() {
     };
   }, [isOpen]);
 
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user_data');
+    } catch (e) {
+      console.error('Logout error', e);
+    }
+    router.push('/login');
+  };
+
   const navItems = [
-    { label: t.nav.signIn, path: '/login', icon: LogIn, badge: null },
-    { label: t.nav.signUp, path: '/signup', icon: UserPlus, badge: null },
-    { label: t.nav.payment, path: '/payment', icon: CreditCard, badge: null },
-    { label: t.nav.staffScan, path: '/staff/scan', icon: QrCode, badge: t.nav.staffBadge },
+    { label: lang === 'th' ? 'วาระการประชุม' : 'Agenda', href: '/agenda#agenda-section', icon: Calendar, isAnchor: true },
+    { label: lang === 'th' ? 'ข่าวสาร & ประชาสัมพันธ์' : 'News & PR', href: '/agenda#pr-section', icon: Sparkles, isAnchor: true },
+    { label: lang === 'th' ? 'สถานที่ & ติดต่อ' : 'Venue & Contact', href: '/agenda#contact-section', icon: MapPin, isAnchor: true },
+    { label: t.nav.payment, href: '/payment', icon: CreditCard, isAnchor: false },
   ];
 
   return (
-    <header ref={navRef} className="w-full bg-slate-900/95 backdrop-blur-md text-white sticky top-0 z-50 border-b border-slate-800/90 shadow-lg">
-      <div className="px-2.5 sm:px-3.5 py-2 flex items-center justify-between gap-1.5 max-w-7xl mx-auto">
+    <header ref={navRef} className="w-full bg-slate-950/95 backdrop-blur-md text-white sticky top-0 z-50 border-b border-slate-800/90 shadow-xl">
+      <div className="px-3.5 sm:px-6 py-2.5 flex items-center justify-between gap-3 max-w-7xl mx-auto">
         {/* Logo & Brand Info */}
         <Link
-          href="/login"
+          href="/agenda"
           onClick={() => setIsOpen(false)}
-          className="flex items-center gap-2 hover:opacity-90 transition shrink-0"
-          aria-label="THAISRM Home"
+          className="flex items-center gap-2.5 hover:opacity-95 transition shrink-0 group"
+          aria-label="THAISRM Agenda"
         >
-          <BornIvfLogo className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 transition-transform active:scale-95" />
+          <BornIvfLogo className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 group-hover:scale-105 transition-transform" />
           <div className="flex flex-col justify-center shrink-0">
-            <span className="block text-[9px] min-[360px]:text-[10px] font-bold text-blue-300 leading-none truncate max-w-[140px] min-[360px]:max-w-[190px] min-[440px]:max-w-[260px] sm:max-w-none">
+            <span className="block text-[9px] min-[360px]:text-[10px] font-bold text-blue-300 leading-none truncate max-w-[150px] min-[440px]:max-w-none">
               {t.associationName}
             </span>
             <span className="text-xs sm:text-sm font-black tracking-wider text-white leading-tight">
-              {t.brandName}
+              {t.brandName} <span className="text-[#4ade80] text-[10px] font-bold">2026</span>
             </span>
           </div>
         </Link>
 
-        {/* Right Section: Nav Items & Language Switcher */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Desktop & Wide Layout Navigation Pills */}
-          <nav className="hidden min-[1080px]:flex items-center bg-slate-950/90 p-0.5 rounded-xl border border-slate-800/90 gap-0.5 shrink-0">
-            {navItems.map((item) => {
-              const isActive = pathname === item.path || (pathname === '/' && item.path === '/login');
+        {/* Right Section: Desktop Navigation & Language Switcher & Logout */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Desktop Navigation Links */}
+          <nav className="hidden lg:flex items-center bg-slate-900/90 p-1 rounded-2xl border border-slate-800 gap-1 shrink-0">
+            {navItems.map((item, idx) => {
               const Icon = item.icon;
               return (
-                <Link
-                  key={item.path}
-                  href={item.path}
-                  className={`px-2 py-1 rounded-lg text-[10px] min-[1180px]:text-[11px] font-bold transition-all flex items-center gap-1 whitespace-nowrap shrink-0 ${
-                    isActive
-                      ? 'bg-[#0026b3] text-white shadow-md'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
-                  }`}
+                <a
+                  key={idx}
+                  href={item.href}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
                 >
-                  <Icon className={`w-3 h-3 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                  <Icon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                   <span>{item.label}</span>
-                  {item.badge && (
-                    <span className="ml-0.5 bg-emerald-500/20 text-emerald-300 text-[8px] font-black px-1 py-0.2 rounded-full border border-emerald-500/40 uppercase">
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
+                </a>
               );
             })}
+
+            {/* Logout Button in Desktop Nav */}
+            <button
+              onClick={handleLogout}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-rose-300 hover:text-rose-100 hover:bg-rose-950/60 transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer border border-rose-500/20 active:scale-95"
+              title={t.nav.signOut}
+            >
+              <LogOut className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+              <span>{t.nav.signOut}</span>
+            </button>
           </nav>
+
+          {/* Language Switcher Pill */}
+          <button
+            onClick={toggleLang}
+            className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white backdrop-blur-md px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-black transition border border-white/15 cursor-pointer active:scale-95 shrink-0 shadow-xs"
+            title="Switch Language / สลับภาษา"
+          >
+            <Globe className="w-3.5 h-3.5 text-[#4ade80] shrink-0" />
+            <span className={lang === 'th' ? 'text-white font-black' : 'text-blue-200/60'}>TH</span>
+            <span className="text-white/40 font-normal">|</span>
+            <span className={lang === 'en' ? 'text-white font-black' : 'text-blue-200/60'}>EN</span>
+          </button>
 
           {/* Mobile & Tablet Hamburger Button */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="min-[1080px]:hidden w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white flex items-center justify-center transition border border-slate-700/80 cursor-pointer active:scale-95 shrink-0 shadow-sm"
+            className="lg:hidden w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white flex items-center justify-center transition border border-slate-700/80 cursor-pointer active:scale-95 shrink-0 shadow-sm"
             aria-label="Toggle Navigation Menu"
             aria-expanded={isOpen}
           >
@@ -102,44 +125,50 @@ export function TopNavbar() {
         </div>
       </div>
 
-      {/* Mobile & Tablet Expandable Drawer Navigation Menu */}
+      {/* Mobile Expandable Drawer Navigation Menu */}
       {isOpen && (
-        <div className="min-[1080px]:hidden bg-slate-950/98 backdrop-blur-xl border-t border-slate-800/90 p-2.5 sm:p-3 animate-slide-down shadow-2xl space-y-1.5">
-          {navItems.map((item) => {
-            const isActive = pathname === item.path || (pathname === '/' && item.path === '/login');
+        <div className="lg:hidden bg-slate-950/98 backdrop-blur-xl border-t border-slate-800/90 p-3 sm:p-4 animate-slide-down shadow-2xl space-y-1.5">
+          {navItems.map((item, idx) => {
             const Icon = item.icon;
             return (
-              <Link
-                key={item.path}
-                href={item.path}
+              <a
+                key={idx}
+                href={item.href}
                 onClick={() => setIsOpen(false)}
-                className={`w-full px-3 py-2.5 sm:py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
-                  isActive
-                    ? 'bg-[#0026b3] text-white shadow-lg ring-1 ring-blue-500/30'
-                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
-                }`}
+                className="w-full px-3.5 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between text-slate-200 hover:bg-slate-800/80 hover:text-white"
               >
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg transition-colors ${isActive ? 'bg-white/20' : 'bg-slate-800/90'}`}>
+                  <div className="p-2 rounded-lg bg-slate-800/90 text-[#4ade80]">
                     <Icon className="w-4 h-4" />
                   </div>
                   <span className="text-xs sm:text-sm font-bold">{item.label}</span>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  {item.badge && (
-                    <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-emerald-500/30">
-                      {item.badge}
-                    </span>
-                  )}
-                  <ChevronRight className={`w-4 h-4 transition-transform ${isActive ? 'text-white translate-x-0.5' : 'text-slate-500 opacity-70'}`} />
-                </div>
-              </Link>
+                <ChevronRight className="w-4 h-4 text-slate-500" />
+              </a>
             );
           })}
+
+          {/* Mobile Logout Option */}
+          <button
+            onClick={() => {
+              setIsOpen(false);
+              handleLogout();
+            }}
+            className="w-full px-3.5 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between text-rose-300 hover:bg-rose-950/50 hover:text-rose-100 border border-rose-900/40 mt-1 cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-rose-950/60 text-rose-400">
+                <LogOut className="w-4 h-4" />
+              </div>
+              <span className="text-xs sm:text-sm font-bold">{t.nav.signOut}</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-rose-500" />
+          </button>
         </div>
       )}
     </header>
   );
 }
+
+
 
