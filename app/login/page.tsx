@@ -33,8 +33,8 @@ function LoginContent() {
       if (errorParam === 'Configuration') {
         triggerNotification(
           lang === 'th'
-            ? 'เกิดข้อผิดพลาดในการตั้งค่า Google OAuth (Configuration Error) กรุณาตรวจสอบ Authorized Redirect URI ใน Google Cloud Console ให้ตรงกับ http://localhost:3000/api/auth/callback/google'
-            : 'Google OAuth Configuration Error. Please verify Authorized Redirect URI in Google Cloud Console matches http://localhost:3000/api/auth/callback/google'
+            ? 'เกิดข้อผิดพลาดในการตั้งค่า Google OAuth (Configuration Error) กรุณาตรวจสอบ Authorized Redirect URI ใน Google Cloud Console'
+            : 'Google OAuth Configuration Error. Please verify Authorized Redirect URI in Google Cloud Console'
         );
       } else if (errorParam === 'AccessDenied') {
         triggerNotification(

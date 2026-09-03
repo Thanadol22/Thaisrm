@@ -15,6 +15,32 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     error: "/login",
   },
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      // Determine real base URL in production or current environment
+      let effectiveBaseUrl = baseUrl;
+      if (process.env.NODE_ENV === "production") {
+        if (process.env.FRONTEND_URL) {
+          effectiveBaseUrl = process.env.FRONTEND_URL;
+        } else if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes("localhost")) {
+          effectiveBaseUrl = process.env.NEXTAUTH_URL;
+        } else if (process.env.VERCEL_URL) {
+          effectiveBaseUrl = `https://${process.env.VERCEL_URL}`;
+        }
+      }
+
+      // If relative URL (e.g. /agenda), prepend effective base URL
+      if (url.startsWith("/")) {
+        return `${effectiveBaseUrl}${url}`;
+      }
+      // If absolute URL, check if origin matches
+      try {
+        const parsedUrl = new URL(url);
+        if (parsedUrl.origin === effectiveBaseUrl || parsedUrl.origin === baseUrl) {
+          return url;
+        }
+      } catch (e) {}
+      return effectiveBaseUrl;
+    },
     async jwt({ token, user, profile }) {
       // On first sign-in or subsequent token refreshes, persist Google profile data
       if (user) {
