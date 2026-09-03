@@ -2,7 +2,18 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Check, Copy, Shield, Upload, Globe } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  Check, 
+  Copy, 
+  Shield, 
+  Upload, 
+  Globe, 
+  FileText, 
+  CheckCircle2, 
+  Trash2, 
+  RotateCw 
+} from 'lucide-react';
 import { BornIvfLogo } from '@/components/BornIvfLogo';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -12,6 +23,9 @@ interface PaymentViewProps {
   onCopyBank: () => void;
   copiedBank: boolean;
   bankAccount: string;
+  uploadedSlipData?: { fileName: string; fileUrl: string } | null;
+  onRemoveSlip?: () => void;
+  onConfirmPayment: () => void;
 }
 
 export function PaymentView({
@@ -19,7 +33,10 @@ export function PaymentView({
   onOpenUploadModal,
   onCopyBank,
   copiedBank,
-  bankAccount
+  bankAccount,
+  uploadedSlipData,
+  onRemoveSlip,
+  onConfirmPayment
 }: PaymentViewProps) {
   const router = useRouter();
   const { lang, toggleLang, t } = useLanguage();
@@ -136,20 +153,103 @@ export function PaymentView({
           </button>
         </div>
 
+        {/* Uploaded Slip Card (When slip is attached) */}
+        {uploadedSlipData && (
+          <div className="bg-white rounded-2xl p-4 border-2 border-[#4ade80]/60 bg-gradient-to-b from-white to-emerald-50/30 shadow-2xs space-y-3 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 leading-tight">
+                    {t.payment.uploadedSlipTitle}
+                  </h4>
+                  <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                    อัปโหลดหลักฐานแล้ว
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={onOpenUploadModal}
+                  className="text-xs font-bold text-[#0026b3] hover:bg-blue-50 px-2.5 py-1.5 rounded-lg border border-[#0026b3]/20 transition flex items-center gap-1 cursor-pointer"
+                  title={t.payment.changeSlipButton}
+                >
+                  <RotateCw className="w-3 h-3" />
+                  <span className="text-xs">{t.payment.changeSlipButton}</span>
+                </button>
+
+                {onRemoveSlip && (
+                  <button
+                    type="button"
+                    onClick={onRemoveSlip}
+                    className="text-xs font-bold text-red-500 hover:bg-red-50 p-1.5 rounded-lg border border-red-200 transition flex items-center gap-1 cursor-pointer"
+                    title={t.payment.removeSlipButton}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Preview Thumbnail & File Name display */}
+            <div className="flex items-center gap-3 bg-slate-50/90 p-2.5 rounded-xl border border-slate-200">
+              <img
+                src={uploadedSlipData.fileUrl}
+                alt="Slip Preview"
+                className="w-12 h-14 object-cover rounded-lg border border-slate-200 shadow-2xs shrink-0 cursor-pointer hover:scale-105 transition-transform"
+                onClick={onOpenUploadModal}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 text-slate-800">
+                  <FileText className="w-4 h-4 text-[#0026b3] shrink-0" />
+                  <p className="text-xs font-bold text-slate-800 truncate" title={uploadedSlipData.fileName}>
+                    {uploadedSlipData.fileName}
+                  </p>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {t.payment.readyToConfirmNotice}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Security Encrypted Checkout Badge */}
         <div className="w-full bg-[#eff4ff] text-[#0026b3] font-bold text-[10px] sm:text-[11px] uppercase tracking-wider py-2 sm:py-2.5 px-3 sm:px-4 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 border border-[#d6e4ff] text-center">
           <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0026b3] shrink-0" />
           <span className="whitespace-normal sm:whitespace-nowrap">{t.payment.securityBadge}</span>
         </div>
 
-        {/* Primary Green CTA Button */}
-        <button
-          onClick={onOpenUploadModal}
-          className="w-full bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] font-bold text-sm sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-sm hover:shadow transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
-        >
-          <Upload className="w-5 h-5 stroke-[2.5]" />
-          <span>{t.payment.uploadButton}</span>
-        </button>
+        {/* Action Buttons Section */}
+        <div className="space-y-2.5">
+          {!uploadedSlipData ? (
+            <button
+              onClick={onOpenUploadModal}
+              className="w-full bg-white hover:bg-blue-50/50 text-[#0026b3] border-2 border-dashed border-[#0026b3]/40 font-bold text-sm sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-2xs transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Upload className="w-5 h-5 stroke-[2.5]" />
+              <span>{t.payment.uploadButton}</span>
+            </button>
+          ) : null}
+
+          {/* Confirm Payment Button */}
+          <button
+            onClick={onConfirmPayment}
+            className={`w-full font-bold text-sm sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-md transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2 ${
+              uploadedSlipData
+                ? 'bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] ring-4 ring-[#4ade80]/20'
+                : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-blue-900/10'
+            }`}
+          >
+            <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
+            <span>{t.payment.confirmPaymentButton}</span>
+          </button>
+        </div>
 
         {/* Footer Terms Disclaimer */}
         <p className="text-[10px] sm:text-[11px] text-slate-400 text-center leading-normal px-2 pb-4">
@@ -159,3 +259,4 @@ export function PaymentView({
     </div>
   );
 }
+

@@ -81,6 +81,46 @@ export function SignupView({
 
   const [photoPreview, setPhotoPreview] = useState<string | null>(initialUserData?.picture || null);
 
+  // Ultra-smooth easing scroll to top function
+  const smoothScrollToTop = (duration = 500) => {
+    if (typeof window === 'undefined') return;
+
+    const startY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    if (startY <= 0) return;
+
+    const startTime = 'performance' in window ? performance.now() : Date.now();
+
+    // Smooth cubic bezier ease-in-out curve
+    const easeInOutCubic = (t: number) => {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    };
+
+    const stepAnimation = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = easeInOutCubic(progress);
+
+      const nextY = Math.max(0, startY * (1 - ease));
+      window.scrollTo(0, nextY);
+
+      if (progress < 1) {
+        window.requestAnimationFrame(stepAnimation);
+      }
+    };
+
+    window.requestAnimationFrame(stepAnimation);
+  };
+
+  const goToStep = (step: 1 | 2 | 3) => {
+    setCurrentStep(step);
+    smoothScrollToTop(480);
+  };
+
+  // Scroll smoothly to top of the page when changing steps
+  useEffect(() => {
+    smoothScrollToTop(480);
+  }, [currentStep]);
+
   // Synchronize initialUserData prop changes instantly while staying on Step 1
   useEffect(() => {
     if (initialUserData) {
@@ -275,7 +315,7 @@ export function SignupView({
                 <button
                   key={step.id}
                   type="button"
-                  onClick={() => setCurrentStep(step.id as 1 | 2 | 3)}
+                  onClick={() => goToStep(step.id as 1 | 2 | 3)}
                   className="flex flex-col items-center relative z-10 group cursor-pointer"
                 >
                   <div
@@ -427,7 +467,7 @@ export function SignupView({
               {/* Step 1 Next Button */}
               <button
                 type="button"
-                onClick={() => setCurrentStep(2)}
+                onClick={() => goToStep(2)}
                 className="w-full bg-[#0026b3] hover:bg-[#001f94] text-white font-bold text-xs sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-md hover:shadow-lg transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
               >
                 <span>{t.signup.nextButton}</span>
@@ -663,7 +703,7 @@ export function SignupView({
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(1)}
+                  onClick={() => goToStep(1)}
                   className="px-4 py-3.5 sm:py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-2xl border border-slate-200 transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer active:scale-95"
                 >
                   <ArrowLeft className="w-4 h-4 shrink-0" />
@@ -672,7 +712,7 @@ export function SignupView({
 
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(3)}
+                  onClick={() => goToStep(3)}
                   className="flex-1 bg-[#0026b3] hover:bg-[#001f94] text-white font-bold text-xs sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-md hover:shadow-lg transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
                 >
                   <span>{t.signup.nextButton}</span>
@@ -803,7 +843,7 @@ export function SignupView({
               <div className="flex items-center gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(2)}
+                  onClick={() => goToStep(2)}
                   className="px-3.5 sm:px-4 py-3.5 sm:py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-2xl border border-slate-200 transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer active:scale-95 shadow-2xs"
                 >
                   <ArrowLeft className="w-4 h-4 shrink-0" />

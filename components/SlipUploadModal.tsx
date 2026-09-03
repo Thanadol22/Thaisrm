@@ -1,19 +1,20 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { Upload, CheckCircle2, X } from 'lucide-react';
+import { Upload, CheckCircle2, X, FileText } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface SlipUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (slipData: { fileName: string; fileUrl: string }) => void;
   bankAccount: string;
 }
 
 export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount }: SlipUploadModalProps) {
   const { t } = useLanguage();
   const [uploadedSlip, setUploadedSlip] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string>('');
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -22,6 +23,7 @@ export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount }: Sli
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setUploadedFileName(file.name);
       const reader = new FileReader();
       reader.onload = (event) => {
         setUploadedSlip(event.target?.result as string);
@@ -37,11 +39,15 @@ export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount }: Sli
     }
     setUploadSuccess(true);
     setTimeout(() => {
-      onSuccess();
+      onSuccess({
+        fileName: uploadedFileName || 'slip-transfer.png',
+        fileUrl: uploadedSlip
+      });
       onClose();
       setUploadSuccess(false);
       setUploadedSlip(null);
-    }, 1800);
+      setUploadedFileName('');
+    }, 1200);
   };
 
   return (
@@ -93,6 +99,12 @@ export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount }: Sli
                     alt="Slip Preview"
                     className="max-h-40 max-w-full rounded-xl object-contain shadow-md mx-auto"
                   />
+                  {uploadedFileName && (
+                    <div className="flex items-center justify-center gap-1.5 text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-lg max-w-[280px] truncate mx-auto border border-slate-200">
+                      <FileText className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
+                      <span className="truncate">{uploadedFileName}</span>
+                    </div>
+                  )}
                   <span className="text-xs text-[#0026b3] font-bold block">{t.slipModal.clickToChange}</span>
                 </div>
               ) : (

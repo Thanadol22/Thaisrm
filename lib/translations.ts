@@ -110,7 +110,7 @@ export const translations = {
     payment: {
       title: 'ชำระเงินค่าสมัครสมาชิก',
       subtitle: 'ชำระเงินและอัปโหลดหลักฐานการโอนเงิน (สลิป) เพื่อยืนยันการสมัครสมาชิก TSRM',
-      passName: 'บัตรสมาชิก THAISRM Premium Pass',
+      passName: 'THAISRM Premium Pass',
       passBadge: 'สมาชิกตลอดชีพ',
       feature1: 'สิทธิ์เข้าร่วมประชุมวิชาการประจำปี TSRM',
       feature2: 'ระบบการติดต่อและสอบถามทีมงานคลินิกโดยตรง',
@@ -121,9 +121,15 @@ export const translations = {
       copiedButton: 'คัดลอกแล้ว!',
       securityBadge: 'ระบบชำระเงินปลอดภัย ด้วยการเข้ารหัส 256-BIT',
       uploadButton: 'อัปโหลดสลิปการโอนเงิน',
+      confirmPaymentButton: 'ยืนยันการชำระเงิน',
+      uploadedSlipTitle: 'หลักฐานการโอนเงินที่แนบ',
+      changeSlipButton: 'เปลี่ยนสลิป',
+      removeSlipButton: 'ลบ',
+      noSlipWarning: 'กรุณาอัปโหลดสลิปการโอนเงินก่อนยืนยันการชำระเงิน',
+      readyToConfirmNotice: 'แนบสลิปเรียบร้อยแล้ว กรุณากดยืนยันการชำระเงินเพื่อดำเนินการต่อ',
       termsDisclaimer: 'การชำระเงินแสดงว่าท่านยอมรับข้อตกลงและเงื่อนไขของสมาคม TSRM',
       copyToast: 'คัดลอกเลขบัญชี 020-8-16398-1 เรียบร้อยแล้ว!',
-      uploadSuccessToast: 'อัปโหลดสลิปสำเร็จ! ระบบกำลังยืนยันยอดชำระเงินของคุณ',
+      uploadSuccessToast: 'อัปโหลดสลิปสำเร็จ! สลิปพร้อมสำหรับการยืนยันการชำระเงิน',
     },
 
     // Slip Upload Modal
@@ -302,9 +308,15 @@ export const translations = {
       copiedButton: 'Copied!',
       securityBadge: 'SECURE 256-BIT ENCRYPTED CHECKOUT',
       uploadButton: 'Upload Payment Slip',
+      confirmPaymentButton: 'Confirm Payment',
+      uploadedSlipTitle: 'Attached Payment Slip',
+      changeSlipButton: 'Change Slip',
+      removeSlipButton: 'Remove',
+      noSlipWarning: 'Please upload a payment slip before confirming payment',
+      readyToConfirmNotice: 'Slip attached successfully. Please click confirm payment to proceed.',
       termsDisclaimer: 'By making payment you agree to THAISRM terms and conditions.',
       copyToast: 'Bank account number 020-8-16398-1 copied successfully!',
-      uploadSuccessToast: 'Slip uploaded successfully! Verifying your payment status.',
+      uploadSuccessToast: 'Slip uploaded successfully! Ready for payment confirmation.',
     },
 
     // Slip Upload Modal
