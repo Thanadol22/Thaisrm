@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 import { useLanguage } from '@/context/LanguageContext';
 import { Calendar, Sparkles, MapPin, Globe, Menu, X, ChevronRight, LogOut, CreditCard } from 'lucide-react';
@@ -35,13 +36,7 @@ export function TopNavbar() {
   }, [isOpen]);
 
   const handleLogout = () => {
-    try {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user_data');
-    } catch (e) {
-      console.error('Logout error', e);
-    }
-    router.push('/login');
+    signOut({ callbackUrl: '/login' });
   };
 
   const navItems = [

@@ -4,26 +4,17 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "server": "node server/index.js",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "postinstall": "npx prisma skills sync || true"
+    "lint": "eslint"
   },
   "dependencies": {
-    "@prisma/client": "^7.10.0",
     "clsx": "^2.1.1",
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "google-auth-library": "^11.0.2",
     "html5-qrcode": "^2.3.8",
-    "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.38.0",
     "next": "16.3.4",
-    "next-auth": "^4.24.15",
+    "next-auth": "^5.0.0-beta.32",
     "nodemailer": "^7.0.13",
-    "prisma": "^8.0.0-rc.12",
     "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -31,7 +22,6 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.1",
     "@types/qrcode": "^1.5.6",
