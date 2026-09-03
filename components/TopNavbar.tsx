@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { BornIvfLogo } from '@/components/BornIvfLogo';
+import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 import { useLanguage } from '@/context/LanguageContext';
 import { Calendar, Sparkles, MapPin, Globe, Menu, X, ChevronRight, LogOut, CreditCard } from 'lucide-react';
 
@@ -61,7 +61,7 @@ export function TopNavbar() {
           className="flex items-center gap-2.5 hover:opacity-95 transition shrink-0 group"
           aria-label="THAISRM Agenda"
         >
-          <BornIvfLogo className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 group-hover:scale-105 transition-transform" />
+          <ThaiSrmLogo className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 group-hover:scale-105 transition-transform" />
           <div className="flex flex-col justify-center shrink-0">
             <span className="block text-[9px] min-[360px]:text-[10px] font-bold text-blue-300 leading-none truncate max-w-[150px] min-[440px]:max-w-none">
               {t.associationName}

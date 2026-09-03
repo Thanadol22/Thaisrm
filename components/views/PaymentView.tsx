@@ -14,7 +14,7 @@ import {
   Trash2, 
   RotateCw 
 } from 'lucide-react';
-import { BornIvfLogo } from '@/components/BornIvfLogo';
+import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface PaymentViewProps {
@@ -62,7 +62,7 @@ export function PaymentView({
                 className="flex items-center gap-2.5 min-w-0 cursor-pointer group hover:opacity-90 transition"
                 title="กลับสู่หน้าเข้าสู่ระบบ / Back to Login"
               >
-                <BornIvfLogo className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 group-hover:scale-105 transition-transform" />
+                <ThaiSrmLogo className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 group-hover:scale-105 transition-transform" />
                 <div className="min-w-0">
                   <span className="text-[9px] sm:text-[10px] font-bold text-blue-200 uppercase block leading-tight truncate">
                     {t.associationName}

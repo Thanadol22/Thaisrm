@@ -28,7 +28,7 @@ import {
   ArrowRight,
   ArrowLeft
 } from 'lucide-react';
-import { BornIvfLogo } from '@/components/BornIvfLogo';
+import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 import { GoogleIcon } from '@/components/GoogleIcon';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -260,7 +260,7 @@ export function SignupView({
               className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-90 transition"
               title="กลับสู่หน้าเข้าสู่ระบบ / Back to Login"
             >
-              <BornIvfLogo className="w-9 h-9 sm:w-12 sm:h-12 shrink-0 group-hover:scale-105 transition-transform" />
+              <ThaiSrmLogo className="w-9 h-9 sm:w-12 sm:h-12 shrink-0 group-hover:scale-105 transition-transform" />
               <div className="min-w-0">
                 <span className="text-[10px] sm:text-xs font-bold tracking-wider sm:tracking-widest text-blue-200 uppercase block truncate">
                   {t.associationName}

@@ -28,7 +28,7 @@ import {
   UserCheck,
   ChevronUp
 } from 'lucide-react';
-import { BornIvfLogo } from '@/components/BornIvfLogo';
+import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 import { useLanguage } from '@/context/LanguageContext';
 
 // Scroll-driven Reveal Component using IntersectionObserver
@@ -736,13 +736,13 @@ export function AgendaView() {
               <span>{t.agenda.congressBadge}</span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight leading-tight">
+            <h1 className="text-xl min-[400px]:text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight leading-tight [text-wrap:balance]">
               {t.agenda.congressTitle}
             </h1>
-            <p className="text-sm sm:text-base text-blue-100 font-medium">
+            <p className="text-xs sm:text-sm md:text-base text-blue-100 font-medium [text-wrap:balance]">
               {t.agenda.congressSubtitle}
             </p>
-            <p className="text-xs sm:text-sm text-[#4ade80] font-semibold italic bg-blue-950/50 inline-block px-3 py-1.5 rounded-lg border border-blue-500/30 shadow-xs">
+            <p className="text-xs sm:text-sm text-[#4ade80] font-semibold italic bg-blue-950/50 inline-block px-3 py-1.5 rounded-lg border border-blue-500/30 shadow-xs [text-wrap:balance] max-w-full">
               {t.agenda.congressTheme}
             </p>
 
@@ -1210,7 +1210,7 @@ export function AgendaView() {
             {/* Badge Header */}
             <div className="space-y-1.5 pt-1">
               <div className="inline-flex items-center gap-1.5 bg-blue-50 text-[#0026b3] px-3 py-1 rounded-full text-[11px] font-extrabold uppercase">
-                <BornIvfLogo className="w-3.5 h-3.5" />
+                <ThaiSrmLogo className="w-3.5 h-3.5" />
                 <span>THAISRM Congress Pass</span>
               </div>
               <h3 className="text-lg sm:text-xl font-black text-slate-900 leading-snug">

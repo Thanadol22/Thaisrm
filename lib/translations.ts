@@ -286,6 +286,28 @@ export const translations = {
       passCloseBtn: 'ปิดหน้าต่าง',
       passSaveBtn: 'บันทึกรูปภาพบัตร',
       passSavedToast: 'บันทึกบัตร E-Pass ลงเครื่องเรียบร้อยแล้ว'
+    },
+
+    // Footer
+    footer: {
+      orgNameTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+      orgNameEn: 'Thai Society for Reproductive Medicine (THAISRM)',
+      orgDescription: 'มุ่งมั่นส่งเสริม พัฒนา และยกระดับมาตรฐานวิชาการ การวิจัย และการบริการทางการแพทย์ด้านเวชศาสตร์การเจริญพันธุ์สู่ระดับ\u00A0สากล',
+      quickLinksTitle: 'หัวข้อสำคัญ',
+      linkAgenda: 'วาระการประชุมประจำปี',
+      linkPr: 'ประชาสัมพันธ์ & หน่วยกิต CME',
+      linkVenue: 'สถานที่จัดงาน & การเดินทาง',
+      linkSecretariat: 'ติดต่อฝ่ายเลขานุการ',
+      linkOfficialWeb: 'เว็บไซต์หลักสมาคม TSRM',
+      contactTitle: 'กองเลขาธิการสมาคม',
+      address: 'อาคารเฉลิมพระบารมี ๕๐ ปี ซอยศูนย์วิจัย ถนนเพชรบุรีตัดใหม่ แขวงบางกะปิ เขตห้วยขวาง กรุงเทพฯ 10310',
+      phone: 'โทรศัพท์: +66 (0) 2-716-6556',
+      email: 'อีเมล: secretariat@thaisrm.or.th',
+      hours: 'เวลาทำการ: จันทร์ - ศุกร์ 08:30 - 17:00 น.',
+      copyright: 'สงวนลิขสิทธิ์ © 2026 สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (THAISRM)',
+      privacy: 'นโยบายความเป็นส่วนตัว',
+      terms: 'ข้อกำหนดและเงื่อนไข',
+      pdpa: 'การคุ้มครองข้อมูลส่วนบุคคล (PDPA)'
     }
   },
 
@@ -574,6 +596,28 @@ export const translations = {
       passCloseBtn: 'Close',
       passSaveBtn: 'Save E-Pass Image',
       passSavedToast: 'E-Pass ticket saved to device successfully'
+    },
+
+    // Footer
+    footer: {
+      orgNameTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+      orgNameEn: 'Thai Society for Reproductive Medicine (THAISRM)',
+      orgDescription: 'มุ่งมั่นส่งเสริม พัฒนา และยกระดับมาตรฐานวิชาการ การวิจัย และการบริการทางการแพทย์ด้านเวชศาสตร์การเจริญพันธุ์สู่ระดับสากล',
+      quickLinksTitle: 'หัวข้อสำคัญ',
+      linkAgenda: 'วาระการประชุมประจำปี',
+      linkPr: 'ประชาสัมพันธ์ & หน่วยกิต CME',
+      linkVenue: 'สถานที่จัดงาน & การเดินทาง',
+      linkSecretariat: 'ติดต่อฝ่ายเลขานุการ',
+      linkOfficialWeb: 'เว็บไซต์หลักสมาคม TSRM',
+      contactTitle: 'กองเลขาธิการสมาคม',
+      address: 'อาคารเฉลิมพระบารมี ๕๐ ปี ซอยศูนย์วิจัย ถนนเพชรบุรีตัดใหม่ แขวงบางกะปิ เขตห้วยขวาง กรุงเทพฯ 10310',
+      phone: 'โทรศัพท์: +66 (0) 2-716-6556',
+      email: 'อีเมล: secretariat@thaisrm.or.th',
+      hours: 'เวลาทำการ: จันทร์ - ศุกร์ 08:30 - 17:00 น.',
+      copyright: 'สงวนลิขสิทธิ์ © 2026 สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (THAISRM)',
+      privacy: 'นโยบายความเป็นส่วนตัว',
+      terms: 'ข้อกำหนดและเงื่อนไข',
+      pdpa: 'การคุ้มครองข้อมูลส่วนบุคคล (PDPA)'
     }
   }
 };

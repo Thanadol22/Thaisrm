@@ -2,6 +2,7 @@ import React from 'react';
 import { Metadata } from 'next';
 import { TopNavbar } from '@/components/TopNavbar';
 import { AgendaView } from '@/components/views/AgendaView';
+import { Footer } from '@/components/Footer';
 
 export const metadata: Metadata = {
   title: 'วาระการประชุม & ประชาสัมพันธ์ | TSRM Annual Congress 2026',
@@ -18,6 +19,10 @@ export default function AgendaPage() {
       <div className="flex-1 flex flex-col">
         <AgendaView />
       </div>
+
+      {/* Footer Section */}
+      <Footer />
     </div>
   );
 }
+

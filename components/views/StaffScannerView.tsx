@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Html5Qrcode } from 'html5-qrcode';
 import { Camera, QrCode, Search, CheckCircle2, AlertTriangle, XCircle, Users, UserCheck, AlertCircle, Video, VideoOff, ShieldCheck, Sparkles, Globe, Lock, Delete } from 'lucide-react';
-import { BornIvfLogo } from '@/components/BornIvfLogo';
+import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface CheckInRecord {
@@ -279,7 +279,7 @@ export function StaffScannerView() {
                 className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-90 transition"
                 title="กลับสู่หน้าเข้าสู่ระบบ / Back to Login"
               >
-                <BornIvfLogo className="w-8 h-8 sm:w-10 sm:h-10 ring-2 ring-[#4ade80]/40 shadow-sm shrink-0 group-hover:scale-105 transition-transform" />
+                <ThaiSrmLogo className="w-8 h-8 sm:w-10 sm:h-10 ring-2 ring-[#4ade80]/40 shadow-sm shrink-0 group-hover:scale-105 transition-transform" />
                 <div className="min-w-0">
                   <span className="text-[10px] sm:text-xs font-bold text-blue-200 block leading-tight truncate">
                     {t.associationName}
@@ -422,7 +422,7 @@ export function StaffScannerView() {
               className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-90 transition"
               title="กลับสู่หน้าเข้าสู่ระบบ / Back to Login"
             >
-              <BornIvfLogo className="w-8 h-8 sm:w-10 sm:h-10 ring-2 ring-[#4ade80]/40 shadow-sm shrink-0 group-hover:scale-105 transition-transform" />
+              <ThaiSrmLogo className="w-8 h-8 sm:w-10 sm:h-10 ring-2 ring-[#4ade80]/40 shadow-sm shrink-0 group-hover:scale-105 transition-transform" />
               <div className="min-w-0">
                 <span className="text-[10px] sm:text-xs font-bold text-blue-200 block leading-tight truncate">
                   {t.associationName}

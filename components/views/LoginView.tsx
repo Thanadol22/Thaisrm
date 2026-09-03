@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Shield, Globe } from 'lucide-react';
-import { BornIvfLogo } from '@/components/BornIvfLogo';
+import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 import { GoogleIcon } from '@/components/GoogleIcon';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -29,7 +29,7 @@ export function LoginView({ onNavigateToSignup, onGoogleSignIn }: LoginViewProps
               className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-90 transition"
               title="หน้าเข้าสู่ระบบ / Login Page"
             >
-              <BornIvfLogo className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 group-hover:scale-105 transition-transform" />
+              <ThaiSrmLogo className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 group-hover:scale-105 transition-transform" />
               <div className="min-w-0">
                 <span className="text-[10px] sm:text-xs font-bold tracking-wider sm:tracking-widest text-blue-200 uppercase block truncate">
                   {t.associationName}
