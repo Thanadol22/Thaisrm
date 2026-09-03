@@ -21,12 +21,12 @@
     "proceedToPaymentButton": "Proceed to Payment"
   },
   "login": {
-    "welcomeTitle": "Welcome Back",
-    "welcomeSubtitle": "Sign in to access your member account and event features.",
+    "welcomeTitle": "Attendee Sign In",
+    "welcomeSubtitle": "Sign in to access your event E-Pass, agenda, and conference details.",
     "securityBadge": "SECURE SINGLE SIGN-ON",
     "googleSignInButton": "Sign in with Google",
-    "noAccount": "Don't have an account?",
-    "signUpLink": "Sign Up",
+    "noAccount": "Haven't registered for the event yet?",
+    "signUpLink": "Register Now",
     "googleSuccessToast": "Signed in with Google successfully",
     "serverError": "Server connection error occurred",
     "verifyingAuth": "Authenticating...",

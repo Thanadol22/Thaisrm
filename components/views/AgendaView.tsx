@@ -1225,11 +1225,11 @@ export function AgendaView() {
 
       {/* Digital E-Pass Modal */}
       {showPassModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-start sm:items-center justify-center p-3 sm:p-4 pt-4 sm:pt-6 overflow-y-auto animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-sm sm:max-w-md w-full p-5 sm:p-7 shadow-2xl border border-slate-200 relative animate-scale-up space-y-4 text-center my-2 sm:my-auto">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-start justify-center p-4 pt-6 sm:pt-10 overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-sm sm:max-w-md w-full p-5 sm:p-7 shadow-2xl border border-slate-200 relative animate-scale-up space-y-4 text-center mb-6">
             <button
               onClick={() => setShowPassModal(false)}
-              className="absolute top-3.5 right-3.5 text-slate-400 hover:text-slate-700 p-2 rounded-full hover:bg-slate-100 transition cursor-pointer"
+              className="absolute top-3.5 right-3.5 text-slate-400 hover:text-slate-700 p-2 rounded-full hover:bg-slate-100 transition cursor-pointer z-10"
             >
               <X className="w-5 h-5" />
             </button>
