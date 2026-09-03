@@ -81,45 +81,9 @@ export function SignupView({
 
   const [photoPreview, setPhotoPreview] = useState<string | null>(initialUserData?.picture || null);
 
-  // Ultra-smooth easing scroll to top function
-  const smoothScrollToTop = (duration = 500) => {
-    if (typeof window === 'undefined') return;
-
-    const startY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
-    if (startY <= 0) return;
-
-    const startTime = 'performance' in window ? performance.now() : Date.now();
-
-    // Smooth cubic bezier ease-in-out curve
-    const easeInOutCubic = (t: number) => {
-      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    };
-
-    const stepAnimation = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const ease = easeInOutCubic(progress);
-
-      const nextY = Math.max(0, startY * (1 - ease));
-      window.scrollTo(0, nextY);
-
-      if (progress < 1) {
-        window.requestAnimationFrame(stepAnimation);
-      }
-    };
-
-    window.requestAnimationFrame(stepAnimation);
-  };
-
   const goToStep = (step: 1 | 2 | 3) => {
     setCurrentStep(step);
-    smoothScrollToTop(480);
   };
-
-  // Scroll smoothly to top of the page when changing steps
-  useEffect(() => {
-    smoothScrollToTop(480);
-  }, [currentStep]);
 
   // Synchronize initialUserData prop changes instantly while staying on Step 1
   useEffect(() => {
