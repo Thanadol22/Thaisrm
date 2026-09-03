@@ -1,21 +1,56 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { signIn, signOut } from 'next-auth/react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { signIn, signOut, useSession } from 'next-auth/react';
 import { LoginView } from '@/components/views/LoginView';
 import { ToastNotification } from '@/components/ToastNotification';
 import { useLanguage } from '@/context/LanguageContext';
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
-  const { t } = useLanguage();
+  const searchParams = useSearchParams();
+  const { data: session, status } = useSession();
+  const { t, lang } = useLanguage();
   const [notification, setNotification] = useState<string | null>(null);
 
   const triggerNotification = (msg: string) => {
     setNotification(msg);
-    setTimeout(() => setNotification(null), 4000);
+    setTimeout(() => setNotification(null), 5000);
   };
+
+  // If already logged in, automatically redirect to /agenda
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user) {
+      router.replace('/agenda');
+    }
+  }, [status, session, router]);
+
+  // Handle URL errors (e.g. ?error=Configuration or ?error=AccessDenied)
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    if (errorParam) {
+      if (errorParam === 'Configuration') {
+        triggerNotification(
+          lang === 'th'
+            ? 'เกิดข้อผิดพลาดในการตั้งค่า Google OAuth (Configuration Error) กรุณาตรวจสอบ Authorized Redirect URI ใน Google Cloud Console ให้ตรงกับ http://localhost:3000/api/auth/callback/google'
+            : 'Google OAuth Configuration Error. Please verify Authorized Redirect URI in Google Cloud Console matches http://localhost:3000/api/auth/callback/google'
+        );
+      } else if (errorParam === 'AccessDenied') {
+        triggerNotification(
+          lang === 'th'
+            ? 'การเข้าสู่ระบบถูกปฏิเสธ (Access Denied)'
+            : 'Access was denied during sign in.'
+        );
+      } else {
+        triggerNotification(
+          lang === 'th'
+            ? `การเข้าสู่ระบบไม่สำเร็จ (${errorParam})`
+            : `Sign in failed (${errorParam})`
+        );
+      }
+    }
+  }, [searchParams, lang]);
 
   const handleGoogleSignIn = async () => {
     try {
@@ -52,3 +87,18 @@ export default function LoginPage() {
     </div>
   );
 }
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+          <div className="w-8 h-8 border-4 border-[#0026b3] border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
+  );
+}
+
