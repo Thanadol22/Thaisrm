@@ -7,7 +7,9 @@
     "signOut": "Sign Out",
     "signUp": "Sign Up",
     "payment": "Payment",
-    "staffScan": "Staff Scan",
+    "staffScan": "Scan Check-in",
+    "staffSlips": "Payment Slips",
+    "staffHistory": "Registration Data",
     "staffBadge": "Staff"
   },
   "successModal": {

@@ -66,7 +66,6 @@ export default function PaymentPage() {
 
       <main className="w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl min-h-screen bg-[#f6f8fc] shadow-2xl flex flex-col justify-between relative border-x border-slate-200/80 overflow-hidden transition-all duration-300">
         <PaymentView
-          onNavigateBack={() => router.push('/signup')}
           onOpenUploadModal={() => setUploadModalOpen(true)}
           onCopyBank={handleCopyBank}
           copiedBank={copiedBank}

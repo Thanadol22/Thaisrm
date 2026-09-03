@@ -47,10 +47,27 @@ export function StaffScannerView() {
     setIsAuthChecking(false);
   }, []);
 
-  // Web Audio API Beep Generator for Scanner Feedback
+  // Shared Web Audio API Beep Generator for Instant Audio Feedback (Zero Latency)
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const getAudioContext = () => {
+    if (typeof window === 'undefined') return null;
+    if (!audioCtxRef.current) {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        audioCtxRef.current = new AudioContextClass();
+      }
+    }
+    if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume();
+    }
+    return audioCtxRef.current;
+  };
+
   const playBeepSound = (type: 'success' | 'warning' | 'error') => {
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioCtx = getAudioContext();
+      if (!audioCtx) return;
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.connect(gain);
@@ -658,3 +675,4 @@ export function StaffScannerView() {
     </div>
   );
 }
+

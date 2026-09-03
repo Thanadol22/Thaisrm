@@ -8,6 +8,8 @@
     "signUp": "สมัครสมาชิก",
     "payment": "ชำระเงินและสลิป",
     "staffScan": "สแกนเช็คอิน",
+    "staffSlips": "สลิปการโอนเงิน",
+    "staffHistory": "ข้อมูลการลงทะเบียน",
     "staffBadge": "เจ้าหน้าที่"
   },
   "successModal": {
@@ -25,8 +27,8 @@
     "welcomeSubtitle": "เข้าสู่ระบบเพื่อดูสูจิบัตร กำหนดการ และบัตร E-Pass สำหรับเข้าร่วมงาน",
     "securityBadge": "ระบบเข้าสู่ระบบปลอดภัย",
     "googleSignInButton": "เข้าสู่ระบบด้วย Google",
-    "noAccount": "ยังไม่ได้ลงทะเบียนเข้าร่วมงาน?",
-    "signUpLink": "ลงทะเบียนเข้าร่วมงาน",
+    "noAccount": "ยังไม่ได้ลงทะเบียน?",
+    "signUpLink": "สมัครสมาชิก",
     "googleSuccessToast": "เข้าสู่ระบบด้วย Google สำเร็จ",
     "serverError": "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์",
     "verifyingAuth": "กำลังยืนยันตัวตน...",

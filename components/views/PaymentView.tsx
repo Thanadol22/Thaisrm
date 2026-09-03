@@ -3,7 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  ArrowLeft, 
+  ArrowLeft,
   Check, 
   Copy, 
   Shield, 
@@ -18,7 +18,7 @@ import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface PaymentViewProps {
-  onNavigateBack: () => void;
+  onNavigateBack?: () => void;
   onOpenUploadModal: () => void;
   onCopyBank: () => void;
   copiedBank: boolean;
@@ -41,6 +41,16 @@ export function PaymentView({
   const router = useRouter();
   const { lang, toggleLang, t } = useLanguage();
 
+  const handleBack = () => {
+    if (onNavigateBack) {
+      onNavigateBack();
+    } else if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/agenda');
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[640px]">
       {/* Header Blue Card Section */}
@@ -50,8 +60,10 @@ export function PaymentView({
             <div className="flex items-center gap-3 min-w-0">
               {/* Back Button */}
               <button
-                onClick={onNavigateBack}
+                onClick={handleBack}
                 className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-white/15 hover:bg-white/25 backdrop-blur-md text-white flex items-center justify-center transition border border-white/15 cursor-pointer active:scale-95 shrink-0"
+                title="ย้อนกลับไปหน้าก่อนหน้า / Go Back"
+                aria-label="ย้อนกลับไปหน้าก่อนหน้า"
               >
                 <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>

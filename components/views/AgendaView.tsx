@@ -32,6 +32,41 @@ import {
 import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 import { useLanguage } from '@/context/LanguageContext';
 
+// Zero-overhead Scroll Progress Bar using RAF & direct DOM updates (0 React re-renders)
+function ScrollProgressBar() {
+  const barRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          if (barRef.current) {
+            const totalScrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const progress = totalScrollHeight > 0 ? (window.scrollY / totalScrollHeight) * 100 : 0;
+            barRef.current.style.width = `${progress}%`;
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  return (
+    <div className="fixed top-0 left-0 right-0 h-1 z-50 bg-slate-900/10 pointer-events-none">
+      <div
+        ref={barRef}
+        className="h-full bg-gradient-to-r from-[#0026b3] via-[#0055ff] to-[#4ade80] shadow-[0_0_10px_rgba(74,222,128,0.8)]"
+        style={{ width: '0%', transition: 'width 75ms ease-out' }}
+      />
+    </div>
+  );
+}
+
 // Scroll-driven Reveal Component using IntersectionObserver
 function RevealOnScroll({
   children,
@@ -511,7 +546,6 @@ export function AgendaView() {
   const [imgError, setImgError] = useState<boolean>(false);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [scrollProgress, setScrollProgress] = useState<number>(0);
   const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
 
   const [timeLeft, setTimeLeft] = useState<{
@@ -558,15 +592,15 @@ export function AgendaView() {
     }
   }, [session]);
 
-  // Scroll Progress and Scroll-to-Top tracking
+  // Optimized Scroll-to-Top tracking (only re-render when boolean threshold crossed)
   useEffect(() => {
+    let prevShow = false;
     const handleScroll = () => {
-      const totalScrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-      if (totalScrollHeight > 0) {
-        const currentProgress = (window.scrollY / totalScrollHeight) * 100;
-        setScrollProgress(currentProgress);
+      const shouldShow = window.scrollY > 350;
+      if (shouldShow !== prevShow) {
+        prevShow = shouldShow;
+        setShowScrollTop(shouldShow);
       }
-      setShowScrollTop(window.scrollY > 350);
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -633,18 +667,20 @@ export function AgendaView() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const filteredSessions = AGENDA_DATA.filter((session) => {
-    if (session.day !== selectedDay) return false;
-    if (filterCategory !== 'all' && session.category !== filterCategory) return false;
-    if (searchTerm.trim() !== '') {
-      const term = searchTerm.toLowerCase();
-      const matchTh = session.titleTh.toLowerCase().includes(term) || session.descriptionTh.toLowerCase().includes(term);
-      const matchEn = session.titleEn.toLowerCase().includes(term) || session.descriptionEn.toLowerCase().includes(term);
-      const matchSpeaker = session.speakers.some(s => s.nameTh.toLowerCase().includes(term) || s.nameEn.toLowerCase().includes(term));
-      return matchTh || matchEn || matchSpeaker;
-    }
-    return true;
-  });
+  const filteredSessions = React.useMemo(() => {
+    return AGENDA_DATA.filter((session) => {
+      if (session.day !== selectedDay) return false;
+      if (filterCategory !== 'all' && session.category !== filterCategory) return false;
+      if (searchTerm.trim() !== '') {
+        const term = searchTerm.toLowerCase();
+        const matchTh = session.titleTh.toLowerCase().includes(term) || session.descriptionTh.toLowerCase().includes(term);
+        const matchEn = session.titleEn.toLowerCase().includes(term) || session.descriptionEn.toLowerCase().includes(term);
+        const matchSpeaker = session.speakers.some(s => s.nameTh.toLowerCase().includes(term) || s.nameEn.toLowerCase().includes(term));
+        return matchTh || matchEn || matchSpeaker;
+      }
+      return true;
+    });
+  }, [selectedDay, filterCategory, searchTerm]);
 
   const memberDisplayName = userData?.name || (lang === 'th' ? 'สมาชิกสมาคม TSRM' : 'TSRM Active Member');
   const memberEmail = userData?.email || 'member@thaisrm.or.th';
@@ -652,12 +688,7 @@ export function AgendaView() {
   return (
     <div className="flex-1 w-full bg-[#f8fafc] text-slate-800 font-sans pb-20 animate-fade-in overflow-x-hidden relative">
       {/* Scroll Progress Indicator Bar at Top */}
-      <div className="fixed top-0 left-0 right-0 h-1 z-50 bg-slate-900/10 pointer-events-none">
-        <div
-          className="h-full bg-gradient-to-r from-[#0026b3] via-[#0055ff] to-[#4ade80] transition-all duration-150 ease-out shadow-[0_0_10px_rgba(74,222,128,0.8)]"
-          style={{ width: `${scrollProgress}%` }}
-        />
-      </div>
+      <ScrollProgressBar />
 
       {/* Toast Notification */}
       {toastMessage && (

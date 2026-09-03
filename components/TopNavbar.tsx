@@ -74,14 +74,14 @@ export function TopNavbar() {
             {navItems.map((item, idx) => {
               const Icon = item.icon;
               return (
-                <a
+                <Link
                   key={idx}
                   href={item.href}
                   className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
                 >
                   <Icon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                   <span>{item.label}</span>
-                </a>
+                </Link>
               );
             })}
 
@@ -126,7 +126,7 @@ export function TopNavbar() {
           {navItems.map((item, idx) => {
             const Icon = item.icon;
             return (
-              <a
+              <Link
                 key={idx}
                 href={item.href}
                 onClick={() => setIsOpen(false)}
@@ -139,7 +139,7 @@ export function TopNavbar() {
                   <span className="text-xs sm:text-sm font-bold">{item.label}</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-500" />
-              </a>
+              </Link>
             );
           })}
 

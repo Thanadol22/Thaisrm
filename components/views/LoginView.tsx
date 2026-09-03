@@ -25,9 +25,7 @@ export function LoginView({ onNavigateToSignup, onGoogleSignIn }: LoginViewProps
         <div className="relative z-10">
           <div className="flex items-center justify-between gap-3 mb-2">
             <div
-              onClick={() => window.location.href = '/login'}
-              className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-90 transition"
-              title="หน้าเข้าสู่ระบบ / Login Page"
+              className="flex items-center gap-2.5 sm:gap-3 min-w-0 group hover:opacity-95 transition"
             >
               <ThaiSrmLogo className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 group-hover:scale-105 transition-transform" />
               <div className="min-w-0">
