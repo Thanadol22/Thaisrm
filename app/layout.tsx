@@ -19,12 +19,13 @@ export const metadata: Metadata = {
   description: "Event platform for association management, registration, and attendee experience.",
   icons: {
     icon: [
-      { url: '/tsrm-logoPNG.png', type: 'image/png' },
-      { url: '/favicon.ico' }
+      { url: '/tsrm-logoPNG.png?v=2', type: 'image/png' },
+      { url: '/favicon.ico?v=2' }
     ],
-    shortcut: ['/tsrm-logoPNG.png'],
+    shortcut: ['/tsrm-logoPNG.png?v=2'],
     apple: [
-      { url: '/tsrm-logoPNG.png', type: 'image/png' }
+      { url: '/apple-touch-icon.png?v=2', sizes: '180x180', type: 'image/png' },
+      { url: '/tsrm-logoPNG.png?v=2', type: 'image/png' }
     ]
   }
 };
