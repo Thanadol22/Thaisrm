@@ -17,6 +17,16 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "THAISRM | Meeting System",
   description: "Event platform for association management, registration, and attendee experience.",
+  icons: {
+    icon: [
+      { url: '/tsrm-logoPNG.png', type: 'image/png' },
+      { url: '/favicon.ico' }
+    ],
+    shortcut: ['/tsrm-logoPNG.png'],
+    apple: [
+      { url: '/tsrm-logoPNG.png', type: 'image/png' }
+    ]
+  }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

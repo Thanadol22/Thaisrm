@@ -17,7 +17,7 @@ interface CheckInRecord {
 export function StaffScannerView() {
   const router = useRouter();
   const { lang, toggleLang, t } = useLanguage();
-  
+
   // Staff Passcode Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
@@ -220,22 +220,77 @@ export function StaffScannerView() {
     };
   }, [isCameraOn, isAuthenticated]);
 
-  // Process Scanned Code
+const KNOWN_ATTENDEES: Record<string, { name: string; email: string; ticketType: string }> = {
+  'TSRM-2026-8891': {
+    name: 'ธนดล จำปาเต็ม',
+    email: 'thanadolpetch22@gmail.com',
+    ticketType: 'THAISRM Congress Full Pass',
+  },
+  'TSRM-2026-0012': {
+    name: 'นพ. วรวัฒน์ เกียรติอนันต์',
+    email: 'worawat.k@chula.md.ac.th',
+    ticketType: 'THAISRM Congress Full Pass',
+  },
+  'TSRM-2026-0034': {
+    name: 'พญ. นภัสสร สุวรรณเวช',
+    email: 'napassorn.s@med.tu.ac.th',
+    ticketType: 'THAISRM Congress Full Pass',
+  },
+  'TSRM-2026-0089': {
+    name: 'นว. ปรียานุช รัตนศิลป์',
+    email: 'preeyanuch.r@ivfcenter.co.th',
+    ticketType: 'Embryology Workshop Only',
+  },
+  'TSRM-2026-0005': {
+    name: 'นพ. ธนกฤต วิเศษไพบูลย์',
+    email: 'thanakrit.w@siriraj.ac.th',
+    ticketType: 'THAISRM Congress Full Pass',
+  },
+  'TSRM-2026-0104': {
+    name: 'ภญ. พัชราภา วงศ์มณี',
+    email: 'patcharapa.w@pharma.com',
+    ticketType: 'Day Pass (Day 2 Only)',
+  },
+  'TSRM-2026-0168': {
+    name: 'พว. กัลยา สุขสำราญ',
+    email: 'kanlaya.s@bnh.co.th',
+    ticketType: 'THAISRM Congress Full Pass',
+  },
+};
+
+  // Process Scanned Code or Manual Pass Token
   const handleProcessScan = (decodedText: string) => {
     setIsProcessing(true);
-    const inputCode = decodedText || 'TICKET-2026-8891';
+    const trimmed = (decodedText || '').trim();
+    if (!trimmed) {
+      setIsProcessing(false);
+      return;
+    }
 
-    if (inputCode.includes('DUP') || inputCode === 'TICKET-DUP') {
+    // Support JSON encoded QR codes
+    let parsedJson: any = null;
+    try {
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        parsedJson = JSON.parse(trimmed);
+      }
+    } catch {
+      // not JSON
+    }
+
+    const inputCode = parsedJson?.code || parsedJson?.id || trimmed;
+    const upperCode = inputCode.toUpperCase();
+
+    if (upperCode.includes('DUP') || upperCode === 'TICKET-DUP') {
       playBeepSound('warning');
       setLastScanned({
-        id: 'TICKET-2026-0042',
+        id: 'TSRM-2026-0042',
         name: 'สมชาย ใจดี',
         ticketType: 'THAISRM Premium Pass',
         email: 'somchai@example.com',
-        checkInTime: '10:15',
+        checkInTime: new Date().toLocaleTimeString(lang === 'th' ? 'th-TH' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
         status: 'duplicate'
       });
-    } else if (inputCode.includes('ERR')) {
+    } else if (upperCode.includes('ERR') || upperCode === 'INVALID') {
       playBeepSound('error');
       setLastScanned({
         id: inputCode,
@@ -246,19 +301,55 @@ export function StaffScannerView() {
         status: 'invalid'
       });
     } else {
+      // Lookup in known attendees
+      let matched = KNOWN_ATTENDEES[upperCode];
+
+      // Support partial search (e.g. "8891", "0012", "0034")
+      if (!matched) {
+        const foundKey = Object.keys(KNOWN_ATTENDEES).find(
+          k => k.endsWith(upperCode) || k.includes(upperCode) || upperCode.endsWith(k.split('-').pop() || '')
+        );
+        if (foundKey) {
+          matched = KNOWN_ATTENDEES[foundKey];
+        }
+      }
+
+      // Check current user from local storage
+      if (!matched && typeof window !== 'undefined') {
+        try {
+          const stored = localStorage.getItem('user_data');
+          if (stored) {
+            const u = JSON.parse(stored);
+            if (u?.name || u?.email) {
+              matched = {
+                name: u.name || 'สมาชิก TSRM',
+                email: u.email || 'member@thaisrm.or.th',
+                ticketType: 'Full Congress Pass'
+              };
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      const finalName = parsedJson?.name || matched?.name || (lang === 'th' ? 'ธนดล จำปาเต็ม' : 'Thanadol Jampatem');
+      const finalEmail = parsedJson?.email || matched?.email || 'thanadolpetch22@gmail.com';
+      const finalTicketType = parsedJson?.ticketType || matched?.ticketType || 'THAISRM Congress Full Pass';
+
       playBeepSound('success');
       setLastScanned({
-        id: inputCode,
-        name: 'ภัทรพล วงศ์สวัสดิ์',
-        ticketType: 'THAISRM Premium Pass',
-        email: 'phattarapol@example.com',
+        id: inputCode.startsWith('TSRM-') ? inputCode : `TSRM-2026-${inputCode}`,
+        name: finalName,
+        ticketType: finalTicketType,
+        email: finalEmail,
         checkInTime: new Date().toLocaleTimeString(lang === 'th' ? 'th-TH' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
         status: 'success'
       });
       setStats(prev => ({ ...prev, checkedIn: Math.min(prev.total, prev.checkedIn + 1) }));
     }
 
-    // Pause for 2 seconds before allowing next scan
+    // Pause for 2 seconds before allowing next camera frame scan
     setTimeout(() => {
       setIsProcessing(false);
     }, 2000);
@@ -291,7 +382,7 @@ export function StaffScannerView() {
 
           <div className="relative z-10 space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <div 
+              <div
                 onClick={handleBackToLogin}
                 className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-90 transition"
                 title="กลับสู่หน้าเข้าสู่ระบบ / Back to Login"
@@ -306,7 +397,7 @@ export function StaffScannerView() {
                   </span>
                 </div>
               </div>
-              
+
               {/* Language Switcher Pill */}
               <button
                 onClick={toggleLang}
@@ -354,20 +445,19 @@ export function StaffScannerView() {
           />
 
           {/* 6 Digit Indicators */}
-          <div 
+          <div
             onClick={() => document.getElementById('staff-pin-input')?.focus()}
             className={`flex justify-center gap-2.5 sm:gap-3 my-3 cursor-pointer ${isShake ? 'animate-shake' : ''}`}
           >
             {[0, 1, 2, 3, 4, 5].map((index) => (
               <div
                 key={index}
-                className={`w-10 h-12 sm:w-11 sm:h-13 rounded-2xl border-2 flex items-center justify-center text-xl font-black transition-all duration-200 ${
-                  pin.length > index
-                    ? 'border-[#0026b3] bg-[#0026b3] text-white shadow-md scale-105'
-                    : pin.length === index
+                className={`w-10 h-12 sm:w-11 sm:h-13 rounded-2xl border-2 flex items-center justify-center text-xl font-black transition-all duration-200 ${pin.length > index
+                  ? 'border-[#0026b3] bg-[#0026b3] text-white shadow-md scale-105'
+                  : pin.length === index
                     ? 'border-[#0026b3] bg-blue-50/80 text-blue-900 animate-pulse'
                     : 'border-slate-200 bg-white text-slate-400'
-                }`}
+                  }`}
               >
                 {pin.length > index ? '●' : ''}
               </div>
@@ -434,7 +524,7 @@ export function StaffScannerView() {
 
         <div className="relative z-10 space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <div 
+            <div
               onClick={handleBackToLogin}
               className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-90 transition"
               title="กลับสู่หน้าเข้าสู่ระบบ / Back to Login"
@@ -449,7 +539,7 @@ export function StaffScannerView() {
                 </span>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2 shrink-0">
               {/* Language Switcher Pill */}
               <button
@@ -591,11 +681,11 @@ export function StaffScannerView() {
           {/* Quick Test Action Buttons for Demo */}
           <div className="flex gap-2">
             <button
-              onClick={() => handleProcessScan('TICKET-2026-PASS')}
+              onClick={() => handleProcessScan('TSRM-2026-8891')}
               className="flex-1 py-2.5 sm:py-3 px-2 sm:px-3 rounded-2xl bg-[#4ade80]/20 hover:bg-[#4ade80]/30 text-emerald-950 border border-[#4ade80]/50 text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer shadow-2xs whitespace-nowrap"
             >
               <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-700 shrink-0" />
-              <span>{t.staff.statusSuccess}</span>
+              <span>{t.staff.statusSuccess} (8891)</span>
             </button>
             <button
               onClick={() => handleProcessScan('TICKET-DUP')}
@@ -641,9 +731,16 @@ export function StaffScannerView() {
                 </span>
               </div>
 
-              <div className="mt-3 pt-2.5 border-t border-slate-200/80 text-[11px] sm:text-xs flex justify-between text-slate-600 font-semibold gap-2">
-                <span className="truncate">{t.staff.participantName} {lastScanned.name}</span>
-                <span className="shrink-0 whitespace-nowrap">{t.staff.checkInTimeLabel} {lastScanned.checkInTime}</span>
+              <div className="mt-3 pt-2.5 border-t border-slate-200/80 text-[11px] sm:text-xs flex flex-wrap justify-between items-end text-slate-600 font-semibold gap-2">
+                <div className="min-w-0">
+                  <span className="truncate block">{t.staff.participantName} {lastScanned.name}</span>
+                  {lastScanned.id && (
+                    <span className="inline-flex items-center gap-1 font-mono text-[10px] text-blue-900 bg-blue-100/80 font-black px-2 py-0.5 rounded-md mt-1">
+                      Token: {lastScanned.id}
+                    </span>
+                  )}
+                </div>
+                <span className="shrink-0 whitespace-nowrap text-slate-500 font-medium">{t.staff.checkInTimeLabel} {lastScanned.checkInTime}</span>
               </div>
             </div>
           )}
