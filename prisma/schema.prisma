@@ -1,0 +1,52 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Member {
+  memberId        BigInt            @id @default(autoincrement()) @map("member_id")
+  code            String            @unique @db.VarChar(6)
+  membershipNo    String            @unique @map("membership_no") @db.VarChar(6)
+  fullNameTh      String            @map("full_name_th") @db.VarChar(255)
+  fullNameEn      String?           @map("full_name_en") @db.VarChar(255)
+  idLast4         String?           @map("id_last4") @db.Char(4)
+  mobile          String?           @db.VarChar(20)
+  email           String?           @db.VarChar(255)
+  lineId          String?           @map("line_id") @db.VarChar(100)
+  workplace       String?           @db.VarChar(255)
+  startDate       DateTime?         @map("start_date") @db.Date
+  position        String?           @db.VarChar(255)
+  memberType      Int?              @map("member_type") @db.SmallInt
+  memberTypeOther String?           @map("member_type_other") @db.VarChar(255)
+  scientistRegNo  String?           @map("scientist_reg_no") @db.VarChar(50)
+  scientistRegNw  String?           @map("scientist_reg_nw") @db.VarChar(50)
+  photoPath       String?           @map("photo_path") @db.Text
+  qrCodePath      String?           @map("qr_code_path") @db.Text
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  educations      MemberEducation[]
+
+  @@map("members")
+}
+
+model MemberEducation {
+  educationId    BigInt   @id @default(autoincrement()) @map("education_id")
+  memberId       BigInt   @map("member_id")
+  degree         String?  @db.VarChar(255)
+  institution    String?  @db.VarChar(255)
+  graduationYear Int?     @map("graduation_year") @db.SmallInt
+  displayOrder   Int      @default(1) @map("display_order") @db.SmallInt
+
+  member         Member   @relation(fields: [memberId], references: [memberId], onDelete: Cascade)
+
+  @@index([memberId], map: "idx_education_member_id")
+  @@map("member_education")
+}

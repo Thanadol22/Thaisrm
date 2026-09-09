@@ -33,6 +33,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import QRCode from 'qrcode';
+import Velaris from '@/components/ui/velaris';
 import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -804,14 +805,16 @@ export function AgendaView() {
         </div>
       )}
 
-      {/* Hero Header Section */}
-      <section className="bg-gradient-to-br from-[#0026b3] via-[#001d8c] to-[#001460] text-white pt-8 pb-14 px-4 sm:px-6 lg:px-8 relative overflow-hidden shadow-2xl">
-        {/* Animated Background Glow Accents */}
-        <div className="absolute -top-24 -right-24 w-96 h-96 bg-blue-400/25 rounded-full blur-3xl pointer-events-none animate-float" />
-        <div className="absolute bottom-0 -left-20 w-80 h-80 bg-[#4ade80]/20 rounded-full blur-3xl pointer-events-none animate-pulse-glow" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none opacity-50" />
-
-        <div className="max-w-6xl mx-auto relative z-10 space-y-6">
+      {/* Hero Header Section with Animated WebGL Shader Background */}
+      <Velaris
+        bg="#000e38"
+        colors={["#38bdf8", "#0052cc", "#0026b3", "#001460"]}
+        speed={1.2}
+        grain={0.15}
+        height="auto"
+        className="text-white pt-8 pb-14 px-4 sm:px-6 lg:px-8 shadow-2xl relative"
+      >
+        <div className="max-w-6xl mx-auto space-y-6">
           {/* Top User Bar Card */}
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 sm:p-5 border border-white/15 flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4 shadow-xl hover:border-white/25 transition-all duration-300">
             <div className="flex items-center gap-3 min-w-0">
@@ -938,7 +941,7 @@ export function AgendaView() {
             </div>
           </div>
         </div>
-      </section>
+      </Velaris>
 
       {/* Congress Stats Overview Banner with Scroll Reveal */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 relative z-20">
@@ -1018,11 +1021,10 @@ export function AgendaView() {
                   <button
                     key={d.day}
                     onClick={() => setSelectedDay(d.day)}
-                    className={`px-3 py-2.5 sm:py-3.5 rounded-xl text-center transition-all duration-200 cursor-pointer active:scale-98 ${
-                      isActive
+                    className={`px-3 py-2.5 sm:py-3.5 rounded-xl text-center transition-all duration-200 cursor-pointer active:scale-98 ${isActive
                         ? 'bg-[#0026b3] text-white shadow-lg font-black ring-2 ring-[#0026b3]/30 scale-[1.01]'
                         : 'bg-white/80 hover:bg-white text-slate-700 hover:text-slate-900 font-semibold hover:shadow-xs'
-                    }`}
+                      }`}
                   >
                     <span className="block text-xs sm:text-sm font-extrabold leading-tight">
                       {d.title}
@@ -1051,11 +1053,10 @@ export function AgendaView() {
                 <button
                   key={cat.id}
                   onClick={() => setFilterCategory(cat.id)}
-                  className={`px-3 py-1.5 rounded-full whitespace-nowrap font-bold text-[11px] sm:text-xs transition-all duration-200 cursor-pointer shrink-0 active:scale-95 ${
-                    filterCategory === cat.id
+                  className={`px-3 py-1.5 rounded-full whitespace-nowrap font-bold text-[11px] sm:text-xs transition-all duration-200 cursor-pointer shrink-0 active:scale-95 ${filterCategory === cat.id
                       ? 'bg-slate-900 text-white shadow-sm ring-2 ring-slate-900/20'
                       : 'bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200'
-                  }`}
+                    }`}
                 >
                   {cat.label}
                 </button>
@@ -1092,11 +1093,10 @@ export function AgendaView() {
               return (
                 <RevealOnScroll key={session.id} delay={Math.min(index * 60, 300)} direction="up">
                   <div
-                    className={`bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border card-hover-effect transition-all duration-300 group ${
-                      session.isHighlight
+                    className={`bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border card-hover-effect transition-all duration-300 group ${session.isHighlight
                         ? 'border-blue-200 ring-1 ring-blue-500/20 shadow-md bg-gradient-to-r from-blue-50/25 via-white to-white'
                         : 'border-slate-200/90 shadow-xs'
-                    }`}
+                      }`}
                   >
                     <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                       {/* Time & Room Column */}
@@ -1141,11 +1141,10 @@ export function AgendaView() {
                           {/* Bookmark Button */}
                           <button
                             onClick={() => toggleBookmark(session.id)}
-                            className={`p-2 rounded-xl transition-all duration-200 cursor-pointer shrink-0 active:scale-90 ${
-                              isBookmarked
+                            className={`p-2 rounded-xl transition-all duration-200 cursor-pointer shrink-0 active:scale-90 ${isBookmarked
                                 ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 shadow-2xs'
                                 : 'bg-slate-100 text-slate-400 hover:text-slate-700 hover:bg-slate-200'
-                            }`}
+                              }`}
                             title={isBookmarked ? t.agenda.addedToSchedule : t.agenda.addToSchedule}
                           >
                             {isBookmarked ? (
