@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 const vertexShaderGLSL = `
@@ -13,12 +13,7 @@ void main() {
 `;
 
 const fragmentShaderGLSL = `
-#ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
-#else
-precision mediump float;
-#endif
-
 varying vec2 vUv;
 
 uniform vec2  u_resolution;
@@ -57,7 +52,7 @@ float snoise(vec2 v){
 
 void main() {
   vec2 uv = vUv;
-  float ratio = u_resolution.x / max(u_resolution.y, 1.0);
+  float ratio = u_resolution.x / u_resolution.y;
   vec2 p = uv - 0.5;
   p.x *= ratio;
 
@@ -99,20 +94,19 @@ export interface VelarisProps {
   children?: React.ReactNode;
 }
 
-const DEFAULT_COLORS = ["#38bdf8", "#0052cc", "#0026b3", "#001460"];
+const DEFAULT_COLORS = ["#86efac", "#4ade80", "#059669", "#000000"];
 
 const Velaris = ({
-  bg = "#000e38",
+  bg = "#000000",
   colors = DEFAULT_COLORS,
-  speed = 1.2,
-  grain = 0.15,
-  height = "auto",
+  speed = 2.0,
+  grain = 0.3,
+  height = "100vh",
   className,
   children,
 }: VelarisProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [webglSupported, setWebglSupported] = useState(true);
 
   const hexToRgb = (hex: string): [number, number, number] => {
     const h = hex.replace("#", "");
@@ -128,57 +122,23 @@ const Velaris = ({
     const container = containerRef.current;
     if (!canvas || !container) return;
 
-    // Support WebGL across multiple platforms / iOS Safari / Android
-    let gl: WebGLRenderingContext | null = null;
-    try {
-      gl = (canvas.getContext("webgl", { powerPreference: "high-performance", alpha: false }) ||
-        canvas.getContext("experimental-webgl")) as WebGLRenderingContext | null;
-    } catch {
-      gl = null;
-    }
-
-    if (!gl) {
-      setWebglSupported(false);
-      return;
-    }
+    const gl = canvas.getContext("webgl");
+    if (!gl) return;
 
     const createShader = (type: number, src: string) => {
-      const s = gl.createShader(type);
-      if (!s) return null;
+      const s = gl.createShader(type)!;
       gl.shaderSource(s, src);
       gl.compileShader(s);
-      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-        console.warn("Velaris shader compile failed:", gl.getShaderInfoLog(s));
-        gl.deleteShader(s);
-        return null;
-      }
       return s;
     };
 
-    const vertShader = createShader(gl.VERTEX_SHADER, vertexShaderGLSL);
-    const fragShader = createShader(gl.FRAGMENT_SHADER, fragmentShaderGLSL);
-
-    if (!vertShader || !fragShader) {
-      setWebglSupported(false);
-      return;
-    }
-
-    const program = gl.createProgram();
-    if (!program) {
-      setWebglSupported(false);
-      return;
-    }
-
-    gl.attachShader(program, vertShader);
-    gl.attachShader(program, fragShader);
+    const program = gl.createProgram()!;
+    gl.attachShader(program, createShader(gl.VERTEX_SHADER, vertexShaderGLSL));
+    gl.attachShader(
+      program,
+      createShader(gl.FRAGMENT_SHADER, fragmentShaderGLSL),
+    );
     gl.linkProgram(program);
-
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.warn("Velaris program link failed:", gl.getProgramInfoLog(program));
-      setWebglSupported(false);
-      return;
-    }
-
     gl.useProgram(program);
 
     const buffer = gl.createBuffer();
@@ -202,52 +162,32 @@ const Velaris = ({
     };
 
     const resize = () => {
-      if (!container || !canvas || !gl) return;
-      const width = container.clientWidth || window.innerWidth;
-      const height = container.clientHeight || 400;
-      if (width <= 0 || height <= 0) return;
-
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
+      const dpr = Math.min(window.devicePixelRatio, 2);
+      canvas.width = container.clientWidth * dpr;
+      canvas.height = container.clientHeight * dpr;
       gl.viewport(0, 0, canvas.width, canvas.height);
     };
 
-    resize();
-
-    let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== "undefined") {
-      ro = new ResizeObserver(resize);
-      ro.observe(container);
-    }
-
-    window.addEventListener("resize", resize, { passive: true });
+    const ro = new ResizeObserver(resize);
+    ro.observe(container);
 
     let raf: number;
-    let isRunning = true;
-
     const render = (t: number) => {
-      if (!isRunning || !gl) return;
-      if (canvas.width > 0 && canvas.height > 0) {
-        gl.uniform2f(locs.res, canvas.width, canvas.height);
-        gl.uniform1f(locs.time, t * 0.001 * speed);
-        gl.uniform1f(locs.grain, grain);
-        gl.uniform3f(locs.bg, ...hexToRgb(bg));
+      gl.uniform2f(locs.res, canvas.width, canvas.height);
+      gl.uniform1f(locs.time, t * 0.001 * speed);
+      gl.uniform1f(locs.grain, grain);
+      gl.uniform3f(locs.bg, ...hexToRgb(bg));
 
-        const flat = new Float32Array(colors.slice(0, 4).flatMap(hexToRgb));
-        gl.uniform3fv(locs.colors, flat);
+      const flat = new Float32Array(colors.slice(0, 4).flatMap(hexToRgb));
+      gl.uniform3fv(locs.colors, flat);
 
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      }
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       raf = requestAnimationFrame(render);
     };
 
     raf = requestAnimationFrame(render);
-
     return () => {
-      isRunning = false;
-      if (ro) ro.disconnect();
-      window.removeEventListener("resize", resize);
+      ro.disconnect();
       cancelAnimationFrame(raf);
     };
   }, [bg, colors, speed, grain]);
@@ -255,20 +195,13 @@ const Velaris = ({
   return (
     <div
       ref={containerRef}
-      style={{
-        height,
-        backgroundColor: bg,
-        backgroundImage: `radial-gradient(ellipse at top, ${colors[0] || "#38bdf8"}22, transparent 70%), linear-gradient(to bottom, ${bg}, #000820)`,
-      }}
+      style={{ height }}
       className={cn("relative w-full overflow-hidden", className)}
     >
-      {webglSupported && (
-        <canvas
-          ref={canvasRef}
-          className="pointer-events-none absolute inset-0 h-full w-full"
-          style={{ width: "100%", height: "100%" }}
-        />
-      )}
+      <canvas
+        ref={canvasRef}
+        className="pointer-events-none absolute inset-0 h-full w-full"
+      />
       <div className="relative z-10 h-full w-full">{children}</div>
     </div>
   );
