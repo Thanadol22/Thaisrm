@@ -3,6 +3,9 @@ import { getMemberById, updateMember, deleteMember } from '@/lib/services/member
 import { validateUpdateMember } from '@/lib/validators/memberValidator';
 import { UpdateMemberInput, ApiResponse } from '@/types/member';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 interface RouteContext {
   params: Promise<{ id: string }>;
 }

@@ -3,6 +3,9 @@ import { createMember, getMembers } from '@/lib/services/memberService';
 import { validateCreateMember } from '@/lib/validators/memberValidator';
 import { CreateMemberInput, ApiResponse } from '@/types/member';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * GET /api/members
  * ดึงรายการสมาชิก พร้อมรองรับ Search, Filter และ Pagination

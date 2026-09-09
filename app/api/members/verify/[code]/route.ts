@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getMemberByCodeOrNo } from '@/lib/services/memberService';
 import { ApiResponse } from '@/types/member';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 interface RouteContext {
   params: Promise<{ code: string }>;
 }
