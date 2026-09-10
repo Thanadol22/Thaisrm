@@ -603,6 +603,27 @@ export function SignupView({
                         required
                       />
                     </div>
+                    {/* Quick Workplace Chips */}
+                    <div className="flex items-center gap-1 flex-wrap pt-1.5">
+                      <span className="text-[10px] font-bold text-slate-400">เลือกด่วน:</span>
+                      {[
+                        'รพ.จุฬาลงกรณ์',
+                        'รพ.ศิริราช',
+                        'รพ.รามาธิบดี',
+                        'รพ.ธรรมศาสตร์',
+                        'BORN IVF Center',
+                        'รพ.กรุงเทพ',
+                      ].map((w) => (
+                        <button
+                          key={w}
+                          type="button"
+                          onClick={() => handleInputChange('workplace', w)}
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-[#0026b3] border border-blue-200 transition cursor-pointer"
+                        >
+                          {w}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div>

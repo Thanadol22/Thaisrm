@@ -1,0 +1,226 @@
+'use client';
+
+import React from 'react';
+import { ReceiptData, DEFAULT_ASSOCIATION_INFO } from '@/types/receipt';
+import { thaiBahtText } from '@/lib/thaiBahtText';
+
+interface ReceiptDocumentProps {
+  data: ReceiptData;
+  className?: string;
+  isPrintOnly?: boolean;
+}
+
+export function ReceiptDocument({ data, className = '', isPrintOnly = false }: ReceiptDocumentProps) {
+  const formattedTotal = data.totalAmount.toLocaleString('th-TH', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+
+  const bahtText = data.thaiBahtTextOverride || thaiBahtText(data.totalAmount);
+
+  return (
+    <div
+      className={`receipt-document bg-white text-black font-sarabun text-[15px] leading-relaxed mx-auto select-text ${className}`}
+      style={{
+        width: '210mm',
+        minHeight: '297mm',
+        padding: '18mm 20mm 15mm 20mm',
+        boxSizing: 'border-box',
+        fontFamily: "var(--font-sarabun), 'Sarabun', 'TH Sarabun New', 'Angsana New', sans-serif",
+      }}
+    >
+      {/* ─── Header: Association Logo & Info ─────────────────────────── */}
+      <div className="relative flex items-start justify-center mb-5">
+        {/* TSRM Logo on Left */}
+        <div className="absolute left-0 top-0 w-24 h-24 flex items-center justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/tsrm-logoPNG.png"
+            alt="THAISRM Logo"
+            className="w-22 h-22 object-contain"
+            onError={(e) => {
+              e.currentTarget.src = '/logoPNG.png';
+            }}
+          />
+        </div>
+
+        {/* Association Info (Center) */}
+        <div className="text-center pl-10 pr-2">
+          <h1 className="text-[21px] font-bold text-black tracking-tight mb-0.5">
+            {data.associationNameTh || DEFAULT_ASSOCIATION_INFO.nameTh}
+          </h1>
+          <p className="text-[13px] font-semibold tracking-wide text-black mb-0.5">
+            {data.associationNameEn || DEFAULT_ASSOCIATION_INFO.nameEn}
+          </p>
+          <p className="text-[12.5px] text-black leading-snug">
+            {data.associationAddress || DEFAULT_ASSOCIATION_INFO.address}
+          </p>
+          <p className="text-[12px] text-black leading-snug">
+            {data.associationContact || DEFAULT_ASSOCIATION_INFO.contact}
+          </p>
+          <p className="text-[12.5px] text-black leading-snug">
+            เลขประจำตัวผู้เสียภาษี {data.associationTaxId || DEFAULT_ASSOCIATION_INFO.taxId}
+          </p>
+        </div>
+      </div>
+
+      {/* ─── Document Title ─────────────────────────────────────────── */}
+      <div className="text-center my-3">
+        <h2 className="text-[26px] font-bold tracking-wide text-black">
+          ใบเสร็จรับเงิน
+        </h2>
+      </div>
+
+      {/* ─── Receipt Number & Date ───────────────────────────────────── */}
+      <div className="flex justify-between items-baseline mb-4 text-[15px]">
+        <div className="font-normal">
+          <span>{data.receiptNo}</span>
+        </div>
+        <div className="text-right">
+          <span>วันที่ {data.receiptDate}</span>
+        </div>
+      </div>
+
+      {/* ─── Payer Information ───────────────────────────────────────── */}
+      <div className="space-y-1 text-[15px] leading-relaxed mb-4 pl-8">
+        <p>
+          <span className="font-normal">สมาคมเวชศาสตร์การเจริญพันธุ์ไทย </span>
+          <span>{data.purposeText || 'ได้รับเงินสนับสนุน ประจำปี 2569'}</span>
+        </p>
+        <p>
+          <span>จาก </span>
+          <span className="font-normal">{data.payerName}</span>
+          {data.branchName ? <span className="ml-2 font-normal">{data.branchName}</span> : null}
+        </p>
+        {data.payerAddressLine1 && (
+          <p className="font-normal">
+            {data.payerAddressLine1}
+          </p>
+        )}
+        <p className="font-normal">
+          {data.payerAddressLine2 ? `${data.payerAddressLine2} ` : ''}
+          {data.payerPhone ? `Tel: ${data.payerPhone} ` : ''}
+          {data.payerTaxId ? `เลขประจำตัวผู้เสียภาษี ${data.payerTaxId}` : ''}
+        </p>
+      </div>
+
+      {/* ─── Items Table ────────────────────────────────────────────── */}
+      <div className="border border-black mb-3">
+        {/* Table Header */}
+        <div className="flex border-b border-black text-center font-normal text-[15px] bg-white">
+          <div className="flex-1 py-1.5 px-3 text-center border-r border-black font-semibold">
+            รายการ
+          </div>
+          <div className="w-48 py-1.5 px-3 text-center font-semibold">
+            จำนวนเงิน ( บาท)
+          </div>
+        </div>
+
+        {/* Table Body */}
+        <div className="flex min-h-[220px]">
+          {/* Left Column: Items */}
+          <div className="flex-1 p-3 border-r border-black text-[15px] space-y-2">
+            {data.items.map((item, index) => (
+              <div key={item.id || index} className="space-y-1">
+                <div className="font-normal">
+                  <span className="mr-3">{item.itemNumber || index + 1}</span>
+                  <span>{item.title}</span>
+                </div>
+                {item.subDetails && item.subDetails.length > 0 && (
+                  <div className="pl-6 space-y-0.5 text-[14.5px]">
+                    {item.subDetails.map((line, subIdx) => (
+                      <p key={subIdx}>{line}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Right Column: Amount */}
+          <div className="w-48 p-3 text-right text-[15px]">
+            {data.items.map((item, index) => (
+              <div key={item.id || index} className="font-normal">
+                {item.amount.toLocaleString('th-TH', {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 2,
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Total Row */}
+        <div className="flex border-t border-black text-[15px]">
+          <div className="flex-1 py-1.5 px-4 font-normal border-r border-black text-left">
+            จำนวนเงิน
+          </div>
+          <div className="w-48 py-1.5 px-3 text-right font-normal">
+            {formattedTotal}
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Amount in Thai Words ────────────────────────────────────── */}
+      <div className="flex items-center text-[15px] mb-8 font-normal pl-8">
+        <span className="mr-4">(ตัวอักษร)</span>
+        <span>({bahtText})</span>
+      </div>
+
+      {/* ─── Signatures Block ────────────────────────────────────────── */}
+      <div className="mt-8 space-y-6 text-[15px] pl-6 pr-4">
+        {/* Row 1: Payer Signature */}
+        <div className="flex justify-between items-end">
+          <div className="space-y-1">
+            <p>
+              ลงชื่อ..................................................................
+              {data.payerSignerRole || 'ผู้จ่ายเงิน'}
+            </p>
+            <p className="pl-2">
+              ( {data.payerSignerName || '.........................................................................'} )
+            </p>
+          </div>
+          <div className="text-right pb-1">
+            <span>ลงวันที่.......................</span>
+          </div>
+        </div>
+
+        {/* Row 2: Authorized Signer */}
+        <div className="flex justify-between items-end">
+          <div className="space-y-1">
+            <p>
+              ลงชื่อ..................................................................
+              {data.authorizedSignerRole || ''}
+            </p>
+            <p className="pl-2">
+              (&nbsp;
+              {data.authorizedSignerName ? `.............${data.authorizedSignerName}...............` : '.........................................................................'}
+              &nbsp;)
+            </p>
+          </div>
+          <div className="text-right pb-1">
+            <span>ลงวันที่.......................</span>
+          </div>
+        </div>
+
+        {/* Row 3: Prepared By */}
+        <div className="flex justify-between items-end">
+          <div className="space-y-1">
+            <p>
+              ลงชื่อ................................................................
+              {data.preparedByRole || 'ผู้จัดทำ'}
+            </p>
+            <p className="pl-2">
+              (&nbsp;
+              {data.preparedByName ? `..${data.preparedByName} ....` : '.........................................................................'}
+              &nbsp;)
+            </p>
+          </div>
+          <div className="text-right pb-1">
+            <span>ลงวันที่.......................</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

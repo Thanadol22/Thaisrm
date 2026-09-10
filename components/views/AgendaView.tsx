@@ -31,11 +31,14 @@ import {
   Copy,
   Check,
   ShieldCheck,
+  LayoutGrid,
+  Table as TableIcon,
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import Velaris from '@/components/ui/velaris';
 import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 import { useLanguage } from '@/context/LanguageContext';
+import { OfficialWorkshopAgenda } from '@/components/OfficialWorkshopAgenda';
 
 // Zero-overhead Scroll Progress Bar using RAF & direct DOM updates (0 React re-renders)
 function ScrollProgressBar() {
@@ -154,6 +157,8 @@ interface AgendaSession {
   roomTh: string;
   roomEn: string;
   category: 'keynote' | 'embryology' | 'surgery' | 'symposium' | 'general';
+  sponsor?: string;
+  workshopTrack?: 'ws1' | 'ws3';
   titleTh: string;
   titleEn: string;
   descriptionTh: string;
@@ -167,366 +172,1403 @@ interface AgendaSession {
 }
 
 const AGENDA_DATA: AgendaSession[] = [
-  // DAY 1 (Oct 15, 2026)
+  // ==========================================
+  // DAY 1 (Oct 20, 2026: Precongress Workshops)
+  // ==========================================
+  // --- Workshop 1: ART Nurse (12th Floor Wanalai 1,2) ---
   {
-    id: 'd1-s1',
+    id: 'd1-ws1-reg',
     day: 1,
-    time: '08:30 - 09:00',
-    roomTh: 'Foyer หน้าห้อง Grand Ballroom',
-    roomEn: 'Grand Ballroom Foyer',
+    time: '07:30 - 08:15',
+    roomTh: 'ห้องวนาลัย 1, 2 ชั้น 12',
+    roomEn: '12th Floor Wanalai 1, 2',
     category: 'general',
-    titleTh: 'ลงทะเบียนผู้เข้าร่วมงาน & รับสูจิบัตรและของที่ระลึก',
-    titleEn: 'Registration & Welcome Morning Refreshments',
-    descriptionTh: 'รับป้ายชื่อดิจิทัล, เอกสารประกอบการประชุม และชุดสูจิบัตร TSRM Annual Congress 2026',
-    descriptionEn: 'Badge collection, congress bags, and morning networking reception.',
+    workshopTrack: 'ws1',
+    titleTh: '[WS 1: ART Nurse] ลงทะเบียนเข้าร่วมการประชุมเชิงปฏิบัติการ',
+    titleEn: '[WS 1: ART Nurse] Workshop Registration',
+    descriptionTh: 'ลงทะเบียนรับเอกสารวิชาการ สูจิบัตร และอุปกรณ์สำหรับผู้เข้าร่วม Program WS 1 ART Nurse',
+    descriptionEn: 'Attendee registration and symposium kit collection for ART Nurse Program.',
     speakers: [],
     hasCme: false
   },
   {
-    id: 'd1-s2',
+    id: 'd1-ws1-welcome',
     day: 1,
-    time: '09:00 - 10:30',
-    roomTh: 'Lab Studio 1 (ชั้น 22)',
-    roomEn: 'Lab Studio 1 (22nd Fl.)',
-    category: 'embryology',
-    titleTh: 'Hands-on Workshop 1: Next-Gen ICSI & Laser-Assisted Hatching Techniques',
-    titleEn: 'Hands-on Workshop 1: Next-Gen ICSI & Laser-Assisted Hatching Techniques',
-    descriptionTh: 'เจาะลึกเทคนิคการทำ ICSI ขั้นสูง และการใช้เลเซอร์ช่วยฟักตัวอ่อนเพื่อเพิ่มอัตราการฝังตัว',
-    descriptionEn: 'Advanced micromanipulation techniques, piezo-ICSI, and optimized laser-assisted hatching protocols.',
+    time: '08:15 - 08:30',
+    roomTh: 'ห้องวนาลัย 1, 2 ชั้น 12',
+    roomEn: '12th Floor Wanalai 1, 2',
+    category: 'keynote',
+    workshopTrack: 'ws1',
+    sponsor: 'TSRM',
+    titleTh: '[WS 1: ART Nurse] Welcome Speech & พิธีเปิดเวิร์กช็อป',
+    titleEn: '[WS 1: ART Nurse] Welcome Speech by TSRM President',
+    descriptionTh: 'กล่าวเปิดการประชุมเชิงปฏิบัติการ Program WS 1 ART Nurse โดย นพ.สวัสดิ์ ไตรตรงึษ์ทัศนา นายกสมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+    descriptionEn: 'Opening address by Dr. Sawat Traitrongtassana, President of Thai Society for Reproductive Medicine (TSRM).',
     speakers: [
       {
-        nameTh: 'ศ.ดร.พญ. ศิริรัตน์ กฤษณาวารินทร์',
-        nameEn: 'Prof. Sirirat Krisanawarin, MD, PhD',
+        nameTh: 'นพ.สวัสดิ์ ไตรตรงึษ์ทัศนา',
+        nameEn: 'Dr. Sawat Traitrongtassana, MD',
+        titleTh: 'นายกสมาคมเวชศาสตร์การเจริญพันธุ์ไทย (President of TSRM)',
+        titleEn: 'President, Thai Society for Reproductive Medicine',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-blue-700 to-indigo-900',
+        avatarInitials: 'สต'
+      }
+    ],
+    isHighlight: true,
+    hasCme: true
+  },
+  {
+    id: 'd1-ws1-s1',
+    day: 1,
+    time: '08:30 - 09:00',
+    roomTh: 'ห้องวนาลัย 1, 2 ชั้น 12',
+    roomEn: '12th Floor Wanalai 1, 2',
+    category: 'embryology',
+    workshopTrack: 'ws1',
+    sponsor: 'TSRM',
+    titleTh: '[WS 1: ART Nurse] Semen analysis and sperm preparation',
+    titleEn: '[WS 1: ART Nurse] Semen analysis and sperm preparation',
+    descriptionTh: 'หลักการและเทคนิคการตรวจวิเคราะห์น้ำอสุจิและการเตรียมสเปิร์มสำหรับการปฏิสนธิทางการแพทย์',
+    descriptionEn: 'Essential principles of semen evaluation, parameters, and preparation methods in reproductive technology.',
+    speakers: [
+      {
+        nameTh: 'ผศ.พญ. อุษณีย์ แสนหมี่',
+        nameEn: 'Asst. Prof. Ussanee Sanmee, MD',
         titleTh: 'ผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์',
         titleEn: 'Reproductive Endocrinologist',
-        institutionTh: 'คณะแพทยศาสตร์ จุฬาลงกรณ์มหาวิทยาลัย',
-        institutionEn: 'Chulalongkorn University',
-        avatarBg: 'from-blue-600 to-indigo-700',
-        avatarInitials: 'SK'
-      },
-      {
-        nameTh: 'Prof. David Evans',
-        nameEn: 'Prof. David Evans, PhD, HCLD',
-        titleTh: 'Senior Clinical Embryologist',
-        titleEn: 'Senior Clinical Embryologist',
-        institutionTh: 'University College London (UCL), UK',
-        institutionEn: 'University College London (UCL), UK',
-        avatarBg: 'from-emerald-600 to-teal-700',
-        avatarInitials: 'DE'
-      }
-    ],
-    isHighlight: true,
-    hasCme: true,
-    hasLiveStream: true
-  },
-  {
-    id: 'd1-s3',
-    day: 1,
-    time: '10:45 - 12:15',
-    roomTh: 'Lotus Ballroom (ชั้น 22)',
-    roomEn: 'Lotus Ballroom (22nd Fl.)',
-    category: 'surgery',
-    titleTh: 'Workshop 2: 3D/4D Hysteroscopic Surgery in Infertile Patients with Uterine Anomalies',
-    titleEn: 'Workshop 2: 3D/4D Hysteroscopic Surgery in Infertile Patients with Uterine Anomalies',
-    descriptionTh: 'การวินิจฉัยและผ่าตัดส่องกล้องโพรงมดลูกด้วยเทคโนโลยี 3D เพื่อแก้ไขภาวะมดลูกผิดปกติและเยื่อบุโพรงมดลูกเจริญผิดที่',
-    descriptionEn: 'Advanced endoscopic and hysteroscopic correction for structural uterine pathologies causing implantation failure.',
-    speakers: [
-      {
-        nameTh: 'รศ.นพ. ธนพร ชัยวัฒนานนท์',
-        nameEn: 'Assoc. Prof. Thanaporn Chaiwattananon, MD',
-        titleTh: 'หัวหน้าสาขาวิชาเวชศาสตร์การเจริญพันธุ์',
-        titleEn: 'Head of Reproductive Medicine Division',
-        institutionTh: 'โรงพยาบาลศิริราช',
-        institutionEn: 'Siriraj Hospital, Mahidol University',
-        avatarBg: 'from-violet-600 to-purple-800',
-        avatarInitials: 'TC'
-      }
-    ],
-    hasCme: true
-  },
-  {
-    id: 'd1-s4',
-    day: 1,
-    time: '12:15 - 13:30',
-    roomTh: 'Grand Ballroom B',
-    roomEn: 'Grand Ballroom B',
-    category: 'symposium',
-    titleTh: 'Luncheon Symposium: Optimizing Ovarian Stimulation in Poor Ovarian Responders (POR)',
-    titleEn: 'Luncheon Symposium: Optimizing Ovarian Stimulation in Poor Ovarian Responders (POR)',
-    descriptionTh: 'แนวทางการกระตุ้นไข่แบบเฉพาะบุคคล และการใช้ฮอร์โมนเสริมในผู้ป่วยกลุ่มตอบสนองรังไข่ต่ำตามเกณฑ์ POSEIDON',
-    descriptionEn: 'Personalized stimulation strategies and adjuvant therapies for POSEIDON criteria patients.',
-    speakers: [
-      {
-        nameTh: 'ผศ.นพ. กฤษฎา ธีรพงศ์ไพศาล',
-        nameEn: 'Asst. Prof. Kritsada Theerapongpaisan, MD',
-        titleTh: 'แพทย์ผู้เชี่ยวชาญด้านภาวะมีบุตรยาก',
-        titleEn: 'Subfertility Specialist',
         institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
-        institutionEn: 'THAISRM Committee',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-pink-600 to-rose-700',
+        avatarInitials: 'อส'
+      }
+    ],
+    hasCme: true
+  },
+  {
+    id: 'd1-ws1-s2',
+    day: 1,
+    time: '09:00 - 09:30',
+    roomTh: 'ห้องวนาลัย 1, 2 ชั้น 12',
+    roomEn: '12th Floor Wanalai 1, 2',
+    category: 'surgery',
+    workshopTrack: 'ws1',
+    sponsor: 'TSRM',
+    titleTh: '[WS 1: ART Nurse] Ovarian Stimulation protocol for IVF',
+    titleEn: '[WS 1: ART Nurse] Ovarian Stimulation protocol for IVF',
+    descriptionTh: 'โพรโทคอลการกระตุ้นรังไข่สำหรับการทำเด็กหลอดแก้ว บทบาทและการดูแลผู้ป่วยของพยาบาลผู้มีบุตรยาก',
+    descriptionEn: 'Protocols for controlled ovarian stimulation in IVF cycles and patient monitoring essentials.',
+    speakers: [
+      {
+        nameTh: 'รศ.พญ. ชนกานต์ สืบถวิลกุล',
+        nameEn: 'Assoc. Prof. Chonnakarn Suebthawinkul, MD',
+        titleTh: 'ผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์',
+        titleEn: 'Reproductive Specialist',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-purple-600 to-indigo-700',
+        avatarInitials: 'ชส'
+      }
+    ],
+    hasCme: true
+  },
+  {
+    id: 'd1-ws1-s3',
+    day: 1,
+    time: '09:30 - 10:00',
+    roomTh: 'ห้องวนาลัย 1, 2 ชั้น 12',
+    roomEn: '12th Floor Wanalai 1, 2',
+    category: 'surgery',
+    workshopTrack: 'ws1',
+    sponsor: 'TSRM',
+    titleTh: '[WS 1: ART Nurse] Ovarian Stimulation protocol for fertility preservation in cancer patients',
+    titleEn: '[WS 1: ART Nurse] Ovarian Stimulation protocol for fertility preservation in cancer patients',
+    descriptionTh: 'แนวทางการกระตุ้นไข่เพื่อการอนุรักษ์ภาวะเจริญพันธุ์ในผู้ป่วยโรคมะเร็งอย่างปลอดภัยและมีประสิทธิภาพ',
+    descriptionEn: 'Oncofertility strategies and tailored ovarian stimulation protocols for cancer patients prior to gonadotoxic therapy.',
+    speakers: [
+      {
+        nameTh: 'ผศ.พญ. พรทิพย์ สิริยาภิวัฒน์',
+        nameEn: 'Asst. Prof. Pornthip Sirayapiwat, MD',
+        titleTh: 'ผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์',
+        titleEn: 'Reproductive Endocrinologist',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-teal-600 to-emerald-700',
+        avatarInitials: 'พส'
+      }
+    ],
+    hasCme: true
+  },
+  {
+    id: 'd1-ws1-break1',
+    day: 1,
+    time: '10:00 - 10:30',
+    roomTh: 'Foyer ชั้น 12',
+    roomEn: '12th Floor Foyer',
+    category: 'general',
+    workshopTrack: 'ws1',
+    titleTh: '☕ พักรับประทานอาหารว่าง (Coffee Break)',
+    titleEn: 'Coffee Break & Refreshments',
+    descriptionTh: 'พักรับประทานของว่าง เครื่องดื่ม ชา และกาแฟ',
+    descriptionEn: 'Morning coffee break and networking refreshments.',
+    speakers: [],
+    hasCme: false
+  },
+  {
+    id: 'd1-ws1-s4',
+    day: 1,
+    time: '10:30 - 11:10',
+    roomTh: 'ห้องวนาลัย 1, 2 ชั้น 12',
+    roomEn: '12th Floor Wanalai 1, 2',
+    category: 'surgery',
+    workshopTrack: 'ws1',
+    sponsor: 'TSRM',
+    titleTh: '[WS 1: ART Nurse] Endometrial preparation for frozen-thawed embryo transfer',
+    titleEn: '[WS 1: ART Nurse] Endometrial preparation for frozen-thawed embryo transfer',
+    descriptionTh: 'การเตรียมเยื่อบุโพรงมดลูกสำหรับการย้ายตัวอ่อนแช่แข็งเพื่อเพิ่มอัตราการตั้งครรภ์',
+    descriptionEn: 'Clinical strategies for endometrial priming in FET cycles: natural, stimulated, and programmed hormonal regimens.',
+    speakers: [
+      {
+        nameTh: 'รศ.นพ. สมสิญจน์ เพ็ชรยิ้ม',
+        nameEn: 'Assoc. Prof. Somsin Petyim, MD',
+        titleTh: 'ผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์',
+        titleEn: 'Reproductive Endocrinologist & Infertility Specialist',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-blue-600 to-sky-700',
+        avatarInitials: 'สพ'
+      }
+    ],
+    hasCme: true
+  },
+  {
+    id: 'd1-ws1-s5',
+    day: 1,
+    time: '11:10 - 11:50',
+    roomTh: 'ห้องวนาลัย 1, 2 ชั้น 12',
+    roomEn: '12th Floor Wanalai 1, 2',
+    category: 'embryology',
+    workshopTrack: 'ws1',
+    sponsor: 'TSRM',
+    titleTh: '[WS 1: ART Nurse] Infection control and aseptic technique in ART lab',
+    titleEn: '[WS 1: ART Nurse] Infection control and aseptic technique in ART lab',
+    descriptionTh: 'การควบคุมการติดเชื้อและเทคนิคปลอดเชื้อมาตรฐานสากลในห้องปฏิบัติการเทคโนโลยีช่วยการเจริญพันธุ์',
+    descriptionEn: 'Rigorous aseptic techniques, pathogen containment, and infection control standards in the ART laboratory.',
+    speakers: [
+      {
+        nameTh: 'อ.นพ. ดิษรุจ โตวิกกัย',
+        nameEn: 'Dr. Ditsapoj Towikkai, MD',
+        titleTh: 'ภาควิชาอายุรศาสตร์ คณะแพทยศาสตร์ จุฬาลงกรณ์มหาวิทยาลัย',
+        titleEn: 'Department of Medicine, Chulalongkorn University',
+        institutionTh: 'รพ.จุฬาลงกรณ์',
+        institutionEn: 'Chulalongkorn Memorial Hospital',
         avatarBg: 'from-amber-600 to-orange-700',
-        avatarInitials: 'KT'
+        avatarInitials: 'ดต'
+      }
+    ],
+    hasCme: true
+  },
+  {
+    id: 'd1-ws1-lunch',
+    day: 1,
+    time: '12:00 - 13:00',
+    roomTh: 'Dining Room ชั้น 12',
+    roomEn: '12th Floor Dining Room',
+    category: 'general',
+    workshopTrack: 'ws1',
+    titleTh: '🍽️ พักรับประทานอาหารกลางวัน (Lunch)',
+    titleEn: 'Luncheon Break',
+    descriptionTh: 'พักรับประทานอาหารกลางวัน',
+    descriptionEn: 'Buffet lunch for workshop participants.',
+    speakers: [],
+    hasCme: false
+  },
+  {
+    id: 'd1-ws1-s6',
+    day: 1,
+    time: '13:00 - 13:30',
+    roomTh: 'ห้องวนาลัย 1, 2 ชั้น 12',
+    roomEn: '12th Floor Wanalai 1, 2',
+    category: 'surgery',
+    workshopTrack: 'ws1',
+    sponsor: 'TSRM',
+    titleTh: '[WS 1: ART Nurse] Pre-treatment investigations and treatment in ART',
+    titleEn: '[WS 1: ART Nurse] Pre-treatment investigations and treatment in ART',
+    descriptionTh: 'การตรวจวินิจฉัยก่อนเริ่มการรักษาและการวางแผนให้การรักษาในเทคโนโลยีช่วยการเจริญพันธุ์',
+    descriptionEn: 'Diagnostic workups, baseline evaluations, and clinical pathways for infertile couples embarking on ART.',
+    speakers: [
+      {
+        nameTh: 'พญ. พิมพกา ชวนะเวสน์',
+        nameEn: 'Dr. Pimpaka Chawanaves, MD',
+        titleTh: 'ผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์',
+        titleEn: 'Reproductive Endocrinologist',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-rose-600 to-pink-700',
+        avatarInitials: 'พช'
+      }
+    ],
+    hasCme: true
+  },
+  {
+    id: 'd1-ws1-s7',
+    day: 1,
+    time: '13:30 - 14:00',
+    roomTh: 'ห้องวนาลัย 1, 2 ชั้น 12',
+    roomEn: '12th Floor Wanalai 1, 2',
+    category: 'embryology',
+    workshopTrack: 'ws1',
+    sponsor: 'TSRM',
+    titleTh: '[WS 1: ART Nurse] Laboratory testing in ART: what fertility nurse should know.',
+    titleEn: '[WS 1: ART Nurse] Laboratory testing in ART: what fertility nurse should know.',
+    descriptionTh: 'การตรวจทางห้องปฏิบัติการใน ART ที่พยาบาลและบุคลากรทางการแพทย์ผู้ดูแลผู้มีบุตรยากต้องทราบ',
+    descriptionEn: 'Key lab diagnostics, hormone profiling, quality control, and clinical interpretation essentials for fertility nurses.',
+    speakers: [
+      {
+        nameTh: 'ผศ.พญ. ณิชมน ภาคภิญโญ',
+        nameEn: 'Asst. Prof. Nichamon Pakpinyo, MD',
+        titleTh: 'ผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์',
+        titleEn: 'Reproductive Specialist',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-indigo-600 to-purple-700',
+        avatarInitials: 'ณภ'
+      }
+    ],
+    hasCme: true
+  },
+  {
+    id: 'd1-ws1-s8',
+    day: 1,
+    time: '14:00 - 14:30',
+    roomTh: 'ห้องวนาลัย 1, 2 ชั้น 12',
+    roomEn: '12th Floor Wanalai 1, 2',
+    category: 'keynote',
+    workshopTrack: 'ws1',
+    sponsor: 'TSRM',
+    titleTh: '[WS 1: ART Nurse] การขออนุญาตตั้งครรภ์แทน (อุ้มบุญ)',
+    titleEn: '[WS 1: ART Nurse] Legal & Regulatory Process of Gestational Surrogacy in Thailand',
+    descriptionTh: 'กระบวนการและข้อกำหนดทางกฎหมายในการขออนุญาตตั้งครรภ์แทน (อุ้มบุญ) ภายใต้การกำกับดูแลของ สบส.',
+    descriptionEn: 'Regulatory guidelines, legal compliance, and permission application processes for surrogacy in Thailand.',
+    speakers: [
+      {
+        nameTh: 'เภสัชกรหญิง ชยาวี กาญวัฒะกิจ',
+        nameEn: 'Chayawee Kanwattanakit, RPh',
+        titleTh: 'กรมสนับสนุนบริการสุขภาพ (สบส.) กระทรวงสาธารณสุข',
+        titleEn: 'Department of Health Service Support (HSS)',
+        institutionTh: 'กรมสนับสนุนบริการสุขภาพ (สบส.)',
+        institutionEn: 'Ministry of Public Health, Thailand',
+        avatarBg: 'from-cyan-600 to-blue-800',
+        avatarInitials: 'ชก'
       }
     ],
     isHighlight: true,
     hasCme: true
   },
   {
-    id: 'd1-s5',
+    id: 'd1-ws1-break2',
     day: 1,
-    time: '13:30 - 15:30',
-    roomTh: 'Lab Studio 2',
-    roomEn: 'Lab Studio 2',
-    category: 'embryology',
-    titleTh: 'Workshop 3: AI-Powered Embryo Selection: Time-Lapse Morphokinetics in Action',
-    titleEn: 'Workshop 3: AI-Powered Embryo Selection: Time-Lapse Morphokinetics in Action',
-    descriptionTh: 'การนำปัญญาประดิษฐ์และระบบ Time-Lapse มาใช้วิเคราะห์การแบ่งตัวของตัวอ่อนเพื่อคัดเลือกตัวอ่อนที่มีศักยภาพสูงสุด',
-    descriptionEn: 'Integrating AI scoring models with continuous time-lapse incubation for non-invasive viability prediction.',
+    time: '14:30 - 15:00',
+    roomTh: 'Foyer ชั้น 12',
+    roomEn: '12th Floor Foyer',
+    category: 'general',
+    workshopTrack: 'ws1',
+    titleTh: '☕ พักรับประทานอาหารว่าง (Coffee Break)',
+    titleEn: 'Afternoon Refreshments & Coffee Break',
+    descriptionTh: 'พักรับประทานของว่าง เครื่องดื่ม ชา และกาแฟ',
+    descriptionEn: 'Afternoon coffee and tea break.',
+    speakers: [],
+    hasCme: false
+  },
+  {
+    id: 'd1-ws1-s9',
+    day: 1,
+    time: '15:00 - 15:45',
+    roomTh: 'ห้องวนาลัย 1, 2 ชั้น 12',
+    roomEn: '12th Floor Wanalai 1, 2',
+    category: 'keynote',
+    workshopTrack: 'ws1',
+    sponsor: 'TSRM',
+    titleTh: '[WS 1: ART Nurse] Counselling patients through IVF/ICSI and embryo transfer: the essential role of fertility nurses',
+    titleEn: '[WS 1: ART Nurse] Counselling patients through IVF/ICSI and embryo transfer: the essential role of fertility nurses',
+    descriptionTh: 'การให้คำปรึกษาและดูแลจิตใจผู้ป่วยตลอดเส้นทางการรักษา IVF/ICSI และการย้ายตัวอ่อน: บทบาทสำคัญของพยาบาลเวชศาสตร์การเจริญพันธุ์',
+    descriptionEn: 'Psychological support, patient communication, and comprehensive counseling through stimulation, retrieval, and embryo transfer.',
     speakers: [
       {
-        nameTh: 'Dr. Kenji Sato, PhD',
-        nameEn: 'Dr. Kenji Sato, PhD',
-        titleTh: 'AI Bio-Informatics Lead',
-        titleEn: 'AI Bio-Informatics Lead',
-        institutionTh: 'Tokyo Reproductive Genetics Institute, Japan',
-        institutionEn: 'Tokyo Reproductive Genetics Institute, Japan',
-        avatarBg: 'from-sky-600 to-blue-800',
-        avatarInitials: 'KS'
-      },
-      {
-        nameTh: 'ดร. ประไพพิศ สิทธิโชค',
-        nameEn: 'Dr. Prapaipit Sitthichok, PhD',
-        titleTh: 'นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อนอาวุโส',
-        titleEn: 'Senior Embryologist',
-        institutionTh: 'ศูนย์รักษาผู้มีบุตรยากมาตรฐานสากล',
-        institutionEn: 'THAISRM Laboratory Board',
-        avatarBg: 'from-rose-600 to-pink-700',
-        avatarInitials: 'PS'
+        nameTh: 'คุณเหมือนฝัน สระทองคุ้ม',
+        nameEn: 'Muenfan Sratongkhum, RN',
+        titleTh: 'พยาบาลวิชาชีพผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์ คณะแพทยศาสตร์ศิริราชพยาบาล',
+        titleEn: 'Clinical Fertility Nurse Specialist, Siriraj Hospital',
+        institutionTh: 'คณะแพทยศาสตร์ศิริราชพยาบาล',
+        institutionEn: 'Faculty of Medicine Siriraj Hospital, Mahidol University',
+        avatarBg: 'from-emerald-600 to-teal-800',
+        avatarInitials: 'มห'
       }
     ],
     isHighlight: true,
-    hasCme: true,
-    hasLiveStream: true
+    hasCme: true
+  },
+  {
+    id: 'd1-ws1-close',
+    day: 1,
+    time: '15:45',
+    roomTh: 'ห้องวนาลัย 1, 2 ชั้น 12',
+    roomEn: '12th Floor Wanalai 1, 2',
+    category: 'general',
+    workshopTrack: 'ws1',
+    titleTh: '[WS 1: ART Nurse] ถาม-ตอบ (QA) และปิดการประชุมเชิงปฏิบัติการ',
+    titleEn: '[WS 1: ART Nurse] Q&A and Workshop Concluded',
+    descriptionTh: 'ช่วงถาม-ตอบข้อซักถาม สรุปประเด็นสำคัญ และปิดการประชุม Program WS 1 ART Nurse',
+    descriptionEn: 'Open Q&A session, closing remarks, and CME check-out for ART Nurse Program.',
+    speakers: [],
+    hasCme: true
   },
 
-  // DAY 2 (Oct 16, 2026)
+  // --- Workshop 3: Fertility-enhancing hysteroscopic surgery (THAI session) (12th Floor ห้องพิมาน 2) ---
+  {
+    id: 'd1-ws3-reg',
+    day: 1,
+    time: '07:30 - 08:00',
+    roomTh: 'ห้องพิมาน 2 ชั้น 12',
+    roomEn: '12th Floor Phiman 2 Room',
+    category: 'general',
+    workshopTrack: 'ws3',
+    titleTh: '[WS 3: Hysteroscopy] ลงทะเบียนเข้าร่วมเวิร์กช็อปผ่าตัดส่องกล้อง',
+    titleEn: '[WS 3: Hysteroscopy] Workshop Registration',
+    descriptionTh: 'ลงทะเบียนรับอุปกรณ์และเอกสารการอบรมเชิงปฏิบัติการ Hands-on Hysteroscopy',
+    descriptionEn: 'Registration and workshop syllabus collection for hysteroscopic surgery attendees.',
+    speakers: [],
+    hasCme: false
+  },
+  {
+    id: 'd1-ws3-welcome',
+    day: 1,
+    time: '08:00 - 08:05',
+    roomTh: 'ห้องพิมาน 2 ชั้น 12',
+    roomEn: '12th Floor Phiman 2 Room',
+    category: 'keynote',
+    workshopTrack: 'ws3',
+    sponsor: 'TSRM',
+    titleTh: '[WS 3: Hysteroscopy] Welcome Speech โดยอดีตนายกสมาคมฯ',
+    titleEn: '[WS 3: Hysteroscopy] Welcome Speech by Past President of TSRM',
+    descriptionTh: 'กล่าวต้อนรับและเปิดการอบรมเชิงปฏิบัติการ Fertility-enhancing hysteroscopic surgery โดย ศ.นพ.แสงชัย พฤทธิพันธุ์',
+    descriptionEn: 'Welcome address by Prof. Saengchai Pruksapanyarat, MD, Past President of TSRM.',
+    speakers: [
+      {
+        nameTh: 'ศ.นพ.แสงชัย พฤทธิพันธุ์',
+        nameEn: 'Prof. Saengchai Pruksapanyarat, MD',
+        titleTh: 'Past President of TSRM / ผู้เชี่ยวชาญด้านผ่าตัดผ่านกล้องทางนรีเวช',
+        titleEn: 'Past President of TSRM / Gynecologic Endoscopic Surgeon',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-blue-700 to-slate-900',
+        avatarInitials: 'สพ'
+      }
+    ],
+    isHighlight: true,
+    hasCme: true
+  },
+  {
+    id: 'd1-ws3-s1',
+    day: 1,
+    time: '08:05 - 08:20',
+    roomTh: 'ห้องพิมาน 2 ชั้น 12',
+    roomEn: '12th Floor Phiman 2 Room',
+    category: 'surgery',
+    workshopTrack: 'ws3',
+    sponsor: 'TSRM',
+    titleTh: '[WS 3: Hysteroscopy] Overview hysteroscopy',
+    titleEn: '[WS 3: Hysteroscopy] Overview hysteroscopy',
+    descriptionTh: 'ภาพรวมการตรวจวินิจฉัยและรักษาด้วยการส่องกล้องตรวจโพรงมดลูกในเวชศาสตร์การเจริญพันธุ์',
+    descriptionEn: 'Comprehensive overview of diagnostic and operative hysteroscopy in reproductive medicine.',
+    speakers: [
+      {
+        nameTh: 'นพ.วิบูลย์ กมลพรวจิตร',
+        nameEn: 'Dr. Wibool Kamolpornwichit, MD',
+        titleTh: 'ผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์และผ่าตัดผ่านกล้อง',
+        titleEn: 'Reproductive Surgeon & Endoscopist',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-teal-600 to-cyan-700',
+        avatarInitials: 'วก'
+      }
+    ],
+    hasCme: true
+  },
+  {
+    id: 'd1-ws3-s2',
+    day: 1,
+    time: '08:20 - 08:45',
+    roomTh: 'ห้องพิมาน 2 ชั้น 12',
+    roomEn: '12th Floor Phiman 2 Room',
+    category: 'surgery',
+    workshopTrack: 'ws3',
+    sponsor: 'TSRM',
+    titleTh: '[WS 3: Hysteroscopy] Enhancing IVF outcome with hysteroscopy',
+    titleEn: '[WS 3: Hysteroscopy] Enhancing IVF outcome with hysteroscopy',
+    descriptionTh: 'การเพิ่มอัตราความสำเร็จของการทำเด็กหลอดแก้วด้วยการผ่าตัดส่องกล้องโพรงมดลูกแก้ไขความผิดปกติ',
+    descriptionEn: 'Evidence-based improvements in implantation and live birth rates through corrective hysteroscopic intervention.',
+    speakers: [
+      {
+        nameTh: 'รศ.นพ.สมสิญจน์ เพ็ชรยิ้ม',
+        nameEn: 'Assoc. Prof. Somsin Petyim, MD',
+        titleTh: 'ผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์',
+        titleEn: 'Reproductive Endocrinologist',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-blue-600 to-indigo-700',
+        avatarInitials: 'สพ'
+      }
+    ],
+    hasCme: true
+  },
+  {
+    id: 'd1-ws3-s3',
+    day: 1,
+    time: '08:45 - 09:10',
+    roomTh: 'ห้องพิมาน 2 ชั้น 12',
+    roomEn: '12th Floor Phiman 2 Room',
+    category: 'surgery',
+    workshopTrack: 'ws3',
+    sponsor: 'TSRM',
+    titleTh: '[WS 3: Hysteroscopy] Enhancing technique of hysteroscopy',
+    titleEn: '[WS 3: Hysteroscopy] Enhancing technique of hysteroscopy',
+    descriptionTh: 'เทคนิคขั้นสูงและเคล็ดลับทางศัลยกรรมในการผ่าตัดส่องกล้องโพรงมดลูกอย่างปลอดภัยและได้ผลสูงสุด',
+    descriptionEn: 'Advanced surgical tips, fluid management, energy systems, and complication prevention in hysteroscopic procedures.',
+    speakers: [
+      {
+        nameTh: 'ผศ. นพ.ศรีเธียร เลิศวิกูล',
+        nameEn: 'Asst. Prof. Sritheirn Lertvikool, MD',
+        titleTh: 'ผู้เชี่ยวชาญด้านการผ่าตัดผ่านกล้องทางนรีเวช',
+        titleEn: 'Minimally Invasive Gynecologic Surgeon',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-purple-600 to-pink-700',
+        avatarInitials: 'ศล'
+      }
+    ],
+    hasCme: true
+  },
+  {
+    id: 'd1-ws3-s4',
+    day: 1,
+    time: '09:10 - 09:40',
+    roomTh: 'ห้องพิมาน 2 ชั้น 12',
+    roomEn: '12th Floor Phiman 2 Room',
+    category: 'symposium',
+    workshopTrack: 'ws3',
+    sponsor: 'Medtronic • Storz • Olympus • Tawan • BJC',
+    titleTh: '[WS 3: Hysteroscopy] Innovative in equipment and instrument for hysteroscopy',
+    titleEn: '[WS 3: Hysteroscopy] Innovative in equipment and instrument for hysteroscopy',
+    descriptionTh: 'นวัตกรรมและเทคโนโลยีเครื่องมือผ่าตัดส่องกล้องโพรงมดลูกรุ่นใหม่ล่าสุด',
+    descriptionEn: 'Next-generation optical systems, miniature resectoscopes, and morcellation instrumentation.',
+    speakers: [
+      {
+        nameTh: 'ทีมผู้เชี่ยวชาญด้านเครื่องมือแพทย์',
+        nameEn: 'Surgical Technology Specialists Panel',
+        titleTh: 'Medtronic Storz Olympus Tawanmcweis BJC Healthcare',
+        titleEn: 'Medtronic Storz Olympus Tawanmcweis BJC Healthcare',
+        institutionTh: 'Medtronic / Olympus / Storz / Tawan / BJC',
+        institutionEn: 'Industry Consortium',
+        avatarBg: 'from-sky-600 to-blue-800',
+        avatarInitials: 'IN'
+      }
+    ],
+    hasCme: true
+  },
+  {
+    id: 'd1-ws3-break',
+    day: 1,
+    time: '09:40 - 10:00',
+    roomTh: 'Foyer ชั้น 12',
+    roomEn: '12th Floor Foyer',
+    category: 'general',
+    workshopTrack: 'ws3',
+    titleTh: '☕ พักรับประทานอาหารว่าง (Coffee Break)',
+    titleEn: 'Morning Coffee Break',
+    descriptionTh: 'พักรับประทานของว่าง เครื่องดื่ม ชา และกาแฟ',
+    descriptionEn: 'Coffee and light morning refreshments.',
+    speakers: [],
+    hasCme: false
+  },
+  {
+    id: 'd1-ws3-s5',
+    day: 1,
+    time: '10:00 - 12:00',
+    roomTh: 'ห้องพิมาน 2 ชั้น 12',
+    roomEn: '12th Floor Phiman 2 Room',
+    category: 'surgery',
+    workshopTrack: 'ws3',
+    sponsor: 'TSRM',
+    titleTh: '[WS 3: Hysteroscopy] Hands on Hysteroscopic Workshop',
+    titleEn: '[WS 3: Hysteroscopy] Hands on Hysteroscopic Surgical Workshop',
+    descriptionTh: 'ฝึกปฏิบัติจริง Hands-on ร่วมกับคณาจารย์ผู้ทรงคุณวุฒิ และสาธิตการใช้อุปกรณ์ผ่าตัดมาตรฐานสูง (จำกัดเพียง 25 ท่าน)',
+    descriptionEn: 'Intensive hands-on dry and wet lab hysteroscopic training stations mentored by expert faculty panel.',
+    speakers: [
+      {
+        nameTh: 'ศ.นพ.แสงชัย พฤทธิพันธุ์',
+        nameEn: 'Prof. Saengchai Pruksapanyarat, MD',
+        titleTh: 'อาจารย์ผู้ฝึกสอน / Past President of TSRM',
+        titleEn: 'Faculty Mentor / Past President TSRM',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-blue-700 to-indigo-800',
+        avatarInitials: 'สพ'
+      },
+      {
+        nameTh: 'นพ.วิบูลย์ กมลพรวจิตร',
+        nameEn: 'Dr. Wibool Kamolpornwichit, MD',
+        titleTh: 'อาจารย์ผู้ฝึกสอน',
+        titleEn: 'Faculty Mentor',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-teal-600 to-emerald-700',
+        avatarInitials: 'วก'
+      },
+      {
+        nameTh: 'รศ.นพ.สมสิญจน์ เพ็ชรยิ้ม',
+        nameEn: 'Assoc. Prof. Somsin Petyim, MD',
+        titleTh: 'อาจารย์ผู้ฝึกสอน',
+        titleEn: 'Faculty Mentor',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-purple-600 to-indigo-700',
+        avatarInitials: 'สพ'
+      },
+      {
+        nameTh: 'ผศ. นพ.ศรีเธียร เลิศวิกูล',
+        nameEn: 'Asst. Prof. Sritheirn Lertvikool, MD',
+        titleTh: 'อาจารย์ผู้ฝึกสอน',
+        titleEn: 'Faculty Mentor',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-rose-600 to-pink-700',
+        avatarInitials: 'ศล'
+      },
+      {
+        nameTh: 'นพ.พัฒน์ศมา วิจินศาสตร์วิจัย',
+        nameEn: 'Dr. Phatsama Wijinsartwijai, MD',
+        titleTh: 'อาจารย์ผู้ฝึกสอน',
+        titleEn: 'Faculty Mentor',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-amber-600 to-orange-700',
+        avatarInitials: 'พว'
+      },
+      {
+        nameTh: 'พญ.พิมพกา ชวนะเวสน์',
+        nameEn: 'Dr. Pimpaka Chawanaves, MD',
+        titleTh: 'อาจารย์ผู้ฝึกสอน',
+        titleEn: 'Faculty Mentor',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-emerald-600 to-teal-700',
+        avatarInitials: 'พช'
+      }
+    ],
+    isHighlight: true,
+    hasCme: true
+  },
+  {
+    id: 'd1-ws3-lunch',
+    day: 1,
+    time: '12:00 - 13:00',
+    roomTh: 'Dining Room ชั้น 12',
+    roomEn: '12th Floor Dining Room',
+    category: 'general',
+    workshopTrack: 'ws3',
+    titleTh: '🍽️ พักรับประทานอาหารกลางวัน & ปิดการประชุมเชิงปฏิบัติการ',
+    titleEn: 'Luncheon & Workshop Concluded',
+    descriptionTh: 'รับประทานอาหารกลางวัน และปิดการประชุม Program WS 3 Fertility-enhancing hysteroscopic surgery อย่างเป็นทางการ',
+    descriptionEn: 'Lunch buffet and official conclusion of WS 3 Hysteroscopy.',
+    speakers: [],
+    hasCme: false
+  },
+
+  // ==========================================
+  // DAY 2 (Oct 21, 2026: Main Program Day 1)
+  // Room: 10th Floor Grand Hall Lumphini 2,3
+  // ==========================================
+  {
+    id: 'd2-reg',
+    day: 2,
+    time: '07:30 - 08:20',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'general',
+    titleTh: 'ลงทะเบียนผู้เข้าร่วมประชุม (Registration)',
+    titleEn: 'Main Congress Registration',
+    descriptionTh: 'ลงทะเบียนรับป้ายชื่อ เอกสารการประชุมวิชาการประจำปี และของที่ระลึก',
+    descriptionEn: 'Attendee badge check-in, registration kit pickup, and morning reception.',
+    speakers: [],
+    hasCme: false
+  },
+  {
+    id: 'd2-welcome',
+    day: 2,
+    time: '08:20 - 08:30',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'keynote',
+    sponsor: 'TSRM',
+    titleTh: 'Welcome Speech & พิธีเปิดการประชุมวิชาการประจำปี 2569',
+    titleEn: 'Official Opening Ceremony & Presidential Welcome Speech',
+    descriptionTh: 'กล่าวเปิดการประชุมวิชาการประจำปี ครั้งที่ 34 (34th TSRM 2026) โดย นพ.สวัสดิ์ ไตรตรงึษ์ทัศนา นายกสมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+    descriptionEn: 'Welcome address and official opening remarks by Dr. Sawat Traitrongtassana, President of TSRM.',
+    speakers: [
+      {
+        nameTh: 'นพ.สวัสดิ์ ไตรตรงึษ์ทัศนา',
+        nameEn: 'Dr. Sawat Traitrongtassana, MD',
+        titleTh: 'President of TSRM',
+        titleEn: 'President, Thai Society for Reproductive Medicine',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-blue-700 to-indigo-900',
+        avatarInitials: 'สต'
+      }
+    ],
+    isHighlight: true,
+    hasCme: true
+  },
   {
     id: 'd2-s1',
     day: 2,
-    time: '08:45 - 09:15',
-    roomTh: 'Grand Ballroom A-B',
-    roomEn: 'Grand Ballroom A-B',
-    category: 'general',
-    titleTh: 'พิธีเปิดการประชุมวิชาการประจำปี 2569 & สุนทรพจน์นายกสมาคมฯ',
-    titleEn: 'Opening Ceremony & Presidential Address: Shaping the Future of ART in Thailand',
-    descriptionTh: 'พิธีเปิดอย่างเป็นทางการ พร้อมมอบโล่เกียรติคุณแก่อาจารย์อาวุโสผู้ทรงคุณวุฒิ',
-    descriptionEn: 'Official opening ceremony, honorary awards, and keynote speech by THAISRM President.',
+    time: '08:30 - 09:10',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'keynote',
+    sponsor: 'TSRM',
+    titleTh: 'Safe Practice in ART: ข้อพึงระวังทางกฎหมายในการรักษาผู้มีบุตรยาก',
+    titleEn: 'Safe Practice in ART: Legal Considerations and Cautions in Infertility Treatment',
+    descriptionTh: 'บรรยายข้อพึงระวังทางกฎหมาย กฎระเบียบมาตรฐานการให้บริการด้านเทคโนโลยีช่วยการเจริญพันธุ์ และแนวทางปฏิบัติที่ปลอดภัย',
+    descriptionEn: 'Legal frameworks, statutory regulations, and clinical risk mitigation under health service laws in Thailand.',
     speakers: [
       {
-        nameTh: 'ศ.เกียรติคุณ นพ. สุรชัย วัฒนาวิบูลย์',
-        nameEn: 'Prof. Emeritus Surachai Wattanavibul, MD',
-        titleTh: 'นายกสมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
-        titleEn: 'President, THAISRM',
-        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
-        institutionEn: 'THAISRM Association',
-        avatarBg: 'from-blue-700 to-slate-900',
-        avatarInitials: 'SW'
+        nameTh: 'เภสัชกรหญิง ชยาวี กาญวัฒะกิจ',
+        nameEn: 'Chayawee Kanwattanakit, RPh',
+        titleTh: 'กรมสนับสนุนบริการสุขภาพ (สบส.) กระทรวงสาธารณสุข',
+        titleEn: 'Department of Health Service Support (HSS)',
+        institutionTh: 'กรมสนับสนุนบริการสุขภาพ (สบส.)',
+        institutionEn: 'Ministry of Public Health, Thailand',
+        avatarBg: 'from-cyan-600 to-blue-800',
+        avatarInitials: 'ชก'
       }
     ],
     isHighlight: true,
-    hasCme: true,
-    hasLiveStream: true
+    hasCme: true
   },
   {
     id: 'd2-s2',
     day: 2,
-    time: '09:15 - 10:15',
-    roomTh: 'Grand Ballroom A-B',
-    roomEn: 'Grand Ballroom A-B',
+    time: '09:10 - 09:50',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
     category: 'keynote',
-    titleTh: 'Keynote Plenary 1: Future Horizons in Reproductive Genetics: Non-Invasive PGT & Epigenetics',
-    titleEn: 'Keynote Plenary 1: Future Horizons in Reproductive Genetics: Non-Invasive PGT & Epigenetics',
-    descriptionTh: 'ทิศทางใหม่ของการตรวจพันธุกรรมตัวอ่อนแบบไม่เจาะเซลล์ (niPGT) และผลกระทบของการเปลี่ยนแปลงด้าน Epigenetics ต่อทารก',
-    descriptionEn: 'Revolutionary insights into non-invasive spent medium DNA testing and epigenetic programming in ART.',
+    sponsor: 'TSRM',
+    titleTh: 'ความรับผิดของแพทย์และนักวิทยาศาสตร์กรณีการอุ้มบุญโดยไม่ชอบด้วยกฎหมาย',
+    titleEn: 'Legal Liabilities of Physicians and Embryologists in Unlawful Surrogacy Cases',
+    descriptionTh: 'เจาะลึกมุมมองทางกฎหมาย คดีความ ข้อวินิจฉัย และความรับผิดทางแพ่งและอาญาของแพทย์และนักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อน',
+    descriptionEn: 'Judicial precedents, penal sanctions, and civil liabilities regarding non-compliant surrogacy practices.',
     speakers: [
       {
-        nameTh: 'Prof. Michael Chen, MD, PhD, FRCOG',
-        nameEn: 'Prof. Michael Chen, MD, PhD, FRCOG',
-        titleTh: 'Professor of Genomic Medicine',
-        titleEn: 'Professor of Genomic Medicine',
-        institutionTh: 'Oxford Fertility & Genomics Institute, UK',
-        institutionEn: 'Oxford Fertility & Genomics Institute, UK',
-        avatarBg: 'from-blue-600 to-cyan-700',
-        avatarInitials: 'MC'
+        nameTh: 'ดร.รณชัย ชูสุวรรณประทีป',
+        nameEn: 'Dr. Ronnachai Choosuwanpratheep',
+        titleTh: 'ผู้พิพากษาและเลขาฯ อุทธรณ์คดีชำนัญพิเศษ',
+        titleEn: 'Judge & Secretary of the Court of Appeal for Specialized Cases',
+        institutionTh: 'ศาลอุทธรณ์คดีชำนัญพิเศษ',
+        institutionEn: 'Court of Appeal for Specialized Cases',
+        avatarBg: 'from-purple-700 to-indigo-900',
+        avatarInitials: 'รช'
       }
     ],
     isHighlight: true,
-    hasCme: true,
-    hasLiveStream: true
+    hasCme: true
   },
   {
-    id: 'd2-s3',
+    id: 'd2-s3-qa',
     day: 2,
-    time: '10:30 - 12:00',
-    roomTh: 'Grand Ballroom A-B',
-    roomEn: 'Grand Ballroom A-B',
-    category: 'surgery',
-    titleTh: 'Plenary Symposium: Endometrial Receptivity, Microbiome & Immune Rejection: Solving RIF',
-    titleEn: 'Plenary Symposium: Endometrial Receptivity, Microbiome & Immune Rejection: Solving RIF',
-    descriptionTh: 'ไขความลับภาวะตัวอ่อนไม่ฝังตัวซ้ำซ้อน (RIF) ผ่านการตรวจความพร้อมเยื่อบุโพรงมดลูก จุลชีพในโพรงมดลูก และระบบภูมิคุ้มกัน',
-    descriptionEn: 'Multidisciplinary discussion on recurrent implantation failure, uterine microbiome dysbiosis, and immunotherapy.',
-    speakers: [
-      {
-        nameTh: 'พญ. วราภรณ์ สุวรรณประสิทธิ์',
-        nameEn: 'Dr. Waraporn Suwannaprasit, MD',
-        titleTh: 'ผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์',
-        titleEn: 'Reproductive Immunologist',
-        institutionTh: 'โรงพยาบาลรามาธิบดี',
-        institutionEn: 'Ramathibodi Hospital',
-        avatarBg: 'from-teal-600 to-emerald-800',
-        avatarInitials: 'WS'
-      },
-      {
-        nameTh: 'Dr. Alan Foster, PhD',
-        nameEn: 'Dr. Alan Foster, PhD',
-        titleTh: 'Microbiome Research Director',
-        titleEn: 'Microbiome Research Director',
-        institutionTh: 'Karolinska Institute, Sweden',
-        institutionEn: 'Karolinska Institute, Sweden',
-        avatarBg: 'from-indigo-600 to-blue-900',
-        avatarInitials: 'AF'
-      }
-    ],
+    time: '09:50 - 10:00',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'general',
+    titleTh: 'ช่วงถาม-ตอบ (Q & A): กฎหมายและมาตรฐานการรักษา ART',
+    titleEn: 'Q & A Session: Legal and Practice Standards in ART',
+    descriptionTh: 'เปิดรับข้อซักถามจากแพทย์และผู้เข้าร่วมประชุมเกี่ยวกับประเด็นทางกฎหมายในการรักษาผู้มีบุตรยาก',
+    descriptionEn: 'Interactive audience Q&A with panel experts on legal liabilities and ethical clinical ART practice.',
+    speakers: [],
     hasCme: true
   },
   {
     id: 'd2-s4',
     day: 2,
-    time: '13:30 - 15:00',
-    roomTh: 'Grand Ballroom A',
-    roomEn: 'Grand Ballroom A',
-    category: 'keynote',
-    titleTh: 'Great Debate: Freeze-All Strategy vs Fresh Embryo Transfer: Are We Doing Too Much?',
-    titleEn: 'Great Debate: Freeze-All Strategy vs Fresh Embryo Transfer: Are We Doing Too Much?',
-    descriptionTh: 'การโต้วาทีทางวิชาการ: การแช่แข็งตัวอ่อนทั้งหมดช่วยเพิ่มอัตราความสำเร็จจริงหรือเป็นการเพิ่มภาระและค่าใช้จ่ายโดยไม่จำเป็น',
-    descriptionEn: 'Pros and cons of universal elective freeze-all versus customized fresh transfer protocols.',
+    time: '10:00 - 10:30',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'embryology',
+    sponsor: 'TSRM',
+    titleTh: 'Expanded carrier screening for ART',
+    titleEn: 'Expanded carrier screening for ART',
+    descriptionTh: 'การตรวจคัดกรองพาหะโรคทางพันธุกรรมแบบครอบคลุม (Expanded Carrier Screening) เพื่อความปลอดภัยของทารกในกระบวนการ ART',
+    descriptionEn: 'Clinical utility, panel design, and reproductive counseling for pan-ethnic expanded genetic carrier screening.',
     speakers: [
       {
-        nameTh: 'ศ.นพ. ชัยณรงค์ เลิศวิมลวัฒน์',
-        nameEn: 'Prof. Chainarong Lertwimonwat, MD',
-        titleTh: 'Team Pro Freeze-All',
-        titleEn: 'Team Pro Freeze-All',
-        institutionTh: 'คณะแพทยศาสตร์ มหาวิทยาลัยเชียงใหม่',
-        institutionEn: 'Chiang Mai University',
-        avatarBg: 'from-blue-600 to-indigo-800',
-        avatarInitials: 'CL'
-      },
-      {
-        nameTh: 'รศ.พญ. นภาพร จิตติชัยกุล',
-        nameEn: 'Assoc. Prof. Naphaporn Jittichaikul, MD',
-        titleTh: 'Team Customized Fresh ET',
-        titleEn: 'Team Customized Fresh ET',
-        institutionTh: 'คณะแพทยศาสตร์ มหาวิทยาลัยขอนแก่น',
-        institutionEn: 'Khon Kaen University',
-        avatarBg: 'from-purple-600 to-pink-700',
-        avatarInitials: 'NJ'
+        nameTh: 'ศ. นพ. นเรศร สุขเจริญ',
+        nameEn: 'Prof. Nares Sukcharoen, MD',
+        titleTh: 'ผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์ คณะแพทยศาสตร์ จุฬาลงกรณ์มหาวิทยาลัย',
+        titleEn: 'Professor of Reproductive Medicine, Chulalongkorn University',
+        institutionTh: 'รพ.จุฬาลงกรณ์',
+        institutionEn: 'Chulalongkorn Memorial Hospital',
+        avatarBg: 'from-emerald-600 to-teal-800',
+        avatarInitials: 'นส'
       }
     ],
     isHighlight: true,
     hasCme: true
   },
   {
+    id: 'd2-break1',
+    day: 2,
+    time: '10:30 - 11:00',
+    roomTh: 'Foyer ชั้น 10',
+    roomEn: '10th Floor Foyer',
+    category: 'general',
+    titleTh: '☕ พักรับประทานอาหารว่าง (Coffee Break)',
+    titleEn: 'Morning Coffee Break & Poster Viewing',
+    descriptionTh: 'พักรับประทานของว่าง เครื่องดื่ม ชา และกาแฟ พร้อมชมนิทรรศการทางวิชาการ',
+    descriptionEn: 'Coffee, tea, refreshments, and trade exhibition viewing.',
+    speakers: [],
+    hasCme: false
+  },
+  {
     id: 'd2-s5',
     day: 2,
-    time: '18:30 - 21:30',
-    roomTh: 'Lotus Grand Ballroom',
-    roomEn: 'Lotus Grand Ballroom',
+    time: '11:00 - 11:30',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'surgery',
+    sponsor: 'TSRM',
+    titleTh: 'State-of-the-Art Management of Isthmocele in Women with Infertility',
+    titleEn: 'State-of-the-Art Management of Isthmocele in Women with Infertility',
+    descriptionTh: 'การจัดการและรักษาภาวะแผลผ่าคลอดที่มดลูก (Isthmocele/Cesarean Scar Defect) ในสตรีที่มีบุตรยากด้วยแนวทางทันสมัย',
+    descriptionEn: 'Diagnostic modalities, surgical repair techniques, and fertility outcomes in symptomatic cesarean scar defects.',
+    speakers: [
+      {
+        nameTh: 'รศ. นพ. ปวิตร สุจริตพงศ์',
+        nameEn: 'Assoc. Prof. Pawit Suchartpong, MD',
+        titleTh: 'ภาควิชาสูติศาสตร์-นรีเวชวิทยา คณะแพทยศาสตร์ศิริราชพยาบาล',
+        titleEn: 'Department of OB-GYN, Siriraj Hospital',
+        institutionTh: 'คณะแพทยศาสตร์ศิริราชพยาบาล',
+        institutionEn: 'Siriraj Hospital, Mahidol University',
+        avatarBg: 'from-blue-600 to-cyan-700',
+        avatarInitials: 'ปส'
+      }
+    ],
+    isHighlight: true,
+    hasCme: true
+  },
+  {
+    id: 'd2-s6',
+    day: 2,
+    time: '11:30 - 12:00',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'symposium',
+    sponsor: 'A.P.Tec',
+    titleTh: 'Challenging the status quo : Redesigning IVF for the modern lab',
+    titleEn: 'Challenging the status quo : Redesigning IVF for the modern lab',
+    descriptionTh: 'การออกแบบกระบวนการทำงานและเทคโนโลยีห้องแล็บเพาะเลี้ยงตัวอ่อนยุคใหม่เพื่อเพิ่มประสิทธิภาพและลดความผันแปร',
+    descriptionEn: 'Innovative methodologies in culture systems, lab automation, and ergonomic design in contemporary embryology.',
+    speakers: [
+      {
+        nameTh: 'Kathryn Gebhardt',
+        nameEn: 'Kathryn Gebhardt, PhD',
+        titleTh: 'International Scientific Specialist, A.P.Tec',
+        titleEn: 'International Scientific Specialist, A.P.Tec',
+        institutionTh: 'A.P.Tec',
+        institutionEn: 'A.P.Tec Biomedical Solutions',
+        avatarBg: 'from-indigo-600 to-purple-800',
+        avatarInitials: 'KG'
+      }
+    ],
+    isHighlight: true,
+    hasCme: true
+  },
+  {
+    id: 'd2-lunch',
+    day: 2,
+    time: '12:00 - 13:00',
+    roomTh: 'Grand Dining Hall ชั้น 10',
+    roomEn: '10th Floor Dining Hall',
     category: 'general',
-    titleTh: 'TSRM Gala Dinner & Scientific Research Awards Night 2026',
-    titleEn: 'TSRM Gala Dinner & Scientific Research Awards Night 2026',
-    descriptionTh: 'งานเลี้ยงสังสรรค์สมาชิก TSRM พร้อมพิธีประกาศรางวัลผลงานวิจัยยอดเยี่ยม และการแสดงดนตรีพิเศษ',
-    descriptionEn: 'Networking gala dinner, Best Research Presentation Award announcements, and live entertainment.',
+    titleTh: '🍽️ พักรับประทานอาหารกลางวัน (Lunch)',
+    titleEn: 'Luncheon Break',
+    descriptionTh: 'พักรับประทานอาหารกลางวัน',
+    descriptionEn: 'Buffet luncheon at conference dining hall.',
     speakers: [],
-    isHighlight: true
+    hasCme: false
+  },
+  {
+    id: 'd2-s7',
+    day: 2,
+    time: '13:00 - 13:30',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'symposium',
+    sponsor: 'Merck',
+    titleTh: 'Mimicking Nature: Unlocking the Potential of LH for Personalized Reproductive Medicine',
+    titleEn: 'Mimicking Nature: Unlocking the Potential of LH for Personalized Reproductive Medicine',
+    descriptionTh: 'บทบาทของ Luteinizing Hormone (LH) ในการกระตุ้นไข่แบบเฉพาะบุคคลเพื่อเลียนแบบสรีรวิทยาตามธรรมชาติ',
+    descriptionEn: 'Physiological roles of LH supplementation in follicular dynamics, oocyte competence, and individualized stimulation.',
+    speakers: [
+      {
+        nameTh: 'นพ.พันธ์กวี ตันติวิริยพันธุ์',
+        nameEn: 'Dr. Phankawi Tantiviriyaphan, MD',
+        titleTh: 'ผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์ รพ.จุฬาลงกรณ์',
+        titleEn: 'Reproductive Endocrinologist, Chulalongkorn Hospital',
+        institutionTh: 'รพ.จุฬาลงกรณ์',
+        institutionEn: 'Chulalongkorn Memorial Hospital',
+        avatarBg: 'from-blue-600 to-teal-700',
+        avatarInitials: 'พต'
+      }
+    ],
+    isHighlight: true,
+    hasCme: true
+  },
+  {
+    id: 'd2-s8-oral1',
+    day: 2,
+    time: '13:30 - 13:45',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'surgery',
+    sponsor: 'TSRM',
+    titleTh: 'Oral Presentation: The effect of pretreatment transdermal testosterone gel on IVF outcomes in patients with poor ovarian reserve: a randomized control trial (PRETTI-TRIAL)',
+    titleEn: 'Oral Presentation: Pretreatment transdermal testosterone gel in poor ovarian reserve: randomized control trial (PRETTI-TRIAL)',
+    descriptionTh: 'การศึกษาเปรียบเทียบแบบสุ่มและมีกลุ่มควบคุม ประสิทธิผลของการใช้ฮอร์โมนเทสโทสเตอโรนเจลทาก่อนกระตุ้นไข่ในผู้ป่วยตอบสนองต่อการกระตุ้นรังไข่ต่ำ',
+    descriptionEn: 'Findings from the PRETTI-TRIAL on oocyte yield, embryo quality, and clinical pregnancy outcomes in POR patients.',
+    speakers: [
+      {
+        nameTh: 'พญ.สิริกุล ฐานพงษ์',
+        nameEn: 'Dr. Sirikun Thanaphong, MD',
+        titleTh: 'คณะแพทยศาสตร์ศิริราชพยาบาล',
+        titleEn: 'Faculty of Medicine Siriraj Hospital',
+        institutionTh: 'คณะแพทยศาสตร์ศิริราชพยาบาล',
+        institutionEn: 'Siriraj Hospital, Mahidol University',
+        avatarBg: 'from-pink-600 to-rose-700',
+        avatarInitials: 'สฐ'
+      }
+    ],
+    hasCme: true
+  },
+  {
+    id: 'd2-s9-oral2',
+    day: 2,
+    time: '13:45 - 14:00',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'embryology',
+    sponsor: 'TSRM',
+    titleTh: 'Oral Presentation: Differences in transcriptomic expression of apoptotic genes between euploid and aneuploid embryos using trophectoderm biopsy and spent culture media',
+    titleEn: 'Oral Presentation: Differences in transcriptomic expression of apoptotic genes in euploid vs aneuploid embryos',
+    descriptionTh: 'การวิเคราะห์ความแตกต่างของการแสดงออกทางทรานสคริปโตมิกส์ของยีนที่ควบคุมการตายของเซลล์ ระหว่างตัวอ่อนปกติและผิดปกติ โดยใช้เซลล์โทรโฟเอกโทเดิร์มและน้ำเลี้ยงตัวอ่อน',
+    descriptionEn: 'Molecular apoptotic gene expression profiling in blastocyst biopsies and spent culture media DNA concordance.',
+    speakers: [
+      {
+        nameTh: 'นพ. ภัทร แกน ลีละอมรวิเชษฐ์',
+        nameEn: 'Dr. Pattara Gan Leela-amornvicheat, MD',
+        titleTh: 'คณะแพทยศาสตร์ จุฬาลงกรณ์มหาวิทยาลัย',
+        titleEn: 'Faculty of Medicine, Chulalongkorn University',
+        institutionTh: 'จุฬาลงกรณ์มหาวิทยาลัย',
+        institutionEn: 'Chulalongkorn University',
+        avatarBg: 'from-teal-600 to-cyan-700',
+        avatarInitials: 'ภล'
+      }
+    ],
+    hasCme: true
+  },
+  {
+    id: 'd2-break2',
+    day: 2,
+    time: '14:00 - 14:30',
+    roomTh: 'Foyer ชั้น 10',
+    roomEn: '10th Floor Foyer',
+    category: 'general',
+    titleTh: '☕ พักรับประทานอาหารว่าง (Coffee Break)',
+    titleEn: 'Afternoon Refreshments & Coffee Break',
+    descriptionTh: 'พักรับประทานของว่าง เครื่องดื่ม ชา และกาแฟ',
+    descriptionEn: 'Coffee break and academic exchange.',
+    speakers: [],
+    hasCme: false
+  },
+  {
+    id: 'd2-s10',
+    day: 2,
+    time: '14:30 - 15:00',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'surgery',
+    sponsor: 'TSRM',
+    titleTh: 'Endometrial Microbiome in IVF: current evidence and clinical perspectives',
+    titleEn: 'Endometrial Microbiome in IVF: Current Evidence and Clinical Perspectives',
+    descriptionTh: 'หลักฐานทางคลินิกล่าสุดและมุมมองการประยุกต์ใช้เรื่องจุลชีพในโพรงมดลูก (Microbiome) กับความสำเร็จในการรักษาเด็กหลอดแก้ว',
+    descriptionEn: 'Microbiome composition, dysbiosis impact on endometrial receptivity, and clinical therapeutic interventions.',
+    speakers: [
+      {
+        nameTh: 'รศ.พญ. ชลธิชา สถิระพจน์',
+        nameEn: 'Assoc. Prof. Chonthicha Satirapod, MD',
+        titleTh: 'คณะแพทยศาสตร์โรงพยาบาลรามาธิบดี มหาวิทยาลัยมหิดล',
+        titleEn: 'Faculty of Medicine Ramathibodi Hospital, Mahidol University',
+        institutionTh: 'รพ.รามาธิบดี',
+        institutionEn: 'Ramathibodi Hospital',
+        avatarBg: 'from-indigo-600 to-purple-800',
+        avatarInitials: 'ชส'
+      }
+    ],
+    isHighlight: true,
+    hasCme: true
+  },
+  {
+    id: 'd2-s11',
+    day: 2,
+    time: '15:00 - 15:30',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'surgery',
+    sponsor: 'TSRM',
+    titleTh: 'Endometrial Add-ons Before Embryo Transfer: Evidence for Intrauterine hCG and Other Interventions',
+    titleEn: 'Endometrial Add-ons Before Embryo Transfer: Evidence for Intrauterine hCG and Other Interventions',
+    descriptionTh: 'วิเคราะห์หลักฐานเชิงประจักษ์ของการใช้วิธีเสริม (Add-ons) เช่น การฉีด hCG เข้าโพรงมดลูก ก่อนการย้ายตัวอ่อน',
+    descriptionEn: 'Critical evaluation of efficacy, safety, and Cochrane evidence for intrauterine hCG infusion, PRP, and endometrial scratch.',
+    speakers: [
+      {
+        nameTh: 'รศ.พญ. อิสรินทร์ ธนบุณยวัฒน์',
+        nameEn: 'Assoc. Prof. Issarin Thanaboonyawat, MD',
+        titleTh: 'คณะแพทยศาสตร์ศิริราชพยาบาล มหาวิทยาลัยมหิดล',
+        titleEn: 'Faculty of Medicine Siriraj Hospital, Mahidol University',
+        institutionTh: 'คณะแพทยศาสตร์ศิริราชพยาบาล',
+        institutionEn: 'Siriraj Hospital, Mahidol University',
+        avatarBg: 'from-rose-600 to-pink-700',
+        avatarInitials: 'อธ'
+      }
+    ],
+    isHighlight: true,
+    hasCme: true
+  },
+  {
+    id: 'd2-s12',
+    day: 2,
+    time: '15:30 - 16:00',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'embryology',
+    sponsor: 'TSRM',
+    titleTh: 'PGT in 2026: What\'s New from PGDIS?',
+    titleEn: 'PGT in 2026: What\'s New from PGDIS?',
+    descriptionTh: 'อัปเดตแนวทางและข้อแนะนำล่าสุดในการตรวจพันธุกรรมตัวอ่อนก่อนการฝังตัวจากสมาคม PGDIS ประจำปี 2026',
+    descriptionEn: 'Latest consensus statements, mosaic embryo transfer guidelines, and technological breakthroughs from PGDIS 2026.',
+    speakers: [
+      {
+        nameTh: 'นพ. พันธ์กวี ตันติวิริยพันธุ์',
+        nameEn: 'Dr. Phankawi Tantiviriyaphan, MD',
+        titleTh: 'ผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์ รพ.จุฬาลงกรณ์',
+        titleEn: 'Reproductive Endocrinologist, Chulalongkorn Hospital',
+        institutionTh: 'รพ.จุฬาลงกรณ์',
+        institutionEn: 'Chulalongkorn Memorial Hospital',
+        avatarBg: 'from-blue-600 to-cyan-700',
+        avatarInitials: 'พต'
+      }
+    ],
+    isHighlight: true,
+    hasCme: true
   },
 
-  // DAY 3 (Oct 17, 2026)
+  // ==========================================
+  // DAY 3 (Oct 22, 2026: Main Program Day 2)
+  // Room: 10th Floor Grand Hall Lumphini 2,3
+  // ==========================================
+  {
+    id: 'd3-reg',
+    day: 3,
+    time: '07:30 - 08:30',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'general',
+    titleTh: 'ลงทะเบียนเข้าประชุมวันที่ 2 (Registration)',
+    titleEn: 'Registration & Morning Welcome',
+    descriptionTh: 'ลงทะเบียนผู้เข้าร่วมประชุมวันที่ 2',
+    descriptionEn: 'Attendee morning sign-in and program handouts.',
+    speakers: [],
+    hasCme: false
+  },
   {
     id: 'd3-s1',
     day: 3,
-    time: '09:00 - 10:30',
-    roomTh: 'Grand Ballroom A',
-    roomEn: 'Grand Ballroom A',
-    category: 'surgery',
-    titleTh: 'Symposium: Male Infertility Innovations: Micro-TESE & Spermatogonial Stem Cell Biology',
-    titleEn: 'Symposium: Male Infertility Innovations: Micro-TESE & Spermatogonial Stem Cell Biology',
-    descriptionTh: 'ความก้าวหน้าในการผ่าตัดค้นหาอสุจิด้วยกล้องจุลทรรศน์ (micro-TESE) ในผู้ป่วย NOA และการฟื้นฟูเซลล์ต้นกำเนิดสร้างอสุจิ',
-    descriptionEn: 'Surgical sperm retrieval optimization and emerging cellular therapies for non-obstructive azoospermia (NOA).',
+    time: '08:30 - 09:00',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'embryology',
+    sponsor: 'TSRM',
+    titleTh: 'Comprehensive NGS for PGT: From Basic Concepts to Clinical Application',
+    titleEn: 'Comprehensive NGS for PGT: From Basic Concepts to Clinical Application',
+    descriptionTh: 'เทคโนโลยี Next-Generation Sequencing (NGS) แบบครอบคลุมสำหรับการตรวจพันธุกรรมตัวอ่อน จากหลักการพื้นฐานสู่การใช้งานทางคลินิก',
+    descriptionEn: 'High-resolution NGS pipelines, bioinformatic workflows, and clinical decision-making in PGT-A and PGT-SR.',
     speakers: [
       {
-        nameTh: 'นพ. ปริญญา วงศ์สว่างศิริ',
-        nameEn: 'Dr. Parinya Wongsawangsiri, MD',
-        titleTh: 'ผู้เชี่ยวชาญด้านศัลยศาสตร์ระบบปัสสาวะและบุรุษเวช',
-        titleEn: 'Urologist & Andrologist',
-        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
-        institutionEn: 'THAISRM Andrology Group',
-        avatarBg: 'from-cyan-600 to-blue-800',
-        avatarInitials: 'PW'
+        nameTh: 'ผศ.พญ. อาทิตยา สิงห์วงษา',
+        nameEn: 'Asst. Prof. Artitaya Singwongsa, MD',
+        titleTh: 'คณะแพทยศาสตร์โรงพยาบาลรามาธิบดี',
+        titleEn: 'Ramathibodi Hospital, Mahidol University',
+        institutionTh: 'รพ.รามาธิบดี',
+        institutionEn: 'Ramathibodi Hospital',
+        avatarBg: 'from-purple-600 to-indigo-700',
+        avatarInitials: 'อส'
       }
     ],
+    isHighlight: true,
     hasCme: true
   },
   {
     id: 'd3-s2',
     day: 3,
-    time: '10:45 - 12:00',
-    roomTh: 'Grand Ballroom A-B',
-    roomEn: 'Grand Ballroom A-B',
-    category: 'keynote',
-    titleTh: 'Keynote Plenary 2: In-Vitro Gametogenesis (IVG) & Artificial Wombs: Science Fiction to Reality?',
-    titleEn: 'Keynote Plenary 2: In-Vitro Gametogenesis (IVG) & Artificial Wombs: Science Fiction to Reality?',
-    descriptionTh: 'การสร้างเซลล์ไข่และอสุจิจากสเต็มเซลล์ (IVG) และระบบอุ้มบุญประดิษฐ์: ข้อพิจารณาทางวิทยาศาสตร์และจริยธรรมการแพทย์',
-    descriptionEn: 'Cutting-edge stem-cell-derived gametes, artificial ectogenesis models, and biomedical ethics.',
+    time: '09:00 - 09:30',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'embryology',
+    sponsor: 'TSRM',
+    titleTh: 'Advances in PGT-M: Emerging Technologies and Clinical Challenges',
+    titleEn: 'Advances in PGT-M: Emerging Technologies and Clinical Challenges',
+    descriptionTh: 'ความก้าวหน้าของการตรวจคัดกรองโรคยีนเดี่ยวในตัวอ่อน (PGT-M) เทคโนโลยีใหม่และความท้าทายทางคลินิก',
+    descriptionEn: 'Karyomapping, haplotyping, direct mutation detection, and complex monogenic disease resolution.',
     speakers: [
       {
-        nameTh: 'Prof. Elena Rossi, MD, PhD',
-        nameEn: 'Prof. Elena Rossi, MD, PhD',
-        titleTh: 'Chair of Regenerative Embryology',
-        titleEn: 'Chair of Regenerative Embryology',
-        institutionTh: 'University of Milan, Italy',
-        institutionEn: 'University of Milan, Italy',
-        avatarBg: 'from-violet-600 to-indigo-900',
-        avatarInitials: 'ER'
+        nameTh: 'ดร. เกษร เตียวศิริ',
+        nameEn: 'Dr. Kessara Tiawsirisup, PhD',
+        titleTh: 'ผู้เชี่ยวชาญด้านพันธุศาสตร์ Superior A.R.T.',
+        titleEn: 'Chief Scientific Geneticist, Superior A.R.T.',
+        institutionTh: 'Superior A.R.T.',
+        institutionEn: 'Superior A.R.T. Center',
+        avatarBg: 'from-emerald-600 to-teal-700',
+        avatarInitials: 'กต'
       }
     ],
     isHighlight: true,
-    hasCme: true,
-    hasLiveStream: true
+    hasCme: true
   },
   {
     id: 'd3-s3',
     day: 3,
-    time: '13:15 - 14:30',
-    roomTh: 'Grand Ballroom A-B',
-    roomEn: 'Grand Ballroom A-B',
-    category: 'general',
-    titleTh: 'Oral Presentation of Best Scientific Abstracts & Young Investigator Awards',
-    titleEn: 'Oral Presentation of Best Scientific Abstracts & Young Investigator Awards',
-    descriptionTh: 'การนำเสนอผลงานวิจัยดีเด่น 5 อันดับแรกโดยนักวิจัยรุ่นใหม่ และการตัดสินรางวัลเกียรติยศ',
-    descriptionEn: 'Top 5 research abstract presentations, live Q&A jury assessment, and Young Investigator Award ceremony.',
-    speakers: [],
+    time: '09:30 - 10:10',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'keynote',
+    sponsor: 'TSRM',
+    titleTh: 'Breaking Bad News in IVF patients',
+    titleEn: 'Breaking Bad News in IVF patients: Psychiatric & Communication Perspectives',
+    descriptionTh: 'ศิลปะและทักษะการแจ้งข่าวร้ายและการดูแลสภาพจิตใจของผู้ป่วยที่ไม่ประสบความสำเร็จในการทำ IVF',
+    descriptionEn: 'Psychological dynamics, trauma-informed communication strategies, and empathetic guidance in IVF failures.',
+    speakers: [
+      {
+        nameTh: 'นพ.สมรักษ์ สันติเบ็ญจกุล',
+        nameEn: 'Dr. Somrak Santibenchakul, MD',
+        titleTh: 'จิตแพทย์ผู้เชี่ยวชาญ',
+        titleEn: 'Consultant Psychiatrist',
+        institutionTh: 'ผู้เชี่ยวชาญด้านสุขภาพจิตและจิตเวชศาสตร์',
+        institutionEn: 'Psychiatric Specialist',
+        avatarBg: 'from-amber-600 to-orange-700',
+        avatarInitials: 'สส'
+      }
+    ],
+    isHighlight: true,
     hasCme: true
+  },
+  {
+    id: 'd3-break1',
+    day: 3,
+    time: '10:10 - 10:40',
+    roomTh: 'Foyer ชั้น 10',
+    roomEn: '10th Floor Foyer',
+    category: 'general',
+    titleTh: '☕ พักรับประทานอาหารว่าง (Coffee Break)',
+    titleEn: 'Morning Refreshments & Coffee Break',
+    descriptionTh: 'พักรับประทานของว่าง เครื่องดื่ม ชา และกาแฟ',
+    descriptionEn: 'Coffee, tea, and morning refreshments.',
+    speakers: [],
+    hasCme: false
   },
   {
     id: 'd3-s4',
     day: 3,
-    time: '14:30 - 15:00',
-    roomTh: 'Grand Ballroom A-B',
-    roomEn: 'Grand Ballroom A-B',
+    time: '10:40 - 11:10',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'symposium',
+    sponsor: 'LG Chem',
+    titleTh: 'Overcoming Endometriosis-Associated Infertility',
+    titleEn: 'Overcoming Endometriosis-Associated Infertility',
+    descriptionTh: 'กลยุทธ์การรักษาและการแก้ปัญหาภาวะมีบุตรยากที่เกิดจากโรคเยื่อบุโพรงมดลูกเจริญผิดที่อย่างตรงจุด',
+    descriptionEn: 'Medical suppression, surgical timing, and optimized IVF stimulation strategies for endometriosis patients.',
+    speakers: [
+      {
+        nameTh: 'นพ. ปวริศ หุมอาจ',
+        nameEn: 'Dr. Pawaris Huma-at, MD',
+        titleTh: 'ผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์',
+        titleEn: 'Reproductive Medicine Specialist',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-rose-600 to-pink-700',
+        avatarInitials: 'ปห'
+      }
+    ],
+    isHighlight: true,
+    hasCme: true
+  },
+  {
+    id: 'd3-s5',
+    day: 3,
+    time: '11:10 - 11:40',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'symposium',
+    sponsor: 'Ferring',
+    titleTh: 'Rethinking LH Supplementation in ART: From Steroidogenesis to Embryo Competence and Live Birth',
+    titleEn: 'Rethinking LH Supplementation in ART: From Steroidogenesis to Embryo Competence and Live Birth',
+    descriptionTh: 'การทบทวนหลักการเสริม LH ในกระบวนการ ART: จากการสร้างฮอร์โมนสเตียรอยด์สู่คุณภาพตัวอ่อนและอัตราการเกิดมีชีพ',
+    descriptionEn: 'Translational biology of LH signaling in granulosa cells, luteal function, and reproductive outcomes.',
+    speakers: [
+      {
+        nameTh: 'ผศ.พญ.ภัทราพร ชีระอารี',
+        nameEn: 'Asst. Prof. Patraporn Chira-aree, MD',
+        titleTh: 'ผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์',
+        titleEn: 'Reproductive Endocrinologist',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-blue-600 to-indigo-800',
+        avatarInitials: 'ภช'
+      },
+      {
+        nameTh: 'พ.ท.นพ.กฤติเดช ภู่กิตติวรางกูร',
+        nameEn: 'Lt. Col. Krittidet Phukittiwaran-kun, MD',
+        titleTh: 'ผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์',
+        titleEn: 'Reproductive Specialist',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-teal-600 to-emerald-700',
+        avatarInitials: 'กภ'
+      }
+    ],
+    isHighlight: true,
+    hasCme: true
+  },
+  {
+    id: 'd3-s6',
+    day: 3,
+    time: '11:40 - 12:10',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'symposium',
+    sponsor: 'DHA MAMA',
+    titleTh: 'DHA in Reproductive Medicine: From Biological Mechanisms to Clinical Translation',
+    titleEn: 'DHA in Reproductive Medicine: From Biological Mechanisms to Clinical Translation',
+    descriptionTh: 'บทบาทของ DHA ในเวชศาสตร์การเจริญพันธุ์: จากกลไกทางชีววิทยาสู่การประยุกต์ใช้ในการดูแลคู่สมรสมีบุตรยาก',
+    descriptionEn: 'Essential fatty acid metabolism, oocyte membrane fluidity, endometrial anti-inflammatory actions, and clinical trials.',
+    speakers: [
+      {
+        nameTh: 'รศ.พญ. ชนกานต์ สืบถวิลกุล',
+        nameEn: 'Assoc. Prof. Chonnakarn Suebthawinkul, MD',
+        titleTh: 'ผู้เชี่ยวชาญด้านเวชศาสตร์การเจริญพันธุ์',
+        titleEn: 'Reproductive Specialist',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-cyan-600 to-blue-700',
+        avatarInitials: 'ชส'
+      }
+    ],
+    isHighlight: true,
+    hasCme: true
+  },
+  {
+    id: 'd3-lunch',
+    day: 3,
+    time: '12:10 - 13:15',
+    roomTh: 'Grand Dining Hall ชั้น 10',
+    roomEn: '10th Floor Dining Hall',
     category: 'general',
-    titleTh: 'พิธีปิดการประชุม & ส่งมอบธงเจ้าภาพ TSRM Annual Congress 2027',
-    titleEn: 'Closing Ceremony, CME Certificate Issuance & Handover to TSRM 2027',
-    descriptionTh: 'สรุปผลการประชุม มอบเกียรติบัตร และรับเอกสารยืนยันหน่วยกิต CME ออนไลน์',
-    descriptionEn: 'Official closing remarks, CME e-certificate issuance, and preview of TSRM 2027.',
+    titleTh: '🍽️ พักรับประทานอาหารกลางวัน (Lunch)',
+    titleEn: 'Luncheon Break',
+    descriptionTh: 'พักรับประทานอาหารกลางวัน',
+    descriptionEn: 'Buffet lunch for attendees.',
+    speakers: [],
+    hasCme: false
+  },
+  {
+    id: 'd3-s7-agm',
+    day: 3,
+    time: '13:15 - 13:45',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'keynote',
+    sponsor: 'TSRM',
+    titleTh: 'การประชุมสามัญประจำปี สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (AGM 2026)',
+    titleEn: 'TSRM Annual General Meeting (AGM 2026)',
+    descriptionTh: 'การประชุมสามัญประจำปีของสมาชิกสมาคมเวชศาสตร์การเจริญพันธุ์ไทย รายงานผลการดำเนินงานและแถลงงบดุล',
+    descriptionEn: 'Annual General Meeting for TSRM society members: presidential reports, financial audit, and governance.',
+    speakers: [
+      {
+        nameTh: 'คณะกรรมการบริหารสมาคมฯ (TSRM Committee)',
+        nameEn: 'TSRM Executive Board',
+        titleTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        titleEn: 'Thai Society for Reproductive Medicine',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-blue-700 to-indigo-900',
+        avatarInitials: 'TS'
+      }
+    ],
+    isHighlight: true,
+    hasCme: true
+  },
+  {
+    id: 'd3-s8-oral1',
+    day: 3,
+    time: '13:45 - 14:00',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'embryology',
+    sponsor: 'TSRM',
+    titleTh: 'Oral presentation: Microfluidic sperm selection versus density gradient centrifugation in ICSI cycles with abnormal semen parameters: a randomized sibling-oocyte study',
+    titleEn: 'Oral presentation: Microfluidic sperm selection vs density gradient centrifugation in sibling oocyte ICSI cycles',
+    descriptionTh: 'การเปรียบเทียบการคัดแยกอสุจิด้วยเทคโนโลยีไมโครฟลูอิดิกส์กับการปั่นแยกด้วยชั้นสารละลายเกรเดียนต์ในรอบ ICSI ที่มีน้ำอสุจิผิดปกติ: การศึกษาแบบสุ่มในไข่พี่น้อง',
+    descriptionEn: 'Randomized sibling-oocyte comparison of fertilization, blastocyst conversion, and DNA integrity using microfluidics.',
+    speakers: [
+      {
+        nameTh: 'พญ.ชัชศรัณย์ ธนพงษ์พิบูลย์',
+        nameEn: 'Dr. Chatcharan Thanaphongphibun, MD',
+        titleTh: 'คณะแพทยศาสตร์โรงพยาบาลรามาธิบดี',
+        titleEn: 'Ramathibodi Hospital',
+        institutionTh: 'รพ.รามาธิบดี',
+        institutionEn: 'Ramathibodi Hospital',
+        avatarBg: 'from-purple-600 to-pink-700',
+        avatarInitials: 'ชธ'
+      }
+    ],
+    hasCme: true
+  },
+  {
+    id: 'd3-s9-oral2',
+    day: 3,
+    time: '14:00 - 14:15',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'surgery',
+    sponsor: 'TSRM',
+    titleTh: 'Oral presentation: Effects of curcuminoids on sperm DNA fragmentation: randomized, double-blind, placebo-controlled trial',
+    titleEn: 'Oral presentation: Effects of curcuminoids on sperm DNA fragmentation: randomized, double-blind, placebo-controlled trial',
+    descriptionTh: 'ผลของสารเคอร์คูมินอยด์ต่อการแตกหักของดีเอ็นเอในอสุจิ: การทดลองแบบสุ่ม มีกลุ่มควบคุมและปกปิดสองด้าน',
+    descriptionEn: 'Double-blind RCT on antioxidant curcuminoid intervention in reducing oxidative stress and sperm DNA fragmentation index (DFI).',
+    speakers: [
+      {
+        nameTh: 'พญ. อัญมณี วีระนรพานิช',
+        nameEn: 'Dr. Anyamanee Weeranarophanit, MD',
+        titleTh: 'คณะแพทยศาสตร์ มหาวิทยาลัยสงขลานครินทร์ (มอ.)',
+        titleEn: 'Prince of Songkla University (PSU)',
+        institutionTh: 'รพ.สงขลานครินทร์ (มอ.)',
+        institutionEn: 'Songklanagarind Hospital (PSU)',
+        avatarBg: 'from-emerald-600 to-teal-700',
+        avatarInitials: 'อว'
+      }
+    ],
+    hasCme: true
+  },
+  {
+    id: 'd3-break2',
+    day: 3,
+    time: '14:15 - 14:30',
+    roomTh: 'Foyer ชั้น 10',
+    roomEn: '10th Floor Foyer',
+    category: 'general',
+    titleTh: '☕ พักรับประทานอาหารว่าง (Coffee Break)',
+    titleEn: 'Afternoon Refreshments',
+    descriptionTh: 'พักรับประทานของว่าง เครื่องดื่ม ชา และกาแฟ',
+    descriptionEn: 'Coffee, tea, and afternoon refreshments.',
+    speakers: [],
+    hasCme: false
+  },
+  {
+    id: 'd3-s10',
+    day: 3,
+    time: '14:30 - 15:00',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'embryology',
+    sponsor: 'TSRM',
+    titleTh: 'Sperm DNA Fragmentation: Testing Methods and Clinical Utility',
+    titleEn: 'Sperm DNA Fragmentation: Testing Methods and Clinical Utility',
+    descriptionTh: 'การตรวจการแตกหักของดีเอ็นเออสุจิ วิธีการตรวจวิเคราะห์ที่เหมาะสม และประโยชน์ในการประเมินทางคลินิก',
+    descriptionEn: 'Analytical methodologies (TUNEL, SCSA, Comet, SCD) and clinical indications for male factor infertility counseling.',
+    speakers: [
+      {
+        nameTh: 'รศ. นพ. ชัยณรงค์ โชติสุชาติ',
+        nameEn: 'Assoc. Prof. Chainarong Chotisuchart, MD',
+        titleTh: 'คณะแพทยศาสตร์ มหาวิทยาลัยสงขลานครินทร์ (มอ.)',
+        titleEn: 'Prince of Songkla University (PSU)',
+        institutionTh: 'รพ.สงขลานครินทร์ (มอ.)',
+        institutionEn: 'Songklanagarind Hospital (PSU)',
+        avatarBg: 'from-blue-600 to-indigo-800',
+        avatarInitials: 'ชช'
+      }
+    ],
+    isHighlight: true,
+    hasCme: true
+  },
+  {
+    id: 'd3-s11',
+    day: 3,
+    time: '15:00 - 15:45',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'surgery',
+    sponsor: 'TSRM',
+    titleTh: 'High-Intensity Focused Ultrasound (HIFU) for uterine fibroids: Pros and Cons',
+    titleEn: 'High-Intensity Focused Ultrasound (HIFU) for uterine fibroids: Pros and Cons (Debate Session)',
+    descriptionTh: 'การรักษาเนื้องอกกล้ามเนื้อมดลูกด้วยคลื่นเสียงความถี่สูงแบบเฉพาะจุด (HIFU): ข้อดี ข้อเสีย และข้อควรระวังในมุมมองวิชาการ',
+    descriptionEn: 'Comprehensive scientific debate on HIFU ablation efficacy, fertility preservation safety, recurrence rates, and surgical alternatives.',
+    speakers: [
+      {
+        nameTh: 'พญ. รัชดาพร ฤกษ์ยินดี (Pros)',
+        nameEn: 'Dr. Ratchadaporn Roerkyindee, MD (Pros)',
+        titleTh: 'โรงพยาบาลราชวิถี (ฝ่ายสนับสนุน / Pros)',
+        titleEn: 'Rajavithi Hospital (Pros)',
+        institutionTh: 'โรงพยาบาลราชวิถี',
+        institutionEn: 'Rajavithi Hospital',
+        avatarBg: 'from-emerald-600 to-teal-800',
+        avatarInitials: 'รร'
+      },
+      {
+        nameTh: 'พญ. พิมพกา ชวนะเวสน์ (Cons)',
+        nameEn: 'Dr. Pimpaka Chawanaves, MD (Cons)',
+        titleTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (ฝ่ายข้อพิจารณา / Cons)',
+        titleEn: 'Thai Society for Reproductive Medicine (Cons)',
+        institutionTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+        institutionEn: 'Thai Society for Reproductive Medicine',
+        avatarBg: 'from-rose-600 to-pink-700',
+        avatarInitials: 'พช'
+      }
+    ],
+    isHighlight: true,
+    hasCme: true
+  },
+  {
+    id: 'd3-close',
+    day: 3,
+    time: '15:45',
+    roomTh: 'Grand Hall Lumphini 2, 3 ชั้น 10',
+    roomEn: '10th Floor Grand Hall Lumphini 2, 3',
+    category: 'general',
+    titleTh: 'พิธีปิดการประชุมวิชาการประจำปี ครั้งที่ 34 (Conference Closed)',
+    titleEn: 'Closing Remarks & Official Conference Closed',
+    descriptionTh: 'สรุปภาพรวมการประชุมวิชาการประจำปี ครั้งที่ 34 ประจำปี 2569 ขอบคุณวิทยากร ผู้สนับสนุน และผู้เข้าร่วมประชุมทุกท่าน',
+    descriptionEn: 'Closing address by the organizing committee, CME credits confirmation, and conference adjournment.',
     speakers: [],
     hasCme: true
   }
@@ -537,6 +1579,8 @@ export function AgendaView() {
   const { lang, t } = useLanguage();
 
   const [selectedDay, setSelectedDay] = useState<number>(1);
+  const [day1ViewMode, setDay1ViewMode] = useState<'sheet' | 'cards'>('sheet');
+  const [day1WorkshopFilter, setDay1WorkshopFilter] = useState<'all' | 'ws1' | 'ws3'>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [bookmarks, setBookmarks] = useState<string[]>([]);
@@ -688,9 +1732,9 @@ export function AgendaView() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Countdown logic to Oct 15, 2026 08:30:00 GMT+7
+  // Countdown logic to Oct 20, 2026 07:30:00 GMT+7 (34th TSRM 2026)
   useEffect(() => {
-    const targetDate = new Date('2026-10-15T08:30:00+07:00').getTime();
+    const targetDate = new Date('2026-10-20T07:30:00+07:00').getTime();
 
     const updateCountdown = () => {
       const now = new Date().getTime();
@@ -753,17 +1797,21 @@ export function AgendaView() {
   const filteredSessions = React.useMemo(() => {
     return AGENDA_DATA.filter((session) => {
       if (session.day !== selectedDay) return false;
+      if (selectedDay === 1 && day1WorkshopFilter !== 'all' && session.workshopTrack !== day1WorkshopFilter) {
+        return false;
+      }
       if (filterCategory !== 'all' && session.category !== filterCategory) return false;
       if (searchTerm.trim() !== '') {
         const term = searchTerm.toLowerCase();
         const matchTh = session.titleTh.toLowerCase().includes(term) || session.descriptionTh.toLowerCase().includes(term);
         const matchEn = session.titleEn.toLowerCase().includes(term) || session.descriptionEn.toLowerCase().includes(term);
         const matchSpeaker = session.speakers.some(s => s.nameTh.toLowerCase().includes(term) || s.nameEn.toLowerCase().includes(term));
-        return matchTh || matchEn || matchSpeaker;
+        const matchSponsor = session.sponsor?.toLowerCase().includes(term);
+        return matchTh || matchEn || matchSpeaker || matchSponsor;
       }
       return true;
     });
-  }, [selectedDay, filterCategory, searchTerm]);
+  }, [selectedDay, filterCategory, searchTerm, day1WorkshopFilter]);
 
   const memberDisplayName = userData?.name || (lang === 'th' ? 'สมาชิกสมาคม TSRM' : 'TSRM Active Member');
   const memberEmail = userData?.email || 'member@thaisrm.or.th';
@@ -915,7 +1963,7 @@ export function AgendaView() {
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-[#4ade80]" />
                   </span>
                 </h3>
-                <p className="text-[11px] text-blue-200">15-17 Oct 2026 | Bangkok, Thailand</p>
+                <p className="text-[11px] text-blue-200">20-22 Oct 2026 | Grande Centre Point LUMPHINI, Bangkok</p>
               </div>
             </div>
 
@@ -1065,139 +2113,241 @@ export function AgendaView() {
           </div>
         </RevealOnScroll>
 
-        {/* Sessions List */}
-        <div className="space-y-4">
-          {filteredSessions.length === 0 ? (
-            <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-xs space-y-3 animate-fade-in">
-              <Search className="w-10 h-10 text-slate-300 mx-auto" />
-              <h3 className="text-base font-bold text-slate-700">
-                {lang === 'th' ? 'ไม่พบวาระการประชุมตามเงื่อนไขที่เลือก' : 'No sessions match your search or filter'}
-              </h3>
-              <p className="text-xs text-slate-500">
-                {lang === 'th' ? 'ลองล้างคำค้นหาหรือเลือกหมวดหมู่อื่น' : 'Try clearing your search or selecting all categories'}
-              </p>
-              <button
-                onClick={() => { setSearchTerm(''); setFilterCategory('all'); }}
-                className="bg-[#0026b3] hover:bg-blue-800 text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer transition shadow-xs active:scale-95"
-              >
-                {lang === 'th' ? 'แสดงทั้งหมด' : 'Show All'}
-              </button>
-            </div>
-          ) : (
-            filteredSessions.map((session, index) => {
-              const isBookmarked = bookmarks.includes(session.id);
-              const title = lang === 'th' ? session.titleTh : session.titleEn;
-              const desc = lang === 'th' ? session.descriptionTh : session.descriptionEn;
-              const room = lang === 'th' ? session.roomTh : session.roomEn;
+        {/* Day 1 Special Banner & View Mode Switcher */}
+        {selectedDay === 1 && (
+          <RevealOnScroll direction="up">
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-blue-50/90 via-sky-50/70 to-indigo-50/90 p-4 rounded-3xl border border-blue-200/80 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-[#0026b3] text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Sparkles className="w-5 h-5 text-cyan-300" />
+                  </div>
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-black text-[#0026b3] uppercase tracking-wider">
+                      <span>Precongress Workshops</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
+                      <span>20 ต.ค. 2569</span>
+                    </div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-slate-900 leading-tight">
+                      WS 1: ART Nurse • WS 3: Fertility-enhancing hysteroscopic surgery
+                    </h3>
+                  </div>
+                </div>
 
-              return (
-                <RevealOnScroll key={session.id} delay={Math.min(index * 60, 300)} direction="up">
-                  <div
-                    className={`bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border card-hover-effect transition-all duration-300 group ${session.isHighlight
-                        ? 'border-blue-200 ring-1 ring-blue-500/20 shadow-md bg-gradient-to-r from-blue-50/25 via-white to-white'
-                        : 'border-slate-200/90 shadow-xs'
-                      }`}
+                {/* Switch View Buttons */}
+                <div className="inline-flex p-1 bg-white rounded-2xl border border-slate-200 shadow-2xs self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setDay1ViewMode('sheet')}
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      day1ViewMode === 'sheet'
+                        ? 'bg-[#0026b3] text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
                   >
-                    <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-                      {/* Time & Room Column */}
-                      <div className="lg:w-56 shrink-0 space-y-2 border-b lg:border-b-0 lg:border-r border-slate-100 pb-3 lg:pb-0 lg:pr-4">
-                        <div className="inline-flex items-center gap-2 bg-[#eff4ff] text-[#0026b3] px-3 py-1.5 rounded-xl font-mono text-xs sm:text-sm font-extrabold border border-[#d6e4ff] group-hover:border-blue-400/60 transition-colors">
-                          <Clock className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
-                          <span>{session.time}</span>
-                        </div>
+                    <TableIcon className="w-3.5 h-3.5" />
+                    <span>{lang === 'th' ? 'ตารางสูจิบัตรทางการ' : 'Official Flyer Sheet'}</span>
+                  </button>
 
-                        <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
-                          <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                          <span className="font-bold text-slate-700">{room}</span>
-                        </div>
+                  <button
+                    type="button"
+                    onClick={() => setDay1ViewMode('cards')}
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      day1ViewMode === 'cards'
+                        ? 'bg-[#0026b3] text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span>{lang === 'th' ? 'มุมมองการ์ดสรุป' : 'Interactive Cards'}</span>
+                  </button>
+                </div>
+              </div>
 
-                        {/* Badges */}
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {session.hasCme && (
-                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold px-2 py-0.5 rounded-md flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                              <span>{t.agenda.cmeBadge}</span>
-                            </span>
-                          )}
-                          {session.hasLiveStream && (
-                            <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-extrabold px-2 py-0.5 rounded-md flex items-center gap-1">
-                              <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-600" />
-                              </span>
-                              <span>{t.agenda.liveStreamBadge}</span>
-                            </span>
-                          )}
-                        </div>
-                      </div>
+              {/* Day 1 Workshop Track Switcher Pills (Cards view) */}
+              {day1ViewMode === 'cards' && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+                  <span className="text-slate-500 font-bold text-[11px] shrink-0">
+                    {lang === 'th' ? 'เลือกเวิร์กช็อป:' : 'Select Workshop:'}
+                  </span>
+                  {[
+                    { id: 'all', label: lang === 'th' ? 'ทุกเวิร์กช็อป (All WS)' : 'All Workshops' },
+                    { id: 'ws1', label: 'WS 1: ART Nurse (วนาลัย 1-2)' },
+                    { id: 'ws3', label: 'WS 3: Hysteroscopy (พิมาน 2)' },
+                  ].map((track) => (
+                    <button
+                      key={track.id}
+                      onClick={() => setDay1WorkshopFilter(track.id as any)}
+                      className={`px-3 py-1.5 rounded-full whitespace-nowrap font-bold text-[11px] transition-all duration-200 cursor-pointer shrink-0 ${
+                        day1WorkshopFilter === track.id
+                          ? 'bg-[#0026b3] text-white shadow-xs'
+                          : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                      }`}
+                    >
+                      {track.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </RevealOnScroll>
+        )}
 
-                      {/* Session Content Column */}
-                      <div className="flex-1 space-y-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <h3 className="text-base sm:text-lg font-black text-slate-900 leading-snug group-hover:text-[#0026b3] transition-colors duration-200">
-                            {title}
-                          </h3>
+        {/* If Day 1 and Sheet View (without active search or filter) */}
+        {selectedDay === 1 && day1ViewMode === 'sheet' && !searchTerm && filterCategory === 'all' ? (
+          <RevealOnScroll direction="up">
+            <OfficialWorkshopAgenda lang={lang} />
+          </RevealOnScroll>
+        ) : (
+          /* Sessions List Cards */
+          <div className="space-y-4">
+            {filteredSessions.length === 0 ? (
+              <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-xs space-y-3 animate-fade-in">
+                <Search className="w-10 h-10 text-slate-300 mx-auto" />
+                <h3 className="text-base font-bold text-slate-700">
+                  {lang === 'th' ? 'ไม่พบวาระการประชุมตามเงื่อนไขที่เลือก' : 'No sessions match your search or filter'}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {lang === 'th' ? 'ลองล้างคำค้นหาหรือเลือกหมวดหมู่อื่น' : 'Try clearing your search or selecting all categories'}
+                </p>
+                <button
+                  onClick={() => { setSearchTerm(''); setFilterCategory('all'); setDay1WorkshopFilter('all'); }}
+                  className="bg-[#0026b3] hover:bg-blue-800 text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer transition shadow-xs active:scale-95"
+                >
+                  {lang === 'th' ? 'แสดงทั้งหมด' : 'Show All'}
+                </button>
+              </div>
+            ) : (
+              filteredSessions.map((session, index) => {
+                const isBookmarked = bookmarks.includes(session.id);
+                const title = lang === 'th' ? session.titleTh : session.titleEn;
+                const desc = lang === 'th' ? session.descriptionTh : session.descriptionEn;
+                const room = lang === 'th' ? session.roomTh : session.roomEn;
 
-                          {/* Bookmark Button */}
-                          <button
-                            onClick={() => toggleBookmark(session.id)}
-                            className={`p-2 rounded-xl transition-all duration-200 cursor-pointer shrink-0 active:scale-90 ${isBookmarked
-                                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 shadow-2xs'
-                                : 'bg-slate-100 text-slate-400 hover:text-slate-700 hover:bg-slate-200'
-                              }`}
-                            title={isBookmarked ? t.agenda.addedToSchedule : t.agenda.addToSchedule}
-                          >
-                            {isBookmarked ? (
-                              <BookmarkCheck className="w-4 h-4 fill-amber-600 text-amber-600 animate-scale-up" />
-                            ) : (
-                              <Bookmark className="w-4 h-4" />
-                            )}
-                          </button>
-                        </div>
-
-                        <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
-                          {desc}
-                        </p>
-
-                        {/* Speakers Card */}
-                        {session.speakers.length > 0 && (
-                          <div className="pt-2">
-                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
-                              {t.agenda.speakerLabel} ({session.speakers.length})
-                            </span>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                              {session.speakers.map((speaker, sIdx) => {
-                                const sName = lang === 'th' ? speaker.nameTh : speaker.nameEn;
-                                const sTitle = lang === 'th' ? speaker.titleTh : speaker.titleEn;
-                                const sInst = lang === 'th' ? speaker.institutionTh : speaker.institutionEn;
-
-                                return (
-                                  <div
-                                    key={sIdx}
-                                    className="flex items-center gap-2.5 bg-slate-50 hover:bg-blue-50/70 p-2.5 rounded-xl border border-slate-100 hover:border-blue-200 transition-all duration-200 group/speaker"
-                                  >
-                                    <div className={`w-9 h-9 rounded-xl bg-gradient-to-tr ${speaker.avatarBg} text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs group-hover/speaker:scale-105 transition-transform`}>
-                                      {speaker.avatarInitials}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <h5 className="text-xs font-bold text-slate-900 truncate group-hover/speaker:text-[#0026b3] transition-colors">{sName}</h5>
-                                      <p className="text-[10px] text-slate-500 font-medium truncate">{sTitle}</p>
-                                      <p className="text-[9px] text-[#0026b3] font-semibold truncate">{sInst}</p>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                return (
+                  <RevealOnScroll key={session.id} delay={Math.min(index * 60, 300)} direction="up">
+                    <div
+                      className={`bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border card-hover-effect transition-all duration-300 group ${session.isHighlight
+                          ? 'border-blue-200 ring-1 ring-blue-500/20 shadow-md bg-gradient-to-r from-blue-50/25 via-white to-white'
+                          : 'border-slate-200/90 shadow-xs'
+                        }`}
+                    >
+                      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                        {/* Time & Room Column */}
+                        <div className="lg:w-56 shrink-0 space-y-2 border-b lg:border-b-0 lg:border-r border-slate-100 pb-3 lg:pb-0 lg:pr-4">
+                          <div className="inline-flex items-center gap-2 bg-[#eff4ff] text-[#0026b3] px-3 py-1.5 rounded-xl font-mono text-xs sm:text-sm font-extrabold border border-[#d6e4ff] group-hover:border-blue-400/60 transition-colors">
+                            <Clock className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
+                            <span>{session.time}</span>
                           </div>
-                        )}
+
+                          <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
+                            <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                            <span className="font-bold text-slate-700">{room}</span>
+                          </div>
+
+                          {/* Badges */}
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {session.workshopTrack && (
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
+                                session.workshopTrack === 'ws1'
+                                  ? 'bg-blue-100 text-blue-900 border-blue-200'
+                                  : 'bg-emerald-100 text-emerald-900 border-emerald-200'
+                              }`}>
+                                {session.workshopTrack === 'ws1' ? 'WS 1: ART Nurse' : 'WS 3: Hysteroscopy'}
+                              </span>
+                            )}
+                            {session.sponsor && (
+                              <span className="bg-slate-100 text-slate-800 border border-slate-200 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+                                <span className="text-slate-500 font-normal">Sponsor:</span>
+                                <span className="font-extrabold text-[#0026b3]">{session.sponsor}</span>
+                              </span>
+                            )}
+                            {session.hasCme && (
+                              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold px-2 py-0.5 rounded-md flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>{t.agenda.cmeBadge}</span>
+                              </span>
+                            )}
+                            {session.hasLiveStream && (
+                              <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-extrabold px-2 py-0.5 rounded-md flex items-center gap-1">
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-600" />
+                                </span>
+                                <span>{t.agenda.liveStreamBadge}</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Session Content Column */}
+                        <div className="flex-1 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <h3 className="text-base sm:text-lg font-black text-slate-900 leading-snug group-hover:text-[#0026b3] transition-colors duration-200">
+                              {title}
+                            </h3>
+
+                            {/* Bookmark Button */}
+                            <button
+                              onClick={() => toggleBookmark(session.id)}
+                              className={`p-2 rounded-xl transition-all duration-200 cursor-pointer shrink-0 active:scale-90 ${isBookmarked
+                                  ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 shadow-2xs'
+                                  : 'bg-slate-100 text-slate-400 hover:text-slate-700 hover:bg-slate-200'
+                                }`}
+                              title={isBookmarked ? t.agenda.addedToSchedule : t.agenda.addToSchedule}
+                            >
+                              {isBookmarked ? (
+                                <BookmarkCheck className="w-4 h-4 fill-amber-600 text-amber-600 animate-scale-up" />
+                              ) : (
+                                <Bookmark className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+
+                          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
+                            {desc}
+                          </p>
+
+                          {/* Speakers Card */}
+                          {session.speakers.length > 0 && (
+                            <div className="pt-2">
+                              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
+                                {t.agenda.speakerLabel} ({session.speakers.length})
+                              </span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                {session.speakers.map((speaker, sIdx) => {
+                                  const sName = lang === 'th' ? speaker.nameTh : speaker.nameEn;
+                                  const sTitle = lang === 'th' ? speaker.titleTh : speaker.titleEn;
+                                  const sInst = lang === 'th' ? speaker.institutionTh : speaker.institutionEn;
+
+                                  return (
+                                    <div
+                                      key={sIdx}
+                                      className="flex items-center gap-2.5 bg-slate-50 hover:bg-blue-50/70 p-2.5 rounded-xl border border-slate-100 hover:border-blue-200 transition-all duration-200 group/speaker"
+                                    >
+                                      <div className={`w-9 h-9 rounded-xl bg-gradient-to-tr ${speaker.avatarBg} text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs group-hover/speaker:scale-105 transition-transform`}>
+                                        {speaker.avatarInitials}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <h5 className="text-xs font-bold text-slate-900 truncate group-hover/speaker:text-[#0026b3] transition-colors">{sName}</h5>
+                                        <p className="text-[10px] text-slate-500 font-medium truncate">{sTitle}</p>
+                                        <p className="text-[9px] text-[#0026b3] font-semibold truncate">{sInst}</p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </RevealOnScroll>
-              );
-            })
-          )}
-        </div>
+                  </RevealOnScroll>
+                );
+              })
+            )}
+          </div>
+        )}
 
         {/* PR Highlights & Conference Information Section */}
         <section id="pr-section" className="pt-8 space-y-6">
@@ -1251,7 +2401,7 @@ export function AgendaView() {
                 <div className="bg-rose-50/60 p-3 rounded-xl border border-rose-100 text-xs text-slate-700 font-medium space-y-2">
                   <p>{t.agenda.venueParking}</p>
                   <a
-                    href="https://maps.google.com/?q=Centara+Grand+at+CentralWorld"
+                    href="https://maps.google.com/?q=Grande+Centre+Point+Lumphini+Bangkok"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-[#0026b3] font-bold hover:underline cursor-pointer"
@@ -1263,19 +2413,37 @@ export function AgendaView() {
               </div>
             </RevealOnScroll>
 
-            {/* Gala Dinner & Networking Card */}
+            {/* Registration Fees & Payment Card (Replacing old Gala Dinner) */}
             <RevealOnScroll delay={150} direction="up">
-              <div className="bg-gradient-to-br from-indigo-900 via-blue-900 to-slate-900 text-white rounded-3xl p-5 sm:p-6 shadow-xl card-hover-effect space-y-4 relative overflow-hidden group h-full">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/15 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500" />
-                <div className="w-12 h-12 rounded-2xl bg-white/10 text-amber-300 flex items-center justify-center font-bold border border-white/15 group-hover:scale-110 transition-transform">
-                  <Sparkles className="w-6 h-6" />
+              <div className="bg-gradient-to-br from-slate-900 via-[#00176b] to-blue-950 text-white rounded-3xl p-5 sm:p-6 shadow-xl card-hover-effect space-y-4 relative overflow-hidden group h-full border border-blue-500/20">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-[#4ade80]/10 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500" />
+                <div className="w-12 h-12 rounded-2xl bg-white/10 text-[#4ade80] flex items-center justify-center font-bold border border-white/15 group-hover:scale-110 transition-transform">
+                  <Award className="w-6 h-6" />
                 </div>
                 <div className="space-y-1.5">
                   <h3 className="text-base font-black text-white">{t.agenda.dinnerTitle}</h3>
                   <p className="text-xs text-blue-100 leading-relaxed">{t.agenda.dinnerDesc}</p>
                 </div>
-                <div className="bg-white/10 px-3.5 py-2 rounded-xl border border-white/15 text-xs text-[#4ade80] font-bold">
-                  {t.agenda.dinnerDressCode}
+
+                <div className="space-y-2 text-xs">
+                  <div className="bg-white/10 p-3 rounded-xl border border-white/15 space-y-1.5 text-[11px]">
+                    <div className="flex justify-between font-bold">
+                      <span className="text-cyan-300">Onsite Main (21-22 Oct)</span>
+                      <span>Member ฿ 4,000 / Non-member ฿ 5,000</span>
+                    </div>
+                    <div className="flex justify-between text-blue-200">
+                      <span>Fellow Onsite</span>
+                      <span>฿ 2,000 (Member / Non-member)</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-300 font-semibold">
+                      <span>Online Member</span>
+                      <span>Participant ฿ 4,000 / Fellow ฟรีที่สถาบัน</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-emerald-950/60 p-2.5 rounded-xl border border-emerald-500/30 text-[11px] text-[#4ade80] font-bold">
+                    {t.agenda.dinnerDressCode}
+                  </div>
                 </div>
               </div>
             </RevealOnScroll>
@@ -1291,7 +2459,7 @@ export function AgendaView() {
                   <p className="text-xs text-slate-600 leading-relaxed">{t.agenda.researchDesc}</p>
                 </div>
                 <div className="bg-purple-50/60 p-3 rounded-xl border border-purple-100 text-xs text-purple-900 font-semibold">
-                  🏆 Young Scientist Award: 50,000 THB Prize + Honorary Shield
+                  🏆 การนำเสนอผลงานวิจัยดีเด่น 4 หัวข้อ (PRETTI-TRIAL, Apoptotic genes, Microfluidic sperm, Curcuminoids)
                 </div>
               </div>
             </RevealOnScroll>
