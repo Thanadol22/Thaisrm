@@ -1,98 +1,110 @@
 -- ============================================================
--- TSRM Member Application Form Schema
--- ใบสมัคร TSRM Member
+-- Thai Society for Reproductive Medicine (TSRM) Database Schema
 -- ฐานข้อมูล: thaisrm
+-- อัปเดตโครงสร้างล่าสุด: member_no เป็น PRIMARY KEY VARCHAR(20) เติม 0 4 หลัก
 -- ============================================================
 
--- Sequence สำหรับรันเลข "รหัส" และ "เลขสมาชิก" อัตโนมัติ (คนละชุดกัน)
-CREATE SEQUENCE IF NOT EXISTS code_seq START 1;
-CREATE SEQUENCE IF NOT EXISTS membership_no_seq START 1;
+-- ------------------------------------------------------------
+-- Sequence สำหรับรันเลขที่สมาชิก (เริ่มที่ 1281)
+-- ------------------------------------------------------------
+CREATE SEQUENCE IF NOT EXISTS member_no_seq
+    START WITH 1281
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
--- ตารางหลัก: ข้อมูลสมาชิก
+-- ------------------------------------------------------------
+-- 1. ตารางหลัก: ข้อมูลสมาชิก (members)
+-- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS members (
-    member_id           BIGSERIAL PRIMARY KEY,
-
-    -- รหัส* และ เลขสมาชิก* : รันอัตโนมัติเป็นตัวเลขล้วน 6 หลัก เช่น 000123
-    code                VARCHAR(6)  NOT NULL
-        DEFAULT lpad(nextval('code_seq')::TEXT, 6, '0'),
-    membership_no       VARCHAR(6)  NOT NULL
-        DEFAULT lpad(nextval('membership_no_seq')::TEXT, 6, '0'),
-
-    full_name_th        VARCHAR(255) NOT NULL,   -- ชื่อ-นามสกุล
-    full_name_en        VARCHAR(255),            -- Name
-
-    id_last4            CHAR(4),                 -- ID4หลักท้าย (เลขบัตร ปชช. 4 หลักท้าย)
-
-    mobile              VARCHAR(20),             -- Mobile
-    email               VARCHAR(255),            -- email
-    line_id             VARCHAR(100),            -- Line
-
-    workplace           VARCHAR(255),            -- ที่ทำงาน**
-    start_date          DATE,                    -- วันที่เริ่มงาน
-    position            VARCHAR(255),            -- ตำแหน่ง
-
-    -- ประเภทสมาชิก [ ] 1-6 หรือ 0 อื่นๆ
-    member_type         SMALLINT
-        CHECK (member_type BETWEEN 0 AND 6),
-    -- 1 = RM
-    -- 2 = Fellow RM
-    -- 3 = Embryologist
-    -- 4 = Technologist for Andrology
-    -- 5 = Molecular Geneticist
-    -- 6 = Nurse
-    -- 0 = อื่นๆ (ระบุใน member_type_other)
-    member_type_other   VARCHAR(255),            -- ระบุกรณีเลือก 0 อื่นๆ
-
-    scientist_reg_no    VARCHAR(50),             -- เลขทะเบียนนักวิทย์ *
-    scientist_reg_nw    VARCHAR(50),             -- นว. .........
-
-    photo_path          TEXT,                    -- Digital PHOTO (path/URL รูป)
-    qr_code_path        TEXT,                    -- QR code (path/URL)
-
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    UNIQUE (code),
-    UNIQUE (membership_no)
+    member_no            VARCHAR(20) PRIMARY KEY DEFAULT LPAD(nextval('member_no_seq')::text, 4, '0'), -- เลขที่สมาชิก (Primary Key 4 หลัก เช่น 0001, 1281)
+    id                   BIGSERIAL,                              -- ลำดับ ID เดิม
+    full_name_th         VARCHAR(255) NOT NULL,                  -- ชื่อ-นามสกุล (ภาษาไทย)
+    full_name_en         VARCHAR(255),                           -- ชื่อ-นามสกุล (ภาษาอังกฤษ)
+    id_last4             VARCHAR(4),                             -- บัตรประชาชน 4 หลักท้าย
+    mobile               VARCHAR(30),                            -- เบอร์โทรศัพท์มือถือ
+    email                VARCHAR(255) UNIQUE,                    -- อีเมล
+    line_id              VARCHAR(100),                           -- LINE ID
+    address              TEXT,                                   -- ที่อยู่
+    workplace            VARCHAR(255),                           -- สถานที่ทำงาน
+    work_phone           VARCHAR(50),                            -- เบอร์โทรศัพท์ที่ทำงาน
+    work_start_date      DATE,                                   -- วันที่เริ่มทำงาน
+    position             VARCHAR(150),                           -- ตำแหน่ง
+    job_category         VARCHAR(50),                            -- สายงาน/หมวดหมู่อาชีพ
+    job_category_other   VARCHAR(255),                           -- สายงานอื่นๆ (กรณีเลือกอื่นๆ)
+    scientist_license_no VARCHAR(50),                            -- เลขทะเบียนนักวิทยาศาสตร์การแพทย์
+    username             VARCHAR(100),                           -- ชื่อผู้ใช้งานสำหรับเข้าสู่ระบบ
+    password_hash        VARCHAR(255),                           -- รหัสผ่าน (Hashed)
+    referees             TEXT,                                   -- ผู้รับรอง
+    photo_url            VARCHAR(500),                           -- URL หรือ Path รูปถ่ายสมาชิก
+    id_card_doc          VARCHAR(500),                           -- URL หรือ Path เอกสารสำเนาบัตรประชาชน
+    degree_cert_doc      VARCHAR(500),                           -- URL หรือ Path เอกสารวุฒิการศึกษา
+    work_cert_doc        VARCHAR(500),                           -- URL หรือ Path เอกสารรับรองการทำงาน
+    membership_status    VARCHAR(50) DEFAULT 'Active',           -- สถานะสมาชิก (Active, Inactive, etc.)
+    membership_type      VARCHAR(50) DEFAULT 'Regular',          -- ประเภทสมาชิก (Regular, Associate, etc.)
+    applied_at           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,  -- วันที่สมัครสมาชิก
+    expire_date          DATE,                                   -- วันหมดอายุสมาชิก
+    special_expire_date  DATE,                                   -- วันหมดอายุพิเศษ
+    qr_code_data         JSONB,                                  -- ข้อมูลสำหรับ QR Code (JSON)
+    qr_code_image_url    VARCHAR(500)                            -- URL หรือ Path รูปภาพ QR Code
 );
 
-COMMENT ON TABLE members IS 'ข้อมูลใบสมัครสมาชิก TSRM';
-COMMENT ON COLUMN members.id_last4 IS 'เลขบัตรประชาชน/บัตรอื่น 4 หลักท้าย';
-COMMENT ON COLUMN members.member_type IS '0=อื่นๆ,1=RM,2=Fellow RM,3=Embryologist,4=Technologist for Andrology,5=Molecular Geneticist,6=Nurse';
+-- ดัชนีสำหรับการค้นหาสมาชิก
+CREATE INDEX IF NOT EXISTS idx_members_email ON members (email);
+CREATE INDEX IF NOT EXISTS idx_members_name_th ON members (full_name_th);
 
--- ตารางย่อย: วุฒิการศึกษา (หนึ่งสมาชิกมีได้หลายวุฒิ)
-CREATE TABLE IF NOT EXISTS member_education (
-    education_id        BIGSERIAL PRIMARY KEY,
-    member_id           BIGINT NOT NULL
-        REFERENCES members (member_id)
-        ON DELETE CASCADE,
+COMMENT ON TABLE members IS 'ข้อมูลสมาชิกสมาคม TSRM (member_no เป็น Primary Key)';
 
-    degree              VARCHAR(255),   -- วุฒิ / Degree
-    institution         VARCHAR(255),   -- สถาบัน / College / University
-    graduation_year     SMALLINT,       -- ปีที่จบ (พ.ศ. หรือ ค.ศ. ตามที่ใช้งานจริง)
-
-    display_order       SMALLINT NOT NULL DEFAULT 1  -- ลำดับแถวในฟอร์ม
+-- ------------------------------------------------------------
+-- 2. ตารางย่อย: ประวัติการศึกษาของสมาชิก (member_educations)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS member_educations (
+    edu_id          BIGSERIAL PRIMARY KEY,
+    member_no       VARCHAR(20) NOT NULL
+        REFERENCES members (member_no)
+        ON DELETE CASCADE
+        ON UPDATE NO ACTION,
+    degree          VARCHAR(150) NOT NULL,                  -- วุฒิการศึกษา / Degree
+    institution     VARCHAR(255) NOT NULL,                  -- สถาบันการศึกษา / มหาวิทยาลัย
+    graduation_year VARCHAR(10)                             -- ปีที่สำเร็จการศึกษา
 );
 
-COMMENT ON TABLE member_education IS 'ตารางวุฒิการศึกษา/สถาบัน/ปีที่จบ ของสมาชิกแต่ละคน (แถวในฟอร์มด้านล่าง)';
+COMMENT ON TABLE member_educations IS 'ประวัติการศึกษาของสมาชิก ผูกกับ member_no';
 
-CREATE INDEX IF NOT EXISTS idx_education_member_id ON member_education (member_id);
+-- ------------------------------------------------------------
+-- 3. ตารางการประชุม / กิจกรรม (meetings)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS meetings (
+    meeting_id           VARCHAR(50) PRIMARY KEY,           -- รหัสการประชุม (เช่น AGM-2024, SYM-01)
+    meeting_name         VARCHAR(255) NOT NULL,             -- ชื่องานประชุม/สัมมนา
+    meeting_date         DATE NOT NULL,                     -- วันที่จัดประชุม
+    counts_toward_active BOOLEAN NOT NULL DEFAULT true      -- นับเป็นการเข้าร่วมเพื่อคงสถานะ Active หรือไม่
+);
 
--- Trigger: auto update updated_at
-CREATE OR REPLACE FUNCTION set_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = now();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+COMMENT ON TABLE meetings IS 'ข้อมูลการประชุม / กิจกรรมของสมาคม';
 
-DROP TRIGGER IF EXISTS trg_members_updated_at ON members;
-CREATE TRIGGER trg_members_updated_at
-BEFORE UPDATE ON members
-FOR EACH ROW
-EXECUTE FUNCTION set_updated_at();
+-- ------------------------------------------------------------
+-- 4. ตารางการลงทะเบียน / บันทึกการเข้าร่วมประชุม (meeting_attendances)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS meeting_attendances (
+    attendance_id     BIGSERIAL PRIMARY KEY,
+    meeting_id        VARCHAR(50) NOT NULL
+        REFERENCES meetings (meeting_id)
+        ON UPDATE NO ACTION
+        ON DELETE RESTRICT,
+    member_no         VARCHAR(20) NOT NULL
+        REFERENCES members (member_no)
+        ON DELETE CASCADE
+        ON UPDATE NO ACTION,
+    attendance_status VARCHAR(20) NOT NULL DEFAULT 'Attended', -- สถานะการเข้าร่วม
+    checkin_time      TIMESTAMPTZ,                            -- เวลาที่ทำการเช็คอินเข้าร่วม
 
--- ผูก sequence เข้ากับคอลัมน์ เพื่อให้ถูกลบไปพร้อมกันถ้า drop table/column
-ALTER SEQUENCE code_seq OWNED BY members.code;
-ALTER SEQUENCE membership_no_seq OWNED BY members.membership_no;
+    CONSTRAINT uq_member_meeting UNIQUE (meeting_id, member_no)
+);
+
+-- ดัชนีสำหรับการค้นหาและตรวจสอบการเข้าร่วม
+CREATE INDEX IF NOT EXISTS idx_attendance_meeting ON meeting_attendances (meeting_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_member ON meeting_attendances (member_no);
+
+COMMENT ON TABLE meeting_attendances IS 'บันทึกการเช็คอินและการเข้าร่วมประชุมของสมาชิก';

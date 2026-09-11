@@ -19,12 +19,12 @@ function LoginContent() {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  // If already logged in, automatically redirect to /agenda
+  // If already logged in explicitly to view agenda, redirect to /agenda
   useEffect(() => {
-    if (status === 'authenticated' && session?.user) {
+    if (status === 'authenticated' && session?.user && searchParams.get('login') === 'true') {
       router.replace('/agenda');
     }
-  }, [status, session, router]);
+  }, [status, session, router, searchParams]);
 
   // Handle URL errors (e.g. ?error=Configuration or ?error=AccessDenied)
   useEffect(() => {
@@ -82,6 +82,7 @@ function LoginContent() {
         <LoginView
           onNavigateToSignup={handleNavigateToSignup}
           onGoogleSignIn={handleGoogleSignIn}
+          initialGoogleUser={session?.user ? { name: session.user.name, email: session.user.email } : null}
         />
       </main>
     </div>

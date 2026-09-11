@@ -28,7 +28,6 @@ import {
   ArrowRight,
   ArrowLeft
 } from 'lucide-react';
-import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 import { GoogleIcon } from '@/components/GoogleIcon';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -38,6 +37,7 @@ interface SignupViewProps {
   onGoogleSignUp: () => void;
   onClearForm?: () => void;
   initialUserData?: { name?: string; email?: string; picture?: string } | null;
+  isEmbedded?: boolean;
 }
 
 interface EducationRow {
@@ -52,7 +52,8 @@ export function SignupView({
   onSubmitSignup, 
   onGoogleSignUp,
   onClearForm,
-  initialUserData
+  initialUserData,
+  isEmbedded = false
 }: SignupViewProps) {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [showPassword, setShowPassword] = useState(false);
@@ -236,48 +237,9 @@ export function SignupView({
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[640px] pb-8">
-      {/* Header Blue Card Section */}
-      <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-4 sm:px-8 pt-6 sm:pt-8 pb-7 sm:pb-10 rounded-b-[28px] sm:rounded-b-[40px] shadow-xl relative overflow-hidden">
-        <div className="relative z-10">
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <div 
-              onClick={onNavigateToLogin}
-              className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-90 transition"
-              title="กลับสู่หน้าเข้าสู่ระบบ / Back to Login"
-            >
-              <ThaiSrmLogo className="w-9 h-9 sm:w-12 sm:h-12 shrink-0 group-hover:scale-105 transition-transform" />
-              <div className="min-w-0">
-                <span className="text-[10px] sm:text-xs font-bold tracking-wider sm:tracking-widest text-blue-200 uppercase block truncate">
-                  {t.associationName}
-                </span>
-                <p className="text-xs sm:text-sm font-extrabold text-white">{t.brandName}</p>
-              </div>
-            </div>
-
-            {/* Language Switcher Pill */}
-            <button
-              onClick={toggleLang}
-              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shrink-0 shadow-2xs"
-              title="Switch Language / สลับภาษา"
-            >
-              <Globe className="w-3.5 h-3.5 text-blue-200 shrink-0" />
-              <span className={lang === 'th' ? 'text-white font-black' : 'text-blue-200/60'}>TH</span>
-              <span className="text-white/40 font-normal">|</span>
-              <span className={lang === 'en' ? 'text-white font-black' : 'text-blue-200/60'}>EN</span>
-            </button>
-          </div>
-          <h1 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight mt-1">
-            {t.signup.title}
-          </h1>
-          <p className="text-xs sm:text-sm text-blue-100/90 leading-relaxed mt-1 font-normal">
-            {t.signup.subtitle}
-          </p>
-        </div>
-      </div>
-
+    <div className={isEmbedded ? "w-full animate-fade-in space-y-3" : "flex-1 flex flex-col justify-between animate-fade-in min-h-[640px] pb-8 pt-2"}>
       {/* Form Body */}
-      <div className="px-3.5 sm:px-7 py-4 sm:py-6 flex-1 flex flex-col space-y-4">
+      <div className={isEmbedded ? "px-0 py-1 flex-1 flex flex-col space-y-4" : "px-3.5 sm:px-7 py-2 sm:py-4 flex-1 flex flex-col space-y-4"}>
         
         {/* Roadmap Stepper Bar */}
         <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200 shadow-2xs mb-1">
@@ -437,7 +399,6 @@ export function SignupView({
                       value={formData.password}
                       onChange={(e) => handleInputChange('password', e.target.value)}
                       className="w-full bg-transparent text-xs sm:text-sm text-slate-800 outline-none placeholder:text-slate-400 font-medium"
-                      required
                     />
                     <button
                       type="button"
@@ -450,14 +411,17 @@ export function SignupView({
                 </div>
               </div>
 
-              {/* Step 1 Next Button */}
+              {/* Step 1 Next Button (Primary Blue & Accent Green CTA) */}
               <button
                 type="button"
                 onClick={() => goToStep(2)}
-                className="w-full bg-[#0026b3] hover:bg-[#001f94] text-white font-bold text-xs sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-md hover:shadow-lg transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+                className="w-full bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] hover:brightness-110 text-white font-black text-sm sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-xl shadow-blue-900/30 hover:shadow-blue-900/40 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-3 group border border-blue-400/20 relative overflow-hidden"
               >
-                <span>{t.signup.nextButton}</span>
-                <ArrowRight className="w-4 h-4 shrink-0" />
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#4ade80] to-transparent opacity-90" />
+                <span className="tracking-wide">{t.signup.nextButton}</span>
+                <div className="w-7 h-7 rounded-xl bg-[#4ade80] text-[#061d08] flex items-center justify-center shadow-xs group-hover:translate-x-1 transition-transform shrink-0">
+                  <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                </div>
               </button>
             </div>
           )}
@@ -484,7 +448,6 @@ export function SignupView({
                     value={formData.nameTh}
                     onChange={(e) => handleInputChange('nameTh', e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 transition outline-none font-medium"
-                    required
                   />
                 </div>
 
@@ -501,7 +464,6 @@ export function SignupView({
                     value={formData.nameEn}
                     onChange={(e) => handleInputChange('nameEn', e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 transition outline-none font-medium"
-                    required
                   />
                 </div>
 
@@ -520,7 +482,6 @@ export function SignupView({
                       value={formData.id4Digits}
                       onChange={(e) => handleInputChange('id4Digits', e.target.value.replace(/\D/g, ''))}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 transition outline-none font-mono"
-                      required
                     />
                   </div>
 
@@ -538,7 +499,6 @@ export function SignupView({
                         value={formData.mobile}
                         onChange={(e) => handleInputChange('mobile', e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 transition outline-none font-medium"
-                        required
                       />
                     </div>
                   </div>
@@ -560,7 +520,6 @@ export function SignupView({
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 transition outline-none font-medium"
-                        required
                       />
                     </div>
                   </div>
@@ -600,7 +559,6 @@ export function SignupView({
                         value={formData.workplace}
                         onChange={(e) => handleInputChange('workplace', e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 transition outline-none font-medium"
-                        required
                       />
                     </div>
                     {/* Quick Workplace Chips */}
@@ -720,10 +678,13 @@ export function SignupView({
                 <button
                   type="button"
                   onClick={() => goToStep(3)}
-                  className="flex-1 bg-[#0026b3] hover:bg-[#001f94] text-white font-bold text-xs sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-md hover:shadow-lg transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+                  className="flex-1 bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] hover:brightness-110 text-white font-black text-sm sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-xl shadow-blue-900/30 hover:shadow-blue-900/40 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-3 group border border-blue-400/20 relative overflow-hidden"
                 >
-                  <span>{t.signup.nextButton}</span>
-                  <ArrowRight className="w-4 h-4 shrink-0" />
+                  <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#4ade80] to-transparent opacity-90" />
+                  <span className="tracking-wide">{t.signup.nextButton}</span>
+                  <div className="w-7 h-7 rounded-xl bg-[#4ade80] text-[#061d08] flex items-center justify-center shadow-xs group-hover:translate-x-1 transition-transform shrink-0">
+                    <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                  </div>
                 </button>
               </div>
             </div>
@@ -838,7 +799,6 @@ export function SignupView({
                     checked={consentChecked}
                     onChange={(e) => setConsentChecked(e.target.checked)}
                     className="w-4 h-4 text-[#0026b3] focus:ring-[#0026b3] rounded border-slate-300 mt-0.5 shrink-0 cursor-pointer"
-                    required
                   />
                   <span className="text-xs text-slate-700 font-medium leading-relaxed group-hover:text-slate-900 transition">
                     {t.signup.consentCheckboxLabel} <span className="text-red-500">*</span>
@@ -869,9 +829,11 @@ export function SignupView({
 
                 <button
                   type="submit"
-                  className="flex-1 bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] font-bold text-xs sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-sm hover:shadow transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+                  className="flex-1 bg-gradient-to-r from-[#4ade80] via-[#38d172] to-[#22c55e] hover:brightness-105 text-[#061d08] font-black text-sm sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-xl shadow-emerald-500/30 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2.5 border border-emerald-300/60 relative overflow-hidden group"
                 >
-                  <span>{t.signup.submitButton}</span>
+                  <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/60 opacity-90" />
+                  <span className="tracking-wide">{t.signup.submitButton}</span>
+                  <Check className="w-5 h-5 stroke-[3] group-hover:scale-110 transition-transform" />
                 </button>
               </div>
             </div>
@@ -880,17 +842,19 @@ export function SignupView({
         </form>
 
         {/* Switch to Login */}
-        <div className="text-center pt-2 pb-2">
-          <p className="text-xs text-slate-500">
-            {t.signup.alreadyHaveAccount}{' '}
-            <button
-              onClick={onNavigateToLogin}
-              className="text-[#0026b3] font-bold hover:underline cursor-pointer ml-1"
-            >
-              {t.signup.loginLink}
-            </button>
-          </p>
-        </div>
+        {!isEmbedded && (
+          <div className="text-center pt-2 pb-2">
+            <p className="text-xs text-slate-500">
+              {t.signup.alreadyHaveAccount}{' '}
+              <button
+                onClick={onNavigateToLogin}
+                className="text-[#0026b3] font-bold hover:underline cursor-pointer ml-1"
+              >
+                {t.signup.loginLink}
+              </button>
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
