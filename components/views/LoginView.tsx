@@ -198,31 +198,44 @@ export function LoginView({
         <div className="space-y-4">
 
           {/* Main Action Segmented Buttons (Call to Action Tabs) */}
-          <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-200/80 rounded-2xl border border-slate-200/90 shadow-inner">
+          <div className="relative grid grid-cols-2 p-1.5 bg-slate-200/80 rounded-2xl border border-slate-200/90 shadow-inner select-none">
+            {/* Sliding Active Indicator Pill */}
+            <div
+              aria-hidden="true"
+              className={`absolute top-1.5 bottom-1.5 left-1.5 w-[calc(50%-6px)] rounded-xl bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] shadow-md shadow-blue-950/25 ring-2 ring-[#4ade80]/50 transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none will-change-transform ${activeTab === 'membership' ? 'translate-x-full' : 'translate-x-0'
+                }`}
+            />
+
             {/* Tab 1: ลงทะเบียนเข้าร่วมงานประชุม */}
             <button
               type="button"
               onClick={() => handleTabChange('conference')}
-              className={`flex items-center justify-center gap-2 py-3 px-2 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer active:scale-98 ${activeTab === 'conference'
-                  ? 'bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white shadow-md shadow-blue-950/25 ring-2 ring-[#4ade80]/50'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              className={`relative z-10 flex items-center justify-center gap-2 py-3 px-2 rounded-xl font-black text-xs sm:text-sm transition-colors duration-200 cursor-pointer active:scale-98 ${activeTab === 'conference'
+                  ? 'text-white'
+                  : 'text-slate-600 hover:text-slate-900'
                 }`}
             >
-              <Ticket className={`w-4 h-4 shrink-0 ${activeTab === 'conference' ? 'text-[#4ade80]' : 'text-slate-400'}`} />
-              <span>{lang === 'th' ? 'ลงทะเบียนเข้าร่วมงานประชุม' : 'Register Conference'}</span>
+              <Ticket
+                className={`w-4 h-4 shrink-0 transition-colors duration-200 ${activeTab === 'conference' ? 'text-[#4ade80]' : 'text-slate-400'
+                  }`}
+              />
+              <span className="truncate">{lang === 'th' ? 'ลงทะเบียนเข้าร่วมงานประชุม' : 'Register Conference'}</span>
             </button>
 
             {/* Tab 2: สมัครสมาชิก TSRM */}
             <button
               type="button"
               onClick={() => handleTabChange('membership')}
-              className={`flex items-center justify-center gap-2 py-3 px-2 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer active:scale-98 ${activeTab === 'membership'
-                  ? 'bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white shadow-md shadow-blue-950/25 ring-2 ring-[#4ade80]/50'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              className={`relative z-10 flex items-center justify-center gap-2 py-3 px-2 rounded-xl font-black text-xs sm:text-sm transition-colors duration-200 cursor-pointer active:scale-98 ${activeTab === 'membership'
+                  ? 'text-white'
+                  : 'text-slate-600 hover:text-slate-900'
                 }`}
             >
-              <UserPlus className={`w-4 h-4 shrink-0 ${activeTab === 'membership' ? 'text-[#4ade80]' : 'text-slate-400'}`} />
-              <span>{lang === 'th' ? 'สมัครสมาชิกสมาคมฯ (TSRM)' : 'TSRM Membership'}</span>
+              <UserPlus
+                className={`w-4 h-4 shrink-0 transition-colors duration-200 ${activeTab === 'membership' ? 'text-[#4ade80]' : 'text-slate-400'
+                  }`}
+              />
+              <span className="truncate">{lang === 'th' ? 'สมัครสมาชิกTSRM' : 'TSRM Membership'}</span>
             </button>
           </div>
 
@@ -351,12 +364,12 @@ export function LoginView({
                 initialUserData={
                   autofillTarget === 'membership' && initialGoogleUser
                     ? {
-                        name: initialGoogleUser.name || undefined,
-                        email: initialGoogleUser.email || undefined,
-                        picture: initialGoogleUser.picture || undefined,
-                        given_name: initialGoogleUser.given_name || undefined,
-                        family_name: initialGoogleUser.family_name || undefined,
-                      }
+                      name: initialGoogleUser.name || undefined,
+                      email: initialGoogleUser.email || undefined,
+                      picture: initialGoogleUser.picture || undefined,
+                      given_name: initialGoogleUser.given_name || undefined,
+                      family_name: initialGoogleUser.family_name || undefined,
+                    }
                     : null
                 }
               />
@@ -373,16 +386,7 @@ export function LoginView({
             </span>
           </div>
 
-          <p className="text-xs text-slate-500">
-            {lang === 'th' ? 'มีบัญชีผู้ใช้งานอยู่แล้ว?' : 'Already have an account?'}{' '}
-            <button
-              type="button"
-              onClick={onGoogleSignIn}
-              className="text-[#0026b3] font-black hover:underline cursor-pointer ml-1"
-            >
-              {lang === 'th' ? 'เข้าสู่ระบบด้วย Google' : 'Sign In with Google'}
-            </button>
-          </p>
+
         </div>
       </div>
 

@@ -772,34 +772,40 @@ export function SignupView({
               </div>
 
               {/* Step 3 Form Action Buttons */}
-              <div className="flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => goToStep(2)}
-                  className="px-3.5 sm:px-4 py-3.5 sm:py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-2xl border border-slate-200 transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer active:scale-95 shadow-2xs"
-                >
-                  <ArrowLeft className="w-4 h-4 shrink-0" />
-                  <span>{t.signup.prevButton}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleClearForm}
-                  className="px-3.5 sm:px-4 py-3.5 sm:py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-2xl border border-slate-200 transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer active:scale-95 shadow-2xs"
-                  title={t.signup.clearFormButton}
-                >
-                  <RotateCcw className="w-4 h-4 text-slate-500" />
-                  <span className="hidden min-[400px]:inline">{t.signup.clearFormButton}</span>
-                </button>
-
+              <div className="space-y-3 pt-2">
+                {/* Primary Submit Button */}
                 <button
                   type="submit"
-                  className="flex-1 bg-gradient-to-r from-[#4ade80] via-[#38d172] to-[#22c55e] hover:brightness-105 text-[#061d08] font-black text-sm sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-xl shadow-emerald-500/30 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2.5 border border-emerald-300/60 relative overflow-hidden group"
+                  className="w-full bg-gradient-to-r from-[#4ade80] via-[#38d172] to-[#22c55e] hover:brightness-105 text-[#061d08] font-black text-sm sm:text-base py-3.5 sm:py-4 px-4 rounded-2xl shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/35 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-3 border border-emerald-300/80 relative overflow-hidden group"
                 >
-                  <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/60 opacity-90" />
-                  <span className="tracking-wide">{t.signup.submitButton}</span>
-                  <Check className="w-5 h-5 stroke-[3] group-hover:scale-110 transition-transform" />
+                  <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/70 opacity-90" />
+                  <span className="tracking-wide whitespace-nowrap">{t.signup.submitButton}</span>
+                  <div className="w-7 h-7 rounded-xl bg-emerald-950/15 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
+                    <Check className="w-4.5 h-4.5 stroke-[3] text-[#061d08]" />
+                  </div>
                 </button>
+
+                {/* Secondary Action Buttons: Back & Reset */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => goToStep(2)}
+                    className="py-3 px-3 sm:px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-xl border border-slate-200/90 transition flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-2xs group"
+                  >
+                    <ArrowLeft className="w-4 h-4 shrink-0 text-slate-500 group-hover:-translate-x-0.5 transition-transform" />
+                    <span>{t.signup.prevButton}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleClearForm}
+                    className="py-3 px-3 sm:px-4 bg-slate-100 hover:bg-red-50 hover:border-red-200 hover:text-red-600 text-slate-600 font-bold text-xs sm:text-sm rounded-xl border border-slate-200/90 transition flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-2xs group"
+                    title={t.signup.clearFormButton}
+                  >
+                    <RotateCcw className="w-4 h-4 shrink-0 text-slate-400 group-hover:text-red-500 group-hover:-rotate-45 transition-transform" />
+                    <span>{t.signup.clearFormButton}</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
