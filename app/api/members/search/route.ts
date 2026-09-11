@@ -151,57 +151,89 @@ export async function GET(req: NextRequest) {
     const patternRaw = `%${rawQ}%`;
     const patternClean = `%${cleanQ}%`;
 
-    // ค้นหาเลขที่สมาชิกแบบเติมศูนย์ 4 หลัก (เช่น 1 -> 0001)
-    const numOnly = rawQ.replace(/\D/g, '');
-    const paddedNum = numOnly ? numOnly.padStart(4, '0') : '';
+    let membersRaw: RawMemberResult[] = [];
 
-    // ค้นหาข้อมูลสมาชิกแสดงเพียง 3 รายการตามที่ผู้ใช้ต้องการ (LIMIT 3)
-    const membersRaw = await prisma.$queryRaw<RawMemberResult[]>`
-      SELECT 
-        m.member_no,
-        m.id,
-        m.full_name_th,
-        m.full_name_en,
-        m.id_last4,
-        m.mobile,
-        m.email,
-        m.line_id,
-        m.workplace,
-        m.position,
-        m.membership_status,
-        m.membership_type,
-        ma.checkin_time,
-        mt.meeting_name,
-        mt.meeting_date
-      FROM members m
-      LEFT JOIN LATERAL (
-        SELECT checkin_time, meeting_id
-        FROM meeting_attendances
-        WHERE member_no = m.member_no
-        ORDER BY checkin_time DESC NULLS LAST
-        LIMIT 1
-      ) ma ON true
-      LEFT JOIN meetings mt ON mt.meeting_id = ma.meeting_id
-      WHERE 
-        m.full_name_th ILIKE ${patternRaw}
-        OR m.full_name_en ILIKE ${patternRaw}
-        OR m.full_name_th ILIKE ${patternClean}
-        OR m.full_name_en ILIKE ${patternClean}
-        OR m.member_no ILIKE ${patternRaw}
-        OR (${paddedNum} != '' AND m.member_no = ${paddedNum})
-        OR m.email ILIKE ${patternRaw}
-        OR m.mobile ILIKE ${patternRaw}
-        OR m.workplace ILIKE ${patternRaw}
-      ORDER BY 
-        CASE 
-          WHEN m.member_no = ${paddedNum} THEN 1
-          WHEN m.full_name_th ILIKE ${cleanQ} THEN 2
-          WHEN m.full_name_th ILIKE ${patternClean} THEN 3
-          ELSE 4
-        END,
-        m.member_no ASC
-      LIMIT 3;
-    `;
+    try {
+      // 1. Primary Query: ค้นหาเฉพาะชื่อ-นามสกุล (ภาษาไทย / อังกฤษ) พร้อมประวัติการประชุมล่าสุด
+      membersRaw = await prisma.$queryRaw<RawMemberResult[]>`
+        SELECT 
+          m.member_no::text AS member_no,
+          m.id,
+          m.full_name_th,
+          m.full_name_en,
+          m.id_last4,
+          m.mobile,
+          m.email,
+          m.line_id,
+          m.workplace,
+          m.position,
+          m.membership_status,
+          m.membership_type,
+          ma.checkin_time,
+          mt.meeting_name,
+          mt.meeting_date
+        FROM members m
+        LEFT JOIN LATERAL (
+          SELECT checkin_time, meeting_id
+          FROM meeting_attendances
+          WHERE member_no::text = m.member_no::text
+          ORDER BY checkin_time DESC NULLS LAST
+          LIMIT 1
+        ) ma ON true
+        LEFT JOIN meetings mt ON mt.meeting_id = ma.meeting_id
+        WHERE 
+          m.full_name_th ILIKE ${patternRaw}
+          OR m.full_name_en ILIKE ${patternRaw}
+          OR m.full_name_th ILIKE ${patternClean}
+          OR m.full_name_en ILIKE ${patternClean}
+        ORDER BY 
+          CASE 
+            WHEN m.full_name_th ILIKE ${cleanQ} THEN 1
+            WHEN m.full_name_th ILIKE ${patternClean} THEN 2
+            WHEN m.full_name_en ILIKE ${patternClean} THEN 3
+            ELSE 4
+          END,
+          m.full_name_th ASC
+        LIMIT 3;
+      `;
+    } catch (queryErr) {
+      console.warn('Primary search query failed, attempting fallback to members table:', queryErr);
+
+      // 2. Fallback Query: ค้นหาเฉพาะชื่อ-นามสกุลจากตาราง members โดยตรง
+      membersRaw = await prisma.$queryRaw<RawMemberResult[]>`
+        SELECT 
+          m.member_no::text AS member_no,
+          m.id,
+          m.full_name_th,
+          m.full_name_en,
+          m.id_last4,
+          m.mobile,
+          m.email,
+          m.line_id,
+          m.workplace,
+          m.position,
+          m.membership_status,
+          m.membership_type,
+          NULL::timestamptz AS checkin_time,
+          NULL::text AS meeting_name,
+          NULL::date AS meeting_date
+        FROM members m
+        WHERE 
+          m.full_name_th ILIKE ${patternRaw}
+          OR m.full_name_en ILIKE ${patternRaw}
+          OR m.full_name_th ILIKE ${patternClean}
+          OR m.full_name_en ILIKE ${patternClean}
+        ORDER BY 
+          CASE 
+            WHEN m.full_name_th ILIKE ${cleanQ} THEN 1
+            WHEN m.full_name_th ILIKE ${patternClean} THEN 2
+            WHEN m.full_name_en ILIKE ${patternClean} THEN 3
+            ELSE 4
+          END,
+          m.full_name_th ASC
+        LIMIT 3;
+      `;
+    }
 
     const data = membersRaw.map(formatMemberRow);
 

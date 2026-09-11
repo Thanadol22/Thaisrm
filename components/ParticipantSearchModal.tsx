@@ -129,16 +129,13 @@ export function ParticipantSearchModal({ isOpen, onClose }: ParticipantSearchMod
           signal: controller.signal,
         });
 
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
+        const json = await res.json().catch(() => null);
 
-        const json = await res.json();
-        if (json.success) {
+        if (res.ok && json?.success) {
           setMembers(json.data || []);
           setHasSearched(true);
         } else {
-          setSearchError(json.error || 'เกิดข้อผิดพลาดในการดึงข้อมูล');
+          setSearchError(json?.error || (lang === 'th' ? 'เกิดข้อผิดพลาดในการดึงข้อมูลจากเซิร์ฟเวอร์' : 'Failed to fetch member data'));
           setMembers([]);
           setHasSearched(true);
         }
@@ -409,8 +406,8 @@ export function ParticipantSearchModal({ isOpen, onClose }: ParticipantSearchMod
               </h2>
               <p className="text-xs text-blue-200/90 font-medium">
                 {lang === 'th'
-                  ? 'ค้นหาด้วยชื่อ-นามสกุล หรือเลขที่สมาชิก 4 หลัก'
-                  : 'Search by full name or 4-digit member ID'}
+                  ? 'ค้นหาด้วยชื่อ-นามสกุล'
+                  : 'Search by full name'}
               </p>
             </div>
           </div>
@@ -425,8 +422,8 @@ export function ParticipantSearchModal({ isOpen, onClose }: ParticipantSearchMod
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder={
                 lang === 'th'
-                  ? 'พิมพ์ชื่อ-นามสกุล เช่น กนก สีจร หรือเลขสมาชิก เช่น 0001'
-                  : 'Type name e.g. Kanok Seejorn or ID 0001'
+                  ? 'พิมพ์ชื่อ-นามสกุล เช่น กรกนก, สมชาย'
+                  : 'Type full name e.g. Kornkanok, Somchai'
               }
               className="w-full pl-10 pr-10 py-3 bg-white text-slate-900 rounded-2xl border-0 shadow-inner text-sm font-medium placeholder:text-slate-400 focus:ring-2 focus:ring-[#4ade80] focus:outline-none transition"
             />
