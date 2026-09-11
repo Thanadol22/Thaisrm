@@ -10,80 +10,70 @@ import {
   MemberType,
 } from '@/types/member';
 
-// Type helper for raw query sequence result
-interface NextSeqResult {
-  code?: string;
-  membership_no?: string;
-}
-
 /**
  * Format Prisma Member Model to Frontend/API Safe DTO (Handles BigInt & Dates)
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function toMemberDto(member: any): Member {
+  const memberNo = member.member_no ? String(member.member_no).padStart(4, '0') : '';
+  const memberId = member.id ? member.id.toString() : memberNo;
+
   return {
-    member_id: member.memberId.toString(),
-    code: member.code,
-    membership_no: member.membershipNo,
-    full_name_th: member.fullNameTh,
+    member_id: memberId,
+    member_no: memberNo,
+    code: memberNo,
+    membership_no: memberNo,
+    full_name_th: member.fullNameTh || '',
     full_name_en: member.fullNameEn ?? null,
     id_last4: member.idLast4 ?? null,
     mobile: member.mobile ?? null,
     email: member.email ?? null,
     line_id: member.lineId ?? null,
     workplace: member.workplace ?? null,
-    start_date: member.startDate ? new Date(member.startDate).toISOString().split('T')[0] : null,
+    start_date: member.work_start_date ? new Date(member.work_start_date).toISOString().split('T')[0] : null,
     position: member.position ?? null,
-    member_type: member.memberType as MemberType | null,
-    member_type_other: member.memberTypeOther ?? null,
-    scientist_reg_no: member.scientistRegNo ?? null,
-    scientist_reg_nw: member.scientistRegNw ?? null,
-    photo_path: member.photoPath ?? null,
-    qr_code_path: member.qrCodePath ?? null,
-    created_at: new Date(member.createdAt).toISOString(),
-    updated_at: new Date(member.updatedAt).toISOString(),
-    educations: Array.isArray(member.educations)
+    member_type: member.job_category ? (Number(member.job_category) as MemberType) : null,
+    member_type_other: member.job_category_other ?? null,
+    scientist_reg_no: member.scientist_license_no ?? null,
+    scientist_reg_nw: null,
+    photo_path: member.photo_url ?? null,
+    qr_code_path: member.qr_code_image_url ?? null,
+    created_at: member.applied_at ? new Date(member.applied_at).toISOString() : new Date().toISOString(),
+    updated_at: member.applied_at ? new Date(member.applied_at).toISOString() : new Date().toISOString(),
+    educations: Array.isArray(member.member_educations)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? member.educations.map((edu: any): MemberEducation => ({
-          education_id: edu.educationId ? edu.educationId.toString() : undefined,
-          member_id: edu.memberId ? edu.memberId.toString() : undefined,
+      ? member.member_educations.map((edu: any, idx: number): MemberEducation => ({
+          education_id: edu.edu_id ? edu.edu_id.toString() : undefined,
+          member_id: edu.member_no || memberNo,
           degree: edu.degree ?? null,
           institution: edu.institution ?? null,
-          graduation_year: edu.graduationYear ?? null,
-          display_order: edu.displayOrder ?? 1,
+          graduation_year: edu.graduation_year ? (isNaN(Number(edu.graduation_year)) ? undefined : Number(edu.graduation_year)) : null,
+          display_order: idx + 1,
         }))
       : undefined,
   };
 }
 
 /**
- * ดึงเลขรหัส (code) และเลขสมาชิก (membership_no) ถัดไปจาก Sequence ใน PostgreSQL
+ * ดึงเลขรหัสสมาชิก (member_no) ถัดไปจาก Sequence ใน PostgreSQL (4 หลัก)
  */
-export async function getNextMemberCodes(): Promise<{ code: string; membershipNo: string }> {
+export async function getNextMemberCodes(): Promise<{ member_no: string }> {
   try {
-    const rawResult = await prisma.$queryRaw<NextSeqResult[]>`
-      SELECT 
-        lpad(nextval('code_seq')::TEXT, 6, '0') AS code,
-        lpad(nextval('membership_no_seq')::TEXT, 6, '0') AS membership_no
+    const rawResult = await prisma.$queryRaw<Array<{ next_member_no: string }>>`
+      SELECT lpad(nextval('member_no_seq')::TEXT, 4, '0') AS next_member_no
     `;
 
-    if (rawResult && rawResult.length > 0 && rawResult[0].code && rawResult[0].membership_no) {
-      return {
-        code: rawResult[0].code,
-        membershipNo: rawResult[0].membership_no,
-      };
+    if (rawResult && rawResult.length > 0 && rawResult[0].next_member_no) {
+      return { member_no: rawResult[0].next_member_no };
     }
   } catch (error) {
-    console.warn('Postgres sequence nextval failed or not yet initialized, falling back to manual generation:', error);
+    console.warn('Postgres sequence member_no_seq failed or not yet initialized, falling back to count:', error);
   }
 
-  // Fallback if sequences are not created in database
+  // Fallback if sequence is not yet initialized
   const count = await prisma.member.count();
-  const nextNum = (count + 1).toString().padStart(6, '0');
-  return {
-    code: nextNum,
-    membershipNo: nextNum,
-  };
+  const nextNum = (count + 1).toString().padStart(4, '0');
+  return { member_no: nextNum };
 }
 
 /**
@@ -112,51 +102,44 @@ export async function generateQrCode(text: string): Promise<string> {
 export async function createMember(rawInput: CreateMemberInput): Promise<Member> {
   const input = sanitizeMemberInput(rawInput);
 
-  // ดึงรหัสอัตโนมัติ
-  const { code, membershipNo } = await getNextMemberCodes();
+  // ดึงรหัสสมาชิกอัตโนมัติ
+  const { member_no } = await getNextMemberCodes();
 
-  // สร้าง QR Code (อ้างอิงจาก code หรือ verify URL)
-  const qrCodeData = await generateQrCode(code);
+  // สร้าง QR Code (อ้างอิงจาก member_no)
+  const qrCodeData = await generateQrCode(member_no);
 
   // Parse start_date if provided
   const parsedStartDate = input.start_date ? new Date(input.start_date) : null;
 
   const newMember = await prisma.member.create({
     data: {
-      code,
-      membershipNo,
+      member_no,
       fullNameTh: input.full_name_th,
-      fullNameEn: input.full_name_en,
-      idLast4: input.id_last4,
-      mobile: input.mobile,
-      email: input.email,
-      lineId: input.line_id,
-      workplace: input.workplace,
-      startDate: parsedStartDate,
-      position: input.position,
-      memberType: input.member_type !== undefined ? input.member_type : null,
-      memberTypeOther: input.member_type_other,
-      scientistRegNo: input.scientist_reg_no,
-      scientistRegNw: input.scientist_reg_nw,
-      photoPath: input.photo_path,
-      qrCodePath: qrCodeData,
-      educations: input.educations && input.educations.length > 0
+      fullNameEn: input.full_name_en ?? null,
+      idLast4: input.id_last4 ?? null,
+      mobile: input.mobile ?? null,
+      email: input.email ?? null,
+      lineId: input.line_id ?? null,
+      workplace: input.workplace ?? null,
+      work_start_date: parsedStartDate,
+      position: input.position ?? null,
+      job_category: input.member_type !== undefined && input.member_type !== null ? String(input.member_type) : null,
+      job_category_other: input.member_type_other ?? null,
+      scientist_license_no: input.scientist_reg_no ?? null,
+      photo_url: input.photo_path ?? null,
+      qr_code_image_url: qrCodeData,
+      member_educations: input.educations && input.educations.length > 0
         ? {
-            create: input.educations.map((edu, idx) => ({
-              degree: edu.degree,
-              institution: edu.institution,
-              graduationYear: edu.graduation_year,
-              displayOrder: edu.display_order ?? idx + 1,
+            create: input.educations.map((edu) => ({
+              degree: edu.degree || '',
+              institution: edu.institution || '',
+              graduation_year: edu.graduation_year ? String(edu.graduation_year) : null,
             })),
           }
         : undefined,
     },
     include: {
-      educations: {
-        orderBy: {
-          displayOrder: 'asc',
-        },
-      },
+      member_educations: true,
     },
   });
 
@@ -181,8 +164,7 @@ export async function getMembers(params: MemberQueryParams = {}) {
       where.OR = [
         { fullNameTh: { contains: searchClean, mode: 'insensitive' } },
         { fullNameEn: { contains: searchClean, mode: 'insensitive' } },
-        { code: { contains: searchClean, mode: 'insensitive' } },
-        { membershipNo: { contains: searchClean, mode: 'insensitive' } },
+        { member_no: { contains: searchClean, mode: 'insensitive' } },
         { mobile: { contains: searchClean, mode: 'insensitive' } },
         { email: { contains: searchClean, mode: 'insensitive' } },
         { workplace: { contains: searchClean, mode: 'insensitive' } },
@@ -192,7 +174,7 @@ export async function getMembers(params: MemberQueryParams = {}) {
 
   // กรองตามประเภทสมาชิก
   if (params.member_type !== undefined && params.member_type !== '' && params.member_type !== null) {
-    where.memberType = Number(params.member_type);
+    where.job_category = String(params.member_type);
   }
 
   // การจัดเรียง
@@ -201,12 +183,10 @@ export async function getMembers(params: MemberQueryParams = {}) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const orderBy: any = {};
-  if (sortBy === 'created_at') orderBy.createdAt = order;
-  else if (sortBy === 'updated_at') orderBy.updatedAt = order;
+  if (sortBy === 'created_at') orderBy.applied_at = order;
   else if (sortBy === 'full_name_th') orderBy.fullNameTh = order;
-  else if (sortBy === 'code') orderBy.code = order;
-  else if (sortBy === 'membership_no') orderBy.membershipNo = order;
-  else orderBy.createdAt = 'desc';
+  else if (sortBy === 'member_no' || sortBy === 'code' || sortBy === 'membership_no') orderBy.member_no = order;
+  else orderBy.applied_at = 'desc';
 
   const [total, members] = await Promise.all([
     prisma.member.count({ where }),
@@ -216,11 +196,7 @@ export async function getMembers(params: MemberQueryParams = {}) {
       take: limit,
       orderBy,
       include: {
-        educations: {
-          orderBy: {
-            displayOrder: 'asc',
-          },
-        },
+        member_educations: true,
       },
     }),
   ]);
@@ -237,28 +213,37 @@ export async function getMembers(params: MemberQueryParams = {}) {
 }
 
 /**
- * 3. ดึงข้อมูลสมาชิกระบุ ID
+ * 3. ดึงข้อมูลสมาชิกระบุ ID หรือ member_no
  */
 export async function getMemberById(id: string | number | bigint): Promise<Member | null> {
-  const memberId = typeof id === 'bigint' ? id : BigInt(id);
+  const strId = String(id).trim();
 
-  const member = await prisma.member.findUnique({
-    where: { memberId },
+  let member = await prisma.member.findUnique({
+    where: { member_no: strId },
     include: {
-      educations: {
-        orderBy: {
-          displayOrder: 'asc',
-        },
-      },
+      member_educations: true,
     },
   });
+
+  if (!member && /^\d+$/.test(strId)) {
+    try {
+      member = await prisma.member.findFirst({
+        where: { id: BigInt(strId) },
+        include: {
+          member_educations: true,
+        },
+      });
+    } catch {
+      // ignore
+    }
+  }
 
   if (!member) return null;
   return toMemberDto(member);
 }
 
 /**
- * 4. ค้นหาหรือตรวจสอบสมาชิกด้วย code หรือ membership_no (สำหรับสแกน QR)
+ * 4. ค้นหาหรือตรวจสอบสมาชิกด้วย member_no (สำหรับสแกน QR)
  */
 export async function getMemberByCodeOrNo(identifier: string): Promise<Member | null> {
   const trimmed = sanitizeString(identifier);
@@ -267,16 +252,12 @@ export async function getMemberByCodeOrNo(identifier: string): Promise<Member | 
   const member = await prisma.member.findFirst({
     where: {
       OR: [
-        { code: trimmed },
-        { membershipNo: trimmed },
+        { member_no: trimmed },
+        { member_no: trimmed.padStart(4, '0') },
       ],
     },
     include: {
-      educations: {
-        orderBy: {
-          displayOrder: 'asc',
-        },
-      },
+      member_educations: true,
     },
   });
 
@@ -288,34 +269,41 @@ export async function getMemberByCodeOrNo(identifier: string): Promise<Member | 
  * 5. อัปเดตข้อมูลสมาชิก (Update Member)
  */
 export async function updateMember(id: string | number | bigint, rawInput: UpdateMemberInput): Promise<Member | null> {
-  const memberId = typeof id === 'bigint' ? id : BigInt(id);
+  const strId = String(id).trim();
   const input = sanitizeMemberInput(rawInput);
 
   // ตรวจสอบว่ามีสมาชิกนี้อยู่หรือไม่
-  const existing = await prisma.member.findUnique({
-    where: { memberId },
+  let existing = await prisma.member.findUnique({
+    where: { member_no: strId },
   });
 
+  if (!existing && /^\d+$/.test(strId)) {
+    existing = await prisma.member.findFirst({
+      where: { id: BigInt(strId) },
+    });
+  }
+
   if (!existing) return null;
+
+  const member_no = existing.member_no;
 
   // ดำเนินการ Transaction สำหรับอัปเดตสมาชิกและรายการศึกษา
   const updated = await prisma.$transaction(async (tx) => {
     // อัปเดตตารางวุฒิการศึกษา หากส่งมา
     if (input.educations !== undefined) {
       // ลบรายการเดิมทั้งหมด
-      await tx.memberEducation.deleteMany({
-        where: { memberId },
+      await tx.member_educations.deleteMany({
+        where: { member_no },
       });
 
       // เพิ่มรายการใหม่
       if (input.educations.length > 0) {
-        await tx.memberEducation.createMany({
-          data: input.educations.map((edu, idx) => ({
-            memberId,
-            degree: edu.degree,
-            institution: edu.institution,
-            graduationYear: edu.graduation_year,
-            displayOrder: edu.display_order ?? idx + 1,
+        await tx.member_educations.createMany({
+          data: input.educations.map((edu) => ({
+            member_no,
+            degree: edu.degree || '',
+            institution: edu.institution || '',
+            graduation_year: edu.graduation_year ? String(edu.graduation_year) : null,
           })),
         });
       }
@@ -332,24 +320,21 @@ export async function updateMember(id: string | number | bigint, rawInput: Updat
     if (input.line_id !== undefined) updateData.lineId = input.line_id;
     if (input.workplace !== undefined) updateData.workplace = input.workplace;
     if (input.start_date !== undefined) {
-      updateData.startDate = input.start_date ? new Date(input.start_date) : null;
+      updateData.work_start_date = input.start_date ? new Date(input.start_date) : null;
     }
     if (input.position !== undefined) updateData.position = input.position;
-    if (input.member_type !== undefined) updateData.memberType = input.member_type;
-    if (input.member_type_other !== undefined) updateData.memberTypeOther = input.member_type_other;
-    if (input.scientist_reg_no !== undefined) updateData.scientistRegNo = input.scientist_reg_no;
-    if (input.scientist_reg_nw !== undefined) updateData.scientistRegNw = input.scientist_reg_nw;
-    if (input.photo_path !== undefined) updateData.photoPath = input.photo_path;
+    if (input.member_type !== undefined) {
+      updateData.job_category = input.member_type !== null ? String(input.member_type) : null;
+    }
+    if (input.member_type_other !== undefined) updateData.job_category_other = input.member_type_other;
+    if (input.scientist_reg_no !== undefined) updateData.scientist_license_no = input.scientist_reg_no;
+    if (input.photo_path !== undefined) updateData.photo_url = input.photo_path;
 
     return await tx.member.update({
-      where: { memberId },
+      where: { member_no },
       data: updateData,
       include: {
-        educations: {
-          orderBy: {
-            displayOrder: 'asc',
-          },
-        },
+        member_educations: true,
       },
     });
   });
@@ -361,11 +346,25 @@ export async function updateMember(id: string | number | bigint, rawInput: Updat
  * 6. ลบสมาชิก (Delete Member)
  */
 export async function deleteMember(id: string | number | bigint): Promise<boolean> {
-  const memberId = typeof id === 'bigint' ? id : BigInt(id);
+  const strId = String(id).trim();
 
   try {
+    let member_no = strId;
+    const existing = await prisma.member.findUnique({
+      where: { member_no: strId },
+      select: { member_no: true },
+    });
+
+    if (!existing && /^\d+$/.test(strId)) {
+      const byId = await prisma.member.findFirst({
+        where: { id: BigInt(strId) },
+        select: { member_no: true },
+      });
+      if (byId) member_no = byId.member_no;
+    }
+
     await prisma.member.delete({
-      where: { memberId },
+      where: { member_no },
     });
     return true;
   } catch (error) {

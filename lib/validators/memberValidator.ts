@@ -174,13 +174,13 @@ export async function validateCreateMember(
       // ตรวจสอบอีเมลซ้ำในระบบ (ใช้ Prisma Parameterized Query ปลอดภัยจาก SQLi)
       const existingEmail = await prisma.member.findFirst({
         where: { email: { equals: input.email, mode: 'insensitive' } },
-        select: { memberId: true, code: true },
+        select: { member_no: true },
       });
 
       if (existingEmail) {
         errors.push({
           field: 'email',
-          message: `อีเมลนี้ (${input.email}) มีผู้ใช้งานในระบบแล้ว (รหัสสมาชิก: ${existingEmail.code})`,
+          message: `อีเมลนี้ (${input.email}) มีผู้ใช้งานในระบบแล้ว (รหัสสมาชิก: ${existingEmail.member_no})`,
         });
       }
     }
@@ -303,18 +303,19 @@ export async function validateUpdateMember(
     if (!EMAIL_REGEX.test(input.email)) {
       errors.push({ field: 'email', message: 'รูปแบบอีเมลไม่ถูกต้อง' });
     } else {
+      const strCurrentId = String(currentId).trim();
       const duplicateMember = await prisma.member.findFirst({
         where: {
           email: { equals: input.email, mode: 'insensitive' },
-          memberId: { not: currentId },
+          member_no: { not: strCurrentId },
         },
-        select: { memberId: true, code: true },
+        select: { member_no: true },
       });
 
       if (duplicateMember) {
         errors.push({
           field: 'email',
-          message: `อีเมลนี้ (${input.email}) มีสมาชิกคนอื่นใช้งานแล้ว (รหัส: ${duplicateMember.code})`,
+          message: `อีเมลนี้ (${input.email}) มีสมาชิกคนอื่นใช้งานแล้ว (รหัส: ${duplicateMember.member_no})`,
         });
       }
     }

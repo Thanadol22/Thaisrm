@@ -26,8 +26,9 @@ export const MEMBER_TYPE_LABELS: Record<MemberType, string> = {
  */
 export interface Member {
   member_id: string; // Serialized from BigInt for JSON safety
-  code: string; // รหัส 6 หลัก เช่น "000123"
-  membership_no: string; // เลขสมาชิก 6 หลัก เช่น "000123"
+  member_no?: string; // เลขที่สมาชิก VARCHAR(20) เช่น "0001", "1281"
+  code: string; // รหัสสมาชิก เช่น "0001"
+  membership_no: string; // เลขสมาชิก เช่น "0001"
   full_name_th: string; // ชื่อ-นามสกุล ภาษาไทย
   full_name_en?: string | null; // Name ภาษาอังกฤษ
   id_last4?: string | null; // เลขบัตรประชาชน/บัตรอื่น 4 หลักท้าย
@@ -110,7 +111,7 @@ export interface MemberQueryParams {
   member_type?: string | number;
   page?: number;
   limit?: number;
-  sort_by?: 'created_at' | 'updated_at' | 'full_name_th' | 'code' | 'membership_no';
+  sort_by?: 'created_at' | 'updated_at' | 'full_name_th' | 'code' | 'membership_no' | 'member_no';
   order?: 'asc' | 'desc';
 }
 
