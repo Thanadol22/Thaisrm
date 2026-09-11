@@ -8,20 +8,10 @@ import {
   XCircle, 
   Clock, 
   Eye, 
-  Download, 
-  Filter, 
   Check, 
   X, 
-  Calendar, 
   CreditCard, 
-  User, 
-  FileText, 
-  Sparkles, 
-  ChevronDown,
   Building2,
-  Phone,
-  Mail,
-  ShieldCheck,
   AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -152,7 +142,7 @@ const INITIAL_SLIPS: SlipRecord[] = [
 ];
 
 export function StaffSlipsView() {
-  const { lang, t } = useLanguage();
+  const { lang } = useLanguage();
   const [slips, setSlips] = useState<SlipRecord[]>(INITIAL_SLIPS);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');

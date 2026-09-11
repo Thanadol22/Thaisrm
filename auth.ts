@@ -26,7 +26,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Determine real base URL in production or current environment
       let effectiveBaseUrl = baseUrl;
       if (process.env.NODE_ENV === "production") {
-        if (process.env.FRONTEND_URL) {
+        if (process.env.AUTH_URL && !process.env.AUTH_URL.includes("localhost")) {
+          effectiveBaseUrl = process.env.AUTH_URL;
+        } else if (process.env.FRONTEND_URL) {
           effectiveBaseUrl = process.env.FRONTEND_URL;
         } else if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes("localhost")) {
           effectiveBaseUrl = process.env.NEXTAUTH_URL;
@@ -53,10 +55,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.googleId = (user as any).id || (profile as any)?.sub || token.googleId;
         token.picture = user.image || (profile as any)?.picture || token.picture;
+        token.given_name = (profile as any)?.given_name || (user as any)?.given_name || token.given_name;
+        token.family_name = (profile as any)?.family_name || (user as any)?.family_name || token.family_name;
       }
       if (profile) {
         token.googleId = (profile as any).sub;
         token.picture = (profile as any).picture || token.picture;
+        token.given_name = (profile as any).given_name || token.given_name;
+        token.family_name = (profile as any).family_name || token.family_name;
       }
       return token;
     },
@@ -67,6 +73,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const userPic = (token.picture as string) || session.user.image || undefined;
         (session.user as any).picture = userPic;
         session.user.image = userPic;
+        (session.user as any).given_name = token.given_name;
+        (session.user as any).family_name = token.family_name;
       }
       return session;
     },

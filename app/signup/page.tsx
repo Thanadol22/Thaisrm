@@ -15,30 +15,36 @@ function SignupContent() {
   const { t } = useLanguage();
   const [notification, setNotification] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [initialUserData, setInitialUserData] = useState<{ name?: string; email?: string; picture?: string } | null>(null);
+  const [initialUserData, setInitialUserData] = useState<{
+    name?: string;
+    email?: string;
+    picture?: string;
+    given_name?: string;
+    family_name?: string;
+  } | null>(null);
 
   const triggerNotification = (msg: string) => {
     setNotification(msg);
     setTimeout(() => setNotification(null), 4000);
   };
 
-  // Auto-fill from NextAuth session only when active Google session is present
+  // Auto-fill from NextAuth session ONLY when returning from Google OAuth with ?autofill=true
   useEffect(() => {
-    if (session?.user) {
+    if (searchParams.get('autofill') === 'true' && session?.user) {
       const userData = {
         name: session.user.name || undefined,
         email: session.user.email || undefined,
         picture: (session.user as any).picture || session.user.image || undefined,
+        given_name: (session.user as any).given_name || undefined,
+        family_name: (session.user as any).family_name || undefined,
       };
       setInitialUserData(userData);
-      try {
-        localStorage.setItem('user_data', JSON.stringify(userData));
-      } catch (e) {
-        console.error('Failed to save user_data', e);
-      }
       triggerNotification(t.signup.googleAutofillSuccessToast);
+      if (typeof window !== 'undefined' && window.location.search) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
     }
-  }, [session, t.signup.googleAutofillSuccessToast]);
+  }, [session, searchParams, t.signup.googleAutofillSuccessToast]);
 
   const handleClearForm = async () => {
     setInitialUserData(null);
@@ -64,7 +70,7 @@ function SignupContent() {
 
   const handleGoogleSignUp = async () => {
     try {
-      await signIn('google', { callbackUrl: '/signup' });
+      await signIn('google', { callbackUrl: '/signup?autofill=true' }, { prompt: 'select_account' });
     } catch (err: any) {
       console.error('Google Sign Up Error:', err);
     }

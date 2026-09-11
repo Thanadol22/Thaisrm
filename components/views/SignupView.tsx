@@ -4,9 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   User, 
   Mail, 
-  Lock, 
-  Eye, 
-  EyeOff, 
   Phone, 
   Calendar, 
   Building, 
@@ -26,17 +23,25 @@ import {
   ShieldCheck,
   Check,
   ArrowRight,
-  ArrowLeft
+  ArrowLeft,
+  Sparkles
 } from 'lucide-react';
 import { GoogleIcon } from '@/components/GoogleIcon';
 import { useLanguage } from '@/context/LanguageContext';
+import { parseGoogleName } from '@/lib/utils';
 
 interface SignupViewProps {
   onNavigateToLogin: () => void;
   onSubmitSignup: () => void;
   onGoogleSignUp: () => void;
   onClearForm?: () => void;
-  initialUserData?: { name?: string; email?: string; picture?: string } | null;
+  initialUserData?: {
+    name?: string;
+    email?: string;
+    picture?: string;
+    given_name?: string;
+    family_name?: string;
+  } | null;
   isEmbedded?: boolean;
 }
 
@@ -56,14 +61,20 @@ export function SignupView({
   isEmbedded = false
 }: SignupViewProps) {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
-  const [showPassword, setShowPassword] = useState(false);
   const [consentChecked, setConsentChecked] = useState(false);
+  const [autofillSuccess, setAutofillSuccess] = useState(false);
   const { lang, toggleLang, t } = useLanguage();
+
+  const initialNames = parseGoogleName(
+    initialUserData?.name,
+    initialUserData?.given_name,
+    initialUserData?.family_name
+  );
 
   // Form states matching TSRM Member application form
   const [formData, setFormData] = useState({
-    nameTh: initialUserData?.name || '',
-    nameEn: initialUserData?.name || '',
+    nameTh: initialNames.nameTh,
+    nameEn: initialNames.nameEn,
     id4Digits: '',
     mobile: '',
     email: initialUserData?.email || '',
@@ -73,7 +84,6 @@ export function SignupView({
     position: '1 RM',
     positionOther: '',
     scientistNo: '',
-    password: '',
   });
 
   const [educationList, setEducationList] = useState<EducationRow[]>([
@@ -86,20 +96,27 @@ export function SignupView({
     setCurrentStep(step);
   };
 
-  // Synchronize initialUserData prop changes instantly while staying on Step 1
+  // Synchronize initialUserData prop changes when Google profile is provided
   useEffect(() => {
-    if (initialUserData) {
+    if (initialUserData && (initialUserData.name || initialUserData.email || initialUserData.picture)) {
+      const { nameTh, nameEn } = parseGoogleName(
+        initialUserData.name,
+        initialUserData.given_name,
+        initialUserData.family_name
+      );
       setFormData(prev => ({
         ...prev,
-        nameTh: initialUserData.name || prev.nameTh,
-        nameEn: initialUserData.name || prev.nameEn,
+        nameTh: nameTh || prev.nameTh,
+        nameEn: nameEn || prev.nameEn,
         email: initialUserData.email || prev.email,
       }));
       if (initialUserData.picture) {
         setPhotoPreview(initialUserData.picture);
       }
+      setAutofillSuccess(true);
+      const timer = setTimeout(() => setAutofillSuccess(false), 4000);
+      return () => clearTimeout(timer);
     } else if (initialUserData === null) {
-      // Clear form when initialUserData is reset to null
       setFormData({
         nameTh: '',
         nameEn: '',
@@ -112,39 +129,14 @@ export function SignupView({
         position: '1 RM',
         positionOther: '',
         scientistNo: '',
-        password: '',
       });
-      setEducationList([
-        { id: '1', degree: '', institution: '', year: '' },
-      ]);
       setPhotoPreview(null);
-      setConsentChecked(false);
-      setCurrentStep(1);
+      setAutofillSuccess(false);
     }
   }, [initialUserData]);
 
+  // Handle Google button: triggers Google OAuth account picker
   const handleGoogleAutoFill = () => {
-    try {
-      const savedUser = localStorage.getItem('user_data');
-      if (savedUser) {
-        const parsed = JSON.parse(savedUser);
-        if (parsed.email || parsed.name) {
-          setFormData(prev => ({
-            ...prev,
-            nameTh: parsed.name || prev.nameTh,
-            nameEn: parsed.name || prev.nameEn,
-            email: parsed.email || prev.email,
-          }));
-          if (parsed.picture) {
-            setPhotoPreview(parsed.picture);
-          }
-          return;
-        }
-      }
-    } catch (err) {
-      console.error('Error reading Google user data:', err);
-    }
-
     if (onGoogleSignUp) {
       onGoogleSignUp();
     }
@@ -163,7 +155,6 @@ export function SignupView({
       position: '1 RM',
       positionOther: '',
       scientistNo: '',
-      password: '',
     });
     setEducationList([
       { id: '1', degree: '', institution: '', year: '' },
@@ -312,6 +303,13 @@ export function SignupView({
                   <GoogleIcon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
                   <span className="text-xs sm:text-sm font-bold">{t.signup.googleSignUpButton}</span>
                 </button>
+
+                {autofillSuccess && (
+                  <p className="text-[11px] text-emerald-600 font-bold flex items-center gap-1 justify-center animate-fade-in pt-0.5">
+                    <Sparkles className="w-3 h-3 text-emerald-500" />
+                    <span>{t.signup.googleAutofillSuccessToast}</span>
+                  </p>
+                )}
               </div>
 
               {/* Divider */}
@@ -375,39 +373,6 @@ export function SignupView({
                       {t.signup.photoDelete}
                     </button>
                   )}
-                </div>
-              </div>
-
-              {/* Password for Login Account */}
-              <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-2xs space-y-3">
-                <h3 className="font-extrabold text-[#0026b3] text-xs sm:text-sm flex items-center gap-2 border-b border-slate-100 pb-2">
-                  <Lock className="w-4 h-4 text-[#0026b3] shrink-0" />
-                  <span>{t.signup.passwordTitle}</span>
-                </h3>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    {t.signup.passwordLabel} <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative rounded-xl bg-slate-50 border border-slate-200 focus-within:border-[#0026b3] focus-within:ring-2 focus-within:ring-[#0026b3]/20 transition flex items-center px-3.5 py-2.5">
-                    <Lock className="w-4 h-4 text-slate-400 mr-2 shrink-0" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      name="password"
-                      autoComplete="new-password"
-                      placeholder={t.signup.passwordPlaceholder}
-                      value={formData.password}
-                      onChange={(e) => handleInputChange('password', e.target.value)}
-                      className="w-full bg-transparent text-xs sm:text-sm text-slate-800 outline-none placeholder:text-slate-400 font-medium"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="text-slate-400 hover:text-slate-600 ml-2 focus:outline-none shrink-0"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
                 </div>
               </div>
 

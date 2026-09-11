@@ -52,11 +52,38 @@ function LoginContent() {
     }
   }, [searchParams, lang]);
 
+  const isAutofill = searchParams.get('autofill') === 'true';
+  const tabParam = searchParams.get('tab');
+  const autofillTarget: 'conference' | 'membership' | null = isAutofill
+    ? (tabParam === 'membership' ? 'membership' : 'conference')
+    : null;
+
+  // Handle autofill feedback on return from Google
+  useEffect(() => {
+    if (isAutofill && session?.user) {
+      triggerNotification(
+        lang === 'th'
+          ? 'นำเข้าข้อมูลจากบัญชี Google สำเร็จ'
+          : 'Google account details auto-filled successfully'
+      );
+    }
+  }, [isAutofill, session, lang]);
+
   const handleGoogleSignIn = async () => {
     try {
-      await signIn('google', { callbackUrl: '/agenda' });
+      await signIn('google', { callbackUrl: '/agenda' }, { prompt: 'select_account' });
     } catch (err: any) {
       console.error('Google Sign In Error:', err);
+      triggerNotification(err.message || t.login.serverError);
+    }
+  };
+
+  const handleGoogleAutofill = async (tab?: 'conference' | 'membership') => {
+    try {
+      const targetTab = tab || (tabParam === 'membership' ? 'membership' : 'conference');
+      await signIn('google', { callbackUrl: `/login?autofill=true&tab=${targetTab}` }, { prompt: 'select_account' });
+    } catch (err: any) {
+      console.error('Google Autofill Error:', err);
       triggerNotification(err.message || t.login.serverError);
     }
   };
@@ -82,7 +109,20 @@ function LoginContent() {
         <LoginView
           onNavigateToSignup={handleNavigateToSignup}
           onGoogleSignIn={handleGoogleSignIn}
-          initialGoogleUser={session?.user ? { name: session.user.name, email: session.user.email } : null}
+          onGoogleAutofill={handleGoogleAutofill}
+          defaultTab={tabParam === 'membership' ? 'membership' : 'conference'}
+          autofillTarget={autofillTarget}
+          initialGoogleUser={
+            isAutofill && session?.user
+              ? {
+                  name: session.user.name,
+                  email: session.user.email,
+                  picture: (session.user as any).picture || session.user.image || null,
+                  given_name: (session.user as any).given_name || null,
+                  family_name: (session.user as any).family_name || null,
+                }
+              : null
+          }
         />
       </main>
     </div>

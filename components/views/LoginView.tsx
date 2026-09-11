@@ -10,9 +10,6 @@ import {
   UserPlus,
   User,
   Mail,
-  Lock,
-  Eye,
-  EyeOff,
   ArrowRight,
   Sparkles
 } from 'lucide-react';
@@ -22,85 +19,91 @@ import { ParticipantSearchModal } from '@/components/ParticipantSearchModal';
 import { RegistrationSuccessModal } from '@/components/RegistrationSuccessModal';
 import { SignupView } from '@/components/views/SignupView';
 import { useLanguage } from '@/context/LanguageContext';
+import { parseGoogleName } from '@/lib/utils';
 
 interface LoginViewProps {
   onNavigateToSignup: () => void;
   onGoogleSignIn: () => void;
-  initialGoogleUser?: { name?: string | null; email?: string | null } | null;
+  onGoogleAutofill?: (tab?: 'conference' | 'membership') => void;
+  defaultTab?: 'conference' | 'membership';
+  autofillTarget?: 'conference' | 'membership' | null;
+  initialGoogleUser?: {
+    name?: string | null;
+    email?: string | null;
+    picture?: string | null;
+    given_name?: string | null;
+    family_name?: string | null;
+  } | null;
 }
 
-export function LoginView({ onNavigateToSignup, onGoogleSignIn, initialGoogleUser }: LoginViewProps) {
+export function LoginView({
+  onNavigateToSignup,
+  onGoogleSignIn,
+  onGoogleAutofill,
+  defaultTab = 'conference',
+  autofillTarget = null,
+  initialGoogleUser,
+}: LoginViewProps) {
   const router = useRouter();
   const { lang, toggleLang, t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'conference' | 'membership'>('conference');
+  const [activeTab, setActiveTab] = useState<'conference' | 'membership'>(defaultTab);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [autofillSuccess, setAutofillSuccess] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  useEffect(() => {
+    if (defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [defaultTab]);
 
   // Form State for Conference Registration
   const [formData, setFormData] = useState({
     nameTh: '',
     nameEn: '',
     email: '',
-    password: '',
   });
 
-  // Autofill if initial Google User exists
+  // Autofill only when explicitly targeted for conference registration
   useEffect(() => {
-    if (initialGoogleUser) {
-      setFormData(prev => ({
-        ...prev,
-        nameTh: initialGoogleUser.name || prev.nameTh,
-        nameEn: initialGoogleUser.name || prev.nameEn,
-        email: initialGoogleUser.email || prev.email,
-      }));
+    if (autofillTarget === 'conference' && (initialGoogleUser?.name || initialGoogleUser?.email)) {
+      const { nameTh, nameEn } = parseGoogleName(
+        initialGoogleUser.name,
+        initialGoogleUser.given_name,
+        initialGoogleUser.family_name
+      );
+      setFormData({
+        nameTh: nameTh || '',
+        nameEn: nameEn || '',
+        email: initialGoogleUser.email || '',
+      });
       setAutofillSuccess(true);
-      setTimeout(() => setAutofillSuccess(false), 4000);
+      const timer = setTimeout(() => setAutofillSuccess(false), 4000);
+      return () => clearTimeout(timer);
     }
-  }, [initialGoogleUser]);
+  }, [initialGoogleUser, autofillTarget]);
 
-  // Handle Google Autofill Button (ไม่ต้อง validation ข้อมูล)
+  // Tab switching clears fetched data & form fields across tabs
+  const handleTabChange = (tab: 'conference' | 'membership') => {
+    setActiveTab(tab);
+    setFormData({
+      nameTh: '',
+      nameEn: '',
+      email: '',
+    });
+    setAutofillSuccess(false);
+    if (typeof window !== 'undefined' && window.location.search) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  };
+
+  // Handle Google Autofill Button - triggers Google OAuth with account picker
   const handleGoogleAutofill = () => {
-    try {
-      const saved = localStorage.getItem('user_data');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.email || parsed.name) {
-          setFormData(prev => ({
-            ...prev,
-            nameTh: parsed.nameTh || parsed.name || prev.nameTh,
-            nameEn: parsed.nameEn || parsed.name || prev.nameEn,
-            email: parsed.email || prev.email,
-          }));
-          setAutofillSuccess(true);
-          setTimeout(() => setAutofillSuccess(false), 4000);
-          return;
-        }
-      }
-    } catch (e) { }
-
-    if (initialGoogleUser?.name || initialGoogleUser?.email) {
-      setFormData(prev => ({
-        ...prev,
-        nameTh: initialGoogleUser.name || prev.nameTh,
-        nameEn: initialGoogleUser.name || prev.nameEn,
-        email: initialGoogleUser.email || prev.email,
-      }));
-      setAutofillSuccess(true);
-      setTimeout(() => setAutofillSuccess(false), 4000);
-      return;
+    if (onGoogleAutofill) {
+      onGoogleAutofill('conference');
+    } else {
+      onGoogleSignIn();
     }
-
-    // Default autofill fallback
-    setFormData(prev => ({
-      ...prev,
-      nameTh: prev.nameTh || 'วรวัฒน์ เกียรติอนันต์',
-      nameEn: prev.nameEn || 'Worawat Kiat-anan',
-      email: prev.email || 'worawat.k@gmail.com',
-    }));
-    setAutofillSuccess(true);
-    setTimeout(() => setAutofillSuccess(false), 4000);
   };
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
@@ -120,12 +123,6 @@ export function LoginView({ onNavigateToSignup, onGoogleSignIn, initialGoogleUse
         registeredAt: new Date().toISOString(),
       };
       localStorage.setItem('conference_registration', JSON.stringify(regPayload));
-      localStorage.setItem('user_data', JSON.stringify({
-        name: regPayload.nameTh,
-        nameTh: regPayload.nameTh,
-        nameEn: regPayload.nameEn,
-        email: regPayload.email,
-      }));
     } catch (e) {
       console.error('Failed to save registration to localStorage', e);
     }
@@ -205,7 +202,7 @@ export function LoginView({ onNavigateToSignup, onGoogleSignIn, initialGoogleUse
             {/* Tab 1: ลงทะเบียนเข้าร่วมงานประชุม */}
             <button
               type="button"
-              onClick={() => setActiveTab('conference')}
+              onClick={() => handleTabChange('conference')}
               className={`flex items-center justify-center gap-2 py-3 px-2 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer active:scale-98 ${activeTab === 'conference'
                   ? 'bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white shadow-md shadow-blue-950/25 ring-2 ring-[#4ade80]/50'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -218,7 +215,7 @@ export function LoginView({ onNavigateToSignup, onGoogleSignIn, initialGoogleUse
             {/* Tab 2: สมัครสมาชิก TSRM */}
             <button
               type="button"
-              onClick={() => setActiveTab('membership')}
+              onClick={() => handleTabChange('membership')}
               className={`flex items-center justify-center gap-2 py-3 px-2 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer active:scale-98 ${activeTab === 'membership'
                   ? 'bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white shadow-md shadow-blue-950/25 ring-2 ring-[#4ade80]/50'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -320,31 +317,6 @@ export function LoginView({ onNavigateToSignup, onGoogleSignIn, initialGoogleUse
                   </div>
                 </div>
 
-                {/* Password */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    {lang === 'th' ? 'รหัสผ่าน (Password)' : 'Password'}
-                  </label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={formData.password}
-                      onChange={(e) => handleInputChange('password', e.target.value)}
-                      placeholder={lang === 'th' ? 'กำหนดรหัสผ่านสำหรับเข้าสู่ระบบ' : 'Create a secure password'}
-                      className="w-full pl-10 pr-10 py-2.5 sm:py-3 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
-                      tabIndex={-1}
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
                 {/* High-Impact Call to Action Button to Payment Page */}
                 <button
                   type="submit"
@@ -367,10 +339,26 @@ export function LoginView({ onNavigateToSignup, onGoogleSignIn, initialGoogleUse
             <div className="w-full animate-fade-in">
               <SignupView
                 isEmbedded={true}
-                onNavigateToLogin={() => setActiveTab('conference')}
+                onNavigateToLogin={() => handleTabChange('conference')}
                 onSubmitSignup={handleMembershipComplete}
-                onGoogleSignUp={onGoogleSignIn}
-                initialUserData={initialGoogleUser ? { name: initialGoogleUser.name || undefined, email: initialGoogleUser.email || undefined } : null}
+                onGoogleSignUp={() => {
+                  if (onGoogleAutofill) {
+                    onGoogleAutofill('membership');
+                  } else {
+                    onGoogleSignIn();
+                  }
+                }}
+                initialUserData={
+                  autofillTarget === 'membership' && initialGoogleUser
+                    ? {
+                        name: initialGoogleUser.name || undefined,
+                        email: initialGoogleUser.email || undefined,
+                        picture: initialGoogleUser.picture || undefined,
+                        given_name: initialGoogleUser.given_name || undefined,
+                        family_name: initialGoogleUser.family_name || undefined,
+                      }
+                    : null
+                }
               />
             </div>
           )}

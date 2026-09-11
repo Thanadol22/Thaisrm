@@ -7,7 +7,7 @@
 const THAI_DIGITS = ['ศูนย์', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'];
 const THAI_POSITIONS = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน', 'ล้าน'];
 
-function convertGroup(numStr: string, isMillions: boolean = false): string {
+function convertGroup(numStr: string): string {
   let result = '';
   const len = numStr.length;
 
@@ -74,7 +74,7 @@ export function thaiBahtText(amount: number | string): string {
 
     for (let i = 0; i < groups.length; i++) {
       const g = groups[i];
-      const groupText = convertGroup(g, i > 0);
+      const groupText = convertGroup(g);
       bahtResult += groupText;
       if (i < groups.length - 1 && groupText !== '') {
         bahtResult += 'ล้าน';
