@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# data dumps & reports
+*.csv
+/db/neon_export_data.sql
+export.sql

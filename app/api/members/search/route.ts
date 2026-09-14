@@ -119,17 +119,53 @@ function formatMemberRow(m: RawMemberResult) {
   };
 }
 
+// In-memory cache for search queries (TTL: 60 seconds)
+interface CacheEntry {
+  data: ReturnType<typeof formatMemberRow>[];
+  timestamp: number;
+}
+const SEARCH_CACHE = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 60 * 1000;
+const MAX_CACHE_SIZE = 200;
+
+function getCachedResult(key: string) {
+  const entry = SEARCH_CACHE.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    SEARCH_CACHE.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCachedResult(key: string, data: ReturnType<typeof formatMemberRow>[]) {
+  if (SEARCH_CACHE.size >= MAX_CACHE_SIZE) {
+    const firstKey = SEARCH_CACHE.keys().next().value;
+    if (firstKey) SEARCH_CACHE.delete(firstKey);
+  }
+  SEARCH_CACHE.set(key, { data, timestamp: Date.now() });
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const rawQ = (searchParams.get('q') || '').trim();
 
-    // หากไม่มีคำค้นหา ให้คืนค่าผลลัพธ์ว่าง
+    // หากไม่มีคำค้นหา ให้คืนค่าผลลัพธ์ว่างทันที
     if (!rawQ) {
-      return NextResponse.json({
-        success: true,
-        data: [],
-      });
+      return NextResponse.json(
+        { success: true, data: [] },
+        { headers: { 'Cache-Control': 'public, max-age=30, stale-while-revalidate=60' } }
+      );
+    }
+
+    const cacheKey = rawQ.toLowerCase();
+    const cached = getCachedResult(cacheKey);
+    if (cached) {
+      return NextResponse.json(
+        { success: true, data: cached },
+        { headers: { 'Cache-Control': 'public, max-age=30, stale-while-revalidate=60' } }
+      );
     }
 
     // ตัดคำนำหน้าชื่อทางวิชาชีพ/วิชาการ
@@ -154,52 +190,129 @@ export async function GET(req: NextRequest) {
     let membersRaw: RawMemberResult[] = [];
 
     try {
-      // 1. Primary Query: ค้นหาเฉพาะชื่อ-นามสกุล (ภาษาไทย / อังกฤษ) พร้อมประวัติการประชุมล่าสุด
-      membersRaw = await prisma.$queryRaw<RawMemberResult[]>`
-        SELECT 
-          m.member_no::text AS member_no,
-          m.id,
-          m.full_name_th,
-          m.full_name_en,
-          m.id_last4,
-          m.mobile,
-          m.email,
-          m.line_id,
-          m.workplace,
-          m.position,
-          m.membership_status,
-          m.membership_type,
-          ma.checkin_time,
-          mt.meeting_name,
-          mt.meeting_date
-        FROM members m
-        LEFT JOIN LATERAL (
-          SELECT checkin_time, meeting_id
-          FROM meeting_attendances
-          WHERE member_no::text = m.member_no::text
-          ORDER BY checkin_time DESC NULLS LAST
-          LIMIT 1
-        ) ma ON true
-        LEFT JOIN meetings mt ON mt.meeting_id = ma.meeting_id
-        WHERE 
-          m.full_name_th ILIKE ${patternRaw}
-          OR m.full_name_en ILIKE ${patternRaw}
-          OR m.full_name_th ILIKE ${patternClean}
-          OR m.full_name_en ILIKE ${patternClean}
-        ORDER BY 
-          CASE 
-            WHEN m.full_name_th ILIKE ${cleanQ} THEN 1
-            WHEN m.full_name_th ILIKE ${patternClean} THEN 2
-            WHEN m.full_name_en ILIKE ${patternClean} THEN 3
-            ELSE 4
-          END,
-          m.full_name_th ASC
-        LIMIT 3;
-      `;
+      // 1. High-Performance CTE Query: คัดกรองสมาชิกตามชื่อก่อน (Limit 50) แล้วจึง Lateral Join ประวัติประชุมเฉพาะผลลัพธ์ที่ตรง
+      if (cleanQ === rawQ) {
+        membersRaw = await prisma.$queryRaw<RawMemberResult[]>`
+          WITH matched AS (
+            SELECT 
+              m.member_no,
+              m.id,
+              m.full_name_th,
+              m.full_name_en,
+              m.id_last4,
+              m.mobile,
+              m.email,
+              m.line_id,
+              m.workplace,
+              m.position,
+              m.membership_status,
+              m.membership_type,
+              CASE 
+                WHEN m.full_name_th ILIKE ${rawQ} THEN 1
+                WHEN m.full_name_th ILIKE ${rawQ + '%'} THEN 2
+                WHEN m.full_name_th ILIKE ${patternRaw} THEN 3
+                WHEN m.full_name_en ILIKE ${patternRaw} THEN 4
+                ELSE 5
+              END AS sort_rank
+            FROM members m
+            WHERE 
+              m.full_name_th ILIKE ${patternRaw}
+              OR m.full_name_en ILIKE ${patternRaw}
+            ORDER BY sort_rank, m.full_name_th ASC
+            LIMIT 50
+          )
+          SELECT 
+            m.member_no::text AS member_no,
+            m.id,
+            m.full_name_th,
+            m.full_name_en,
+            m.id_last4,
+            m.mobile,
+            m.email,
+            m.line_id,
+            m.workplace,
+            m.position,
+            m.membership_status,
+            m.membership_type,
+            ma.checkin_time,
+            mt.meeting_name,
+            mt.meeting_date
+          FROM matched m
+          LEFT JOIN LATERAL (
+            SELECT checkin_time, meeting_id
+            FROM meeting_attendances
+            WHERE member_no = m.member_no
+            ORDER BY checkin_time DESC NULLS LAST
+            LIMIT 1
+          ) ma ON true
+          LEFT JOIN meetings mt ON mt.meeting_id = ma.meeting_id
+          ORDER BY m.sort_rank, m.full_name_th ASC;
+        `;
+      } else {
+        membersRaw = await prisma.$queryRaw<RawMemberResult[]>`
+          WITH matched AS (
+            SELECT 
+              m.member_no,
+              m.id,
+              m.full_name_th,
+              m.full_name_en,
+              m.id_last4,
+              m.mobile,
+              m.email,
+              m.line_id,
+              m.workplace,
+              m.position,
+              m.membership_status,
+              m.membership_type,
+              CASE 
+                WHEN m.full_name_th ILIKE ${cleanQ} THEN 1
+                WHEN m.full_name_th ILIKE ${cleanQ + '%'} THEN 2
+                WHEN m.full_name_th ILIKE ${patternClean} THEN 3
+                WHEN m.full_name_en ILIKE ${patternClean} THEN 4
+                WHEN m.full_name_th ILIKE ${patternRaw} THEN 5
+                ELSE 6
+              END AS sort_rank
+            FROM members m
+            WHERE 
+              m.full_name_th ILIKE ${patternRaw}
+              OR m.full_name_en ILIKE ${patternRaw}
+              OR m.full_name_th ILIKE ${patternClean}
+              OR m.full_name_en ILIKE ${patternClean}
+            ORDER BY sort_rank, m.full_name_th ASC
+            LIMIT 50
+          )
+          SELECT 
+            m.member_no::text AS member_no,
+            m.id,
+            m.full_name_th,
+            m.full_name_en,
+            m.id_last4,
+            m.mobile,
+            m.email,
+            m.line_id,
+            m.workplace,
+            m.position,
+            m.membership_status,
+            m.membership_type,
+            ma.checkin_time,
+            mt.meeting_name,
+            mt.meeting_date
+          FROM matched m
+          LEFT JOIN LATERAL (
+            SELECT checkin_time, meeting_id
+            FROM meeting_attendances
+            WHERE member_no = m.member_no
+            ORDER BY checkin_time DESC NULLS LAST
+            LIMIT 1
+          ) ma ON true
+          LEFT JOIN meetings mt ON mt.meeting_id = ma.meeting_id
+          ORDER BY m.sort_rank, m.full_name_th ASC;
+        `;
+      }
     } catch (queryErr) {
-      console.warn('Primary search query failed, attempting fallback to members table:', queryErr);
+      console.warn('CTE search query failed, attempting fallback to members table:', queryErr);
 
-      // 2. Fallback Query: ค้นหาเฉพาะชื่อ-นามสกุลจากตาราง members โดยตรง
+      // 2. Fallback Query: ค้นหาตรงจากตาราง members
       membersRaw = await prisma.$queryRaw<RawMemberResult[]>`
         SELECT 
           m.member_no::text AS member_no,
@@ -231,16 +344,17 @@ export async function GET(req: NextRequest) {
             ELSE 4
           END,
           m.full_name_th ASC
-        LIMIT 3;
+        LIMIT 50;
       `;
     }
 
     const data = membersRaw.map(formatMemberRow);
+    setCachedResult(cacheKey, data);
 
-    return NextResponse.json({
-      success: true,
-      data,
-    });
+    return NextResponse.json(
+      { success: true, data },
+      { headers: { 'Cache-Control': 'public, max-age=30, stale-while-revalidate=60' } }
+    );
   } catch (error) {
     console.error('API /api/members/search error:', error);
     return NextResponse.json(
