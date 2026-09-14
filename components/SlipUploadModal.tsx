@@ -9,9 +9,10 @@ interface SlipUploadModalProps {
   onClose: () => void;
   onSuccess: (slipData: { fileName: string; fileUrl: string }) => void;
   bankAccount: string;
+  amountDueText?: string;
 }
 
-export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount }: SlipUploadModalProps) {
+export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount, amountDueText }: SlipUploadModalProps) {
   const { t } = useLanguage();
   const [uploadedSlip, setUploadedSlip] = useState<string | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string>('');
@@ -75,7 +76,7 @@ export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount }: Sli
             <div>
               <h3 className="text-xl font-black text-slate-900">{t.slipModal.modalTitle}</h3>
               <p className="text-xs text-slate-500 mt-1">
-                {t.slipModal.transferTo} <span className="font-bold text-[#0026b3]">{bankAccount}</span> <span className="font-bold text-[#00a950]">{t.slipModal.kasikornBank}</span> {t.slipModal.amountDue}
+                {t.slipModal.transferTo} <span className="font-bold text-[#0026b3]">{bankAccount}</span> <span className="font-bold text-[#00a950]">{t.slipModal.kasikornBank}</span> {amountDueText || t.slipModal.amountDue}
               </p>
             </div>
 

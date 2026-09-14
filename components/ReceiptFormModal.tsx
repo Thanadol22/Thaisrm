@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ReceiptData, ReceiptItemLine, SAMPLE_ORGANON_RECEIPT } from '@/types/receipt';
+import { ReceiptData, ReceiptItemLine } from '@/types/receipt';
 import { thaiBahtText } from '@/lib/thaiBahtText';
 import {
   X,
@@ -155,13 +155,6 @@ export function ReceiptFormModal({
     });
   };
 
-  const handleLoadSample = () => {
-    setFormData({
-      ...SAMPLE_ORGANON_RECEIPT,
-      id: `REC-${Date.now()}`,
-      receiptNo: `2569/02-094`,
-    });
-  };
 
   const handleSelectMeeting = (meetingId: string) => {
     const found = meetings.find((m) => m.id === meetingId);
@@ -212,12 +205,28 @@ export function ReceiptFormModal({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handleLoadSample}
+              onClick={() => {
+                setFormData({
+                  ...formData,
+                  id: `REC-${Date.now()}`,
+                  receiptNo: '',
+                  receiptDate: '',
+                  purposeText: '',
+                  payerType: 'individual',
+                  payerName: '',
+                  payerAddressLine1: '',
+                  payerAddressLine2: '',
+                  items: [{ id: 'item-1', itemNumber: 1, title: '', subDetails: [], amount: 0 }],
+                  totalAmount: 0,
+                  status: 'draft' as const,
+                  createdAt: new Date().toISOString().split('T')[0],
+                });
+              }}
               className="px-3 py-1.5 text-xs font-semibold bg-white/20 hover:bg-white/30 text-white rounded-xl backdrop-blur-md transition-all flex items-center gap-1.5 cursor-pointer"
-              title="โหลดข้อมูลตัวอย่างจากรูปภาพ (บริษัท ออร์กานอน 54,000 บาท)"
+              title="รีเซ็ตฟอร์มเป็นค่าว่าง"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>โหลดตัวอย่างรูปภาพ</span>
+              <span>รีเซ็ตฟอร์ม</span>
             </button>
             <button
               type="button"

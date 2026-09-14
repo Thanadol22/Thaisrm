@@ -64,38 +64,4 @@ export const DEFAULT_ASSOCIATION_INFO = {
   taxId: '0-9930-00367-70-7',
 };
 
-export const SAMPLE_ORGANON_RECEIPT: ReceiptData = {
-  id: 'REC-2569-001',
-  receiptNo: '2569/02-094',
-  receiptDate: '10 มีนาคม 2569',
-  purposeText: 'ได้รับเงินสนับสนุน ประจำปี 2569',
-  payerType: 'company',
-  payerName: 'บริษัท ออร์กานอน (ประเทศไทย) จำกัด',
-  branchName: 'สำนักงานแห่งใหญ่',
-  payerAddressLine1: 'เลขที่ 88 อาคารเดอะปาร์ค ชั้นที่ 7 ฝั่งอีสต์วิง ห้องเลขที่ 07-101 ถนนรัชดาภิเษก แขวงคลองเตย เขตคลองเตย',
-  payerAddressLine2: 'กรุงเทพมหานคร 10110',
-  payerPhone: '+662-257-2500',
-  payerTaxId: '0105563092355',
-  items: [
-    {
-      id: 'item-1',
-      itemNumber: 1,
-      title: 'ค่าลงทะเบียน',
-      subDetails: [
-        'ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์',
-        'จัดขึ้นวันที่ 10-12 มีนาคม 2569',
-        'โรงแรมอีสติน แกรนด์ พญาไท กรุงเทพฯ',
-      ],
-      amount: 54000,
-    },
-  ],
-  totalAmount: 54000,
-  payerSignerName: '',
-  payerSignerRole: 'ผู้จ่ายเงิน',
-  authorizedSignerName: 'แพทย์หญิงพิมพกา ชวนะเวสน์',
-  authorizedSignerRole: '',
-  preparedByName: 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม',
-  preparedByRole: 'ผู้จัดทำ',
-  createdAt: '2026-03-10',
-  status: 'issued',
-};
+

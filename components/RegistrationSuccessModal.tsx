@@ -78,7 +78,7 @@ export function RegistrationSuccessModal({
           ) : (
             <button
               onClick={onClose}
-              className="w-full bg-[#0026b3] hover:bg-[#001f94] text-white font-bold text-sm py-3.5 px-5 rounded-2xl shadow-sm hover:shadow transition active:scale-[0.99] cursor-pointer"
+              className="w-full bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] font-bold text-sm py-3.5 px-5 rounded-2xl shadow-sm hover:shadow transition active:scale-[0.99] cursor-pointer"
             >
               {t.successModal.confirmButton}
             </button>

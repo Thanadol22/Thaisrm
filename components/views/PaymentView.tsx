@@ -12,12 +12,13 @@ import {
   FileText, 
   CheckCircle2, 
   Trash2, 
-  RotateCw 
+  RotateCw
 } from 'lucide-react';
 import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface PaymentViewProps {
+  paymentType?: 'registration' | 'membership';
   onNavigateBack?: () => void;
   onOpenUploadModal: () => void;
   onCopyBank: () => void;
@@ -29,6 +30,7 @@ interface PaymentViewProps {
 }
 
 export function PaymentView({
+  paymentType = 'membership',
   onNavigateBack,
   onOpenUploadModal,
   onCopyBank,
@@ -40,6 +42,7 @@ export function PaymentView({
 }: PaymentViewProps) {
   const router = useRouter();
   const { lang, toggleLang, t } = useLanguage();
+  const isRegistration = paymentType === 'registration';
 
   const handleBack = () => {
     if (onNavigateBack) {
@@ -47,15 +50,29 @@ export function PaymentView({
     } else if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back();
     } else {
-      router.push('/agenda');
+      router.push('/login');
     }
   };
+
+  // Determine amount and program label
+  const totalAmount = isRegistration ? '3,500' : '1,000';
+  const displayProgramName = isRegistration
+    ? ((t.payment as any).regPassName || (lang === 'th' ? 'THAISRM Congress Pass' : 'THAISRM Congress Pass'))
+    : t.payment.passName;
+
+  const displayBadge = isRegistration
+    ? ((t.payment as any).regPassBadge || (lang === 'th' ? 'ลงทะเบียนเข้าร่วมงาน' : 'CONFERENCE REGISTRATION'))
+    : t.payment.passBadge;
 
   return (
     <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[640px]">
       {/* Header Blue Card Section */}
-      <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-5 sm:px-7 pt-6 sm:pt-8 pb-8 sm:pb-10 rounded-b-[32px] sm:rounded-b-[40px] shadow-xl relative overflow-hidden">
-        <div className="relative z-10">
+      <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-5 sm:px-8 lg:px-12 pt-6 sm:pt-8 pb-8 sm:pb-10 rounded-b-[28px] sm:rounded-b-[36px] shadow-xl relative overflow-hidden">
+        {/* Subtle Background Glow */}
+        <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute bottom-0 -left-12 w-40 h-40 bg-[#4ade80]/15 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="max-w-3xl sm:max-w-4xl mx-auto relative z-10">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               {/* Back Button */}
@@ -72,7 +89,7 @@ export function PaymentView({
               <div 
                 onClick={() => router.push('/login')}
                 className="flex items-center gap-2.5 min-w-0 cursor-pointer group hover:opacity-90 transition"
-                title="กลับสู่หน้าเข้าสู่ระบบ / Back to Login"
+                title="กลับสู่หน้าหลัก / Back to Home"
               >
                 <ThaiSrmLogo className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 group-hover:scale-105 transition-transform" />
                 <div className="min-w-0">
@@ -99,66 +116,93 @@ export function PaymentView({
             </button>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-4 sm:mt-5">
-            {t.payment.title}
-          </h1>
-          <p className="text-xs sm:text-sm text-blue-100/90 leading-relaxed mt-1.5 sm:mt-2 font-normal">
-            {t.payment.subtitle}
-          </p>
+          <div className="mt-5 sm:mt-6 space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              {isRegistration
+                ? ((t.payment as any).registrationTitle || 'ชำระเงินค่าลงทะเบียนเข้าร่วมงาน')
+                : t.payment.title}
+            </h1>
+            <p className="text-xs sm:text-sm text-blue-100/90 leading-relaxed font-normal max-w-2xl">
+              {isRegistration
+                ? ((t.payment as any).registrationSubtitle || 'ชำระเงินและอัปโหลดหลักฐานการโอนเงิน (สลิป) เพื่อยืนยันการลงทะเบียนเข้าร่วมงานประชุม TSRM 2026')
+                : t.payment.subtitle}
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Body Content */}
-      <div className="px-4 sm:px-7 py-5 sm:py-6 flex-1 flex flex-col justify-between space-y-4">
+      <div className="px-4 sm:px-8 lg:px-12 py-5 sm:py-6 flex-1 flex flex-col justify-between space-y-4 max-w-3xl sm:max-w-4xl mx-auto w-full">
         {/* Pass Details White Card */}
-        <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-4">
+        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-sm space-y-4">
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-extrabold text-[#0026b3] text-base sm:text-lg tracking-tight truncate">
-              {t.payment.passName}
+              {displayProgramName}
             </h3>
-            <span className="bg-[#eff4ff] text-[#0026b3] text-[9px] sm:text-[10px] font-black tracking-widest px-2.5 sm:px-3 py-1 rounded-full border border-[#d6e4ff] shrink-0 whitespace-nowrap">
-              {t.payment.passBadge}
+            <span className="bg-[#eff4ff] text-[#0026b3] text-[9px] sm:text-[10px] font-black tracking-widest px-2.5 sm:px-3 py-1 rounded-full border border-[#d6e4ff] shrink-0 whitespace-nowrap uppercase">
+              {displayBadge}
             </span>
           </div>
 
           {/* Features List */}
           <div className="space-y-2.5 pt-1">
-            <div className="flex items-start gap-2.5 text-xs text-slate-700">
-              <Check className="w-4 h-4 text-[#0026b3] flex-shrink-0 mt-0.5 stroke-[2.5]" />
-              <span>{t.payment.feature1}</span>
-            </div>
-            <div className="flex items-start gap-2.5 text-xs text-slate-700">
-              <Check className="w-4 h-4 text-[#0026b3] flex-shrink-0 mt-0.5 stroke-[2.5]" />
-              <span>{t.payment.feature2}</span>
-            </div>
-            <div className="flex items-start gap-2.5 text-xs text-slate-700">
-              <Check className="w-4 h-4 text-[#0026b3] flex-shrink-0 mt-0.5 stroke-[2.5]" />
-              <span>{t.payment.feature3}</span>
-            </div>
+            {isRegistration ? (
+              <>
+                <div className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700">
+                  <Check className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#0026b3] flex-shrink-0 mt-0.5 stroke-[2.5]" />
+                  <span>{(t.payment as any).regFeature1 || 'สิทธิ์เข้าร่วมงานประชุมวิชาการประจำปีและเวิร์กช็อป TSRM 2026'}</span>
+                </div>
+                <div className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700">
+                  <Check className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#0026b3] flex-shrink-0 mt-0.5 stroke-[2.5]" />
+                  <span>{(t.payment as any).regFeature2 || 'รับเอกสารประกอบการประชุม สูจิบัตรดิจิทัล และอาหารว่าง/กลางวัน'}</span>
+                </div>
+                <div className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700">
+                  <Check className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#0026b3] flex-shrink-0 mt-0.5 stroke-[2.5]" />
+                  <span>{(t.payment as any).regFeature3 || 'สะสมหน่วยกิตวิชาชีพการศึกษาต่อเนื่อง (CME / CPD / CNEU)'}</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700">
+                  <Check className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#0026b3] flex-shrink-0 mt-0.5 stroke-[2.5]" />
+                  <span>{t.payment.feature1}</span>
+                </div>
+                <div className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700">
+                  <Check className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#0026b3] flex-shrink-0 mt-0.5 stroke-[2.5]" />
+                  <span>{t.payment.feature2}</span>
+                </div>
+                <div className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700">
+                  <Check className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#0026b3] flex-shrink-0 mt-0.5 stroke-[2.5]" />
+                  <span>{t.payment.feature3}</span>
+                </div>
+              </>
+            )}
           </div>
 
-          <div className="border-t border-slate-100 pt-3 flex items-baseline justify-between">
-            <span className="text-xs font-bold text-slate-600">{t.payment.totalDue}</span>
+          <div className="border-t border-slate-100 pt-3.5 flex items-baseline justify-between">
+            <span className="text-xs sm:text-sm font-bold text-slate-600">{t.payment.totalDue}</span>
             <div className="text-right">
-              <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">1,000 {t.payment.currency}</span>
+              <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                {totalAmount} {t.payment.currency}
+              </span>
             </div>
           </div>
         </div>
 
         {/* Bank Account Info Card */}
-        <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200 flex items-center justify-between gap-2 shadow-2xs">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-[#0026b3] font-black text-sm sm:text-base tracking-wider truncate">
+        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-[#0026b3] font-black text-sm sm:text-lg tracking-wider truncate">
               {bankAccount}
             </span>
             {/* Kasikorn K+ Badge */}
-            <span className="bg-[#00a950] text-white text-[10px] sm:text-[11px] font-black px-1.5 py-0.5 rounded shadow-2xs shrink-0 whitespace-nowrap">
+            <span className="bg-[#00a950] text-white text-[10px] sm:text-[11px] font-black px-2 py-0.5 rounded shadow-2xs shrink-0 whitespace-nowrap">
               K+
             </span>
           </div>
           <button
             onClick={onCopyBank}
-            className="text-xs font-bold text-[#0026b3] hover:bg-blue-50 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+            className="text-xs font-bold text-[#0026b3] hover:bg-blue-50 px-3 py-1.5 sm:py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap border border-blue-100"
           >
             <Copy className="w-3.5 h-3.5" />
             <span>{copiedBank ? t.payment.copiedButton : t.payment.copyButton}</span>
@@ -167,17 +211,17 @@ export function PaymentView({
 
         {/* Uploaded Slip Card (When slip is attached) */}
         {uploadedSlipData && (
-          <div className="bg-white rounded-2xl p-4 border-2 border-[#4ade80]/60 bg-gradient-to-b from-white to-emerald-50/30 shadow-2xs space-y-3 animate-fade-in">
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-[#4ade80]/60 bg-gradient-to-b from-white to-emerald-50/30 shadow-2xs space-y-3 animate-fade-in">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
                   <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
                 </div>
                 <div>
                   <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 leading-tight">
                     {t.payment.uploadedSlipTitle}
                   </h4>
-                  <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+                  <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1 mt-0.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
                     อัปโหลดหลักฐานแล้ว
                   </span>
@@ -188,10 +232,10 @@ export function PaymentView({
                 <button
                   type="button"
                   onClick={onOpenUploadModal}
-                  className="text-xs font-bold text-[#0026b3] hover:bg-blue-50 px-2.5 py-1.5 rounded-lg border border-[#0026b3]/20 transition flex items-center gap-1 cursor-pointer"
+                  className="text-xs font-bold text-[#0026b3] hover:bg-blue-50 px-2.5 sm:px-3 py-1.5 rounded-lg border border-[#0026b3]/20 transition flex items-center gap-1 cursor-pointer"
                   title={t.payment.changeSlipButton}
                 >
-                  <RotateCw className="w-3 h-3" />
+                  <RotateCw className="w-3.5 h-3.5" />
                   <span className="text-xs">{t.payment.changeSlipButton}</span>
                 </button>
 
@@ -209,7 +253,7 @@ export function PaymentView({
             </div>
 
             {/* Preview Thumbnail & File Name display */}
-            <div className="flex items-center gap-3 bg-slate-50/90 p-2.5 rounded-xl border border-slate-200">
+            <div className="flex items-center gap-3 bg-slate-50/90 p-3 rounded-xl border border-slate-200">
               <img
                 src={uploadedSlipData.fileUrl}
                 alt="Slip Preview"
@@ -223,7 +267,7 @@ export function PaymentView({
                     {uploadedSlipData.fileName}
                   </p>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1">
+                <p className="text-[11px] text-slate-500 mt-1">
                   {t.payment.readyToConfirmNotice}
                 </p>
               </div>
@@ -232,13 +276,13 @@ export function PaymentView({
         )}
 
         {/* Security Encrypted Checkout Badge */}
-        <div className="w-full bg-[#eff4ff] text-[#0026b3] font-bold text-[10px] sm:text-[11px] uppercase tracking-wider py-2 sm:py-2.5 px-3 sm:px-4 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 border border-[#d6e4ff] text-center">
+        <div className="w-full bg-[#eff4ff] text-[#0026b3] font-bold text-[10px] sm:text-[11px] uppercase tracking-wider py-2.5 sm:py-3 px-3 sm:px-4 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 border border-[#d6e4ff] text-center">
           <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0026b3] shrink-0" />
           <span className="whitespace-normal sm:whitespace-nowrap">{t.payment.securityBadge}</span>
         </div>
 
         {/* Action Buttons Section */}
-        <div className="space-y-2.5">
+        <div className="space-y-2.5 pt-2">
           {!uploadedSlipData ? (
             <button
               onClick={onOpenUploadModal}
@@ -271,4 +315,3 @@ export function PaymentView({
     </div>
   );
 }
-

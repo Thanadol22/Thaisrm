@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { ReceiptData, SAMPLE_ORGANON_RECEIPT } from '@/types/receipt';
+import { ReceiptData } from '@/types/receipt';
 import { ReceiptModal } from '@/components/ReceiptModal';
 import { ReceiptFormModal } from '@/components/ReceiptFormModal';
 import {
@@ -209,12 +209,13 @@ export function ReceiptManagementPanel({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => handleDirectPrint(SAMPLE_ORGANON_RECEIPT)}
-              className="px-3.5 py-2 text-xs font-bold text-[#0026b3] bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-              title="พิมพ์ตัวอย่างตามภาพแนบ (บริษัท ออร์กานอน 54,000 บาท)"
+              onClick={() => receipts.length > 0 && handleDirectPrint(receipts[0])}
+              disabled={receipts.length === 0}
+              className="px-3.5 py-2 text-xs font-bold text-[#0026b3] bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
+              title="พิมพ์ใบเสร็จล่าสุด"
             >
               <Sparkles className="w-3.5 h-3.5 text-[#0026b3]" />
-              <span>พิมพ์ตัวอย่างรูปภาพ 100%</span>
+              <span>พิมพ์ใบเสร็จล่าสุด</span>
             </button>
 
             <button
