@@ -19,13 +19,6 @@ function LoginContent() {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  // If already logged in explicitly to view agenda, redirect to /agenda
-  useEffect(() => {
-    if (status === 'authenticated' && session?.user && searchParams.get('login') === 'true') {
-      router.replace('/agenda');
-    }
-  }, [status, session, router, searchParams]);
-
   // Handle URL errors (e.g. ?error=Configuration or ?error=AccessDenied)
   useEffect(() => {
     const errorParam = searchParams.get('error');
@@ -71,7 +64,7 @@ function LoginContent() {
 
   const handleGoogleSignIn = async () => {
     try {
-      await signIn('google', { callbackUrl: '/agenda' }, { prompt: 'select_account' });
+      await signIn('google', { callbackUrl: '/login' }, { prompt: 'select_account' });
     } catch (err: any) {
       console.error('Google Sign In Error:', err);
       triggerNotification(err.message || t.login.serverError);
@@ -105,7 +98,7 @@ function LoginContent() {
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col items-center justify-start selection:bg-[#4ade80] selection:text-slate-900 font-sans">
       <ToastNotification message={notification} />
 
-      <main className="w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl min-h-screen bg-[#f6f8fc] shadow-2xl flex flex-col justify-between relative border-x border-slate-200/80 overflow-hidden transition-all duration-300">
+      <main className="w-full min-h-screen bg-[#f6f8fc] shadow-2xl flex flex-col justify-between relative border-x border-slate-200/80 overflow-hidden transition-all duration-300">
         <LoginView
           onNavigateToSignup={handleNavigateToSignup}
           onGoogleSignIn={handleGoogleSignIn}

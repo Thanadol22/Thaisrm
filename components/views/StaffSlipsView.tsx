@@ -1,16 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  Receipt, 
-  Search, 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
-  Eye, 
-  Check, 
-  X, 
-  CreditCard, 
+import {
+  Receipt,
+  Search,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Eye,
+  Check,
+  X,
+  CreditCard,
   Building2,
   AlertCircle
 } from 'lucide-react';
@@ -35,111 +35,7 @@ export interface SlipRecord {
   notes?: string;
 }
 
-const INITIAL_SLIPS: SlipRecord[] = [
-  {
-    id: 'SLIP-2026-001',
-    nameTh: 'นพ. วรวัฒน์ เกียรติอนันต์',
-    nameEn: 'Dr. Worawat Kiat-anan',
-    email: 'worawat.k@chula.md.ac.th',
-    phone: '089-123-4567',
-    workplace: 'โรงพยาบาลจุฬาลงกรณ์',
-    ticketType: 'THAISRM Congress Full Pass',
-    ticketCode: 'TSRM-2026-0012',
-    amount: 3500,
-    bank: 'KBANK (กสิกรไทย)',
-    transferDate: '03 ก.ย. 2569',
-    transferTime: '13:45 น.',
-    refNo: 'TXN88920194021',
-    slipUrl: '/bornivf-logo.png', // Fallback display
-    status: 'pending',
-  },
-  {
-    id: 'SLIP-2026-002',
-    nameTh: 'พญ. นภัสสร สุวรรณเวช',
-    nameEn: 'Dr. Napassorn Suwanwech',
-    email: 'napassorn.s@med.tu.ac.th',
-    phone: '081-456-7890',
-    workplace: 'โรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ',
-    ticketType: 'THAISRM Congress Full Pass',
-    ticketCode: 'TSRM-2026-0034',
-    amount: 3500,
-    bank: 'SCB (ไทยพาณิชย์)',
-    transferDate: '03 ก.ย. 2569',
-    transferTime: '11:20 น.',
-    refNo: 'TXN77102948123',
-    slipUrl: '/bornivf-logo.png',
-    status: 'pending',
-  },
-  {
-    id: 'SLIP-2026-003',
-    nameTh: 'นว. ปรียานุช รัตนศิลป์',
-    nameEn: 'Ms. Preeyanuch Rattanasilp',
-    email: 'preeyanuch.r@ivfcenter.co.th',
-    phone: '086-789-0123',
-    workplace: 'BORN IVF Fertility Clinic',
-    ticketType: 'Embryology Workshop Only',
-    ticketCode: 'TSRM-2026-0089',
-    amount: 2500,
-    bank: 'BBL (กรุงเทพ)',
-    transferDate: '03 ก.ย. 2569',
-    transferTime: '09:15 น.',
-    refNo: 'TXN55410928374',
-    slipUrl: '/bornivf-logo.png',
-    status: 'pending',
-  },
-  {
-    id: 'SLIP-2026-004',
-    nameTh: 'นพ. ธนกฤต วิเศษไพบูลย์',
-    nameEn: 'Dr. Thanakrit Wisetpaiboon',
-    email: 'thanakrit.w@siriraj.ac.th',
-    phone: '084-332-1100',
-    workplace: 'โรงพยาบาลศิริราช',
-    ticketType: 'THAISRM Congress Full Pass',
-    ticketCode: 'TSRM-2026-0005',
-    amount: 3500,
-    bank: 'KTB (กรุงไทย)',
-    transferDate: '02 ก.ย. 2569',
-    transferTime: '16:30 น.',
-    refNo: 'TXN44810293845',
-    slipUrl: '/bornivf-logo.png',
-    status: 'approved',
-  },
-  {
-    id: 'SLIP-2026-005',
-    nameTh: 'ภญ. พัชราภา วงศ์มณี',
-    nameEn: 'Ms. Patcharapa Wongmanee',
-    email: 'patcharapa.w@pharma.com',
-    phone: '082-998-7766',
-    workplace: 'บริษัท เวชภัณฑ์การเจริญพันธุ์ จำกัด',
-    ticketType: 'Day Pass (Day 2 Only)',
-    ticketCode: 'TSRM-2026-0104',
-    amount: 1500,
-    bank: 'TTB (ทีทีบี)',
-    transferDate: '02 ก.ย. 2569',
-    transferTime: '14:10 น.',
-    refNo: 'TXN33910283741',
-    slipUrl: '/bornivf-logo.png',
-    status: 'approved',
-  },
-  {
-    id: 'SLIP-2026-006',
-    nameTh: 'นาย กิตติศักดิ์ เจริญกิจ',
-    nameEn: 'Mr. Kittisak Charoenkit',
-    email: 'kittisak.c@invalidmail.com',
-    phone: '080-000-0000',
-    workplace: 'สถาบันวิจัยการแพทย์',
-    ticketType: 'THAISRM Congress Full Pass',
-    ticketCode: 'TSRM-2026-0155',
-    amount: 1000, // Invalid amount
-    bank: 'KBANK (กสิกรไทย)',
-    transferDate: '01 ก.ย. 2569',
-    transferTime: '18:00 น.',
-    refNo: 'TXN11209384756',
-    slipUrl: '/bornivf-logo.png',
-    status: 'rejected',
-    notes: 'ยอดเงินไม่ตรงกับค่าลงทะเบียน Full Pass (3,500 บาท)',
-  },
-];
+const INITIAL_SLIPS: SlipRecord[] = [];
 
 export function StaffSlipsView() {
   const { lang } = useLanguage();
@@ -185,7 +81,7 @@ export function StaffSlipsView() {
         s.ticketCode.toLowerCase().includes(q) ||
         s.refNo.toLowerCase().includes(q) ||
         s.workplace.toLowerCase().includes(q);
-      
+
       const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
@@ -220,8 +116,8 @@ export function StaffSlipsView() {
               </h1>
             </div>
             <p className="text-xs text-blue-100/90 font-normal">
-              {lang === 'th' 
-                ? 'ตรวจสอบหลักฐานการชำระเงินของสมาชิกและอนุมัติการลงทะเบียนเข้าร่วมงาน' 
+              {lang === 'th'
+                ? 'ตรวจสอบหลักฐานการชำระเงินของสมาชิกและอนุมัติการลงทะเบียนเข้าร่วมงาน'
                 : 'Review payment slips, verify bank transaction details, and approve event access.'}
             </p>
           </div>
@@ -242,25 +138,23 @@ export function StaffSlipsView() {
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-        <div 
+        <div
           onClick={() => setStatusFilter('all')}
-          className={`p-3.5 rounded-2xl border transition cursor-pointer ${
-            statusFilter === 'all' 
-              ? 'bg-blue-50/80 border-[#0026b3] shadow-sm' 
+          className={`p-3.5 rounded-2xl border transition cursor-pointer ${statusFilter === 'all'
+              ? 'bg-blue-50/80 border-[#0026b3] shadow-sm'
               : 'bg-white border-slate-200 hover:border-slate-300'
-          }`}
+            }`}
         >
           <p className="text-[11px] font-bold text-slate-500">{lang === 'th' ? 'ทั้งหมด' : 'All Slips'}</p>
           <p className="text-xl font-black text-slate-900 mt-0.5">{totalCount}</p>
         </div>
 
-        <div 
+        <div
           onClick={() => setStatusFilter('pending')}
-          className={`p-3.5 rounded-2xl border transition cursor-pointer ${
-            statusFilter === 'pending' 
-              ? 'bg-amber-50 border-amber-400 shadow-sm' 
+          className={`p-3.5 rounded-2xl border transition cursor-pointer ${statusFilter === 'pending'
+              ? 'bg-amber-50 border-amber-400 shadow-sm'
               : 'bg-white border-slate-200 hover:border-slate-300'
-          }`}
+            }`}
         >
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-bold text-amber-800">{lang === 'th' ? 'รอตรวจสอบ' : 'Pending Review'}</p>
@@ -269,25 +163,23 @@ export function StaffSlipsView() {
           <p className="text-xl font-black text-amber-900 mt-0.5">{pendingCount}</p>
         </div>
 
-        <div 
+        <div
           onClick={() => setStatusFilter('approved')}
-          className={`p-3.5 rounded-2xl border transition cursor-pointer ${
-            statusFilter === 'approved' 
-              ? 'bg-emerald-50 border-emerald-400 shadow-sm' 
+          className={`p-3.5 rounded-2xl border transition cursor-pointer ${statusFilter === 'approved'
+              ? 'bg-emerald-50 border-emerald-400 shadow-sm'
               : 'bg-white border-slate-200 hover:border-slate-300'
-          }`}
+            }`}
         >
           <p className="text-[11px] font-bold text-emerald-800">{lang === 'th' ? 'อนุมัติแล้ว' : 'Approved'}</p>
           <p className="text-xl font-black text-emerald-900 mt-0.5">{approvedCount}</p>
         </div>
 
-        <div 
+        <div
           onClick={() => setStatusFilter('rejected')}
-          className={`p-3.5 rounded-2xl border transition cursor-pointer ${
-            statusFilter === 'rejected' 
-              ? 'bg-rose-50 border-rose-400 shadow-sm' 
+          className={`p-3.5 rounded-2xl border transition cursor-pointer ${statusFilter === 'rejected'
+              ? 'bg-rose-50 border-rose-400 shadow-sm'
               : 'bg-white border-slate-200 hover:border-slate-300'
-          }`}
+            }`}
         >
           <p className="text-[11px] font-bold text-rose-800">{lang === 'th' ? 'ปฏิเสธ / แก้ไข' : 'Rejected'}</p>
           <p className="text-xl font-black text-rose-900 mt-0.5">{rejectedCount}</p>
@@ -306,7 +198,7 @@ export function StaffSlipsView() {
             className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
           />
           {searchQuery && (
-            <button 
+            <button
               onClick={() => setSearchQuery('')}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
             >
@@ -321,11 +213,10 @@ export function StaffSlipsView() {
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-                statusFilter === st
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${statusFilter === st
                   ? 'bg-slate-900 text-white shadow-xs'
                   : 'text-slate-600 bg-slate-100 hover:bg-slate-200'
-              }`}
+                }`}
             >
               {st === 'all' && (lang === 'th' ? 'ทั้งหมด' : 'All')}
               {st === 'pending' && (lang === 'th' ? 'รอตรวจ' : 'Pending')}
@@ -358,13 +249,12 @@ export function StaffSlipsView() {
               {/* Left Details */}
               <div className="flex items-start gap-3.5 min-w-0">
                 {/* Status Indicator Icon */}
-                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-                  slip.status === 'approved'
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 ${slip.status === 'approved'
                     ? 'bg-emerald-100 text-emerald-700'
                     : slip.status === 'pending'
-                    ? 'bg-amber-100 text-amber-700'
-                    : 'bg-rose-100 text-rose-700'
-                }`}>
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-rose-100 text-rose-700'
+                  }`}>
                   {slip.status === 'approved' && <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />}
                   {slip.status === 'pending' && <Clock className="w-5 h-5 sm:w-6 sm:h-6" />}
                   {slip.status === 'rejected' && <XCircle className="w-5 h-5 sm:w-6 sm:h-6" />}
@@ -379,13 +269,12 @@ export function StaffSlipsView() {
                     <span className="text-[10px] font-black bg-blue-50 text-[#0026b3] px-2 py-0.5 rounded-md border border-blue-200">
                       {slip.ticketCode}
                     </span>
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                      slip.status === 'approved'
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${slip.status === 'approved'
                         ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                         : slip.status === 'pending'
-                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                        : 'bg-rose-100 text-rose-800 border border-rose-300'
-                    }`}>
+                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                          : 'bg-rose-100 text-rose-800 border border-rose-300'
+                      }`}>
                       {slip.status === 'approved' && (lang === 'th' ? '✓ อนุมัติแล้ว' : 'Approved')}
                       {slip.status === 'pending' && (lang === 'th' ? '⏳ รอตรวจสอบ' : 'Pending')}
                       {slip.status === 'rejected' && (lang === 'th' ? '✕ ปฏิเสธ' : 'Rejected')}

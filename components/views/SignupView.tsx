@@ -1,19 +1,19 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  Calendar, 
-  Building, 
-  Award, 
-  GraduationCap, 
-  QrCode, 
-  Camera, 
-  Plus, 
-  Trash2, 
-  Hash, 
+import {
+  User,
+  Mail,
+  Phone,
+  Calendar,
+  Building,
+  Award,
+  GraduationCap,
+  QrCode,
+  Camera,
+  Plus,
+  Trash2,
+  Hash,
   FileText,
   MessageSquare,
   Globe,
@@ -52,9 +52,9 @@ interface EducationRow {
   year: string;
 }
 
-export function SignupView({ 
-  onNavigateToLogin, 
-  onSubmitSignup, 
+export function SignupView({
+  onNavigateToLogin,
+  onSubmitSignup,
   onGoogleSignUp,
   onClearForm,
   initialUserData,
@@ -228,10 +228,10 @@ export function SignupView({
   };
 
   return (
-    <div className={isEmbedded ? "w-full animate-fade-in space-y-3" : "flex-1 flex flex-col justify-between animate-fade-in min-h-[640px] pb-8 pt-2"}>
+    <div className={isEmbedded ? "w-full animate-fade-in space-y-3" : "flex-1 flex flex-col justify-between animate-fade-in min-h-[640px] pb-8 pt-2 max-w-5xl xl:max-w-6xl mx-auto w-full"}>
       {/* Form Body */}
-      <div className={isEmbedded ? "px-0 py-1 flex-1 flex flex-col space-y-4" : "px-3.5 sm:px-7 py-2 sm:py-4 flex-1 flex flex-col space-y-4"}>
-        
+      <div className={isEmbedded ? "px-0 py-1 flex-1 flex flex-col space-y-4" : "px-3.5 sm:px-8 lg:px-12 py-2 sm:py-4 flex-1 flex flex-col space-y-4"}>
+
         {/* Roadmap Stepper Bar */}
         <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200 shadow-2xs mb-1">
           <div className="flex items-center justify-between relative px-2 sm:px-6">
@@ -258,20 +258,18 @@ export function SignupView({
                   className="flex flex-col items-center relative z-10 group cursor-pointer"
                 >
                   <div
-                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-black text-xs sm:text-sm transition-all shadow-sm ${
-                      isCompleted
+                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-black text-xs sm:text-sm transition-all shadow-sm ${isCompleted
                         ? 'bg-[#4ade80] text-[#061d08] ring-4 ring-[#4ade80]/20'
                         : isCurrent
-                        ? 'bg-[#0026b3] text-white ring-4 ring-[#0026b3]/20 scale-110'
-                        : 'bg-slate-100 text-slate-400 border border-slate-300'
-                    }`}
+                          ? 'bg-[#0026b3] text-white ring-4 ring-[#0026b3]/20 scale-110'
+                          : 'bg-slate-100 text-slate-400 border border-slate-300'
+                      }`}
                   >
                     {isCompleted ? <Check className="w-4 h-4 sm:w-5 sm:h-5 stroke-[3]" /> : step.id}
                   </div>
                   <span
-                    className={`text-[10px] sm:text-xs font-bold mt-1.5 whitespace-nowrap transition ${
-                      isCurrent ? 'text-[#0026b3] font-black' : isCompleted ? 'text-slate-800' : 'text-slate-400'
-                    }`}
+                    className={`text-[10px] sm:text-xs font-bold mt-1.5 whitespace-nowrap transition ${isCurrent ? 'text-[#0026b3] font-black' : isCompleted ? 'text-slate-800' : 'text-slate-400'
+                      }`}
                   >
                     {step.title}
                   </span>
@@ -400,36 +398,38 @@ export function SignupView({
                   <span>{t.signup.personalInfoTitle}</span>
                 </h3>
 
-                {/* ชื่อ-นามสกุล (Thai) */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    {t.signup.nameThLabel} <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="nameTh"
-                    autoComplete="name"
-                    placeholder={t.signup.nameThPlaceholder}
-                    value={formData.nameTh}
-                    onChange={(e) => handleInputChange('nameTh', e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 transition outline-none font-medium"
-                  />
-                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* ชื่อ-นามสกุล (Thai) */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      {t.signup.nameThLabel} <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="nameTh"
+                      autoComplete="name"
+                      placeholder={t.signup.nameThPlaceholder}
+                      value={formData.nameTh}
+                      onChange={(e) => handleInputChange('nameTh', e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 transition outline-none font-medium"
+                    />
+                  </div>
 
-                {/* Name (English) */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    {t.signup.nameEnLabel} <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="nameEn"
-                    autoComplete="name"
-                    placeholder={t.signup.nameEnPlaceholder}
-                    value={formData.nameEn}
-                    onChange={(e) => handleInputChange('nameEn', e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 transition outline-none font-medium"
-                  />
+                  {/* Name (English) */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      {t.signup.nameEnLabel} <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="nameEn"
+                      autoComplete="name"
+                      placeholder={t.signup.nameEnPlaceholder}
+                      value={formData.nameEn}
+                      onChange={(e) => handleInputChange('nameEn', e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 transition outline-none font-medium"
+                    />
+                  </div>
                 </div>
 
                 {/* ID4หลักท้าย & Mobile */}
@@ -685,8 +685,8 @@ export function SignupView({
                   </div>
 
                   {educationList.map((row, idx) => (
-                    <div 
-                      key={row.id} 
+                    <div
+                      key={row.id}
                       className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-3 bg-slate-50/80 p-3 sm:p-2 rounded-xl border border-slate-200 items-center"
                     >
                       <div className="sm:col-span-4">

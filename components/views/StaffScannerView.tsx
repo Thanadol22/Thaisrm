@@ -27,7 +27,7 @@ export function StaffScannerView() {
 
   const [manualCode, setManualCode] = useState('');
   const [lastScanned, setLastScanned] = useState<CheckInRecord | null>(null);
-  const [stats, setStats] = useState({ total: 500, checkedIn: 148 });
+  const [stats, setStats] = useState({ total: 0, checkedIn: 0 });
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [cameraPermissionError, setCameraPermissionError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
