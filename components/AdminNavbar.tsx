@@ -16,10 +16,11 @@ import {
   Sparkles,
   Activity,
   FileText,
-  DollarSign
+  DollarSign,
+  Users
 } from 'lucide-react';
 
-export type AdminTab = 'dashboard' | 'revenue-report' | 'add-meeting' | 'meeting-history' | 'verify-slip' | 'verify-attendees' | 'receipts';
+export type AdminTab = 'dashboard' | 'revenue-report' | 'members' | 'add-meeting' | 'meeting-history' | 'verify-slip' | 'verify-attendees' | 'receipts';
 
 interface AdminNavbarProps {
   activeTab: AdminTab;
@@ -29,6 +30,7 @@ interface AdminNavbarProps {
   totalAttendeesCount?: number;
   checkedInCount?: number;
   receiptsCount?: number;
+  membersCount?: number;
 }
 
 const navItems: {
@@ -36,13 +38,20 @@ const navItems: {
   labelTh: string;
   labelEn: string;
   icon: React.ElementType;
-  badgeKey?: 'slips' | 'attendees' | 'receipts';
+  badgeKey?: 'slips' | 'attendees' | 'receipts' | 'members';
 }[] = [
   {
     id: 'dashboard',
     labelTh: 'ภาพรวมแดชบอร์ด',
     labelEn: 'Overview Dashboard',
     icon: LayoutDashboard,
+  },
+  {
+    id: 'members',
+    labelTh: 'จัดการสมาชิก',
+    labelEn: 'Member Management',
+    icon: Users,
+    badgeKey: 'members',
   },
   {
     id: 'revenue-report',
@@ -93,13 +102,15 @@ export function AdminNavbar({
   totalAttendeesCount = 0,
   checkedInCount = 0,
   receiptsCount = 0,
+  membersCount,
 }: AdminNavbarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  const getBadge = (key?: 'slips' | 'attendees' | 'receipts') => {
+  const getBadge = (key?: 'slips' | 'attendees' | 'receipts' | 'members') => {
     if (key === 'slips') return pendingSlipsCount > 0 ? pendingSlipsCount : undefined;
     if (key === 'attendees') return totalAttendeesCount > 0 ? `${checkedInCount}/${totalAttendeesCount}` : undefined;
     if (key === 'receipts') return receiptsCount > 0 ? receiptsCount : undefined;
+    if (key === 'members' && typeof membersCount === 'number') return membersCount;
     return undefined;
   };
 

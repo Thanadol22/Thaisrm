@@ -247,7 +247,7 @@ export async function validateUpdateMember(
   rawInput: UpdateMemberInput
 ): Promise<ValidationResult> {
   const errors: ValidationError[] = [];
-  const currentId = typeof memberId === 'bigint' ? memberId : BigInt(memberId);
+  const strCurrentId = String(memberId).trim();
   const input = sanitizeMemberInput(rawInput);
 
   // ตรวจสอบ SQL Injection / Script Attack ในทุกฟิลด์ที่ส่งมาแก้ไข
@@ -303,7 +303,6 @@ export async function validateUpdateMember(
     if (!EMAIL_REGEX.test(input.email)) {
       errors.push({ field: 'email', message: 'รูปแบบอีเมลไม่ถูกต้อง' });
     } else {
-      const strCurrentId = String(currentId).trim();
       const duplicateMember = await prisma.member.findFirst({
         where: {
           email: { equals: input.email, mode: 'insensitive' },

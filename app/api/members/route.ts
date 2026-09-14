@@ -23,16 +23,22 @@ export async function GET(req: NextRequest) {
 
     const search = searchParams.get('search') || undefined;
     const member_type = searchParams.get('member_type') ?? undefined;
+    const job_category = searchParams.get('job_category') || undefined;
+    const membership_type = searchParams.get('membership_type') || undefined;
+    const membership_status = searchParams.get('membership_status') || undefined;
     const page = searchParams.get('page') ? parseInt(searchParams.get('page')!, 10) : 1;
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : 20;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sort_by = (searchParams.get('sort_by') as any) || 'created_at';
+    const sort_by = (searchParams.get('sort_by') as any) || 'member_no';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const order = (searchParams.get('order') as any) || 'desc';
 
     const result = await getMembers({
       search,
       member_type,
+      job_category,
+      membership_type,
+      membership_status,
       page,
       limit,
       sort_by,
@@ -42,6 +48,7 @@ export async function GET(req: NextRequest) {
     const response: ApiResponse = {
       success: true,
       data: result.data,
+      stats: result.stats,
       pagination: result.pagination,
     };
 

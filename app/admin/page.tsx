@@ -49,15 +49,67 @@ import {
   KeyRound,
   Dices,
   Printer,
-  FileText
+  FileText,
+  Coins,
+  Tag,
+  BadgePercent
 } from 'lucide-react';
 import { ThaiDateRangePicker } from '@/components/ThaiDateRangePicker';
 import { ThaiTimeRangePicker } from '@/components/ThaiTimeRangePicker';
-import { ReceiptData, SAMPLE_ORGANON_RECEIPT } from '@/types/receipt';
+import { ReceiptData } from '@/types/receipt';
 import { ReceiptManagementPanel } from '@/components/ReceiptManagementPanel';
 import { ReceiptModal } from '@/components/ReceiptModal';
+import { MemberManagementPanel } from '@/components/MemberManagementPanel';
 
-/* ─── Mock Data ─────────────────────────────────────────────────────────── */
+/* ─── Data Types & Interfaces ─────────────────────────────────────────── */
+
+export interface MeetingPricingTiers {
+  programName: string;
+  participant: {
+    onsiteMember: number;
+    onsiteNonMember: number;
+    onlineMember: number;
+  };
+  fellow: {
+    onsiteMember: number;
+    onsiteNonMember: number;
+    onlineMemberType: 'free' | 'paid';
+    onlineMemberText: string;
+    onlineMemberPrice: number;
+  };
+  changeFee: {
+    label: string;
+    conditionDate: string;
+    onsiteMember: number;
+    onsiteNonMember: number;
+    onlineMember: number;
+  };
+  remark: string;
+}
+
+export const DEFAULT_PRICING_TIERS: MeetingPricingTiers = {
+  programName: '',
+  participant: {
+    onsiteMember: 0,
+    onsiteNonMember: 0,
+    onlineMember: 0,
+  },
+  fellow: {
+    onsiteMember: 0,
+    onsiteNonMember: 0,
+    onlineMemberType: 'free',
+    onlineMemberText: '',
+    onlineMemberPrice: 0,
+  },
+  changeFee: {
+    label: '',
+    conditionDate: '',
+    onsiteMember: 0,
+    onsiteNonMember: 0,
+    onlineMember: 0,
+  },
+  remark: '',
+};
 
 interface MeetingItem {
   id: string;
@@ -70,56 +122,14 @@ interface MeetingItem {
   staffCode?: string;
   maxSeats: number;
   basePrice?: number;
+  pricingTiers?: MeetingPricingTiers;
   registered: number;
   attended: number;
   revenue: number;
   status: 'upcoming' | 'ongoing' | 'completed';
 }
 
-const INITIAL_MEETINGS: MeetingItem[] = [
-  {
-    id: 'MTG-2026-001',
-    titleTh: 'การประชุมวิชาการประจำปี THAISRM Congress 2026',
-    titleEn: 'THAISRM Annual Scientific Congress 2026',
-    date: '15-17 ต.ค. 2569',
-    time: '08:30 - 17:00 น.',
-    location: 'โรงแรม Grand Hyatt Erawan Bangkok & Live Streaming',
-    type: 'hybrid',
-    maxSeats: 600,
-    registered: 500,
-    attended: 389,
-    revenue: 1750000,
-    status: 'ongoing',
-  },
-  {
-    id: 'MTG-2026-002',
-    titleTh: 'อบรมเชิงปฏิบัติการทางคลินิกตัวอ่อนขั้นสูง (Hands-on Workshop)',
-    titleEn: 'Advanced Clinical Embryology Hands-on Workshop',
-    date: '28-29 พ.ย. 2569',
-    time: '09:00 - 16:30 น.',
-    location: 'ศูนย์ปฏิบัติการเพาะเลี้ยงตัวอ่อน BORN IVF Training Center',
-    type: 'onsite',
-    maxSeats: 80,
-    registered: 80,
-    attended: 76,
-    revenue: 400000,
-    status: 'upcoming',
-  },
-  {
-    id: 'MTG-2026-003',
-    titleTh: 'การประชุมใหญ่วิสามัญและสัมมนาทิศทางเวชศาสตร์การเจริญพันธุ์',
-    titleEn: 'THAISRM Extraordinary General Meeting & Reproductive Trend',
-    date: '12 ก.ค. 2569',
-    time: '13:00 - 16:00 น.',
-    location: 'ออนไลน์ผ่านระบบ Zoom Webinar',
-    type: 'online',
-    maxSeats: 1000,
-    registered: 690,
-    attended: 622,
-    revenue: 1300000,
-    status: 'completed',
-  },
-];
+const INITIAL_MEETINGS: MeetingItem[] = [];
 
 interface SlipItem {
   id: string;
@@ -141,94 +151,7 @@ interface SlipItem {
   rejectionReason?: string;
 }
 
-const INITIAL_SLIPS: SlipItem[] = [
-  {
-    id: 'SLIP-001',
-    refNo: 'TXN88920194021',
-    nameTh: 'นพ. วรวัฒน์ เกียรติอนันต์',
-    nameEn: 'Dr. Worawat Kiat-anan',
-    email: 'worawat.k@chula.md.ac.th',
-    phone: '089-123-4567',
-    workplace: 'โรงพยาบาลจุฬาลงกรณ์',
-    ticketType: 'THAISRM Congress Full Pass',
-    meetingId: 'MTG-2026-001',
-    amount: 3500,
-    bank: 'KBANK (กสิกรไทย)',
-    transferDate: '10 ก.ย. 2569',
-    transferTime: '09:12 น.',
-    slipUrl: '/bornivf-logo.png',
-    status: 'pending',
-  },
-  {
-    id: 'SLIP-002',
-    refNo: 'TXN77102948123',
-    nameTh: 'พญ. นภัสสร สุวรรณเวช',
-    nameEn: 'Dr. Napassorn Suwanwech',
-    email: 'napassorn.s@med.tu.ac.th',
-    phone: '081-456-7890',
-    workplace: 'โรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ',
-    ticketType: 'THAISRM Congress Full Pass',
-    meetingId: 'MTG-2026-001',
-    amount: 3500,
-    bank: 'SCB (ไทยพาณิชย์)',
-    transferDate: '10 ก.ย. 2569',
-    transferTime: '08:45 น.',
-    slipUrl: '/bornivf-logo.png',
-    status: 'pending',
-  },
-  {
-    id: 'SLIP-003',
-    refNo: 'TXN55410928374',
-    nameTh: 'นว. ปรียานุช รัตนศิลป์',
-    nameEn: 'Ms. Preeyanuch Rattanasilp',
-    email: 'preeyanuch.r@ivfcenter.co.th',
-    phone: '086-789-0123',
-    workplace: 'BORN IVF Fertility Clinic',
-    ticketType: 'Embryology Workshop Only',
-    meetingId: 'MTG-2026-002',
-    amount: 5000,
-    bank: 'BBL (กรุงเทพ)',
-    transferDate: '09 ก.ย. 2569',
-    transferTime: '16:30 น.',
-    slipUrl: '/bornivf-logo.png',
-    status: 'pending',
-  },
-  {
-    id: 'SLIP-004',
-    refNo: 'TXN33219401827',
-    nameTh: 'ภญ. พิมพิศา ตั้งสัจจะ',
-    nameEn: 'Pharm. Pimpisa Tangsajja',
-    email: 'pimpisa.t@pharma.co.th',
-    phone: '082-345-6789',
-    workplace: 'ศูนย์การแพทย์เฉพาะทางนวบุตร',
-    ticketType: 'THAISRM Congress Full Pass',
-    meetingId: 'MTG-2026-001',
-    amount: 3500,
-    bank: 'KTB (กรุงไทย)',
-    transferDate: '09 ก.ย. 2569',
-    transferTime: '14:00 น.',
-    slipUrl: '/bornivf-logo.png',
-    status: 'approved',
-  },
-  {
-    id: 'SLIP-005',
-    refNo: 'TXN11209384756',
-    nameTh: 'นายธีรเดช เจริญสุข',
-    nameEn: 'Mr. Teeradej Charoensuk',
-    email: 'teeradej.c@biolab.co.th',
-    phone: '084-567-8901',
-    workplace: 'ฝ่ายปฏิบัติการวิจัยชีววิทยาเจริญพันธุ์',
-    ticketType: 'THAISRM Congress Full Pass',
-    meetingId: 'MTG-2026-001',
-    amount: 3500,
-    bank: 'TTB (ทีทีบี)',
-    transferDate: '08 ก.ย. 2569',
-    transferTime: '11:10 น.',
-    slipUrl: '/bornivf-logo.png',
-    status: 'rejected',
-    rejectionReason: 'ยอดเงินไม่ตรงกับค่าลงทะเบียนที่เลือก',
-  },
-];
+const INITIAL_SLIPS: SlipItem[] = [];
 
 interface AttendeeItem {
   id: string;
@@ -250,230 +173,9 @@ interface AttendeeItem {
   checkInTime?: string;
 }
 
-const INITIAL_ATTENDEES: AttendeeItem[] = [
-  {
-    id: 'ATT-001',
-    code: '000101',
-    nameTh: 'นพ. วรวัฒน์ เกียรติอนันต์',
-    nameEn: 'Dr. Worawat Kiat-anan',
-    id4Digits: '8892',
-    email: 'worawat.k@chula.md.ac.th',
-    phone: '089-123-4567',
-    workplace: 'โรงพยาบาลจุฬาลงกรณ์',
-    memberType: 'แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)',
-    ticketType: 'THAISRM Congress Full Pass',
-    ticketCode: 'TSRM-2026-0012',
-    meetingId: 'MTG-2026-001',
-    meetingTitle: 'การประชุมวิชาการประจำปี THAISRM Congress 2026',
-    registeredDate: '01 ก.ย. 2569',
-    paymentStatus: 'paid',
-    checkInStatus: 'checked_in',
-    checkInTime: '08:45 น.',
-  },
-  {
-    id: 'ATT-002',
-    code: '000102',
-    nameTh: 'พญ. นภัสสร สุวรรณเวช',
-    nameEn: 'Dr. Napassorn Suwanwech',
-    id4Digits: '4451',
-    email: 'napassorn.s@med.tu.ac.th',
-    phone: '081-456-7890',
-    workplace: 'โรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ',
-    memberType: 'Fellow RM',
-    ticketType: 'THAISRM Congress Full Pass',
-    ticketCode: 'TSRM-2026-0034',
-    meetingId: 'MTG-2026-001',
-    meetingTitle: 'การประชุมวิชาการประจำปี THAISRM Congress 2026',
-    registeredDate: '01 ก.ย. 2569',
-    paymentStatus: 'paid',
-    checkInStatus: 'checked_in',
-    checkInTime: '09:12 น.',
-  },
-  {
-    id: 'ATT-003',
-    code: '000103',
-    nameTh: 'นว. ปรียานุช รัตนศิลป์',
-    nameEn: 'Ms. Preeyanuch Rattanasilp',
-    id4Digits: '9912',
-    email: 'preeyanuch.r@ivfcenter.co.th',
-    phone: '086-789-0123',
-    workplace: 'BORN IVF Fertility Clinic',
-    memberType: 'นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อน (Embryologist)',
-    ticketType: 'Embryology Workshop Only',
-    ticketCode: 'TSRM-2026-0089',
-    meetingId: 'MTG-2026-002',
-    meetingTitle: 'อบรมเชิงปฏิบัติการทางคลินิกตัวอ่อนขั้นสูง (Hands-on Workshop)',
-    registeredDate: '02 ก.ย. 2569',
-    paymentStatus: 'paid',
-    checkInStatus: 'checked_in',
-    checkInTime: '08:50 น.',
-  },
-  {
-    id: 'ATT-004',
-    code: '000104',
-    nameTh: 'พว. กนกพร สิทธิโชค',
-    nameEn: 'RN. Kanokporn Sitthichok',
-    id4Digits: '3321',
-    email: 'kanokporn.s@bangkokhospital.com',
-    phone: '085-678-9012',
-    workplace: 'โรงพยาบาลกรุงเทพ',
-    memberType: 'พยาบาลผู้เชี่ยวชาญ IVF (Nurse)',
-    ticketType: 'THAISRM Congress Full Pass',
-    ticketCode: 'TSRM-2026-0105',
-    meetingId: 'MTG-2026-001',
-    meetingTitle: 'การประชุมวิชาการประจำปี THAISRM Congress 2026',
-    registeredDate: '03 ก.ย. 2569',
-    paymentStatus: 'paid',
-    checkInStatus: 'checked_in',
-    checkInTime: '09:30 น.',
-  },
-  {
-    id: 'ATT-005',
-    code: '000105',
-    nameTh: 'ดร. กิตติศักดิ์ พงษ์ศิริ',
-    nameEn: 'Dr. Kittisak Pongsiri',
-    id4Digits: '7721',
-    email: 'kittisak.p@genelab.co.th',
-    phone: '087-890-1234',
-    workplace: 'ศูนย์พันธุศาสตร์ระดับโมเลกุล GeneLab',
-    memberType: 'นักพันธุศาสตร์โมเลกุล (Molecular Geneticist)',
-    ticketType: 'THAISRM Congress Full Pass',
-    ticketCode: 'TSRM-2026-0142',
-    meetingId: 'MTG-2026-001',
-    meetingTitle: 'การประชุมวิชาการประจำปี THAISRM Congress 2026',
-    registeredDate: '04 ก.ย. 2569',
-    paymentStatus: 'paid',
-    checkInStatus: 'not_checked_in',
-  },
-  {
-    id: 'ATT-006',
-    code: '000106',
-    nameTh: 'ทพญ. อารียา วงศ์สว่าง',
-    nameEn: 'Dr. Areeya Wongsawang',
-    id4Digits: '5562',
-    email: 'areeya.w@bumrungrad.com',
-    phone: '083-999-1122',
-    workplace: 'โรงพยาบาลบำรุงราษฎร์',
-    memberType: 'Fellow RM',
-    ticketType: 'Embryology Workshop Only',
-    ticketCode: 'TSRM-2026-0188',
-    meetingId: 'MTG-2026-002',
-    meetingTitle: 'อบรมเชิงปฏิบัติการทางคลินิกตัวอ่อนขั้นสูง (Hands-on Workshop)',
-    registeredDate: '05 ก.ย. 2569',
-    paymentStatus: 'paid',
-    checkInStatus: 'not_checked_in',
-  },
-  {
-    id: 'ATT-007',
-    code: '000107',
-    nameTh: 'นพ. ธนกฤต มงคลกุล',
-    nameEn: 'Dr. Thanakrit Mongkolkul',
-    id4Digits: '1144',
-    email: 'thanakrit.m@ramahospital.ac.th',
-    phone: '081-223-9988',
-    workplace: 'โรงพยาบาลรามาธิบดี',
-    memberType: 'แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)',
-    ticketType: 'Online Webinar Pass',
-    ticketCode: 'TSRM-2026-0210',
-    meetingId: 'MTG-2026-003',
-    meetingTitle: 'การประชุมใหญ่วิสามัญและสัมมนาทิศทางเวชศาสตร์การเจริญพันธุ์',
-    registeredDate: '06 ก.ย. 2569',
-    paymentStatus: 'paid',
-    checkInStatus: 'checked_in',
-    checkInTime: '13:05 น.',
-  },
-  {
-    id: 'ATT-008',
-    code: '000108',
-    nameTh: 'นว. ชัชวาล เลิศรัตนชัย',
-    nameEn: 'Mr. Chatchawal Lertrattanachai',
-    id4Digits: '6681',
-    email: 'chatchawal.l@safereproduction.com',
-    phone: '089-778-5544',
-    workplace: 'Safe Fertility Center',
-    memberType: 'นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อน (Embryologist)',
-    ticketType: 'Online Webinar Pass',
-    ticketCode: 'TSRM-2026-0245',
-    meetingId: 'MTG-2026-003',
-    meetingTitle: 'การประชุมใหญ่วิสามัญและสัมมนาทิศทางเวชศาสตร์การเจริญพันธุ์',
-    registeredDate: '07 ก.ย. 2569',
-    paymentStatus: 'pending',
-    checkInStatus: 'not_checked_in',
-  },
-];
+const INITIAL_ATTENDEES: AttendeeItem[] = [];
 
-const INITIAL_RECEIPTS: ReceiptData[] = [
-  SAMPLE_ORGANON_RECEIPT,
-  {
-    id: 'REC-2569-002',
-    receiptNo: '2569/02-095',
-    receiptDate: '10 มีนาคม 2569',
-    purposeText: 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',
-    payerType: 'individual',
-    payerName: 'นพ. วรวัฒน์ เกียรติอนันต์',
-    payerAddressLine1: 'โรงพยาบาลจุฬาลงกรณ์ สภากาชาดไทย แขวงปทุมวัน เขตปทุมวัน',
-    payerAddressLine2: 'กรุงเทพมหานคร 10330',
-    payerPhone: '089-123-4567',
-    items: [
-      {
-        id: 'item-1',
-        itemNumber: 1,
-        title: 'ค่าลงทะเบียน THAISRM Congress Full Pass',
-        subDetails: [
-          'การประชุมวิชาการประจำปี THAISRM Congress 2026',
-          'จัดขึ้นวันที่ 15-17 ต.ค. 2569',
-          'โรงแรม Grand Hyatt Erawan Bangkok',
-        ],
-        amount: 3500,
-      },
-    ],
-    totalAmount: 3500,
-    payerSignerRole: 'ผู้จ่ายเงิน',
-    authorizedSignerName: 'แพทย์หญิงพิมพกา ชวนะเวสน์',
-    authorizedSignerRole: '',
-    preparedByName: 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม',
-    preparedByRole: 'ผู้จัดทำ',
-    meetingId: 'MTG-2026-001',
-    attendeeId: 'ATT-001',
-    createdAt: '2026-03-10',
-    status: 'issued',
-  },
-  {
-    id: 'REC-2569-003',
-    receiptNo: '2569/02-096',
-    receiptDate: '11 มีนาคม 2569',
-    purposeText: 'ได้รับเงินสนับสนุน ประจำปี 2569',
-    payerType: 'company',
-    payerName: 'บริษัท เมอร์ค (ประเทศไทย) จำกัด',
-    branchName: 'สำนักงานใหญ่',
-    payerAddressLine1: 'เลขที่ 191 อาคารสีลมคอมเพล็กซ์ ชั้น 19 ถนนสีลม แขวงสีลม เขตบางรัก',
-    payerAddressLine2: 'กรุงเทพมหานคร 10500',
-    payerPhone: '02-667-8000',
-    payerTaxId: '0105534063211',
-    items: [
-      {
-        id: 'item-1',
-        itemNumber: 1,
-        title: 'ค่าลงทะเบียนและสนับสนุนพื้นที่บูธนิทรรศการ',
-        subDetails: [
-          'การประชุมวิชาการประจำปี THAISRM Congress 2026',
-          'จัดขึ้นวันที่ 15-17 ต.ค. 2569',
-          'โรงแรม Grand Hyatt Erawan Bangkok',
-        ],
-        amount: 120000,
-      },
-    ],
-    totalAmount: 120000,
-    payerSignerRole: 'ผู้จ่ายเงิน',
-    authorizedSignerName: 'แพทย์หญิงพิมพกา ชวนะเวสน์',
-    authorizedSignerRole: '',
-    preparedByName: 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม',
-    preparedByRole: 'ผู้จัดทำ',
-    meetingId: 'MTG-2026-001',
-    createdAt: '2026-03-11',
-    status: 'issued',
-  },
-];
+const INITIAL_RECEIPTS: ReceiptData[] = [];
 
 /* ─── 1. OVERVIEW DASHBOARD PANEL (Light Theme) ──────────────────────────── */
 
@@ -537,7 +239,7 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees }: D
       {/* 4 Core KPI Summary Cards (Brand Primary & Accent High Contrast) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
         {/* Card 1: Total Meetings */}
-        <div 
+        <div
           onClick={() => onNavigateTab('meeting-history')}
           className="group cursor-pointer bg-white hover:bg-blue-50/40 border border-slate-200/90 hover:border-[#0026b3]/40 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all duration-200"
         >
@@ -561,7 +263,7 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees }: D
         </div>
 
         {/* Card 2: Total Registered */}
-        <div 
+        <div
           onClick={() => onNavigateTab('verify-attendees')}
           className="group cursor-pointer bg-white hover:bg-blue-50/40 border border-slate-200/90 hover:border-[#0026b3]/40 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all duration-200"
         >
@@ -583,7 +285,7 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees }: D
         </div>
 
         {/* Card 3: Live Checked-in */}
-        <div 
+        <div
           onClick={() => onNavigateTab('verify-attendees')}
           className="group cursor-pointer bg-white hover:bg-emerald-50/40 border border-slate-200/90 hover:border-emerald-300 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all duration-200"
         >
@@ -599,7 +301,7 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees }: D
           </div>
           <div className="mt-3 pt-3 border-t border-slate-100">
             <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-              <div 
+              <div
                 className="h-full bg-[#4ade80] rounded-full transition-all duration-700"
                 style={{ width: `${checkInRate}%` }}
               ></div>
@@ -608,7 +310,7 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees }: D
         </div>
 
         {/* Card 4: Revenue & Slips */}
-        <div 
+        <div
           onClick={() => onNavigateTab('verify-slip')}
           className="group cursor-pointer bg-white hover:bg-amber-50/40 border border-slate-200/90 hover:border-amber-300 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all duration-200"
         >
@@ -671,11 +373,10 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees }: D
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-3.5 overflow-hidden p-0.5 border border-slate-200/80">
                     <div
-                      className={`h-full rounded-full transition-all duration-700 ${
-                        slot.highlight
+                      className={`h-full rounded-full transition-all duration-700 ${slot.highlight
                           ? 'bg-gradient-to-r from-[#0026b3] via-emerald-500 to-[#4ade80]'
                           : 'bg-[#0026b3]'
-                      }`}
+                        }`}
                       style={{ width: slot.percent }}
                     ></div>
                   </div>
@@ -718,13 +419,12 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees }: D
                 >
                   <div className="space-y-1.5 min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
-                        m.status === 'ongoing'
+                      <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${m.status === 'ongoing'
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                           : m.status === 'upcoming'
-                          ? 'bg-amber-50 text-amber-700 border-amber-200'
-                          : 'bg-slate-100 text-slate-700 border-slate-200'
-                      }`}>
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-slate-100 text-slate-700 border-slate-200'
+                        }`}>
                         {m.status === 'ongoing' ? '● กำลังจัดประชุม' : m.status === 'upcoming' ? 'เร็วๆ นี้' : 'เสร็จสิ้น'}
                       </span>
                       <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
@@ -791,7 +491,7 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees }: D
             </h3>
 
             <div className="space-y-3">
-              <div 
+              <div
                 onClick={() => onNavigateTab('verify-slip')}
                 className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/80 hover:bg-amber-100/70 transition cursor-pointer flex items-center justify-between"
               >
@@ -807,7 +507,7 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees }: D
                 <ChevronRight className="w-4 h-4 text-amber-800" />
               </div>
 
-              <div 
+              <div
                 onClick={() => onNavigateTab('verify-attendees')}
                 className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200/80 hover:bg-blue-100/70 transition cursor-pointer flex items-center justify-between"
               >
@@ -1085,44 +785,40 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
               <button
                 type="button"
                 onClick={() => setFilterType('all')}
-                className={`px-3 py-1.5 rounded-lg transition ${
-                  filterType === 'all'
+                className={`px-3 py-1.5 rounded-lg transition ${filterType === 'all'
                     ? 'bg-[#0026b3] text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
-                }`}
+                  }`}
               >
                 ทุกรูปแบบ
               </button>
               <button
                 type="button"
                 onClick={() => setFilterType('hybrid')}
-                className={`px-3 py-1.5 rounded-lg transition ${
-                  filterType === 'hybrid'
+                className={`px-3 py-1.5 rounded-lg transition ${filterType === 'hybrid'
                     ? 'bg-[#0026b3] text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
-                }`}
+                  }`}
               >
                 Hybrid
               </button>
               <button
                 type="button"
                 onClick={() => setFilterType('onsite')}
-                className={`px-3 py-1.5 rounded-lg transition ${
-                  filterType === 'onsite'
+                className={`px-3 py-1.5 rounded-lg transition ${filterType === 'onsite'
                     ? 'bg-[#0026b3] text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
-                }`}
+                  }`}
               >
                 Onsite
               </button>
               <button
                 type="button"
                 onClick={() => setFilterType('online')}
-                className={`px-3 py-1.5 rounded-lg transition ${
-                  filterType === 'online'
+                className={`px-3 py-1.5 rounded-lg transition ${filterType === 'online'
                     ? 'bg-[#0026b3] text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
-                }`}
+                  }`}
               >
                 Online
               </button>
@@ -1174,19 +870,17 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
             <button
               type="button"
               onClick={() => setSelectedMeetingId('all')}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap flex items-center gap-2 shrink-0 ${
-                selectedMeetingId === 'all'
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap flex items-center gap-2 shrink-0 ${selectedMeetingId === 'all'
                   ? 'bg-[#0026b3] text-white shadow-md shadow-[#0026b3]/25'
                   : 'bg-slate-100 text-slate-700 hover:bg-blue-50/70 hover:text-[#0026b3]'
-              }`}
+                }`}
             >
               <Layers className="w-4 h-4" />
               <span>รวมทุกรอบที่กรอง (Grand Total)</span>
-              <span className={`text-[11px] px-2 py-0.5 rounded-full ${
-                selectedMeetingId === 'all'
+              <span className={`text-[11px] px-2 py-0.5 rounded-full ${selectedMeetingId === 'all'
                   ? 'bg-[#4ade80] text-slate-950 font-black'
                   : 'bg-blue-50 text-[#0026b3] font-bold'
-              }`}>
+                }`}>
                 ฿{(grandTotalRevenue / 1000000).toFixed(2)}M
               </span>
             </button>
@@ -1197,19 +891,17 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                 key={m.id}
                 type="button"
                 onClick={() => setSelectedMeetingId(m.id)}
-                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap flex items-center gap-2 shrink-0 ${
-                  selectedMeetingId === m.id
+                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap flex items-center gap-2 shrink-0 ${selectedMeetingId === m.id
                     ? 'bg-[#0026b3] text-white shadow-md shadow-[#0026b3]/25'
                     : 'bg-slate-100 text-slate-700 hover:bg-blue-50/70 hover:text-[#0026b3]'
-                }`}
+                  }`}
               >
                 <CalendarDays className="w-4 h-4" />
                 <span className="truncate max-w-[220px]">{m.titleTh}</span>
-                <span className={`text-[11px] px-2 py-0.5 rounded-full ${
-                  selectedMeetingId === m.id
+                <span className={`text-[11px] px-2 py-0.5 rounded-full ${selectedMeetingId === m.id
                     ? 'bg-[#4ade80] text-slate-950 font-black'
                     : 'bg-slate-200 text-slate-700 font-bold'
-                }`}>
+                  }`}>
                   ฿{(m.revenue / 1000).toFixed(0)}k
                 </span>
               </button>
@@ -1323,33 +1015,30 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
           <div className="flex items-center gap-1 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
             <button
               onClick={() => setActiveChartTab('layered')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                activeChartTab === 'layered'
+              className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${activeChartTab === 'layered'
                   ? 'bg-white text-[#0026b3] shadow-xs border border-slate-200/80 font-black'
                   : 'text-slate-600 hover:text-slate-900'
-              }`}
+                }`}
             >
               <TrendingUp className="w-4 h-4 text-[#0026b3]" />
               <span>กราฟแยกตามแต่ละรอบ</span>
             </button>
             <button
               onClick={() => setActiveChartTab('comparison')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                activeChartTab === 'comparison'
+              className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${activeChartTab === 'comparison'
                   ? 'bg-white text-[#0026b3] shadow-xs border border-slate-200/80 font-black'
                   : 'text-slate-600 hover:text-slate-900'
-              }`}
+                }`}
             >
               <Users className="w-4 h-4 text-[#0026b3]" />
               <span>เปรียบเทียบจำนวนคน</span>
             </button>
             <button
               onClick={() => setActiveChartTab('donut')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                activeChartTab === 'donut'
+              className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${activeChartTab === 'donut'
                   ? 'bg-white text-[#0026b3] shadow-xs border border-slate-200/80 font-black'
                   : 'text-slate-600 hover:text-slate-900'
-              }`}
+                }`}
             >
               <PieChart className="w-4 h-4 text-[#0026b3]" />
               <span>สัดส่วนบัตร</span>
@@ -1364,11 +1053,10 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
             <div className="flex items-center gap-6 flex-wrap px-2">
               <div
                 onClick={() => setSelectedMeetingId(selectedMeetingId === 'MTG-2026-001' ? 'all' : 'MTG-2026-001')}
-                className={`flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer transition ${
-                  selectedMeetingId === 'MTG-2026-001' || selectedMeetingId === 'all'
+                className={`flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer transition ${selectedMeetingId === 'MTG-2026-001' || selectedMeetingId === 'all'
                     ? 'text-slate-800'
                     : 'text-slate-400 opacity-60'
-                }`}
+                  }`}
               >
                 <span className="w-4 h-4 rounded-sm bg-[#0026b3] shrink-0 shadow-xs" />
                 <span>THAISRM Congress 2026 (สีหลัก Primary)</span>
@@ -1376,11 +1064,10 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
 
               <div
                 onClick={() => setSelectedMeetingId(selectedMeetingId === 'MTG-2026-002' ? 'all' : 'MTG-2026-002')}
-                className={`flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer transition ${
-                  selectedMeetingId === 'MTG-2026-002' || selectedMeetingId === 'all'
+                className={`flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer transition ${selectedMeetingId === 'MTG-2026-002' || selectedMeetingId === 'all'
                     ? 'text-slate-800'
                     : 'text-slate-400 opacity-60'
-                }`}
+                  }`}
               >
                 <span className="w-4 h-4 rounded-sm bg-[#16a34a] shrink-0 shadow-xs" />
                 <span>Hands-on Workshop (สี Accent Green)</span>
@@ -1388,11 +1075,10 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
 
               <div
                 onClick={() => setSelectedMeetingId(selectedMeetingId === 'MTG-2026-003' ? 'all' : 'MTG-2026-003')}
-                className={`flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer transition ${
-                  selectedMeetingId === 'MTG-2026-003' || selectedMeetingId === 'all'
+                className={`flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer transition ${selectedMeetingId === 'MTG-2026-003' || selectedMeetingId === 'all'
                     ? 'text-slate-800'
                     : 'text-slate-400 opacity-60'
-                }`}
+                  }`}
               >
                 <span className="w-4 h-4 rounded-sm bg-[#0284c7] shrink-0 shadow-xs" />
                 <span>Extraordinary Meeting (Sky Blue)</span>
@@ -1587,9 +1273,8 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                   {timeLabels.map((lbl, idx) => (
                     <span
                       key={idx}
-                      className={`text-center transition ${
-                        hoveredPointIdx === idx ? 'text-[#0026b3] font-extrabold scale-110' : ''
-                      }`}
+                      className={`text-center transition ${hoveredPointIdx === idx ? 'text-[#0026b3] font-extrabold scale-110' : ''
+                        }`}
                     >
                       {lbl}
                     </span>
@@ -1660,20 +1345,18 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                     return (
                       <div
                         key={m.id}
-                        className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:px-4 rounded-xl transition border gap-3 ${
-                          selectedMeetingId === m.id
+                        className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:px-4 rounded-xl transition border gap-3 ${selectedMeetingId === m.id
                             ? 'bg-blue-50/70 border-[#0026b3]/40 ring-1 ring-[#0026b3]/20'
                             : 'bg-slate-50/70 hover:bg-blue-50/40 border-slate-200/70'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                            isHybrid
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isHybrid
                               ? 'bg-blue-100/80 text-[#0026b3]'
                               : isOnsite
-                              ? 'bg-emerald-100/80 text-[#16a34a]'
-                              : 'bg-sky-100/80 text-[#0284c7]'
-                          }`}>
+                                ? 'bg-emerald-100/80 text-[#16a34a]'
+                                : 'bg-sky-100/80 text-[#0284c7]'
+                            }`}>
                             {isHybrid ? <Sparkles className="w-4.5 h-4.5" /> : isOnsite ? <Award className="w-4.5 h-4.5" /> : <CalendarDays className="w-4.5 h-4.5" />}
                           </div>
                           <div className="min-w-0">
@@ -1681,13 +1364,12 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                               {m.titleTh}
                             </div>
                             <div className="text-xs text-slate-500 flex flex-wrap items-center gap-2 mt-0.5">
-                              <span className={`px-2 py-0.5 rounded-md font-semibold text-[11px] ${
-                                isHybrid
+                              <span className={`px-2 py-0.5 rounded-md font-semibold text-[11px] ${isHybrid
                                   ? 'bg-blue-100 text-[#0026b3]'
                                   : isOnsite
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-sky-100 text-sky-800'
-                              }`}>
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-sky-100 text-sky-800'
+                                }`}>
                                 {isHybrid ? 'Hybrid' : isOnsite ? 'Onsite Workshop' : 'Online Webinar'}
                               </span>
                               <span>ลงทะเบียน {m.registered.toLocaleString()} ที่นั่ง {m.maxSeats ? `(${Math.round((m.registered / m.maxSeats) * 100)}%)` : ''}</span>
@@ -1922,11 +1604,10 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                         key={tier.name}
                         onMouseEnter={() => setHoveredTier(tier.name)}
                         onMouseLeave={() => setHoveredTier(null)}
-                        className={`p-3.5 rounded-xl border transition cursor-pointer flex items-center justify-between ${
-                          isHovered
+                        className={`p-3.5 rounded-xl border transition cursor-pointer flex items-center justify-between ${isHovered
                             ? 'bg-blue-50/50 border-[#0026b3]/30 ring-1 ring-[#0026b3]/30'
                             : 'bg-white border-slate-200 hover:bg-slate-50'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <span
@@ -1961,6 +1642,89 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
   );
 }
 
+// --- Helper to parse event date range into selectable day choices ---
+interface EventDayChoice {
+  id: string;
+  label: string;
+  value: string;
+  dayNum?: number;
+  monthYear?: string;
+}
+
+function getEventDayChoices(dateStr: string): EventDayChoice[] {
+  if (!dateStr || !dateStr.trim()) return [];
+  const trimmed = dateStr.trim();
+
+  // Pattern 1: Same month range e.g. "25-28 ก.ย. 2569" or "25 - 28 กันยายน 2569"
+  const sameMonthMatch = trimmed.match(/^(\d{1,2})\s*[-–—]\s*(\d{1,2})\s+(.*)$/);
+  if (sameMonthMatch) {
+    const start = parseInt(sameMonthMatch[1], 10);
+    const end = parseInt(sameMonthMatch[2], 10);
+    const monthYear = sameMonthMatch[3]?.trim() || '';
+
+    if (start && end && start <= end && end - start <= 30) {
+      const choices: EventDayChoice[] = [
+        {
+          id: 'all',
+          label: `ทุกวัน (${start}-${end})`,
+          value: trimmed,
+        },
+      ];
+      for (let d = start; d <= end; d++) {
+        choices.push({
+          id: `d-${d}`,
+          label: `วันที่ ${d}`,
+          value: monthYear ? `${d} ${monthYear}` : `วันที่ ${d}`,
+          dayNum: d,
+          monthYear: monthYear,
+        });
+      }
+      return choices;
+    }
+  }
+
+  // Pattern 2: Cross month range e.g. "28 ก.ย. - 2 ต.ค. 2569" or "28 ก.ย. 2569 - 2 ต.ค. 2569"
+  const crossMonthMatch = trimmed.match(/^(\d{1,2})\s+([^\d-]+?)(?:\s+(\d{4}))?\s*[-–—]\s*(\d{1,2})\s+([^\d-]+?)\s+(\d{4})$/);
+  if (crossMonthMatch) {
+    const d1 = parseInt(crossMonthMatch[1], 10);
+    const m1 = crossMonthMatch[2].trim();
+    const y1 = crossMonthMatch[3]?.trim() || crossMonthMatch[6].trim();
+    const d2 = parseInt(crossMonthMatch[4], 10);
+    const m2 = crossMonthMatch[5].trim();
+    const y2 = crossMonthMatch[6].trim();
+
+    return [
+      { id: 'all', label: `ทุกวัน (${d1} ${m1} - ${d2} ${m2})`, value: trimmed },
+      { id: 'd-1', label: `${d1} ${m1}`, value: `${d1} ${m1} ${y1}`, dayNum: d1, monthYear: `${m1} ${y1}` },
+      { id: 'd-2', label: `${d2} ${m2}`, value: `${d2} ${m2} ${y2}`, dayNum: d2, monthYear: `${m2} ${y2}` },
+    ];
+  }
+
+  // Pattern 3: Single date e.g. "25 ก.ย. 2569"
+  const singleMatch = trimmed.match(/^(\d{1,2})\s*(.*)$/);
+  if (singleMatch) {
+    const d = parseInt(singleMatch[1], 10);
+    const my = singleMatch[2]?.trim() || '';
+    return [
+      {
+        id: `d-${d}`,
+        label: `วันที่ ${d}`,
+        value: trimmed,
+        dayNum: d,
+        monthYear: my,
+      },
+    ];
+  }
+
+  return [
+    {
+      id: 'custom',
+      label: trimmed,
+      value: trimmed,
+    },
+  ];
+}
+
 function AddMeetingPanel({
   onMeetingCreated,
   onNavigateTab,
@@ -1970,56 +1734,199 @@ function AddMeetingPanel({
 }) {
   const generateRandomPin = () => Math.floor(100000 + Math.random() * 900000).toString();
 
+  // --- Activity / Program Item Type ---
+  interface ActivityItem {
+    id: string;
+    type: 'main' | 'workshop';
+    name: string;
+    date: string;
+    selectedDays?: string[];
+    maxSeats?: number;
+  }
+
+  const createEmptyActivity = (type: 'main' | 'workshop'): ActivityItem => ({
+    id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    type,
+    name: '',
+    date: '',
+    selectedDays: [],
+    maxSeats: type === 'workshop' ? 50 : 0,
+  });
+
   const [formData, setFormData] = useState({
-    titleTh: '',
-    titleEn: '',
-    date: '20-22 ม.ค. 2570',
-    time: '18:00 - 20:30 น.',
+    title: '',
+    date: '',
+    time: '',
     location: '',
-    type: 'hybrid' as 'hybrid' | 'onsite' | 'online',
+    type: 'onsite' as 'onsite' | 'online',
     staffCode: generateRandomPin(),
-    maxSeats: 500,
-    basePrice: 3500,
+    basePrice: 0,
     description: '',
   });
+
+  const [activities, setActivities] = useState<ActivityItem[]>([
+    createEmptyActivity('main'),
+  ]);
+
+  const [pricing, setPricing] = useState<MeetingPricingTiers>(DEFAULT_PRICING_TIERS);
 
   const [isSaved, setIsSaved] = useState(false);
   const [lastCreatedId, setLastCreatedId] = useState<string>('');
 
+  // Extract day choices dynamically based on the event date range
+  const dayChoices = useMemo(() => getEventDayChoices(formData.date), [formData.date]);
+
+  // --- Activity Handlers ---
+  const handleAddActivity = (type: 'main' | 'workshop') => {
+    setActivities((prev) => [...prev, createEmptyActivity(type)]);
+  };
+
+  const handleRemoveActivity = (id: string) => {
+    setActivities((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const handleUpdateActivity = (id: string, field: keyof ActivityItem, value: string | number) => {
+    setActivities((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, [field]: value } : a))
+    );
+  };
+
+  const handleToggleActivityDay = (activityId: string, choiceId: string) => {
+    setActivities((prev) =>
+      prev.map((act) => {
+        if (act.id !== activityId) return act;
+
+        const individualChoices = dayChoices.filter((c) => c.id !== 'all');
+        const individualIds = individualChoices.map((c) => c.id);
+
+        let currentSelected = act.selectedDays || [];
+        if (currentSelected.length === 0 && act.date) {
+          const matchSingle = individualChoices.find((c) => c.value === act.date);
+          if (matchSingle) {
+            currentSelected = [matchSingle.id];
+          } else if (act.date === formData.date) {
+            currentSelected = [...individualIds];
+          }
+        }
+
+        let nextSelected: string[] = [];
+
+        if (choiceId === 'all') {
+          const isAllSelected = individualIds.length > 0 && individualIds.every((id) => currentSelected.includes(id));
+          if (isAllSelected) {
+            nextSelected = [];
+          } else {
+            nextSelected = [...individualIds];
+          }
+        } else {
+          if (currentSelected.includes(choiceId)) {
+            nextSelected = currentSelected.filter((id) => id !== choiceId);
+          } else {
+            nextSelected = [...currentSelected, choiceId];
+          }
+        }
+
+        // Sort by choice order
+        nextSelected.sort((a, b) => {
+          const idxA = individualChoices.findIndex((c) => c.id === a);
+          const idxB = individualChoices.findIndex((c) => c.id === b);
+          return idxA - idxB;
+        });
+
+        // Compute summary date text
+        let formattedDate = '';
+        if (nextSelected.length === 0) {
+          formattedDate = '';
+        } else if (individualIds.length > 0 && nextSelected.length === individualIds.length) {
+          formattedDate = formData.date;
+        } else {
+          const selectedChoices = individualChoices.filter((c) => nextSelected.includes(c.id));
+          const dayNums = selectedChoices.map((c) => c.dayNum).filter((n): n is number => typeof n === 'number');
+          const monthYears = Array.from(new Set(selectedChoices.map((c) => c.monthYear).filter(Boolean)));
+
+          if (dayNums.length === selectedChoices.length && monthYears.length === 1 && monthYears[0]) {
+            formattedDate = `วันที่ ${dayNums.join(', ')} ${monthYears[0]}`;
+          } else {
+            formattedDate = selectedChoices.map((c) => c.value).join(', ');
+          }
+        }
+
+        return {
+          ...act,
+          selectedDays: nextSelected,
+          date: formattedDate,
+        };
+      })
+    );
+  };
+
   const handleResetForm = () => {
     setFormData({
-      titleTh: '',
-      titleEn: '',
+      title: '',
       date: '',
-      time: '08:30 - 17:00 น.',
+      time: '',
       location: '',
-      type: 'hybrid',
+      type: 'onsite',
       staffCode: generateRandomPin(),
-      maxSeats: 500,
-      basePrice: 3500,
+      basePrice: 0,
       description: '',
     });
+    setActivities([createEmptyActivity('main')]);
+    setPricing(DEFAULT_PRICING_TIERS);
     setIsSaved(false);
+  };
+
+  const handleLoadDefaultPricing = () => {
+    setPricing(DEFAULT_PRICING_TIERS);
+  };
+
+  const handleClearPricing = () => {
+    setPricing({
+      programName: '',
+      participant: {
+        onsiteMember: 0,
+        onsiteNonMember: 0,
+        onlineMember: 0,
+      },
+      fellow: {
+        onsiteMember: 0,
+        onsiteNonMember: 0,
+        onlineMemberType: 'paid',
+        onlineMemberText: '',
+        onlineMemberPrice: 0,
+      },
+      changeFee: {
+        label: '',
+        conditionDate: '',
+        onsiteMember: 0,
+        onsiteNonMember: 0,
+        onlineMember: 0,
+      },
+      remark: '',
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.titleTh || !formData.date) {
+    if (!formData.title || !formData.date) {
       alert('กรุณากรอกชื่อการประชุมและระบุวันที่จัดงาน');
       return;
     }
 
     const meetingId = `MTG-2026-${Math.floor(100 + Math.random() * 900)}`;
+    const wsSeats = activities.filter((a) => a.type === 'workshop').reduce((sum, a) => sum + (a.maxSeats || 0), 0);
     const newMeeting: MeetingItem = {
       id: meetingId,
-      titleTh: formData.titleTh,
-      titleEn: formData.titleEn || formData.titleTh,
+      titleTh: formData.title,
+      titleEn: formData.title,
       date: formData.date,
       time: formData.time || '08:30 - 17:00 น.',
       location: formData.location || 'ศูนย์ประชุมสมาคม',
       type: formData.type,
       staffCode: formData.staffCode || generateRandomPin(),
-      maxSeats: Number(formData.maxSeats) || 500,
+      maxSeats: wsSeats || 500,
+      basePrice: pricing.participant.onsiteMember || formData.basePrice,
+      pricingTiers: pricing,
       registered: 0,
       attended: 0,
       revenue: 0,
@@ -2033,15 +1940,9 @@ function AddMeetingPanel({
     setIsSaved(true);
   };
 
-  // Quick Location Suggestions
-  const POPULAR_LOCATIONS = [
-    'โรงแรม Grand Hyatt Erawan Bangkok',
-    'ศูนย์การประชุมแห่งชาติสิริกิติ์ (QSNCC)',
-    'ศูนย์นิทรรศการและการประชุม BITEC บางนา',
-    'BORN IVF Training Center & Laboratory',
-    'ห้องประชุม อาคารภูมิสิริมังคลานุสรณ์ รพ.จุฬาลงกรณ์',
-    'Zoom Webinar Platform (ระบบออนไลน์)',
-  ];
+  // Count activities by type
+  const mainCount = activities.filter((a) => a.type === 'main').length;
+  const workshopCount = activities.filter((a) => a.type === 'workshop').length;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-12">
@@ -2054,7 +1955,7 @@ function AddMeetingPanel({
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">เพิ่มการประชุม / งานประชุมวิชาการ</h1>
           <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            ระบุข้อมูลการประชุม วันเวลา สถานที่จัดงาน พร้อมรหัสผ่าน 6 หลักสำหรับเจ้าหน้าที่
+            ระบุข้อมูลการประชุม กำหนดการ สถานที่ หลักสูตร Main Program / Workshop พร้อมอัตราค่าลงทะเบียน
           </p>
         </div>
 
@@ -2079,7 +1980,7 @@ function AddMeetingPanel({
                 บันทึกและสร้างงานประชุมใหม่เรียบร้อยแล้ว! (รหัส: {lastCreatedId})
               </div>
               <p className="text-xs text-emerald-700 mt-0.5">
-                ข้อมูลได้บันทึกเข้าสู่ระบบ และพร้อมเปิดรับลงทะเบียนทันที
+                ข้อมูลพร้อมตารางค่าลงทะเบียนได้บันทึกเข้าสู่ระบบ และพร้อมเปิดรับลงทะเบียนทันที
               </p>
             </div>
           </div>
@@ -2107,24 +2008,25 @@ function AddMeetingPanel({
       )}
 
       {/* ─── MAIN INPUT FORM ─── */}
-      <form onSubmit={handleSubmit} className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-8 space-y-6 shadow-xs">
-        {/* Section 1: ข้อมูลหลักของการประชุม */}
+      <form onSubmit={handleSubmit} className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-8 space-y-7 shadow-xs">
+        {/* ─── SECTION 1: ข้อมูลและกำหนดการประชุม ─── */}
         <div className="space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
               <Layers className="w-4 h-4 text-[#0026b3]" />
-              1. ข้อมูลและหัวข้อการประชุม
+              1. ข้อมูลและกำหนดการประชุม
             </h3>
             <span className="text-xs text-slate-500">* ข้อมูลจำเป็น</span>
           </div>
 
+          {/* ชื่อการประชุม (รวมชื่อไทย/อังกฤษในช่องเดียว) */}
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
-              <label className="text-sm font-bold text-slate-700">ชื่อการประชุม (ภาษาไทย) *</label>
-              {formData.titleTh && (
+              <label className="text-sm font-bold text-slate-700">ชื่อการประชุม / งานประชุมวิชาการ *</label>
+              {formData.title && (
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, titleTh: '' })}
+                  onClick={() => setFormData({ ...formData, title: '' })}
                   className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   ล้างข้อความ
@@ -2134,161 +2036,18 @@ function AddMeetingPanel({
             <input
               type="text"
               required
-              value={formData.titleTh}
-              onChange={(e) => setFormData({ ...formData, titleTh: e.target.value })}
-              placeholder="เช่น การประชุมวิชาการประจำปี THAISRM Congress 2026"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              placeholder="เช่น การประชุมวิชาการประจำปี THAISRM Annual Scientific Congress 2026"
               className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition shadow-2xs"
             />
           </div>
 
-          <div className="space-y-1.5">
-            <div className="flex justify-between items-center">
-              <label className="text-sm font-bold text-slate-700">ชื่อการประชุม (English)</label>
-              {formData.titleTh && !formData.titleEn && (
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, titleEn: formData.titleTh })}
-                  className="text-xs font-bold text-[#0026b3] hover:text-[#001f94] cursor-pointer"
-                >
-                  + ใช้ชื่อเดียวกับภาษาไทย
-                </button>
-              )}
-            </div>
-            <input
-              type="text"
-              value={formData.titleEn}
-              onChange={(e) => setFormData({ ...formData, titleEn: e.target.value })}
-              placeholder="e.g. THAISRM Annual Scientific Congress 2026"
-              className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition shadow-2xs"
-            />
-          </div>
-
-          {/* รูปแบบการจัดงาน (Interactive Selector) */}
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">รูปแบบการจัดงาน</label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
-              {[
-                { id: 'hybrid', label: 'Hybrid (Onsite + Online)', desc: 'เข้างานจริง & ถ่ายทอดสด' },
-                { id: 'onsite', label: 'Onsite เท่านั้น', desc: 'เข้าร่วม ณ สถานที่จัดงาน' },
-                { id: 'online', label: 'Online Webinar', desc: 'รับชมผ่าน Zoom Live' },
-              ].map((t) => (
-                <button
-                  type="button"
-                  key={t.id}
-                  onClick={() => setFormData({ ...formData, type: t.id as any })}
-                  className={`p-3 rounded-xl text-left transition border cursor-pointer ${
-                    formData.type === t.id
-                      ? 'bg-blue-50 text-[#0026b3] border-[#0026b3]/50 ring-2 ring-[#0026b3]/20 shadow-xs'
-                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="text-xs sm:text-sm font-bold">{t.label}</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">{t.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* จำนวนที่นั่งและอัตราค่าลงทะเบียน */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* กำหนดการจัดงาน: วันที่จัดงาน & เวลาจัดงาน */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-700">จำนวนที่นั่งรองรับสูงสุด (คน) *</label>
-              <input
-                type="number"
-                required
-                min={1}
-                value={formData.maxSeats}
-                onChange={(e) => setFormData({ ...formData, maxSeats: parseInt(e.target.value) || 0 })}
-                placeholder="เช่น 500"
-                className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition shadow-2xs"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-700">ค่าลงทะเบียนเริ่มต้น (บาท) *</label>
-              <input
-                type="number"
-                required
-                min={0}
-                value={formData.basePrice}
-                onChange={(e) => setFormData({ ...formData, basePrice: parseInt(e.target.value) || 0 })}
-                placeholder="เช่น 3500"
-                className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition shadow-2xs"
-              />
-            </div>
-          </div>
-
-          {/* รหัสเจ้าหน้าที่ (Staff Passcode 6 หลัก) พร้อมปุ่มสุ่ม */}
-          <div className="bg-amber-50/50 border border-amber-200/80 rounded-2xl p-4.5 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-              <label className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
-                <KeyRound className="w-4 h-4 text-amber-600" />
-                <span>รหัสเจ้าหน้าที่ประจำจุดลงทะเบียน (Staff PIN 6 หลัก) *</span>
-              </label>
-              <span className="text-xs text-amber-800 font-medium bg-amber-100/70 px-2 py-0.5 rounded-full">
-                สำหรับสตาฟใช้เข้าสู่ระบบสแกน QR หน้างาน
-              </span>
-            </div>
-
-            <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
-              <div className="relative w-44">
-                <input
-                  type="text"
-                  required
-                  maxLength={6}
-                  value={formData.staffCode}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-                    setFormData({ ...formData, staffCode: val });
-                  }}
-                  placeholder="000000"
-                  className="w-full bg-white border border-amber-300 rounded-xl px-4 py-2.5 text-center text-xl font-mono font-extrabold tracking-[0.35em] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/30 focus:border-[#0026b3] transition shadow-2xs"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, staffCode: generateRandomPin() })}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm transition cursor-pointer active:scale-95 shadow-2xs"
-                title="กดเพื่อสุ่มรหัสตัวเลข 6 หลักใหม่"
-              >
-                <Dices className="w-4 h-4 text-white" />
-                <span>สุ่มตัวเลข 6 หลัก</span>
-              </button>
-            </div>
-
-            <p className="text-[11px] text-slate-500">
-              💡 เจ้าหน้าที่ (Staff) หน้างานสามารถใช้รหัส 6 หลักนี้เพื่อยืนยันตัวตนก่อนเปิดกล้องสแกน QR Code เช็คชื่อผู้เข้าร่วมงาน
-            </p>
-          </div>
-        </div>
-
-        {/* Section 2: กำหนดการและสถานที่จัดงาน */}
-        <div className="space-y-5 pt-4 border-t border-slate-100">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              <CalendarDays className="w-4 h-4 text-[#0026b3]" />
-              2. กำหนดการและสถานที่จัดงาน
-            </h3>
-            {formData.date && (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-[#0026b3] border border-blue-200 text-xs font-bold">
-                <Calendar className="w-3.5 h-3.5" />
-                <span>{formData.date}</span>
-                {formData.time && (
-                  <>
-                    <span className="text-slate-400">•</span>
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>{formData.time}</span>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* วันที่จัดงาน (Calendar Range Picker) * */}
-            <div className="space-y-2">
               <label className="text-sm font-bold text-slate-700">
-                วันที่จัดงาน (เลือกช่วงวันที่จากปฏิทิน) *
+                วันที่จัดงานรวม (เลือกช่วงวันที่) *
               </label>
               <ThaiDateRangePicker
                 value={formData.date}
@@ -2298,8 +2057,7 @@ function AddMeetingPanel({
               />
             </div>
 
-            {/* เวลาจัดงาน (Time Range Picker) */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-700">
                 เวลาจัดงาน (เลือกช่วงเวลา)
               </label>
@@ -2311,56 +2069,723 @@ function AddMeetingPanel({
             </div>
           </div>
 
-          {/* สถานที่จัดงาน พร้อมปุ่มลัดสถานที่ยอดนิยม */}
+          {/* รูปแบบการจัดงาน (Onsite / Online) */}
           <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700">รูปแบบการจัดงาน (Attendance Format)</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, type: 'onsite' })}
+                className={`flex items-center justify-center gap-2.5 p-3.5 rounded-xl transition border-2 cursor-pointer ${
+                  formData.type === 'onsite'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-400 ring-2 ring-emerald-200 shadow-sm'
+                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                }`}
+              >
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
+                  formData.type === 'onsite' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'
+                }`}>
+                  <MapPin className="w-3.5 h-3.5" />
+                </div>
+                <div className="text-left">
+                  <div className="text-sm font-extrabold">Onsite (ที่งาน)</div>
+                  <div className="text-[11px] text-slate-500">เข้าร่วม ณ สถานที่จัดงาน</div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, type: 'online' })}
+                className={`flex items-center justify-center gap-2.5 p-3.5 rounded-xl transition border-2 cursor-pointer ${
+                  formData.type === 'online'
+                    ? 'bg-blue-50 text-[#0026b3] border-[#0026b3]/50 ring-2 ring-blue-200 shadow-sm'
+                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                }`}
+              >
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
+                  formData.type === 'online' ? 'bg-[#0026b3] text-white' : 'bg-slate-200 text-slate-500'
+                }`}>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </div>
+                <div className="text-left">
+                  <div className="text-sm font-extrabold">Online (ออนไลน์)</div>
+                  <div className="text-[11px] text-slate-500">รับชมผ่านระบบออนไลน์</div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* สถานที่จัดงาน (Text Input สะอาดตา ไม่มีตัวเลือกปุ่มลัด) */}
+          <div className="space-y-1.5">
             <label className="text-sm font-bold text-slate-700">สถานที่จัดงาน / ลิงก์ระบบ Zoom</label>
             <input
               type="text"
               value={formData.location}
               onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              placeholder="เช่น ห้องแกรนด์บอลรูม โรงแรม Grand Hyatt Erawan Bangkok"
-              className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition shadow-2xs"
+              placeholder="เช่น ห้องแกรนด์บอลรูม โรงแรม Grand Hyatt Erawan Bangkok หรือ Zoom Webinar"
+              className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition shadow-2xs"
             />
-            {/* Quick Location Chips */}
-            <div className="space-y-1.5 pt-1">
-              <div className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                <span>คลิกเพื่อเลือกสถานที่ยอดนิยม (ไม่ต้องพิมพ์):</span>
+          </div>
+
+          {/* รหัสเจ้าหน้าที่ (Staff PIN 6 หลัก) พร้อมปุ่มสุ่ม */}
+          <div className="bg-amber-50/50 border border-amber-200/80 rounded-2xl p-4 space-y-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <label className="text-xs sm:text-sm font-extrabold text-slate-800 flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-amber-600" />
+                <span>รหัสเจ้าหน้าที่ประจำจุดลงทะเบียน (Staff PIN 6 หลัก) *</span>
+              </label>
+              <span className="text-[11px] text-amber-800 font-medium bg-amber-100/70 px-2 py-0.5 rounded-full">
+                สำหรับสตาฟใช้สแกน QR หน้างาน
+              </span>
+            </div>
+
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
+              <div className="relative w-40">
+                <input
+                  type="text"
+                  required
+                  maxLength={6}
+                  value={formData.staffCode}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                    setFormData({ ...formData, staffCode: val });
+                  }}
+                  placeholder="000000"
+                  className="w-full bg-white border border-amber-300 rounded-xl px-4 py-2 text-center text-lg font-mono font-extrabold tracking-[0.35em] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/30 focus:border-[#0026b3] transition shadow-2xs"
+                />
               </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {POPULAR_LOCATIONS.map((loc) => (
-                  <button
-                    key={loc}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, location: loc })}
-                    className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition cursor-pointer ${
-                      formData.location === loc
-                        ? 'bg-blue-100 text-[#0026b3] border-blue-300'
-                        : 'bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-[#0026b3] border-slate-200'
-                    }`}
-                  >
-                    {loc.split('(')[0]}
-                  </button>
-                ))}
-              </div>
+
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, staffCode: generateRandomPin() })}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition cursor-pointer active:scale-95 shadow-2xs"
+                title="กดเพื่อสุ่มรหัสตัวเลข 6 หลักใหม่"
+              >
+                <Dices className="w-3.5 h-3.5 text-white" />
+                <span>สุ่มตัวเลข 6 หลัก</span>
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Section 3: ระเบียบวาระและหัวข้อบรรยาย */}
+        {/* ─── SECTION 2: หลักสูตร / กิจกรรมที่จะเปิด (Programs & Workshops) ─── */}
+        <div className="space-y-3.5 pt-4 border-t border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <Award className="w-4 h-4 text-[#0026b3]" />
+                2. หลักสูตร / กิจกรรมที่จะเปิด
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                เลือกวันที่จัดกิจกรรม (เลือกได้มากกว่า 1 วัน) และระบุจำนวนที่นั่งสำหรับ Workshop
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 self-start sm:self-auto">
+              {mainCount > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px]">
+                  <CircleDot className="w-2.5 h-2.5" />
+                  Main {mainCount}
+                </span>
+              )}
+              {workshopCount > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 border border-violet-200 text-[11px]">
+                  <CircleDot className="w-2.5 h-2.5" />
+                  Workshop {workshopCount}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 text-[11px]">
+                รวม {activities.length} รายการ
+              </span>
+            </div>
+          </div>
+
+          {/* Compact Activity Item List */}
+          <div className="space-y-3">
+            {activities.map((activity, index) => {
+              const isMain = activity.type === 'main';
+              const borderColor = isMain ? 'border-indigo-200 hover:border-indigo-300' : 'border-violet-200 hover:border-violet-300';
+              const headerBg = isMain ? 'bg-indigo-50/70' : 'bg-violet-50/70';
+              const badgeBg = isMain ? 'bg-indigo-600' : 'bg-violet-600';
+              const typeLabel = isMain ? 'Main Program' : 'Workshop';
+              const typeIcon = isMain ? '📋' : '🔬';
+              const typeIndex = activities.filter((a, i) => a.type === activity.type && i <= index).length;
+
+              const individualChoices = dayChoices.filter((c) => c.id !== 'all');
+              const individualIds = individualChoices.map((c) => c.id);
+              const selectedList = activity.selectedDays && activity.selectedDays.length > 0
+                ? activity.selectedDays
+                : (activity.date === formData.date ? individualIds : (individualChoices.filter(c => c.value === activity.date).map(c => c.id)));
+
+              const isAllSelected = individualIds.length > 0 && individualIds.every((id) => selectedList.includes(id));
+
+              return (
+                <div
+                  key={activity.id}
+                  className={`border ${borderColor} rounded-xl overflow-hidden bg-white shadow-2xs transition-all`}
+                >
+                  {/* Compact Header Bar */}
+                  <div className={`${headerBg} px-3.5 py-2 flex items-center justify-between gap-2 border-b ${isMain ? 'border-indigo-100' : 'border-violet-100'}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`${badgeBg} text-white text-[11px] font-extrabold px-2 py-0.5 rounded-md shadow-2xs shrink-0`}>
+                        {typeIcon} {typeLabel} {typeIndex > 1 || !isMain ? typeIndex : ''}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-600 truncate">
+                        รายการที่ {index + 1}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Delete Button */}
+                      {activities.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveActivity(activity.id)}
+                          className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                          title="ลบรายการนี้"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Compact Body Fields */}
+                  <div className="p-3 sm:p-3.5 space-y-2.5">
+                    {/* Activity Name */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">
+                        ชื่อหัวข้อ / หลักสูตร {isMain ? '(Main Program)' : '(Workshop)'} *
+                      </label>
+                      <input
+                        type="text"
+                        value={activity.name}
+                        onChange={(e) => handleUpdateActivity(activity.id, 'name', e.target.value)}
+                        placeholder={isMain ? 'เช่น Main Scientific Program' : 'เช่น ART Nurse Workshop, Embryologist Hands-on'}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition"
+                      />
+                    </div>
+
+                    {/* Date day pills & Workshop seats */}
+                    {isMain ? (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-slate-700">
+                            วันที่จัดกิจกรรม * <span className="text-[11px] font-normal text-slate-500">(เลือกได้มากกว่า 1 วัน)</span>
+                          </label>
+                          {activity.date ? (
+                            <span className="text-[11px] font-bold text-[#0026b3] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 flex items-center gap-1">
+                              <Check className="w-3 h-3 text-[#0026b3]" />
+                              <span>{activity.date}</span>
+                              {selectedList.length > 1 && (
+                                <span className="bg-[#0026b3] text-white text-[10px] px-1.5 py-0.2 rounded-full">
+                                  {selectedList.length} วัน
+                                </span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-400">ยังไม่ได้เลือกวัน</span>
+                          )}
+                        </div>
+
+                        {dayChoices.length > 0 ? (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {dayChoices.map((choice) => {
+                              const isChoiceSelected = choice.id === 'all' ? isAllSelected : selectedList.includes(choice.id);
+                              return (
+                                <button
+                                  key={choice.id}
+                                  type="button"
+                                  onClick={() => handleToggleActivityDay(activity.id, choice.id)}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 border select-none ${
+                                    isChoiceSelected
+                                      ? 'bg-[#0026b3] text-white border-[#0026b3] shadow-xs ring-1 ring-blue-300'
+                                      : 'bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-[#0026b3] border-slate-200 hover:border-blue-200'
+                                  }`}
+                                >
+                                  <Calendar className="w-3 h-3" />
+                                  <span>{choice.label}</span>
+                                  {isChoiceSelected && <Check className="w-3 h-3 ml-0.5 text-[#4ade80]" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="p-2 rounded-lg bg-amber-50/80 border border-amber-200 text-amber-800 text-[11px] flex items-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            <span>กรุณาเลือกวันที่จัดงานรวมในส่วนที่ 1 ก่อน เพื่อแสดงตัวเลือกวันที่</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-start">
+                        <div className="sm:col-span-8 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold text-slate-700">
+                              วันที่จัดกิจกรรม * <span className="text-[11px] font-normal text-slate-500">(เลือกได้มากกว่า 1 วัน)</span>
+                            </label>
+                            {activity.date ? (
+                              <span className="text-[11px] font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-md border border-violet-100 flex items-center gap-1">
+                                <Check className="w-3 h-3 text-violet-700" />
+                                <span>{activity.date}</span>
+                                {selectedList.length > 1 && (
+                                  <span className="bg-violet-600 text-white text-[10px] px-1.5 py-0.2 rounded-full">
+                                    {selectedList.length} วัน
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-slate-400">ยังไม่ได้เลือกวัน</span>
+                            )}
+                          </div>
+
+                          {dayChoices.length > 0 ? (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {dayChoices.map((choice) => {
+                                const isChoiceSelected = choice.id === 'all' ? isAllSelected : selectedList.includes(choice.id);
+                                return (
+                                  <button
+                                    key={choice.id}
+                                    type="button"
+                                    onClick={() => handleToggleActivityDay(activity.id, choice.id)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 border select-none ${
+                                      isChoiceSelected
+                                        ? 'bg-violet-600 text-white border-violet-600 shadow-xs ring-1 ring-violet-300'
+                                        : 'bg-slate-50 hover:bg-violet-50 text-slate-700 hover:text-violet-700 border-slate-200 hover:border-violet-200'
+                                    }`}
+                                  >
+                                    <Calendar className="w-3 h-3" />
+                                    <span>{choice.label}</span>
+                                    {isChoiceSelected && <Check className="w-3 h-3 ml-0.5 text-[#4ade80]" />}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="p-2 rounded-lg bg-amber-50/80 border border-amber-200 text-amber-800 text-[11px] flex items-center gap-1.5">
+                              <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              <span>กรุณาเลือกวันที่จัดงานรวมในส่วนที่ 1 ก่อน</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="sm:col-span-4 space-y-1.5">
+                          <label className="text-xs font-bold text-slate-700">จำนวนที่นั่ง (คน) *</label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={activity.maxSeats || ''}
+                            onChange={(e) => handleUpdateActivity(activity.id, 'maxSeats', parseInt(e.target.value) || 0)}
+                            placeholder="เช่น 50"
+                            className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Compact Add Buttons */}
+          <div className="flex items-center gap-2.5 pt-1">
+            <button
+              type="button"
+              onClick={() => handleAddActivity('main')}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-dashed border-indigo-300 bg-indigo-50/40 hover:bg-indigo-100/60 text-indigo-700 font-bold text-xs sm:text-sm transition cursor-pointer hover:border-indigo-400 active:scale-[0.98]"
+            >
+              <PlusCircle className="w-4 h-4 text-indigo-600" />
+              <span>+ เพิ่ม Main Program</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleAddActivity('workshop')}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-dashed border-violet-300 bg-violet-50/40 hover:bg-violet-100/60 text-violet-700 font-bold text-xs sm:text-sm transition cursor-pointer hover:border-violet-400 active:scale-[0.98]"
+            >
+              <PlusCircle className="w-4 h-4 text-violet-600" />
+              <span>+ เพิ่ม Workshop</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ─── SECTION 3: ระบุเงินและกำหนดอัตราค่าลงทะเบียน (Interactive Pricing Matrix Table) ─── */}
+        <div className="space-y-3.5 pt-4 border-t border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <Coins className="w-4 h-4 text-[#0026b3]" />
+                3. กำหนดอัตราค่าลงทะเบียน (Registration Fee)
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                กรอกตัวเลขราคา (บาท) ลงในตารางได้โดยตรง ระบบจะนำไปคำนวณและแสดงผลในหน้าลงทะเบียน
+              </p>
+            </div>
+
+            <div className="flex items-center gap-1.5 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={handleLoadDefaultPricing}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#0026b3] text-xs font-bold border border-blue-200 transition cursor-pointer"
+                title="โหลดค่าเริ่มต้นมาตรฐาน"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>ใส่ค่ามาตรฐานอัตโนมัติ</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleClearPricing}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-700 text-xs font-medium border border-slate-200 transition cursor-pointer"
+              >
+                ล้างตาราง
+              </button>
+            </div>
+          </div>
+
+          {/* Compact Directly Editable Matrix Table */}
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
+            <table className="w-full text-left border-collapse text-xs sm:text-sm">
+              <thead>
+                {/* Top Group Header */}
+                <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-bold">
+                  <th className="py-2.5 px-3 w-[32%] text-slate-800">ประเภทผู้เข้าร่วม</th>
+                  <th colSpan={2} className="py-2 px-3 text-center border-l border-slate-200 bg-emerald-50/70 text-emerald-900">
+                    Onsite (เข้าร่วม ณ สถานที่)
+                  </th>
+                  <th className="py-2 px-3 text-center border-l border-slate-200 bg-blue-50/70 text-[#0026b3]">
+                    Online (ออนไลน์)
+                  </th>
+                </tr>
+                {/* Sub Header */}
+                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] sm:text-xs text-slate-600 font-bold">
+                  <th className="py-2 px-3">หมวดหมู่ / รายการ</th>
+                  <th className="py-2 px-3 text-center border-l border-slate-200 w-[22%]">
+                    Member<span className="text-rose-500">*</span>
+                  </th>
+                  <th className="py-2 px-3 text-center border-l border-slate-200 w-[22%]">
+                    Non-member
+                  </th>
+                  <th className="py-2 px-3 text-center border-l border-slate-200 w-[24%] text-[#0026b3]">
+                    Member<span className="text-rose-500">*</span>
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-200">
+                {/* Row 1: Participant */}
+                <tr className="hover:bg-slate-50/50 transition">
+                  <td className="py-2.5 px-3 font-extrabold text-slate-900">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                      <span>Participant</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-normal pl-3">ผู้เข้าร่วมทั่วไป / แพทย์</div>
+                  </td>
+                  {/* Onsite Member */}
+                  <td className="py-2 px-2.5 border-l border-slate-200">
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={100}
+                        value={pricing.participant.onsiteMember}
+                        onChange={(e) =>
+                          setPricing({
+                            ...pricing,
+                            participant: {
+                              ...pricing.participant,
+                              onsiteMember: parseInt(e.target.value) || 0,
+                            },
+                          })
+                        }
+                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                      />
+                    </div>
+                  </td>
+                  {/* Onsite Non-member */}
+                  <td className="py-2 px-2.5 border-l border-slate-200">
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={100}
+                        value={pricing.participant.onsiteNonMember}
+                        onChange={(e) =>
+                          setPricing({
+                            ...pricing,
+                            participant: {
+                              ...pricing.participant,
+                              onsiteNonMember: parseInt(e.target.value) || 0,
+                            },
+                          })
+                        }
+                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                      />
+                    </div>
+                  </td>
+                  {/* Online Member */}
+                  <td className="py-2 px-2.5 border-l border-slate-200 bg-blue-50/20">
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={100}
+                        value={pricing.participant.onlineMember}
+                        onChange={(e) =>
+                          setPricing({
+                            ...pricing,
+                            participant: {
+                              ...pricing.participant,
+                              onlineMember: parseInt(e.target.value) || 0,
+                            },
+                          })
+                        }
+                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-[#0026b3] focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                      />
+                    </div>
+                  </td>
+                </tr>
+
+                {/* Row 2: Fellow */}
+                <tr className="hover:bg-slate-50/50 transition">
+                  <td className="py-2.5 px-3 font-extrabold text-slate-900">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
+                      <span>Fellow</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-normal pl-3">แพทย์ประจำบ้านต่อยอด</div>
+                  </td>
+                  {/* Onsite Member */}
+                  <td className="py-2 px-2.5 border-l border-slate-200">
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={100}
+                        value={pricing.fellow.onsiteMember}
+                        onChange={(e) =>
+                          setPricing({
+                            ...pricing,
+                            fellow: {
+                              ...pricing.fellow,
+                              onsiteMember: parseInt(e.target.value) || 0,
+                            },
+                          })
+                        }
+                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                      />
+                    </div>
+                  </td>
+                  {/* Onsite Non-member */}
+                  <td className="py-2 px-2.5 border-l border-slate-200">
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={100}
+                        value={pricing.fellow.onsiteNonMember}
+                        onChange={(e) =>
+                          setPricing({
+                            ...pricing,
+                            fellow: {
+                              ...pricing.fellow,
+                              onsiteNonMember: parseInt(e.target.value) || 0,
+                            },
+                          })
+                        }
+                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                      />
+                    </div>
+                  </td>
+                  {/* Online Member (Free text or custom price) */}
+                  <td className="py-2 px-2.5 border-l border-slate-200 bg-blue-50/20">
+                    <div className="flex items-center gap-1.5">
+                      {pricing.fellow.onlineMemberType === 'free' ? (
+                        <div className="relative flex-1">
+                          <input
+                            type="text"
+                            value={pricing.fellow.onlineMemberText}
+                            onChange={(e) =>
+                              setPricing({
+                                ...pricing,
+                                fellow: {
+                                  ...pricing.fellow,
+                                  onlineMemberText: e.target.value,
+                                },
+                              })
+                            }
+                            placeholder="Free ที่สถาบัน"
+                            className="w-full bg-pink-50/70 hover:bg-white focus:bg-white border border-pink-300 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-bold text-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-300 text-center"
+                          />
+                        </div>
+                      ) : (
+                        <div className="relative flex-1">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={100}
+                            value={pricing.fellow.onlineMemberPrice}
+                            onChange={(e) =>
+                              setPricing({
+                                ...pricing,
+                                fellow: {
+                                  ...pricing.fellow,
+                                  onlineMemberPrice: parseInt(e.target.value) || 0,
+                                },
+                              })
+                            }
+                            className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                          />
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPricing({
+                            ...pricing,
+                            fellow: {
+                              ...pricing.fellow,
+                              onlineMemberType: pricing.fellow.onlineMemberType === 'free' ? 'paid' : 'free',
+                              onlineMemberText: 'Free ที่สถาบัน',
+                            },
+                          })
+                        }
+                        className={`text-[10px] font-bold px-1.5 py-1.5 rounded border transition cursor-pointer whitespace-nowrap shrink-0 ${pricing.fellow.onlineMemberType === 'free'
+                            ? 'bg-pink-100 text-pink-700 border-pink-200 hover:bg-pink-200'
+                            : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                          }`}
+                        title="คลิกเพื่อสลับระหว่าง 'ฟรีที่สถาบัน' หรือ 'ระบุราคาบาท'"
+                      >
+                        {pricing.fellow.onlineMemberType === 'free' ? 'ฟรี' : '฿'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+
+                {/* Row 3: Format Change Fee */}
+                <tr className="hover:bg-slate-50/50 transition bg-amber-50/30">
+                  <td className="py-2 px-3 font-extrabold text-slate-900">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                      <span className="text-xs">แจ้งเปลี่ยนรูปแบบ</span>
+                    </div>
+                    <div className="flex items-center gap-1 mt-1 pl-3">
+                      <input
+                        type="text"
+                        value={pricing.changeFee.conditionDate}
+                        onChange={(e) =>
+                          setPricing({
+                            ...pricing,
+                            changeFee: {
+                              ...pricing.changeFee,
+                              conditionDate: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder="After 10 Oct 2026"
+                        className="bg-white border border-amber-300 rounded px-1.5 py-0.5 text-[10px] font-bold text-rose-600 focus:outline-none focus:ring-1 focus:ring-rose-400 w-28"
+                      />
+                    </div>
+                  </td>
+                  {/* Onsite Member */}
+                  <td className="py-2 px-2.5 border-l border-slate-200">
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={100}
+                        value={pricing.changeFee.onsiteMember}
+                        onChange={(e) =>
+                          setPricing({
+                            ...pricing,
+                            changeFee: {
+                              ...pricing.changeFee,
+                              onsiteMember: parseInt(e.target.value) || 0,
+                            },
+                          })
+                        }
+                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                      />
+                    </div>
+                  </td>
+                  {/* Onsite Non-member */}
+                  <td className="py-2 px-2.5 border-l border-slate-200">
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={100}
+                        value={pricing.changeFee.onsiteNonMember}
+                        onChange={(e) =>
+                          setPricing({
+                            ...pricing,
+                            changeFee: {
+                              ...pricing.changeFee,
+                              onsiteNonMember: parseInt(e.target.value) || 0,
+                            },
+                          })
+                        }
+                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                      />
+                    </div>
+                  </td>
+                  {/* Online Member */}
+                  <td className="py-2 px-2.5 border-l border-slate-200 bg-blue-50/20">
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={100}
+                        value={pricing.changeFee.onlineMember}
+                        onChange={(e) =>
+                          setPricing({
+                            ...pricing,
+                            changeFee: {
+                              ...pricing.changeFee,
+                              onlineMember: parseInt(e.target.value) || 0,
+                            },
+                          })
+                        }
+                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-[#0026b3] focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                      />
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footnote / Quick Remark */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-slate-500 pt-0.5">
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-slate-600">* Member:</span>
+              <input
+                type="text"
+                value={pricing.remark}
+                onChange={(e) => setPricing({ ...pricing, remark: e.target.value })}
+                placeholder="หมายเหตุสถานะสมาชิก..."
+                className="bg-transparent border-b border-dashed border-slate-300 text-slate-600 focus:border-[#0026b3] focus:outline-none w-80 max-w-full text-xs"
+              />
+            </div>
+            <span className="text-slate-400">💡 กดปุ่ม &quot;ใส่ค่ามาตรฐานอัตโนมัติ&quot; เพื่อเติมข้อมูลตามโครงสร้างมาตรฐานได้ทันที</span>
+          </div>
+        </div>
+
+        {/* ─── SECTION 4: หมายเหตุ / รายละเอียดเพิ่มเติม ─── */}
         <div className="space-y-3 pt-4 border-t border-slate-100">
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
               <ClipboardList className="w-4 h-4 text-[#0026b3]" />
-              3. ระเบียบวาระและหัวข้อบรรยาย (ถ้ามี)
+              4. หมายเหตุ / รายละเอียดเพิ่มเติม (ถ้ามี)
             </h3>
-            <button
-              type="button"
-              onClick={() => setFormData({ ...formData, description: 'การประชุมวิชาการประจำปีสมาคมเวชศาสตร์การเจริญพันธุ์ไทย นำเสนอผลงานวิจัยล่าสุด นวัตกรรมด้าน IVF และเทคโนโลยีเพาะเลี้ยงตัวอ่อน พร้อมมอบหน่วยกิต CME สำหรับแพทย์' })}
-              className="text-xs text-[#0026b3] hover:underline cursor-pointer font-bold"
-            >
-              + ใส่ข้อความแนะนำ
-            </button>
           </div>
           <textarea
             rows={3}
@@ -2375,7 +2800,7 @@ function AddMeetingPanel({
         <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100">
           <div className="text-xs text-slate-500 flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>ระบบจะสร้างรหัสการประชุม (Meeting ID) และเปิดช่องทางลงทะเบียนให้อัตโนมัติ</span>
+            <span>ระบบจะบันทึกข้อมูลและอัตราค่าลงทะเบียน พร้อมเปิดช่องทางลงทะเบียนให้อัตโนมัติ</span>
           </div>
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -2507,11 +2932,10 @@ function MeetingHistoryPanel({
             <button
               key={tab.id}
               onClick={() => setFilterStatus(tab.id as any)}
-              className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap ${
-                filterStatus === tab.id
+              className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap ${filterStatus === tab.id
                   ? 'bg-[#0026b3] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white'
-              }`}
+                }`}
             >
               {tab.label}
             </button>
@@ -2539,13 +2963,12 @@ function MeetingHistoryPanel({
                   <div className="space-y-2 flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-mono font-bold text-[#0026b3] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{m.id}</span>
-                      <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
-                        m.status === 'ongoing'
+                      <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${m.status === 'ongoing'
                           ? 'bg-[#4ade80]/15 text-emerald-800 border-[#4ade80]/40'
                           : m.status === 'upcoming'
-                          ? 'bg-amber-50 text-amber-700 border-amber-200'
-                          : 'bg-slate-100 text-slate-700 border-slate-200'
-                      }`}>
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-slate-100 text-slate-700 border-slate-200'
+                        }`}>
                         {m.status === 'ongoing' ? '● กำลังดำเนินการ' : m.status === 'upcoming' ? 'รอเริ่มงาน' : 'เสร็จสิ้น'}
                       </span>
                       <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-blue-50 text-[#0026b3] border border-blue-200 uppercase">
@@ -2742,11 +3165,10 @@ function VerifySlipsPanel({
             <button
               key={tab.id}
               onClick={() => setFilterTab(tab.id as any)}
-              className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap ${
-                filterTab === tab.id
+              className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap ${filterTab === tab.id
                   ? 'bg-[#0026b3] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white'
-              }`}
+                }`}
             >
               {tab.label}
             </button>
@@ -2782,13 +3204,12 @@ function VerifySlipsPanel({
                 <div className="space-y-1.5 min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm sm:text-base font-extrabold text-slate-900">{slip.nameTh}</span>
-                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
-                      slip.status === 'approved'
+                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${slip.status === 'approved'
                         ? 'bg-[#4ade80]/20 text-emerald-800 border-[#4ade80]/40 font-bold'
                         : slip.status === 'rejected'
-                        ? 'bg-rose-50 text-rose-700 border-rose-200'
-                        : 'bg-amber-50 text-amber-700 border-amber-200'
-                    }`}>
+                          ? 'bg-rose-50 text-rose-700 border-rose-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}>
                       {slip.status === 'approved' ? 'อนุมัติแล้ว' : slip.status === 'rejected' ? 'ปฏิเสธ' : 'รอตรวจสอบ'}
                     </span>
                     <span className="text-xs text-slate-500 font-mono">Ref: {slip.refNo}</span>
@@ -3187,20 +3608,18 @@ function VerifyAttendeesPanel({
           {/* All Rounds Pill */}
           <button
             onClick={() => setSelectedMeetingId('all')}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap flex items-center gap-2.5 shrink-0 ${
-              selectedMeetingId === 'all'
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap flex items-center gap-2.5 shrink-0 ${selectedMeetingId === 'all'
                 ? 'bg-[#0026b3] text-white shadow-md shadow-[#0026b3]/20'
                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
+              }`}
           >
             <Layers className="w-4 h-4" />
             <span>ทุกรอบการประชุม (All Rounds)</span>
             <span
-              className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                selectedMeetingId === 'all'
+              className={`text-xs px-2 py-0.5 rounded-full font-bold ${selectedMeetingId === 'all'
                   ? 'bg-[#4ade80] text-slate-950 font-black'
                   : 'bg-blue-100 text-[#0026b3]'
-              }`}
+                }`}
             >
               {attendees.length} คน
             </span>
@@ -3218,20 +3637,18 @@ function VerifyAttendeesPanel({
               <button
                 key={m.id}
                 onClick={() => setSelectedMeetingId(m.id)}
-                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap flex items-center gap-2.5 shrink-0 ${
-                  isSelected
+                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap flex items-center gap-2.5 shrink-0 ${isSelected
                     ? 'bg-[#0026b3] text-white shadow-md shadow-[#0026b3]/20'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
+                  }`}
               >
                 <CalendarDays className="w-4 h-4" />
                 <span className="max-w-[200px] truncate">{m.titleTh}</span>
                 <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                    isSelected
+                  className={`text-xs px-2 py-0.5 rounded-full font-bold ${isSelected
                       ? 'bg-[#4ade80] text-slate-950 font-black'
                       : 'bg-slate-200 text-slate-700'
-                  }`}
+                    }`}
                 >
                   {mChecked}/{mAttendees.length || m.registered}
                 </span>
@@ -3251,19 +3668,18 @@ function VerifyAttendeesPanel({
                   {currentMeeting.id}
                 </span>
                 <span
-                  className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
-                    currentMeeting.status === 'ongoing'
+                  className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${currentMeeting.status === 'ongoing'
                       ? 'bg-[#4ade80]/15 text-emerald-800 border-[#4ade80]/40'
                       : currentMeeting.status === 'upcoming'
-                      ? 'bg-amber-50 text-amber-700 border-amber-200'
-                      : 'bg-slate-100 text-slate-700 border-slate-200'
-                  }`}
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : 'bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
                 >
                   {currentMeeting.status === 'ongoing'
                     ? '● กำลังดำเนินการ'
                     : currentMeeting.status === 'upcoming'
-                    ? 'รอเริ่มงาน'
-                    : 'เสร็จสิ้น'}
+                      ? 'รอเริ่มงาน'
+                      : 'เสร็จสิ้น'}
                 </span>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-blue-50 text-[#0026b3] border border-blue-200 uppercase">
                   {currentMeeting.type}
@@ -3403,11 +3819,10 @@ function VerifyAttendeesPanel({
               <button
                 key={tab.id}
                 onClick={() => setFilterCheckIn(tab.id as any)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-                  filterCheckIn === tab.id
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${filterCheckIn === tab.id
                     ? 'bg-[#0026b3] text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-white'
-                }`}
+                  }`}
               >
                 {tab.label}
               </button>
@@ -3478,11 +3893,10 @@ function VerifyAttendeesPanel({
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap">
                       <span
-                        className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap ${
-                          a.paymentStatus === 'paid'
+                        className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap ${a.paymentStatus === 'paid'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                             : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}
+                          }`}
                       >
                         {a.paymentStatus === 'paid' ? 'ชำระแล้ว' : 'รอชำระ'}
                       </span>
@@ -3514,11 +3928,10 @@ function VerifyAttendeesPanel({
                         )}
                         <button
                           onClick={() => onToggleCheckIn(a.id)}
-                          className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
-                            a.checkInStatus === 'checked_in'
+                          className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${a.checkInStatus === 'checked_in'
                               ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
                               : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-xs'
-                          }`}
+                            }`}
                         >
                           {a.checkInStatus === 'checked_in' ? 'ยกเลิก' : 'เช็คอิน'}
                         </button>
@@ -3627,11 +4040,10 @@ function VerifyAttendeesPanel({
                   onToggleCheckIn(selectedAttendee.id);
                   setSelectedAttendee(null);
                 }}
-                className={`px-4 py-2.5 rounded-xl font-bold text-sm cursor-pointer shadow-xs transition ${
-                  selectedAttendee.checkInStatus === 'checked_in'
+                className={`px-4 py-2.5 rounded-xl font-bold text-sm cursor-pointer shadow-xs transition ${selectedAttendee.checkInStatus === 'checked_in'
                     ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                     : 'bg-[#0026b3] hover:bg-[#001f94] text-white'
-                }`}
+                  }`}
               >
                 {selectedAttendee.checkInStatus === 'checked_in' ? 'ยกเลิกการเช็คอิน' : 'เช็คอินผู้เข้าร่วมทันที'}
               </button>
@@ -4204,6 +4616,8 @@ export default function AdminPage() {
             attendees={attendees}
           />
         );
+      case 'members':
+        return <MemberManagementPanel />;
       case 'revenue-report':
         return (
           <RevenueReportPanel

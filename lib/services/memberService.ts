@@ -8,7 +8,31 @@ import {
   UpdateMemberInput,
   MemberQueryParams,
   MemberType,
+  MEMBER_TYPE_LABELS,
+  MemberStats,
 } from '@/types/member';
+
+
+/**
+ * ฟังก์ชันช่วยแปลงค่า job_category (เช่น "RM", "Embryologist", "1") เป็น MemberType Enum
+ */
+export function parseJobCategoryToMemberType(jobCat: string | number | null | undefined): MemberType | null {
+  if (jobCat === null || jobCat === undefined || jobCat === '') return null;
+  if (typeof jobCat === 'number') return jobCat as MemberType;
+  const str = String(jobCat).trim();
+  if (/^\d+$/.test(str)) {
+    const num = parseInt(str, 10);
+    return num in MEMBER_TYPE_LABELS ? (num as MemberType) : MemberType.OTHER;
+  }
+  const lower = str.toLowerCase();
+  if (lower === 'rm' || lower.includes('ob-gyn') || lower.includes('obgyn')) return MemberType.RM;
+  if (lower.includes('fellow')) return MemberType.FELLOW_RM;
+  if (lower.includes('embryo')) return MemberType.EMBRYOLOGIST;
+  if (lower.includes('andrology') || lower === 'technologist sa') return MemberType.TECHNOLOGIST_ANDROLOGY;
+  if (lower.includes('pgt') || lower.includes('genetic')) return MemberType.MOLECULAR_GENETICIST;
+  if (lower.includes('nurse')) return MemberType.NURSE;
+  return MemberType.OTHER;
+}
 
 /**
  * Format Prisma Member Model to Frontend/API Safe DTO (Handles BigInt & Dates)
@@ -17,6 +41,16 @@ import {
 export function toMemberDto(member: any): Member {
   const memberNo = member.member_no ? String(member.member_no).padStart(4, '0') : '';
   const memberId = member.id ? member.id.toString() : memberNo;
+  const rawJobCategory = member.job_category ?? null;
+  const memberType = parseJobCategoryToMemberType(rawJobCategory);
+
+  // ตำแหน่ง: หากไม่มีค่า position ให้ดึงจาก job_category หรือประเภทสมาชิกอัตโนมัติ
+  const resolvedPosition =
+    member.position && member.position.trim() !== ''
+      ? member.position
+      : rawJobCategory
+      ? (MEMBER_TYPE_LABELS[memberType as MemberType] || rawJobCategory)
+      : null;
 
   return {
     member_id: memberId,
@@ -29,13 +63,19 @@ export function toMemberDto(member: any): Member {
     mobile: member.mobile ?? null,
     email: member.email ?? null,
     line_id: member.lineId ?? null,
+    address: member.address ?? null,
     workplace: member.workplace ?? null,
+    work_phone: member.work_phone ?? null,
     start_date: member.work_start_date ? new Date(member.work_start_date).toISOString().split('T')[0] : null,
-    position: member.position ?? null,
-    member_type: member.job_category ? (Number(member.job_category) as MemberType) : null,
-    member_type_other: member.job_category_other ?? null,
+    position: resolvedPosition,
+    job_category: rawJobCategory,
+    member_type: memberType,
+    member_type_other: member.job_category_other ?? (memberType === MemberType.OTHER ? rawJobCategory : null),
     scientist_reg_no: member.scientist_license_no ?? null,
     scientist_reg_nw: null,
+    membership_status: member.membership_status ?? 'Active',
+    membership_type: member.membership_type ?? 'Regular',
+    expire_date: member.expire_date ? new Date(member.expire_date).toISOString().split('T')[0] : null,
     photo_path: member.photo_url ?? null,
     qr_code_path: member.qr_code_image_url ?? null,
     created_at: member.applied_at ? new Date(member.applied_at).toISOString() : new Date().toISOString(),
@@ -97,6 +137,51 @@ export async function generateQrCode(text: string): Promise<string> {
 }
 
 /**
+ * สถิติภาพรวมสมาชิกทั้งหมดจากฐานข้อมูล (Total, Regular, Lifelong, Active, Inactive)
+ */
+export async function getMemberStats(): Promise<MemberStats> {
+  const [total, regularCount, lifelongCount, activeCount, inactiveCount] = await Promise.all([
+    prisma.member.count(),
+    prisma.member.count({
+      where: {
+        OR: [
+          { membership_type: { equals: 'Regular', mode: 'insensitive' } },
+          { membership_type: null },
+          { membership_type: '' },
+        ],
+      },
+    }),
+    prisma.member.count({
+      where: {
+        membership_type: { equals: 'Lifelong', mode: 'insensitive' },
+      },
+    }),
+    prisma.member.count({
+      where: {
+        OR: [
+          { membership_status: { equals: 'Active', mode: 'insensitive' } },
+          { membership_status: null },
+          { membership_status: '' },
+        ],
+      },
+    }),
+    prisma.member.count({
+      where: {
+        membership_status: { equals: 'Inactive', mode: 'insensitive' },
+      },
+    }),
+  ]);
+
+  return {
+    total,
+    regular_count: regularCount,
+    lifelong_count: lifelongCount,
+    active_count: activeCount,
+    inactive_count: inactiveCount,
+  };
+}
+
+/**
  * 1. สร้างสมาชิกใหม่ (Create Member) พร้อมประวัติการศึกษาและ QR Code
  */
 export async function createMember(rawInput: CreateMemberInput): Promise<Member> {
@@ -120,11 +205,15 @@ export async function createMember(rawInput: CreateMemberInput): Promise<Member>
       mobile: input.mobile ?? null,
       email: input.email ?? null,
       lineId: input.line_id ?? null,
+      address: input.address ?? null,
       workplace: input.workplace ?? null,
+      work_phone: input.work_phone ?? null,
       work_start_date: parsedStartDate,
       position: input.position ?? null,
-      job_category: input.member_type !== undefined && input.member_type !== null ? String(input.member_type) : null,
+      job_category: input.job_category || (input.member_type !== undefined && input.member_type !== null ? (MEMBER_TYPE_LABELS[input.member_type as MemberType] || String(input.member_type)) : null),
       job_category_other: input.member_type_other ?? null,
+      membership_type: input.membership_type ?? 'Regular',
+      membership_status: input.membership_status ?? 'Active',
       scientist_license_no: input.scientist_reg_no ?? null,
       photo_url: input.photo_path ?? null,
       qr_code_image_url: qrCodeData,
@@ -156,39 +245,128 @@ export async function getMembers(params: MemberQueryParams = {}) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const andConditions: any[] = [];
 
   // ค้นหาตามคำค้นหา (ทำความสะอาดข้อความเพื่อความปลอดภัย)
   if (params.search && params.search.trim() !== '') {
     const searchClean = sanitizeString(params.search);
     if (searchClean !== '') {
-      where.OR = [
-        { fullNameTh: { contains: searchClean, mode: 'insensitive' } },
-        { fullNameEn: { contains: searchClean, mode: 'insensitive' } },
-        { member_no: { contains: searchClean, mode: 'insensitive' } },
-        { mobile: { contains: searchClean, mode: 'insensitive' } },
-        { email: { contains: searchClean, mode: 'insensitive' } },
-        { workplace: { contains: searchClean, mode: 'insensitive' } },
-      ];
+      andConditions.push({
+        OR: [
+          { fullNameTh: { contains: searchClean, mode: 'insensitive' } },
+          { fullNameEn: { contains: searchClean, mode: 'insensitive' } },
+          { member_no: { contains: searchClean, mode: 'insensitive' } },
+          { mobile: { contains: searchClean, mode: 'insensitive' } },
+          { email: { contains: searchClean, mode: 'insensitive' } },
+          { workplace: { contains: searchClean, mode: 'insensitive' } },
+          { position: { contains: searchClean, mode: 'insensitive' } },
+          { job_category: { contains: searchClean, mode: 'insensitive' } },
+        ],
+      });
     }
   }
 
-  // กรองตามประเภทสมาชิก
-  if (params.member_type !== undefined && params.member_type !== '' && params.member_type !== null) {
-    where.job_category = String(params.member_type);
+  // กรองตามตำแหน่ง / สาขาวิชาชีพ (Job Category / Member Type)
+  const filterCat = params.job_category || (params.member_type !== undefined ? String(params.member_type) : undefined);
+  if (
+    filterCat !== undefined &&
+    filterCat !== '' &&
+    filterCat !== null &&
+    filterCat !== 'all'
+  ) {
+    const val = filterCat.trim();
+    if (val === '1' || val.toLowerCase() === 'rm') {
+      andConditions.push({
+        OR: [
+          { job_category: '1' },
+          { job_category: { equals: 'RM', mode: 'insensitive' } },
+          { job_category: { contains: 'OB-GYN', mode: 'insensitive' } },
+        ],
+      });
+    } else if (val === '2' || val.toLowerCase().includes('fellow')) {
+      andConditions.push({
+        OR: [
+          { job_category: '2' },
+          { job_category: { contains: 'Fellow', mode: 'insensitive' } },
+        ],
+      });
+    } else if (val === '3' || val.toLowerCase().includes('embryo')) {
+      andConditions.push({
+        OR: [
+          { job_category: '3' },
+          { job_category: { contains: 'Embryo', mode: 'insensitive' } },
+        ],
+      });
+    } else if (val === '4' || val.toLowerCase().includes('andrology')) {
+      andConditions.push({
+        OR: [
+          { job_category: '4' },
+          { job_category: { contains: 'Andrology', mode: 'insensitive' } },
+          { job_category: { contains: 'SA', mode: 'insensitive' } },
+        ],
+      });
+    } else if (val === '5' || val.toLowerCase().includes('genetic') || val.toLowerCase().includes('pgt')) {
+      andConditions.push({
+        OR: [
+          { job_category: '5' },
+          { job_category: { contains: 'PGT', mode: 'insensitive' } },
+          { job_category: { contains: 'Genetic', mode: 'insensitive' } },
+        ],
+      });
+    } else if (val === '6' || val.toLowerCase().includes('nurse')) {
+      andConditions.push({
+        OR: [
+          { job_category: '6' },
+          { job_category: { contains: 'Nurse', mode: 'insensitive' } },
+        ],
+      });
+    } else if (val === '0' || val.toLowerCase().includes('other')) {
+      andConditions.push({
+        OR: [
+          { job_category: '0' },
+          { job_category: { contains: 'Other', mode: 'insensitive' } },
+          { job_category: { contains: 'อื่นๆ', mode: 'insensitive' } },
+          { job_category: { contains: 'Technician', mode: 'insensitive' } },
+        ],
+      });
+    } else {
+      andConditions.push({
+        job_category: { contains: val, mode: 'insensitive' }
+      });
+    }
   }
 
-  // การจัดเรียง
-  const sortBy = params.sort_by || 'created_at';
-  const order = params.order === 'asc' ? 'asc' : 'desc';
+  // กรองตามประเภทสมาชิก (Regular / Lifelong)
+  if (params.membership_type && params.membership_type !== 'all') {
+    andConditions.push({
+      membership_type: { equals: params.membership_type, mode: 'insensitive' }
+    });
+  }
+
+  // กรองตามสถานะสมาชิก (Active / Inactive)
+  if (params.membership_status && params.membership_status !== 'all' && params.membership_status.trim() !== '') {
+    andConditions.push({
+      membership_status: { equals: params.membership_status, mode: 'insensitive' }
+    });
+  }
+
+  if (andConditions.length > 0) {
+    where.AND = andConditions;
+  }
+
+  // การจัดเรียงเริ่มต้น: รหัสสมาชิกล่าสุด (มากไปน้อย) (member_no desc)
+  const sortBy = params.sort_by || 'member_no';
+  const order = params.order || 'desc';
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const orderBy: any = {};
   if (sortBy === 'created_at') orderBy.applied_at = order;
   else if (sortBy === 'full_name_th') orderBy.fullNameTh = order;
   else if (sortBy === 'member_no' || sortBy === 'code' || sortBy === 'membership_no') orderBy.member_no = order;
-  else orderBy.applied_at = 'desc';
+  else orderBy.member_no = 'asc';
 
-  const [total, members] = await Promise.all([
+  const [total, members, stats] = await Promise.all([
     prisma.member.count({ where }),
     prisma.member.findMany({
       where,
@@ -199,10 +377,12 @@ export async function getMembers(params: MemberQueryParams = {}) {
         member_educations: true,
       },
     }),
+    getMemberStats(),
   ]);
 
   return {
     data: members.map(toMemberDto),
+    stats,
     pagination: {
       total,
       page,
@@ -210,6 +390,7 @@ export async function getMembers(params: MemberQueryParams = {}) {
       total_pages: Math.ceil(total / limit) || 1,
     },
   };
+
 }
 
 /**
@@ -317,16 +498,21 @@ export async function updateMember(id: string | number | bigint, rawInput: Updat
     if (input.id_last4 !== undefined) updateData.idLast4 = input.id_last4;
     if (input.mobile !== undefined) updateData.mobile = input.mobile;
     if (input.email !== undefined) updateData.email = input.email;
-    if (input.line_id !== undefined) updateData.lineId = input.line_id;
+    if (input.address !== undefined) updateData.address = input.address;
     if (input.workplace !== undefined) updateData.workplace = input.workplace;
+    if (input.work_phone !== undefined) updateData.work_phone = input.work_phone;
     if (input.start_date !== undefined) {
       updateData.work_start_date = input.start_date ? new Date(input.start_date) : null;
     }
     if (input.position !== undefined) updateData.position = input.position;
-    if (input.member_type !== undefined) {
-      updateData.job_category = input.member_type !== null ? String(input.member_type) : null;
+    if (input.job_category !== undefined) {
+      updateData.job_category = input.job_category;
+    } else if (input.member_type !== undefined) {
+      updateData.job_category = input.member_type !== null ? (MEMBER_TYPE_LABELS[input.member_type as MemberType] || String(input.member_type)) : null;
     }
     if (input.member_type_other !== undefined) updateData.job_category_other = input.member_type_other;
+    if (input.membership_type !== undefined) updateData.membership_type = input.membership_type;
+    if (input.membership_status !== undefined) updateData.membership_status = input.membership_status;
     if (input.scientist_reg_no !== undefined) updateData.scientist_license_no = input.scientist_reg_no;
     if (input.photo_path !== undefined) updateData.photo_url = input.photo_path;
 
