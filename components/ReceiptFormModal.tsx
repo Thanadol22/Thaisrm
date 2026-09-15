@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ReceiptData, ReceiptItemLine } from '@/types/receipt';
 import { thaiBahtText } from '@/lib/thaiBahtText';
 import {
@@ -39,6 +40,11 @@ export function ReceiptFormModal({
   initialData,
   meetings = [],
 }: ReceiptFormModalProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [formData, setFormData] = useState<ReceiptData>(() => {
     return initialData || {
       id: `REC-${Date.now()}`,
@@ -183,8 +189,10 @@ export function ReceiptFormModal({
     onSave(formData, andPrint);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-sm flex justify-center p-3 sm:p-6">
+  if (!isOpen || !mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center p-3 sm:p-6 animate-fade-in">
       <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[90vh] border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="px-6 py-4 bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 text-white flex items-center justify-between">
@@ -644,6 +652,7 @@ export function ReceiptFormModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

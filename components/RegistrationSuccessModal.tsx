@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { CheckCircle2, Mail, QrCode, X, ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -18,11 +19,16 @@ export function RegistrationSuccessModal({
   title,
 }: RegistrationSuccessModalProps) {
   const { t } = useLanguage();
+  const [mounted, setMounted] = useState(false);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in">
+  if (!isOpen || !mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in">
       <div className="bg-white w-full max-w-md rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-100 relative text-center space-y-5 animate-scale-up">
         {/* Close Button */}
         <button
@@ -85,6 +91,7 @@ export function RegistrationSuccessModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import {
@@ -1822,13 +1823,14 @@ export function AgendaView() {
       <ScrollProgressBar />
 
       {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900/95 text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 animate-slide-down backdrop-blur-md">
+      {toastMessage && typeof document !== 'undefined' && createPortal(
+        <div className="fixed bottom-6 right-6 z-[10000] bg-slate-900/95 text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 animate-slide-down backdrop-blur-md">
           <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-[#4ade80] flex items-center justify-center shrink-0">
             <CheckCircle2 className="w-4 h-4 text-[#4ade80]" />
           </div>
           <span className="text-xs sm:text-sm font-semibold">{toastMessage}</span>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Floating Scroll-to-Top and Quick Pass Floating Widget */}
@@ -2504,8 +2506,8 @@ export function AgendaView() {
       </main>
 
       {/* Digital E-Pass Modal */}
-      {showPassModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-start justify-center p-4 pt-6 sm:pt-10 overflow-y-auto animate-fade-in">
+      {showPassModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-slate-950/80 backdrop-blur-md flex items-start justify-center p-4 pt-6 sm:pt-10 overflow-y-auto animate-fade-in">
           <div className="bg-white rounded-3xl max-w-sm sm:max-w-md w-full p-5 sm:p-7 shadow-2xl border border-slate-200 relative animate-scale-up space-y-4 text-center mb-6">
             <button
               onClick={() => setShowPassModal(false)}
@@ -2658,7 +2660,8 @@ export function AgendaView() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

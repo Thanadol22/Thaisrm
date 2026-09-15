@@ -65,6 +65,16 @@ model meetings {
   meeting_name         String                @db.VarChar(255)
   meeting_date         DateTime              @db.Date
   counts_toward_active Boolean               @default(true)
+  meeting_time         String?               @db.VarChar(100)
+  location             String?               @db.VarChar(500)
+  meeting_type         String?               @default("onsite") @db.VarChar(20)
+  staff_code           String?               @db.VarChar(10)
+  description          String?
+  base_price           Int?                  @default(0)
+  pricing_tiers        Json?
+  activities           Json?
+  max_seats            Int?                  @default(0)
+  status               String?               @default("upcoming") @db.VarChar(20)
   meeting_attendances  meeting_attendances[]
 }
 

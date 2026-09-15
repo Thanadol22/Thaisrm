@@ -355,8 +355,8 @@ export function MemberManagementPanel() {
     <div className="space-y-5 sm:space-y-6 animate-fade-in pb-12 w-full max-w-full overflow-hidden">
       
       {/* Toast Notification Popup */}
-      {toast && (
-        <div className="fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-slate-900 text-white shadow-2xl border border-slate-800 animate-slide-down max-w-[90vw]">
+      {toast && mounted && createPortal(
+        <div className="fixed top-5 right-5 z-[10000] flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-slate-900 text-white shadow-2xl border border-slate-800 animate-slide-down max-w-[90vw]">
           {toast.type === 'success' ? (
             <CheckCircle2 className="w-4 h-4 text-[#4ade80] shrink-0" />
           ) : (
@@ -370,7 +370,8 @@ export function MemberManagementPanel() {
           >
             <X className="w-3.5 h-3.5" />
           </button>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Header Banner */}

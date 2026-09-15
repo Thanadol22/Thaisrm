@@ -103,3 +103,36 @@ psql "<NEON_DATABASE_URL>" -f "export.sql"
 ```
 
 > ⚠️ ห้ามรัน `pg_dump --schema-only` แล้ว import เข้า Neon เพราะจะทำให้โครงสร้างชนกัน
+
+---
+
+# UI Layering, Modals & Toast Notifications Standard
+
+## 9. กฎมาตรฐานการแสดงผล Modal, Dialog, Popup และ Toast Notification (UI Layer & Portal Rules)
+
+เพื่อให้การแสดงผลของ Modal, Dialog, Popup และ Toast Notification ทั่วทั้งระบบเป็นมาตรฐานเดียวกัน และป้องกันปัญหา **Backdrop โดนตัดหรือถูก Sidebar/Navbar บัง** (CSS Stacking Context Trapping):
+
+### 1. ลำดับชั้น z-index มาตรฐาน (Z-Index Hierarchy):
+| UI Element | z-index | การ Mount | Backdrop Overlay Style |
+|---|---|---|---|
+| **Desktop Sidebar / Topbar** | `z-40` / `z-50` | ใน Layout | - |
+| **All Modals / Dialogs / Popups** | `z-[9999]` | `createPortal(..., document.body)` | `fixed inset-0 z-[9999] bg-slate-950/70 backdrop-blur-md` (หรือ `bg-slate-950/60 backdrop-blur-sm`) |
+| **Toast Notifications / Snackbars** | `z-[10000]` | `createPortal(..., document.body)` | `fixed bottom-6 left-0 right-0 z-[10000]` (หรือ `fixed top-5 right-5 z-[10000]`) |
+
+### 2. ข้อกำหนดทางเทคนิค (Technical Requirements):
+1. **ต้องใช้ `createPortal(..., document.body)` เสมอ**: ห้ามเรนเดอร์ Modal หรือ Toast แบบ inline ภายใต้ component ย่อยเด็ดขาด เพราะ CSS Animation (`animate-fade-in`), Transform หรือ Filter ของ parent จะกัก Stacking Context ทำให้ Modal หลุดไม่พ้น Sidebar
+2. **ต้องมี SSR Mounted Guard**: ป้องกัน React Hydration mismatch บน Next.js Client Components
+```tsx
+const [mounted, setMounted] = useState(false);
+useEffect(() => {
+  setMounted(true);
+}, []);
+if (!isOpen || !mounted) return null;
+return createPortal(
+  <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in">
+    {/* Modal Content */}
+  </div>,
+  document.body
+);
+```
+3. **Backdrop ต้องคลุมทั้งหน้าจอ**: ใช้คลาส `fixed inset-0 z-[9999]` เพื่อให้ครอบคลุมทั้งหน้าจอรวมถึง Sidebar และ Navbar อย่างสมบูรณ์

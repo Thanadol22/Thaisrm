@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ReceiptData } from '@/types/receipt';
 import { ReceiptDocument } from './ReceiptDocument';
 import {
@@ -26,8 +27,13 @@ interface ReceiptModalProps {
 
 export function ReceiptModal({ receipt, isOpen, onClose, onEdit }: ReceiptModalProps) {
   const [copied, setCopied] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  if (!isOpen || !receipt) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !receipt || !mounted) return null;
 
   const handlePrint = () => {
     window.print();
@@ -41,8 +47,8 @@ export function ReceiptModal({ receipt, isOpen, onClose, onEdit }: ReceiptModalP
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/80 backdrop-blur-sm flex justify-center p-2 sm:p-4 md:p-6 print:p-0 print:bg-white print:static print:inset-auto">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center p-2 sm:p-4 md:p-6 print:p-0 print:bg-white print:static print:inset-auto animate-fade-in">
       {/* ─── Printable Area container ──────────────────────────────── */}
       <div className="relative w-full max-w-4xl bg-transparent flex flex-col items-center my-auto print:w-full print:max-w-none print:my-0">
         {/* Modal Action Bar (Hidden in Print) */}
@@ -112,6 +118,7 @@ export function ReceiptModal({ receipt, isOpen, onClose, onEdit }: ReceiptModalP
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

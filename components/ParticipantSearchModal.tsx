@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Search,
   X,
@@ -67,7 +68,12 @@ const INITIAL_DISPLAY_COUNT = 2;
 
 export function ParticipantSearchModal({ isOpen, onClose, onSelectMember }: ParticipantSearchModalProps) {
   const { lang } = useLanguage();
+  const [mounted, setMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [members, setMembers] = useState<MemberRecord[]>([]);
   const [displayLimit, setDisplayLimit] = useState(INITIAL_DISPLAY_COUNT);
@@ -432,9 +438,11 @@ export function ParticipantSearchModal({ isOpen, onClose, onSelectMember }: Part
     );
   };
 
-  return (
+  if (!isOpen || !mounted) return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex flex-col justify-start sm:justify-center items-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-hidden"
+      className="fixed inset-0 z-[9999] flex flex-col justify-start sm:justify-center items-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in overflow-hidden"
       onClick={onClose}
     >
       {/* Modal Dialog Card */}
@@ -640,6 +648,7 @@ export function ParticipantSearchModal({ isOpen, onClose, onSelectMember }: Part
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

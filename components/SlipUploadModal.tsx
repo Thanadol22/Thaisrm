@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Upload, CheckCircle2, X, FileText } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -14,12 +15,17 @@ interface SlipUploadModalProps {
 
 export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount, amountDueText }: SlipUploadModalProps) {
   const { t } = useLanguage();
+  const [mounted, setMounted] = useState(false);
   const [uploadedSlip, setUploadedSlip] = useState<string | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string>('');
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -51,8 +57,8 @@ export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount, amoun
     }, 1200);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
       <div className="bg-white text-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 relative animate-scale-up">
         <button
           onClick={onClose}
@@ -136,6 +142,7 @@ export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount, amoun
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

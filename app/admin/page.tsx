@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { AdminNavbar, AdminTab } from '@/components/AdminNavbar';
 import {
   LayoutDashboard,
@@ -60,6 +61,7 @@ import { ReceiptData } from '@/types/receipt';
 import { ReceiptManagementPanel } from '@/components/ReceiptManagementPanel';
 import { ReceiptModal } from '@/components/ReceiptModal';
 import { MemberManagementPanel } from '@/components/MemberManagementPanel';
+import { ToastNotification } from '@/components/ToastNotification';
 
 /* ─── Data Types & Interfaces ─────────────────────────────────────────── */
 
@@ -1742,6 +1744,8 @@ function AddMeetingPanel({
     date: string;
     selectedDays?: string[];
     maxSeats?: number;
+    memberPrice?: number;
+    nonMemberPrice?: number;
   }
 
   const createEmptyActivity = (type: 'main' | 'workshop'): ActivityItem => ({
@@ -1751,6 +1755,8 @@ function AddMeetingPanel({
     date: '',
     selectedDays: [],
     maxSeats: type === 'workshop' ? 50 : 0,
+    memberPrice: type === 'workshop' ? 0 : undefined,
+    nonMemberPrice: type === 'workshop' ? 0 : undefined,
   });
 
   const [formData, setFormData] = useState({
@@ -1758,7 +1764,7 @@ function AddMeetingPanel({
     date: '',
     time: '',
     location: '',
-    type: 'onsite' as 'onsite' | 'online',
+    type: 'onsite' as 'onsite' | 'online' | 'hybrid',
     staffCode: generateRandomPin(),
     basePrice: 0,
     description: '',
@@ -1772,6 +1778,21 @@ function AddMeetingPanel({
 
   const [isSaved, setIsSaved] = useState(false);
   const [lastCreatedId, setLastCreatedId] = useState<string>('');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [savedMeetingDetails, setSavedMeetingDetails] = useState<{
+    id: string;
+    title: string;
+    date: string;
+    time: string;
+    location: string;
+    type: string;
+    staffCode: string;
+    maxSeats: number;
+    mainCount: number;
+    workshopCount: number;
+    basePrice: number;
+  } | null>(null);
 
   // Extract day choices dynamically based on the event date range
   const dayChoices = useMemo(() => getEventDayChoices(formData.date), [formData.date]);
@@ -1874,10 +1895,24 @@ function AddMeetingPanel({
     setActivities([createEmptyActivity('main')]);
     setPricing(DEFAULT_PRICING_TIERS);
     setIsSaved(false);
+    setShowSuccessModal(false);
+    setSavedMeetingDetails(null);
   };
 
   const handleLoadDefaultPricing = () => {
     setPricing(DEFAULT_PRICING_TIERS);
+    setActivities((prev) =>
+      prev.map((act, idx) => {
+        if (act.type === 'workshop') {
+          return {
+            ...act,
+            memberPrice: act.memberPrice || (idx === 0 ? 2500 : 3000),
+            nonMemberPrice: act.nonMemberPrice || (idx === 0 ? 3500 : 4000),
+          };
+        }
+        return act;
+      })
+    );
   };
 
   const handleClearPricing = () => {
@@ -1904,40 +1939,106 @@ function AddMeetingPanel({
       },
       remark: '',
     });
+    setActivities((prev) =>
+      prev.map((act) => (act.type === 'workshop' ? { ...act, memberPrice: 0, nonMemberPrice: 0 } : act))
+    );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title || !formData.date) {
       alert('กรุณากรอกชื่อการประชุมและระบุวันที่จัดงาน');
       return;
     }
 
-    const meetingId = `MTG-2026-${Math.floor(100 + Math.random() * 900)}`;
-    const wsSeats = activities.filter((a) => a.type === 'workshop').reduce((sum, a) => sum + (a.maxSeats || 0), 0);
-    const newMeeting: MeetingItem = {
-      id: meetingId,
-      titleTh: formData.title,
-      titleEn: formData.title,
-      date: formData.date,
-      time: formData.time || '08:30 - 17:00 น.',
-      location: formData.location || 'ศูนย์ประชุมสมาคม',
-      type: formData.type,
-      staffCode: formData.staffCode || generateRandomPin(),
-      maxSeats: wsSeats || 500,
-      basePrice: pricing.participant.onsiteMember || formData.basePrice,
-      pricingTiers: pricing,
-      registered: 0,
-      attended: 0,
-      revenue: 0,
-      status: 'upcoming',
-    };
+    setIsSubmitting(true);
 
-    if (onMeetingCreated) {
-      onMeetingCreated(newMeeting);
+    const meetingId = `MTG-${new Date().getFullYear() + 543}-${Math.floor(100 + Math.random() * 900)}`;
+    const wsSeats = activities.filter((a) => a.type === 'workshop').reduce((sum, a) => sum + (a.maxSeats || 0), 0);
+
+    try {
+      // Call API to save to database
+      const res = await fetch('/api/meetings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          meeting_id: meetingId,
+          meeting_name: formData.title,
+          meeting_date: formData.date,
+          meeting_time: formData.time || '08:30 - 17:00 น.',
+          location: formData.location || '',
+          meeting_type: formData.type,
+          staff_code: formData.staffCode || '',
+          description: formData.description || '',
+          base_price: pricing.participant.onsiteMember || formData.basePrice,
+          pricing_tiers: pricing,
+          activities: activities,
+          max_seats: wsSeats || 500,
+          status: 'upcoming',
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        alert(json.error || 'เกิดข้อผิดพลาดในการบันทึก กรุณาลองใหม่อีกครั้ง');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Create the MeetingItem for frontend state
+      const newMeeting: MeetingItem = {
+        id: meetingId,
+        titleTh: formData.title,
+        titleEn: formData.title,
+        date: formData.date,
+        time: formData.time || '08:30 - 17:00 น.',
+        location: formData.location || 'ศูนย์ประชุมสมาคม',
+        type: formData.type,
+        staffCode: formData.staffCode || '',
+        maxSeats: wsSeats || 500,
+        basePrice: pricing.participant.onsiteMember || formData.basePrice,
+        pricingTiers: pricing,
+        registered: 0,
+        attended: 0,
+        revenue: 0,
+        status: 'upcoming',
+      };
+
+      const meetingDetails = {
+        id: meetingId,
+        title: formData.title,
+        date: formData.date,
+        time: formData.time || '08:30 - 17:00 น.',
+        location: formData.location || 'ศูนย์ประชุมสมาคม',
+        type: formData.type,
+        staffCode: formData.staffCode || '',
+        maxSeats: wsSeats || 500,
+        mainCount: activities.filter((a) => a.type === 'main').length,
+        workshopCount: activities.filter((a) => a.type === 'workshop').length,
+        basePrice: pricing.participant.onsiteMember || formData.basePrice,
+      };
+
+      if (onMeetingCreated) {
+        onMeetingCreated(newMeeting);
+      }
+      setLastCreatedId(meetingId);
+      setSavedMeetingDetails(meetingDetails);
+      setIsSaved(true);
+      setShowSuccessModal(true);
+      setToastMessage(`บันทึกและสร้างงานประชุม "${formData.title}" (รหัส: ${meetingId}) สำเร็จเรียบร้อยแล้ว!`);
+      setTimeout(() => setToastMessage(null), 5000);
+      try {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch {}
+    } catch (err) {
+      console.error('Failed to create meeting:', err);
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์ กรุณาลองใหม่อีกครั้ง');
+    } finally {
+      setIsSubmitting(false);
     }
-    setLastCreatedId(meetingId);
-    setIsSaved(true);
   };
 
   // Count activities by type
@@ -1946,6 +2047,121 @@ function AddMeetingPanel({
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-12">
+      {/* Toast Notification */}
+      <ToastNotification message={toastMessage} />
+
+      {/* ─── SUCCESS MODAL POPUP ─── */}
+      {showSuccessModal && savedMeetingDetails && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in">
+          <div className="bg-white w-full max-w-lg rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-100 relative text-center space-y-5 animate-scale-up">
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setShowSuccessModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Icon Badge with Glow */}
+            <div className="relative mx-auto w-20 h-20 flex items-center justify-center">
+              <div className="absolute inset-0 bg-[#4ade80]/30 rounded-full blur-xl animate-pulse" />
+              <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#0026b3] to-[#0044ff] text-white flex items-center justify-center shadow-lg ring-4 ring-[#4ade80]/40">
+                <CheckCircle2 className="w-9 h-9 text-[#4ade80] stroke-[2.5]" />
+              </div>
+            </div>
+
+            {/* Title & Description */}
+            <div className="space-y-1.5">
+              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <span>บันทึกโครงการสำเร็จ</span>
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                บันทึกการเพิ่มการประชุมเรียบร้อยแล้ว
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
+                โครงการประชุมวิชาการได้ถูกบันทึกลงสู่ระบบ พร้อมเปิดรับลงทะเบียนและตรวจสอบสิทธิ์สมาชิกอัตโนมัติ
+              </p>
+            </div>
+
+            {/* Meeting Summary Card */}
+            <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 text-left space-y-2.5 text-xs text-slate-700">
+              <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                <span className="font-bold text-slate-500">รหัสการประชุม (Meeting ID)</span>
+                <span className="font-mono font-black text-[#0026b3] bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-200 text-xs">
+                  {savedMeetingDetails.id}
+                </span>
+              </div>
+              <div className="space-y-1 pt-0.5">
+                <div className="font-black text-sm text-slate-900">{savedMeetingDetails.title}</div>
+                <div className="flex flex-wrap items-center gap-2 text-slate-600 text-[11px] pt-1">
+                  <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-[#0026b3]" /> {savedMeetingDetails.date}</span>
+                  <span>•</span>
+                  <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-[#0026b3]" /> {savedMeetingDetails.time}</span>
+                </div>
+                {savedMeetingDetails.location && (
+                  <div className="text-[11px] text-slate-500 flex items-center gap-1 pt-0.5">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="truncate">{savedMeetingDetails.location}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/80 text-center">
+                <div className="bg-white p-2 rounded-xl border border-slate-200">
+                  <div className="text-[10px] text-slate-400 font-medium">รูปแบบ</div>
+                  <div className="font-extrabold text-slate-800 uppercase text-[11px] mt-0.5">
+                    {savedMeetingDetails.type}
+                  </div>
+                </div>
+                <div className="bg-white p-2 rounded-xl border border-slate-200">
+                  <div className="text-[10px] text-slate-400 font-medium">Staff PIN</div>
+                  <div className="font-mono font-bold text-amber-700 text-[11px] mt-0.5">
+                    {savedMeetingDetails.staffCode || '-'}
+                  </div>
+                </div>
+                <div className="bg-white p-2 rounded-xl border border-slate-200">
+                  <div className="text-[10px] text-slate-400 font-medium">กิจกรรม/เวิร์กช็อป</div>
+                  <div className="font-bold text-violet-700 text-[11px] mt-0.5">
+                    {savedMeetingDetails.mainCount} Main / {savedMeetingDetails.workshopCount} WS
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-1">
+              {onNavigateTab && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    onNavigateTab('meeting-history');
+                  }}
+                  className="w-full sm:flex-1 flex items-center justify-center gap-2 bg-[#0026b3] hover:bg-[#001f94] text-white font-bold text-xs sm:text-sm py-3 px-4 rounded-xl shadow-md shadow-blue-900/20 transition active:scale-95 cursor-pointer"
+                >
+                  <ClipboardList className="w-4 h-4 text-[#4ade80]" />
+                  <span>ดูในประวัติการประชุม</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  handleResetForm();
+                  setShowSuccessModal(false);
+                }}
+                className="w-full sm:flex-1 flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-sm py-3 px-4 rounded-xl transition cursor-pointer"
+              >
+                <PlusCircle className="w-4 h-4 text-slate-600" />
+                <span>+ สร้างรายการอื่นต่อ</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* Header & Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -2069,49 +2285,132 @@ function AddMeetingPanel({
             </div>
           </div>
 
-          {/* รูปแบบการจัดงาน (Onsite / Online) */}
+          {/* รูปแบบการจัดงาน (Onsite / Online / Hybrid) */}
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">รูปแบบการจัดงาน (Attendance Format)</label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, type: 'onsite' })}
-                className={`flex items-center justify-center gap-2.5 p-3.5 rounded-xl transition border-2 cursor-pointer ${
-                  formData.type === 'onsite'
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-400 ring-2 ring-emerald-200 shadow-sm'
-                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
-                }`}
-              >
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
-                  formData.type === 'onsite' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'
-                }`}>
-                  <MapPin className="w-3.5 h-3.5" />
-                </div>
-                <div className="text-left">
-                  <div className="text-sm font-extrabold">Onsite (ที่งาน)</div>
-                  <div className="text-[11px] text-slate-500">เข้าร่วม ณ สถานที่จัดงาน</div>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, type: 'online' })}
-                className={`flex items-center justify-center gap-2.5 p-3.5 rounded-xl transition border-2 cursor-pointer ${
-                  formData.type === 'online'
-                    ? 'bg-blue-50 text-[#0026b3] border-[#0026b3]/50 ring-2 ring-blue-200 shadow-sm'
-                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
-                }`}
-              >
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
-                  formData.type === 'online' ? 'bg-[#0026b3] text-white' : 'bg-slate-200 text-slate-500'
-                }`}>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </div>
-                <div className="text-left">
-                  <div className="text-sm font-extrabold">Online (ออนไลน์)</div>
-                  <div className="text-[11px] text-slate-500">รับชมผ่านระบบออนไลน์</div>
-                </div>
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-1.5">
+              <label className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
+                <span>รูปแบบการจัดงาน (Attendance Format)</span>
+                <span className="text-xs font-normal text-slate-500">(เลือกได้ทั้ง 2 ตัวเลือก)</span>
+              </label>
+              <div className="text-xs font-semibold">
+                {formData.type === 'hybrid' ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
+                    <Sparkles className="w-3 h-3 text-indigo-600" />
+                    รูปแบบผสมผสาน (Hybrid)
+                  </span>
+                ) : formData.type === 'onsite' ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">
+                    <MapPin className="w-3 h-3 text-emerald-600" />
+                    Onsite เท่านั้น
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[#0026b3]">
+                    <ExternalLink className="w-3 h-3 text-[#0026b3]" />
+                    Online เท่านั้น
+                  </span>
+                )}
+              </div>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(() => {
+                const isOnsite = formData.type === 'onsite' || formData.type === 'hybrid';
+                const isOnline = formData.type === 'online' || formData.type === 'hybrid';
+                return (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isOnsite) {
+                          if (isOnline) {
+                            setFormData({ ...formData, type: 'online' });
+                          }
+                        } else {
+                          setFormData({ ...formData, type: isOnline ? 'hybrid' : 'onsite' });
+                        }
+                      }}
+                      className={`relative flex items-center justify-between p-3.5 rounded-xl transition border-2 text-left cursor-pointer ${
+                        isOnsite
+                          ? 'bg-emerald-50 text-emerald-900 border-emerald-400 ring-2 ring-emerald-200 shadow-xs'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition ${
+                            isOnsite ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-200 text-slate-500'
+                          }`}
+                        >
+                          <MapPin className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-extrabold text-slate-900">Onsite (ที่งาน)</div>
+                          <div className="text-[11px] text-slate-500">เข้าร่วม ณ สถานที่จัดงานจริง</div>
+                        </div>
+                      </div>
+                      <div
+                        className={`w-5 h-5 rounded-md border flex items-center justify-center transition shrink-0 ${
+                          isOnsite
+                            ? 'bg-emerald-600 border-emerald-600 text-white'
+                            : 'border-slate-300 bg-white'
+                        }`}
+                      >
+                        {isOnsite && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isOnline) {
+                          if (isOnsite) {
+                            setFormData({ ...formData, type: 'onsite' });
+                          }
+                        } else {
+                          setFormData({ ...formData, type: isOnsite ? 'hybrid' : 'online' });
+                        }
+                      }}
+                      className={`relative flex items-center justify-between p-3.5 rounded-xl transition border-2 text-left cursor-pointer ${
+                        isOnline
+                          ? 'bg-blue-50 text-[#0026b3] border-[#0026b3]/50 ring-2 ring-blue-200 shadow-xs'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition ${
+                            isOnline ? 'bg-[#0026b3] text-white shadow-xs' : 'bg-slate-200 text-slate-500'
+                          }`}
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-extrabold text-slate-900">Online (ออนไลน์)</div>
+                          <div className="text-[11px] text-slate-500">รับชมผ่านระบบถ่ายทอดสด Zoom / Live</div>
+                        </div>
+                      </div>
+                      <div
+                        className={`w-5 h-5 rounded-md border flex items-center justify-center transition shrink-0 ${
+                          isOnline
+                            ? 'bg-[#0026b3] border-[#0026b3] text-white'
+                            : 'border-slate-300 bg-white'
+                        }`}
+                      >
+                        {isOnline && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      </div>
+                    </button>
+                  </>
+                );
+              })()}
+            </div>
+            {formData.type === 'hybrid' && (
+              <div className="text-xs text-indigo-800 bg-indigo-50/70 border border-indigo-200/80 rounded-xl px-3 py-2 flex items-center gap-2 animate-fade-in">
+                <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span>
+                  <strong>การจัดงานแบบ Hybrid:</strong> ผู้เข้าร่วมสามารถเลือกช่องทางเข้าร่วมได้ทั้งที่หน้างาน (Onsite) หรือรับชมออนไลน์ (Online)
+                </span>
+              </div>
+            )}
           </div>
 
           {/* สถานที่จัดงาน (Text Input สะอาดตา ไม่มีตัวเลือกปุ่มลัด) */}
@@ -2316,69 +2615,133 @@ function AddMeetingPanel({
                         )}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-start">
-                        <div className="sm:col-span-8 space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <label className="text-xs font-bold text-slate-700">
-                              วันที่จัดกิจกรรม * <span className="text-[11px] font-normal text-slate-500">(เลือกได้มากกว่า 1 วัน)</span>
-                            </label>
-                            {activity.date ? (
-                              <span className="text-[11px] font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-md border border-violet-100 flex items-center gap-1">
-                                <Check className="w-3 h-3 text-violet-700" />
-                                <span>{activity.date}</span>
-                                {selectedList.length > 1 && (
-                                  <span className="bg-violet-600 text-white text-[10px] px-1.5 py-0.2 rounded-full">
-                                    {selectedList.length} วัน
-                                  </span>
-                                )}
-                              </span>
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-start">
+                          <div className="sm:col-span-8 space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs font-bold text-slate-700">
+                                วันที่จัดกิจกรรม * <span className="text-[11px] font-normal text-slate-500">(เลือกได้มากกว่า 1 วัน)</span>
+                              </label>
+                              {activity.date ? (
+                                <span className="text-[11px] font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-md border border-violet-100 flex items-center gap-1">
+                                  <Check className="w-3 h-3 text-violet-700" />
+                                  <span>{activity.date}</span>
+                                  {selectedList.length > 1 && (
+                                    <span className="bg-violet-600 text-white text-[10px] px-1.5 py-0.2 rounded-full">
+                                      {selectedList.length} วัน
+                                    </span>
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="text-[11px] text-slate-400">ยังไม่ได้เลือกวัน</span>
+                              )}
+                            </div>
+
+                            {dayChoices.length > 0 ? (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {dayChoices.map((choice) => {
+                                  const isChoiceSelected = choice.id === 'all' ? isAllSelected : selectedList.includes(choice.id);
+                                  return (
+                                    <button
+                                      key={choice.id}
+                                      type="button"
+                                      onClick={() => handleToggleActivityDay(activity.id, choice.id)}
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 border select-none ${
+                                        isChoiceSelected
+                                          ? 'bg-violet-600 text-white border-violet-600 shadow-xs ring-1 ring-violet-300'
+                                          : 'bg-slate-50 hover:bg-violet-50 text-slate-700 hover:text-violet-700 border-slate-200 hover:border-violet-200'
+                                      }`}
+                                    >
+                                      <Calendar className="w-3 h-3" />
+                                      <span>{choice.label}</span>
+                                      {isChoiceSelected && <Check className="w-3 h-3 ml-0.5 text-[#4ade80]" />}
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             ) : (
-                              <span className="text-[11px] text-slate-400">ยังไม่ได้เลือกวัน</span>
+                              <div className="p-2 rounded-lg bg-amber-50/80 border border-amber-200 text-amber-800 text-[11px] flex items-center gap-1.5">
+                                <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                <span>กรุณาเลือกวันที่จัดงานรวมในส่วนที่ 1 ก่อน</span>
+                              </div>
                             )}
                           </div>
 
-                          {dayChoices.length > 0 ? (
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {dayChoices.map((choice) => {
-                                const isChoiceSelected = choice.id === 'all' ? isAllSelected : selectedList.includes(choice.id);
-                                return (
-                                  <button
-                                    key={choice.id}
-                                    type="button"
-                                    onClick={() => handleToggleActivityDay(activity.id, choice.id)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 border select-none ${
-                                      isChoiceSelected
-                                        ? 'bg-violet-600 text-white border-violet-600 shadow-xs ring-1 ring-violet-300'
-                                        : 'bg-slate-50 hover:bg-violet-50 text-slate-700 hover:text-violet-700 border-slate-200 hover:border-violet-200'
-                                    }`}
-                                  >
-                                    <Calendar className="w-3 h-3" />
-                                    <span>{choice.label}</span>
-                                    {isChoiceSelected && <Check className="w-3 h-3 ml-0.5 text-[#4ade80]" />}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <div className="p-2 rounded-lg bg-amber-50/80 border border-amber-200 text-amber-800 text-[11px] flex items-center gap-1.5">
-                              <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                              <span>กรุณาเลือกวันที่จัดงานรวมในส่วนที่ 1 ก่อน</span>
-                            </div>
-                          )}
+                          <div className="sm:col-span-4 space-y-1.5">
+                            <label className="text-xs font-bold text-slate-700">จำนวนที่นั่ง (คน) *</label>
+                            <input
+                              type="number"
+                              min={1}
+                              value={activity.maxSeats || ''}
+                              onChange={(e) => handleUpdateActivity(activity.id, 'maxSeats', parseInt(e.target.value) || 0)}
+                              placeholder="เช่น 50"
+                              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition"
+                            />
+                          </div>
                         </div>
 
-                        <div className="sm:col-span-4 space-y-1.5">
-                          <label className="text-xs font-bold text-slate-700">จำนวนที่นั่ง (คน) *</label>
-                          <input
-                            type="number"
-                            min={1}
-                            value={activity.maxSeats || ''}
-                            onChange={(e) => handleUpdateActivity(activity.id, 'maxSeats', parseInt(e.target.value) || 0)}
-                            placeholder="เช่น 50"
-                            className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition"
-                          />
+                        {/* Workshop Registration Fee (Member* and Non-member) */}
+                        <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                              <Coins className="w-3.5 h-3.5 text-violet-600" />
+                              <span>กำหนดค่าลงทะเบียนเวิร์กช็อป (Registration Fee)</span>
+                            </label>
+                            <span className="text-[10px] text-slate-400">ระบุ 0 หากไม่มีค่าใช้จ่าย</span>
+                          </div>
+
+                          <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/60 shadow-2xs">
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead>
+                                <tr className="bg-slate-100/90 border-b border-slate-200 text-slate-700 font-extrabold text-[11px]">
+                                  <th className="py-2 px-3 w-1/2">
+                                    Member<span className="text-rose-500 font-bold">*</span>
+                                    <span className="text-[10px] text-slate-400 font-normal ml-1">(สมาชิกสมาคม)</span>
+                                  </th>
+                                  <th className="py-2 px-3 w-1/2 border-l border-slate-200">
+                                    Non-member
+                                    <span className="text-[10px] text-slate-400 font-normal ml-1">(บุคคลทั่วไป)</span>
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr className="bg-white">
+                                  {/* Member* */}
+                                  <td className="p-2">
+                                    <div className="relative">
+                                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step={100}
+                                        value={activity.memberPrice !== undefined && activity.memberPrice !== null ? (activity.memberPrice === 0 ? '' : activity.memberPrice) : ''}
+                                        onChange={(e) => handleUpdateActivity(activity.id, 'memberPrice', parseInt(e.target.value) || 0)}
+                                        placeholder="0"
+                                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-[#0026b3] focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                                      />
+                                    </div>
+                                  </td>
+                                  {/* Non-member */}
+                                  <td className="p-2 border-l border-slate-200">
+                                    <div className="relative">
+                                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step={100}
+                                        value={activity.nonMemberPrice !== undefined && activity.nonMemberPrice !== null ? (activity.nonMemberPrice === 0 ? '' : activity.nonMemberPrice) : ''}
+                                        onChange={(e) => handleUpdateActivity(activity.id, 'nonMemberPrice', parseInt(e.target.value) || 0)}
+                                        placeholder="0"
+                                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                                      />
+                                    </div>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
-                      </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -2763,6 +3126,89 @@ function AddMeetingPanel({
             </table>
           </div>
 
+          {/* Workshop Registration Rates Table in Section 3 (if workshops added) */}
+          {workshopCount > 0 && (
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-violet-600"></span>
+                  <span>อัตราค่าลงทะเบียน Pre-congress Workshop ({workshopCount} รายการ)</span>
+                </div>
+                <span className="text-[11px] text-slate-400 font-medium">ซิงค์อัตโนมัติกับรายการ Workshop ด้านบน</span>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-violet-200 bg-white shadow-2xs">
+                <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                  <thead>
+                    <tr className="bg-violet-50/90 border-b border-violet-200 text-violet-950 font-bold text-[11px] sm:text-xs">
+                      <th className="py-2.5 px-3 w-[40%]">ชื่อหลักสูตร / เวิร์กช็อป (WS)</th>
+                      <th className="py-2.5 px-3 text-center border-l border-violet-200 w-[24%] text-[#0026b3]">
+                        Member<span className="text-rose-500 font-bold">*</span>
+                      </th>
+                      <th className="py-2.5 px-3 text-center border-l border-violet-200 w-[24%] text-slate-800">
+                        Non-member
+                      </th>
+                      <th className="py-2.5 px-3 text-center border-l border-violet-200 w-[12%] text-slate-600">
+                        ที่นั่ง (คน)
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-violet-100">
+                    {activities.filter((a) => a.type === 'workshop').map((ws, wsIdx) => (
+                      <tr key={ws.id} className="hover:bg-violet-50/40 transition">
+                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-black text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded shrink-0">
+                              WS {wsIdx + 1}
+                            </span>
+                            <span className="truncate max-w-[200px] sm:max-w-xs">{ws.name || `Workshop ${wsIdx + 1}`}</span>
+                          </div>
+                          {ws.date && <div className="text-[10px] text-slate-400 font-normal pl-7">{ws.date}</div>}
+                        </td>
+                        {/* Member* */}
+                        <td className="py-2 px-2.5 border-l border-violet-100">
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                            <input
+                              type="number"
+                              min={0}
+                              step={100}
+                              value={ws.memberPrice !== undefined && ws.memberPrice !== null ? (ws.memberPrice === 0 ? '' : ws.memberPrice) : ''}
+                              onChange={(e) => handleUpdateActivity(ws.id, 'memberPrice', parseInt(e.target.value) || 0)}
+                              placeholder="0"
+                              className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-[#0026b3] focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-violet-600 text-right"
+                            />
+                          </div>
+                        </td>
+                        {/* Non-member */}
+                        <td className="py-2 px-2.5 border-l border-violet-100">
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                            <input
+                              type="number"
+                              min={0}
+                              step={100}
+                              value={ws.nonMemberPrice !== undefined && ws.nonMemberPrice !== null ? (ws.nonMemberPrice === 0 ? '' : ws.nonMemberPrice) : ''}
+                              onChange={(e) => handleUpdateActivity(ws.id, 'nonMemberPrice', parseInt(e.target.value) || 0)}
+                              placeholder="0"
+                              className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-violet-600 text-right"
+                            />
+                          </div>
+                        </td>
+                        {/* Seats */}
+                        <td className="py-2 px-2.5 border-l border-violet-100 text-center font-bold text-slate-700">
+                          <span className="inline-block px-2 py-1 rounded-md bg-slate-100 text-xs text-slate-700 font-semibold">
+                            {ws.maxSeats || 0}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Footnote / Quick Remark */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-slate-500 pt-0.5">
             <div className="flex items-center gap-1.5">
@@ -2813,10 +3259,15 @@ function AddMeetingPanel({
             </button>
             <button
               type="submit"
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[#0026b3] hover:bg-[#001f94] text-white font-bold text-sm px-8 py-3 rounded-xl shadow-md shadow-[#0026b3]/20 transition active:scale-95 cursor-pointer"
+              disabled={isSubmitting}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 font-bold text-sm px-8 py-3 rounded-xl shadow-md transition active:scale-95 cursor-pointer ${
+                isSubmitting
+                  ? 'bg-slate-400 text-white shadow-slate-300/20 cursor-not-allowed'
+                  : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-[#0026b3]/20'
+              }`}
             >
               <Check className="w-4 h-4 text-[#4ade80]" />
-              <span>บันทึกและเปิดรับลงทะเบียน</span>
+              <span>{isSubmitting ? 'กำลังบันทึก...' : 'บันทึกและเปิดรับลงทะเบียน'}</span>
             </button>
           </div>
         </div>
@@ -3287,8 +3738,8 @@ function VerifySlipsPanel({
       </div>
 
       {/* Slip Preview Modal (Light Theme) */}
-      {selectedSlip && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+      {selectedSlip && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
           <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl space-y-4 p-6">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
@@ -3362,12 +3813,13 @@ function VerifySlipsPanel({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Reject Reason Modal */}
-      {isRejectModalOpen && selectedSlip && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+      {isRejectModalOpen && selectedSlip && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
           <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <h3 className="text-base sm:text-lg font-extrabold text-slate-900 flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-rose-600" />
@@ -3400,7 +3852,8 @@ function VerifySlipsPanel({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -3952,8 +4405,8 @@ function VerifyAttendeesPanel({
       </div>
 
       {/* ─── Attendee Details Modal ──────────────────────────────────────── */}
-      {selectedAttendee && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+      {selectedAttendee && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
           <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
@@ -4055,12 +4508,13 @@ function VerifyAttendeesPanel({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Walk-in Registration Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+      {isAddModalOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl sm:rounded-3xl max-w-xl w-full p-5 sm:p-6 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -4269,7 +4723,8 @@ function VerifyAttendeesPanel({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -4283,6 +4738,40 @@ export default function AdminPage() {
   const [slips, setSlips] = useState<SlipItem[]>(INITIAL_SLIPS);
   const [attendees, setAttendees] = useState<AttendeeItem[]>(INITIAL_ATTENDEES);
   const [receipts, setReceipts] = useState<ReceiptData[]>(INITIAL_RECEIPTS);
+
+  // ─── Fetch meetings from API on mount ───
+  const fetchMeetings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/meetings?limit=100&sort_by=meeting_date&order=desc');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        const mapped: MeetingItem[] = json.data.map((m: Record<string, unknown>) => ({
+          id: m.meeting_id as string,
+          titleTh: m.meeting_name as string,
+          titleEn: m.meeting_name as string,
+          date: m.meeting_date ? new Date(m.meeting_date as string).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : '',
+          time: (m.meeting_time as string) || '08:30 - 17:00 น.',
+          location: (m.location as string) || '',
+          type: ((m.meeting_type as string) || 'onsite') as 'hybrid' | 'onsite' | 'online',
+          staffCode: (m.staff_code as string) || '',
+          maxSeats: (m.max_seats as number) || 0,
+          basePrice: (m.base_price as number) || 0,
+          pricingTiers: m.pricing_tiers as MeetingPricingTiers | undefined,
+          registered: ((m._count as Record<string, number>)?.meeting_attendances) || 0,
+          attended: 0,
+          revenue: 0,
+          status: ((m.status as string) || 'upcoming') as 'upcoming' | 'ongoing' | 'completed',
+        }));
+        setMeetings(mapped);
+      }
+    } catch (err) {
+      console.error('Failed to fetch meetings:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMeetings();
+  }, [fetchMeetings]);
 
   // Global Receipt Modal for quick print from attendees/slips
   const [globalReceipt, setGlobalReceipt] = useState<ReceiptData | null>(null);
@@ -4470,14 +4959,32 @@ export default function AdminPage() {
     );
   };
 
-  const handleUpdateMeetingStatus = (meetingId: string, status: 'upcoming' | 'ongoing' | 'completed') => {
+  const handleUpdateMeetingStatus = async (meetingId: string, status: 'upcoming' | 'ongoing' | 'completed') => {
+    // Optimistic update
     setMeetings((prev) =>
       prev.map((m) => (m.id === meetingId ? { ...m, status } : m))
     );
+    // Sync to API
+    try {
+      await fetch(`/api/meetings/${meetingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+    } catch (err) {
+      console.error('Failed to update meeting status:', err);
+    }
   };
 
-  const handleDeleteMeeting = (meetingId: string) => {
+  const handleDeleteMeeting = async (meetingId: string) => {
+    // Optimistic update
     setMeetings((prev) => prev.filter((m) => m.id !== meetingId));
+    // Sync to API
+    try {
+      await fetch(`/api/meetings/${meetingId}`, { method: 'DELETE' });
+    } catch (err) {
+      console.error('Failed to delete meeting:', err);
+    }
   };
 
   const handleMeetingCreated = (newMeeting: MeetingItem) => {
