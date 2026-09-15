@@ -16,6 +16,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
+import { uploadImageToStorage } from '@/lib/blobUpload';
 
 interface ResubmitPageProps {
   params: Promise<{ token: string }>;
@@ -38,6 +39,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
     ticketCode: string;
   } | null>(null);
 
+  const [newSlipFile, setNewSlipFile] = useState<File | null>(null);
   const [newSlipUrl, setNewSlipUrl] = useState<string | null>(null);
   const [newSlipName, setNewSlipName] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
@@ -69,26 +71,31 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setNewSlipFile(file);
       setNewSlipName(file.name);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setNewSlipUrl(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+      const url = URL.createObjectURL(file);
+      setNewSlipUrl(url);
     }
   };
 
   const handleConfirmResubmit = async () => {
-    if (!newSlipUrl) return;
+    if (!newSlipUrl && !newSlipFile) return;
 
     try {
       setSubmitting(true);
+
+      let finalSlipUrl = newSlipUrl || '';
+      if (newSlipFile) {
+        const uploadResult = await uploadImageToStorage(newSlipFile, 'slips');
+        finalSlipUrl = uploadResult.url;
+      }
+
       const res = await fetch('/api/payment/resubmit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token,
-          slipUrl: newSlipUrl,
+          slipUrl: finalSlipUrl,
           transferDate: new Date().toLocaleDateString('th-TH'),
           transferTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
         }),
