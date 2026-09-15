@@ -2430,16 +2430,12 @@ export function AgendaView() {
                 <div className="space-y-2 text-xs">
                   <div className="bg-white/10 p-3 rounded-xl border border-white/15 space-y-1.5 text-[11px]">
                     <div className="flex justify-between font-bold">
-                      <span className="text-cyan-300">Onsite Main (21-22 Oct)</span>
+                      <span className="text-cyan-300">Onsite (21-22 Oct)</span>
                       <span>Member ฿ 4,000 / Non-member ฿ 5,000</span>
-                    </div>
-                    <div className="flex justify-between text-blue-200">
-                      <span>Fellow Onsite</span>
-                      <span>฿ 2,000 (Member / Non-member)</span>
                     </div>
                     <div className="flex justify-between text-emerald-300 font-semibold">
                       <span>Online Member</span>
-                      <span>Participant ฿ 4,000 / Fellow ฟรีที่สถาบัน</span>
+                      <span>฿ 4,000</span>
                     </div>
                   </div>
 

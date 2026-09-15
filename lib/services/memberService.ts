@@ -95,25 +95,39 @@ export function toMemberDto(member: any): Member {
 }
 
 /**
- * ดึงเลขรหัสสมาชิก (member_no) ถัดไปจาก Sequence ใน PostgreSQL (4 หลัก)
+ * ดึงเลขรหัสสมาชิก (member_no) ถัดไปจากค่าสูงสุดที่มีอยู่ในปัจจุบัน (Hybrid Auto-Sync Sequence)
+ * ช่วยให้รันเลขต่อจากข้อมูลล่าสุดเสมอ แม้ว่าจะมีการลบข้อมูลออกไป
  */
 export async function getNextMemberCodes(): Promise<{ member_no: string }> {
   try {
-    const rawResult = await prisma.$queryRaw<Array<{ next_member_no: string }>>`
-      SELECT lpad(nextval('member_no_seq')::TEXT, 4, '0') AS next_member_no
+    const rawResult = await prisma.$queryRaw<Array<{ max_no: number | bigint | string | null }>>`
+      SELECT COALESCE(MAX(CAST(member_no AS INTEGER)), 0) AS max_no 
+      FROM members 
+      WHERE member_no ~ '^[0-9]+$'
     `;
 
-    if (rawResult && rawResult.length > 0 && rawResult[0].next_member_no) {
-      return { member_no: rawResult[0].next_member_no };
-    }
-  } catch (error) {
-    console.warn('Postgres sequence member_no_seq failed or not yet initialized, falling back to count:', error);
-  }
+    const maxNo = Number(rawResult?.[0]?.max_no) || 0;
+    const nextVal = maxNo + 1;
+    const nextMemberNo = String(nextVal).padStart(4, '0');
 
-  // Fallback if sequence is not yet initialized
-  const count = await prisma.member.count();
-  const nextNum = (count + 1).toString().padStart(4, '0');
-  return { member_no: nextNum };
+    // Sync PostgreSQL sequence member_no_seq ให้สอดคล้องกับค่าล่าสุด
+    try {
+      if (maxNo > 0) {
+        await prisma.$executeRaw`SELECT setval('member_no_seq', ${maxNo}, true)`;
+      } else {
+        await prisma.$executeRaw`SELECT setval('member_no_seq', 1, false)`;
+      }
+    } catch {
+      // หากยังไม่มี sequence หรือ error ให้ข้ามการ sync sequence
+    }
+
+    return { member_no: nextMemberNo };
+  } catch (error) {
+    console.warn('Query max member_no failed, falling back to count:', error);
+    const count = await prisma.member.count();
+    const nextNum = (count + 1).toString().padStart(4, '0');
+    return { member_no: nextNum };
+  }
 }
 
 /**
@@ -190,9 +204,6 @@ export async function createMember(rawInput: CreateMemberInput): Promise<Member>
   // ดึงรหัสสมาชิกอัตโนมัติ
   const { member_no } = await getNextMemberCodes();
 
-  // สร้าง QR Code (อ้างอิงจาก member_no)
-  const qrCodeData = await generateQrCode(member_no);
-
   // Parse start_date if provided
   const parsedStartDate = input.start_date ? new Date(input.start_date) : null;
 
@@ -216,7 +227,8 @@ export async function createMember(rawInput: CreateMemberInput): Promise<Member>
       membership_status: input.membership_status ?? 'Active',
       scientist_license_no: input.scientist_reg_no ?? null,
       photo_url: input.photo_path ?? null,
-      qr_code_image_url: qrCodeData,
+      qr_code_data: { member_no },
+      qr_code_image_url: null,
       member_educations: input.educations && input.educations.length > 0
         ? {
             create: input.educations.map((edu) => ({

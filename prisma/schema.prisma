@@ -40,6 +40,7 @@ model Member {
   qr_code_image_url    String?               @db.VarChar(500)
   meeting_attendances  meeting_attendances[]
   member_educations    member_educations[]
+  payment_slips        payment_slips[]
 
   @@index([email], map: "idx_members_email")
   @@index([fullNameTh], map: "idx_members_name_th")
@@ -49,11 +50,15 @@ model Member {
 model meeting_attendances {
   attendance_id     BigInt    @id @default(autoincrement())
   meeting_id        String    @db.VarChar(50)
-  member_no         String    @db.VarChar(20)
-  attendance_status String    @default("Attended") @db.VarChar(20)
+  member_no         String?   @db.VarChar(20)
+  attendee_name     String?   @db.VarChar(255)
+  attendee_email    String?   @db.VarChar(255)
+  attendee_phone    String?   @db.VarChar(50)
+  workplace         String?   @db.VarChar(255)
+  attendance_status String    @default("Registered") @db.VarChar(50)
   checkin_time      DateTime? @db.Timestamptz(6)
   meetings          meetings  @relation(fields: [meeting_id], references: [meeting_id], onUpdate: NoAction)
-  members           Member    @relation(fields: [member_no], references: [member_no], onDelete: Cascade, onUpdate: NoAction)
+  members           Member?   @relation(fields: [member_no], references: [member_no], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([meeting_id, member_no], map: "uq_member_meeting")
   @@index([meeting_id], map: "idx_attendance_meeting")
@@ -64,6 +69,8 @@ model meetings {
   meeting_id           String                @id @db.VarChar(50)
   meeting_name         String                @db.VarChar(255)
   meeting_date         DateTime              @db.Date
+  start_date           DateTime?             @db.Date
+  end_date             DateTime?             @db.Date
   counts_toward_active Boolean               @default(true)
   meeting_time         String?               @db.VarChar(100)
   location             String?               @db.VarChar(500)
@@ -76,6 +83,7 @@ model meetings {
   max_seats            Int?                  @default(0)
   status               String?               @default("upcoming") @db.VarChar(20)
   meeting_attendances  meeting_attendances[]
+  payment_slips        payment_slips[]
 }
 
 model member_educations {
@@ -85,4 +93,39 @@ model member_educations {
   institution     String  @db.VarChar(255)
   graduation_year String? @db.VarChar(10)
   members         Member  @relation(fields: [member_no], references: [member_no], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model payment_slips {
+  id                  BigInt    @id @default(autoincrement())
+  slip_id             String    @unique @default(uuid()) @db.VarChar(50)
+  meeting_id          String    @db.VarChar(50)
+  member_no           String?   @db.VarChar(20)
+  guest_name          String?   @db.VarChar(255)
+  guest_email         String?   @db.VarChar(255)
+  guest_phone         String?   @db.VarChar(50)
+  guest_workplace     String?   @db.VarChar(255)
+  is_member           Boolean   @default(false)
+  ticket_code         String?   @db.VarChar(50)
+  amount              Int       @default(0)
+  bank                String?   @db.VarChar(100)
+  transfer_date       String?   @db.VarChar(50)
+  transfer_time       String?   @db.VarChar(50)
+  ref_no              String?   @db.VarChar(100)
+  slip_url            String    @db.VarChar(500)
+  status              String    @default("pending") @db.VarChar(20)
+  rejection_reason    String?   @db.VarChar(500)
+  resubmit_token      String?   @unique @db.VarChar(100)
+  selected_activities Json?
+  reviewed_by         String?   @db.VarChar(100)
+  reviewed_at         DateTime? @db.Timestamptz(6)
+  created_at          DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime  @updatedAt @db.Timestamptz(6)
+
+  members             Member?   @relation(fields: [member_no], references: [member_no], onDelete: Cascade, onUpdate: NoAction)
+  meetings            meetings  @relation(fields: [meeting_id], references: [meeting_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([meeting_id], map: "idx_slips_meeting")
+  @@index([member_no], map: "idx_slips_member")
+  @@index([status], map: "idx_slips_status")
+  @@index([resubmit_token], map: "idx_slips_resubmit_token")
 }

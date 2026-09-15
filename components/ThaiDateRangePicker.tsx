@@ -23,6 +23,82 @@ const THAI_MONTH_SHORT = [
 
 const WEEKDAYS = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
+export function parseThaiDateRange(dateStr: string): { start: Date | null; end: Date | null } {
+  if (!dateStr || typeof dateStr !== 'string') return { start: null, end: null };
+  const trimmed = dateStr.replace(/^วันที่\s*/, '').trim();
+
+  // Try ISO format (e.g. 2026-09-15)
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) return { start: d, end: null };
+  }
+
+  const parseMonthIdx = (name: string): number | undefined => {
+    const fullIdx = THAI_MONTH_FULL.indexOf(name);
+    if (fullIdx >= 0) return fullIdx;
+    const shortIdx = THAI_MONTH_SHORT.indexOf(name);
+    if (shortIdx >= 0) return shortIdx;
+    const cleaned = name.replace(/\./g, '');
+    const cleanShortIdx = THAI_MONTH_SHORT.map(s => s.replace(/\./g, '')).indexOf(cleaned);
+    if (cleanShortIdx >= 0) return cleanShortIdx;
+    return undefined;
+  };
+
+  // Cross month range: "28 กันยายน - 2 ตุลาคม 2569" or "28 ก.ย. - 2 ต.ค. 2569"
+  const crossMonth = trimmed.match(/^(\d{1,2})\s+([^\d\s-]+?)(?:\s+(\d{4}))?\s*[-–—]\s*(\d{1,2})\s+([^\d\s-]+?)\s+(?:พ\.ศ\.\s*)?(\d{4})/);
+  if (crossMonth) {
+    const d1 = parseInt(crossMonth[1], 10);
+    const m1 = crossMonth[2].trim();
+    const d2 = parseInt(crossMonth[4], 10);
+    const m2 = crossMonth[5].trim();
+    let y = parseInt(crossMonth[6], 10);
+    if (y > 2400) y -= 543;
+    const mIdx1 = parseMonthIdx(m1);
+    const mIdx2 = parseMonthIdx(m2);
+    if (mIdx1 !== undefined && mIdx2 !== undefined) {
+      return {
+        start: new Date(y, mIdx1, d1),
+        end: new Date(y, mIdx2, d2),
+      };
+    }
+  }
+
+  // Same month range: "15 - 17 กันยายน 2569" or "15-17 ก.ย. 2569"
+  const sameMonthRange = trimmed.match(/^(\d{1,2})\s*[-–—]\s*(\d{1,2})\s+([^\d\s]+)\s+(?:พ\.ศ\.\s*)?(\d{4})/);
+  if (sameMonthRange) {
+    const d1 = parseInt(sameMonthRange[1], 10);
+    const d2 = parseInt(sameMonthRange[2], 10);
+    const m = sameMonthRange[3].trim();
+    let y = parseInt(sameMonthRange[4], 10);
+    if (y > 2400) y -= 543;
+    const mIdx = parseMonthIdx(m);
+    if (mIdx !== undefined) {
+      return {
+        start: new Date(y, mIdx, d1),
+        end: new Date(y, mIdx, d2),
+      };
+    }
+  }
+
+  // Single date: "15 กันยายน 2569" or "15 ก.ย. 2569"
+  const single = trimmed.match(/^(\d{1,2})\s+([^\d\s]+)\s+(?:พ\.ศ\.\s*)?(\d{4})/);
+  if (single) {
+    const d = parseInt(single[1], 10);
+    const m = single[2].trim();
+    let y = parseInt(single[3], 10);
+    if (y > 2400) y -= 543;
+    const mIdx = parseMonthIdx(m);
+    if (mIdx !== undefined) {
+      return {
+        start: new Date(y, mIdx, d),
+        end: null,
+      };
+    }
+  }
+
+  return { start: null, end: null };
+}
+
 export function ThaiDateRangePicker({
   value,
   onChange,
@@ -33,11 +109,25 @@ export function ThaiDateRangePicker({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Default to September 2569 (2026) as in mock/design or current
-  const [viewDate, setViewDate] = useState<Date>(() => new Date(2026, 8, 1)); // Sep 2026
-  const [startDate, setStartDate] = useState<Date | null>(() => new Date(2026, 9, 15)); // Oct 15 2026
-  const [endDate, setEndDate] = useState<Date | null>(() => new Date(2026, 9, 17)); // Oct 17 2026
+  const [viewDate, setViewDate] = useState<Date>(() => new Date(2026, 8, 1));
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
   const [hoverDate, setHoverDate] = useState<Date | null>(null);
+
+  // Sync internal start/end date when incoming value changes
+  useEffect(() => {
+    if (!value) {
+      setStartDate(null);
+      setEndDate(null);
+      return;
+    }
+    const { start, end } = parseThaiDateRange(value);
+    if (start) {
+      setStartDate(start);
+      setViewDate(new Date(start.getFullYear(), start.getMonth(), 1));
+    }
+    setEndDate(end);
+  }, [value]);
 
   // Close when clicking outside
   useEffect(() => {
@@ -57,7 +147,7 @@ export function ThaiDateRangePicker({
     const startMonth = start.getMonth();
 
     if (!end || start.toDateString() === end.toDateString()) {
-      return `${startDay} ${THAI_MONTH_SHORT[startMonth]} ${startThaiYear}`;
+      return `${startDay} ${THAI_MONTH_FULL[startMonth]} ${startThaiYear}`;
     }
 
     const endThaiYear = end.getFullYear() + 543;
@@ -65,11 +155,11 @@ export function ThaiDateRangePicker({
     const endMonth = end.getMonth();
 
     if (startThaiYear === endThaiYear && startMonth === endMonth) {
-      return `${startDay}-${endDay} ${THAI_MONTH_SHORT[startMonth]} ${startThaiYear}`;
+      return `${startDay} - ${endDay} ${THAI_MONTH_FULL[startMonth]} ${startThaiYear}`;
     } else if (startThaiYear === endThaiYear) {
-      return `${startDay} ${THAI_MONTH_SHORT[startMonth]} - ${endDay} ${THAI_MONTH_SHORT[endMonth]} ${startThaiYear}`;
+      return `${startDay} ${THAI_MONTH_FULL[startMonth]} - ${endDay} ${THAI_MONTH_FULL[endMonth]} ${startThaiYear}`;
     } else {
-      return `${startDay} ${THAI_MONTH_SHORT[startMonth]} ${startThaiYear} - ${endDay} ${THAI_MONTH_SHORT[endMonth]} ${endThaiYear}`;
+      return `${startDay} ${THAI_MONTH_FULL[startMonth]} ${startThaiYear} - ${endDay} ${THAI_MONTH_FULL[endMonth]} ${endThaiYear}`;
     }
   };
 

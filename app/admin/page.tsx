@@ -53,7 +53,8 @@ import {
   FileText,
   Coins,
   Tag,
-  BadgePercent
+  BadgePercent,
+  Pencil
 } from 'lucide-react';
 import { ThaiDateRangePicker } from '@/components/ThaiDateRangePicker';
 import { ThaiTimeRangePicker } from '@/components/ThaiTimeRangePicker';
@@ -62,6 +63,7 @@ import { ReceiptManagementPanel } from '@/components/ReceiptManagementPanel';
 import { ReceiptModal } from '@/components/ReceiptModal';
 import { MemberManagementPanel } from '@/components/MemberManagementPanel';
 import { ToastNotification } from '@/components/ToastNotification';
+import { MeetingEditModal } from '@/components/MeetingEditModal';
 
 /* ─── Data Types & Interfaces ─────────────────────────────────────────── */
 
@@ -71,13 +73,6 @@ export interface MeetingPricingTiers {
     onsiteMember: number;
     onsiteNonMember: number;
     onlineMember: number;
-  };
-  fellow: {
-    onsiteMember: number;
-    onsiteNonMember: number;
-    onlineMemberType: 'free' | 'paid';
-    onlineMemberText: string;
-    onlineMemberPrice: number;
   };
   changeFee: {
     label: string;
@@ -95,13 +90,6 @@ export const DEFAULT_PRICING_TIERS: MeetingPricingTiers = {
     onsiteMember: 0,
     onsiteNonMember: 0,
     onlineMember: 0,
-  },
-  fellow: {
-    onsiteMember: 0,
-    onsiteNonMember: 0,
-    onlineMemberType: 'free',
-    onlineMemberText: '',
-    onlineMemberPrice: 0,
   },
   changeFee: {
     label: '',
@@ -186,9 +174,10 @@ interface DashboardOverviewProps {
   meetings: MeetingItem[];
   slips: SlipItem[];
   attendees: AttendeeItem[];
+  onEditMeeting?: (meeting: MeetingItem) => void;
 }
 
-function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees }: DashboardOverviewProps) {
+function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onEditMeeting }: DashboardOverviewProps) {
   const pendingSlips = slips.filter((s) => s.status === 'pending');
   const checkedInAttendees = attendees.filter((a) => a.checkInStatus === 'checked_in');
   const ongoingMeetingsCount = meetings.filter((m) => m.status === 'ongoing').length;
@@ -439,7 +428,7 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees }: D
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-4 shrink-0 sm:border-l sm:border-slate-200 sm:pl-4">
+                  <div className="flex items-center gap-3 shrink-0 sm:border-l sm:border-slate-200 sm:pl-4">
                     <div className="text-right">
                       <div className="text-xs text-slate-500">เช็คอิน/ที่นั่ง</div>
                       <div className="text-sm sm:text-base font-extrabold text-slate-900">{m.attended}/{m.registered} <span className="text-xs font-medium text-slate-500">({Math.round((m.attended / m.registered) * 100)}%)</span></div>
@@ -448,6 +437,17 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees }: D
                       <div className="text-xs text-slate-500">ยอดเงินรวม</div>
                       <div className="text-sm sm:text-base font-extrabold text-emerald-700">฿{m.revenue.toLocaleString()}</div>
                     </div>
+                    {onEditMeeting && (
+                      <button
+                        type="button"
+                        onClick={() => onEditMeeting(m)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold border border-amber-200 transition cursor-pointer"
+                        title="แก้ไขการประชุม"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span>แก้ไข</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -549,21 +549,32 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
   const [hoveredPointIdx, setHoveredPointIdx] = useState<number | null>(null);
   const [hoveredTier, setHoveredTier] = useState<string | null>(null);
 
-  // Filtered Meetings based on comprehensive filters
+  // Filtered Meetings based on comprehensive filters (sorted newest first)
   const filteredMeetings = useMemo(() => {
-    return meetings.filter((m) => {
-      const matchRound = selectedMeetingId === 'all' || m.id === selectedMeetingId;
-      const matchType = filterType === 'all' || m.type === filterType;
-      const matchStatus = filterStatus === 'all' || m.status === filterStatus;
-      const q = searchQuery.toLowerCase().trim();
-      const matchSearch =
-        !q ||
-        m.titleTh.toLowerCase().includes(q) ||
-        m.titleEn.toLowerCase().includes(q) ||
-        m.location.toLowerCase().includes(q) ||
-        m.id.toLowerCase().includes(q);
-      return matchRound && matchType && matchStatus && matchSearch;
-    });
+    return meetings
+      .filter((m) => {
+        const matchRound = selectedMeetingId === 'all' || m.id === selectedMeetingId;
+        const matchType = filterType === 'all' || m.type === filterType;
+        const matchStatus = filterStatus === 'all' || m.status === filterStatus;
+        const q = searchQuery.toLowerCase().trim();
+        const matchSearch =
+          !q ||
+          m.titleTh.toLowerCase().includes(q) ||
+          m.titleEn.toLowerCase().includes(q) ||
+          m.location.toLowerCase().includes(q) ||
+          m.id.toLowerCase().includes(q);
+        return matchRound && matchType && matchStatus && matchSearch;
+      })
+      .sort((a, b) => {
+        const STATUS_PRIORITY: Record<string, number> = { ongoing: 1, upcoming: 2, completed: 3 };
+        const pA = STATUS_PRIORITY[a.status] || 99;
+        const pB = STATUS_PRIORITY[b.status] || 99;
+        if (pA !== pB) return pA - pB;
+        const numA = parseInt((a.id.match(/\d+/) || ['0'])[0], 10);
+        const numB = parseInt((b.id.match(/\d+/) || ['0'])[0], 10);
+        if (numA !== numB) return numB - numA;
+        return b.id.localeCompare(a.id);
+      });
   }, [meetings, selectedMeetingId, filterType, filterStatus, searchQuery]);
 
   const hasActiveFilters = selectedMeetingId !== 'all' || filterType !== 'all' || filterStatus !== 'all' || searchQuery.trim() !== '';
@@ -1760,6 +1771,7 @@ function AddMeetingPanel({
   });
 
   const [formData, setFormData] = useState({
+    meetingId: '',
     title: '',
     date: '',
     time: '',
@@ -1769,6 +1781,21 @@ function AddMeetingPanel({
     basePrice: 0,
     description: '',
   });
+
+  // Fetch next suggested TSRM ID on mount
+  useEffect(() => {
+    fetch('/api/meetings?action=next_id')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.nextMeetingId) {
+          setFormData((prev) => ({
+            ...prev,
+            meetingId: prev.meetingId || data.nextMeetingId,
+          }));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const [activities, setActivities] = useState<ActivityItem[]>([
     createEmptyActivity('main'),
@@ -1882,16 +1909,34 @@ function AddMeetingPanel({
   };
 
   const handleResetForm = () => {
-    setFormData({
-      title: '',
-      date: '',
-      time: '',
-      location: '',
-      type: 'onsite',
-      staffCode: generateRandomPin(),
-      basePrice: 0,
-      description: '',
-    });
+    fetch('/api/meetings?action=next_id')
+      .then((r) => r.json())
+      .then((data) => {
+        setFormData({
+          meetingId: data.nextMeetingId || 'TSRM35',
+          title: '',
+          date: '',
+          time: '',
+          location: '',
+          type: 'onsite',
+          staffCode: generateRandomPin(),
+          basePrice: 0,
+          description: '',
+        });
+      })
+      .catch(() => {
+        setFormData({
+          meetingId: 'TSRM35',
+          title: '',
+          date: '',
+          time: '',
+          location: '',
+          type: 'onsite',
+          staffCode: generateRandomPin(),
+          basePrice: 0,
+          description: '',
+        });
+      });
     setActivities([createEmptyActivity('main')]);
     setPricing(DEFAULT_PRICING_TIERS);
     setIsSaved(false);
@@ -1923,13 +1968,6 @@ function AddMeetingPanel({
         onsiteNonMember: 0,
         onlineMember: 0,
       },
-      fellow: {
-        onsiteMember: 0,
-        onsiteNonMember: 0,
-        onlineMemberType: 'paid',
-        onlineMemberText: '',
-        onlineMemberPrice: 0,
-      },
       changeFee: {
         label: '',
         conditionDate: '',
@@ -1955,7 +1993,19 @@ function AddMeetingPanel({
 
     setIsSubmitting(true);
 
-    const meetingId = `MTG-${new Date().getFullYear() + 543}-${Math.floor(100 + Math.random() * 900)}`;
+    // Format meeting ID: Ensure it follows TSRM<sequence>
+    let meetingId = formData.meetingId.trim();
+    if (!meetingId) {
+      meetingId = 'TSRM35';
+    } else if (/^\d+$/.test(meetingId)) {
+      meetingId = `TSRM${meetingId}`;
+    } else if (/^tsrm\s*(\d+)$/i.test(meetingId)) {
+      const mMatch = meetingId.match(/^tsrm\s*(\d+)$/i);
+      meetingId = mMatch ? `TSRM${mMatch[1]}` : meetingId.toUpperCase();
+    } else {
+      meetingId = meetingId.toUpperCase();
+    }
+
     const wsSeats = activities.filter((a) => a.type === 'workshop').reduce((sum, a) => sum + (a.maxSeats || 0), 0);
 
     try {
@@ -2235,28 +2285,50 @@ function AddMeetingPanel({
             <span className="text-xs text-slate-500">* ข้อมูลจำเป็น</span>
           </div>
 
-          {/* ชื่อการประชุม (รวมชื่อไทย/อังกฤษในช่องเดียว) */}
-          <div className="space-y-1.5">
-            <div className="flex justify-between items-center">
-              <label className="text-sm font-bold text-slate-700">ชื่อการประชุม / งานประชุมวิชาการ *</label>
-              {formData.title && (
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, title: '' })}
-                  className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  ล้างข้อความ
-                </button>
-              )}
+          {/* รหัสการประชุม และ ชื่อการประชุม */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* รหัสการประชุม (Meeting ID) */}
+            <div className="space-y-1.5 md:col-span-1">
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-bold text-slate-700">รหัสการประชุม (ID) *</label>
+                <span className="text-[10px] text-[#0026b3] font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                  TSRM + รอบ
+                </span>
+              </div>
+              <input
+                type="text"
+                required
+                value={formData.meetingId}
+                onChange={(e) => setFormData({ ...formData, meetingId: e.target.value.toUpperCase() })}
+                placeholder="เช่น TSRM34, TSRM35"
+                className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm font-mono font-bold text-[#0026b3] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition shadow-2xs uppercase"
+              />
+              <p className="text-[11px] text-slate-400">ระบบตั้งค่ารหัส TSRM ตามลำดับให้อัตโนมัติ</p>
             </div>
-            <input
-              type="text"
-              required
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="เช่น การประชุมวิชาการประจำปี THAISRM Annual Scientific Congress 2026"
-              className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition shadow-2xs"
-            />
+
+            {/* ชื่อการประชุม (รวมชื่อไทย/อังกฤษในช่องเดียว) */}
+            <div className="space-y-1.5 md:col-span-2">
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-bold text-slate-700">ชื่อการประชุม / งานประชุมวิชาการ *</label>
+                {formData.title && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, title: '' })}
+                    className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    ล้างข้อความ
+                  </button>
+                )}
+              </div>
+              <input
+                type="text"
+                required
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="เช่น 34th TSRM 2026 หรือ THAISRM Annual Congress"
+                className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition shadow-2xs"
+              />
+            </div>
           </div>
 
           {/* กำหนดการจัดงาน: วันที่จัดงาน & เวลาจัดงาน */}
@@ -2910,127 +2982,7 @@ function AddMeetingPanel({
                   </td>
                 </tr>
 
-                {/* Row 2: Fellow */}
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="py-2.5 px-3 font-extrabold text-slate-900">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
-                      <span>Fellow</span>
-                    </div>
-                    <div className="text-[10px] text-slate-400 font-normal pl-3">แพทย์ประจำบ้านต่อยอด</div>
-                  </td>
-                  {/* Onsite Member */}
-                  <td className="py-2 px-2.5 border-l border-slate-200">
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
-                      <input
-                        type="number"
-                        min={0}
-                        step={100}
-                        value={pricing.fellow.onsiteMember}
-                        onChange={(e) =>
-                          setPricing({
-                            ...pricing,
-                            fellow: {
-                              ...pricing.fellow,
-                              onsiteMember: parseInt(e.target.value) || 0,
-                            },
-                          })
-                        }
-                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
-                      />
-                    </div>
-                  </td>
-                  {/* Onsite Non-member */}
-                  <td className="py-2 px-2.5 border-l border-slate-200">
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
-                      <input
-                        type="number"
-                        min={0}
-                        step={100}
-                        value={pricing.fellow.onsiteNonMember}
-                        onChange={(e) =>
-                          setPricing({
-                            ...pricing,
-                            fellow: {
-                              ...pricing.fellow,
-                              onsiteNonMember: parseInt(e.target.value) || 0,
-                            },
-                          })
-                        }
-                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
-                      />
-                    </div>
-                  </td>
-                  {/* Online Member (Free text or custom price) */}
-                  <td className="py-2 px-2.5 border-l border-slate-200 bg-blue-50/20">
-                    <div className="flex items-center gap-1.5">
-                      {pricing.fellow.onlineMemberType === 'free' ? (
-                        <div className="relative flex-1">
-                          <input
-                            type="text"
-                            value={pricing.fellow.onlineMemberText}
-                            onChange={(e) =>
-                              setPricing({
-                                ...pricing,
-                                fellow: {
-                                  ...pricing.fellow,
-                                  onlineMemberText: e.target.value,
-                                },
-                              })
-                            }
-                            placeholder="Free ที่สถาบัน"
-                            className="w-full bg-pink-50/70 hover:bg-white focus:bg-white border border-pink-300 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-bold text-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-300 text-center"
-                          />
-                        </div>
-                      ) : (
-                        <div className="relative flex-1">
-                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
-                          <input
-                            type="number"
-                            min={0}
-                            step={100}
-                            value={pricing.fellow.onlineMemberPrice}
-                            onChange={(e) =>
-                              setPricing({
-                                ...pricing,
-                                fellow: {
-                                  ...pricing.fellow,
-                                  onlineMemberPrice: parseInt(e.target.value) || 0,
-                                },
-                              })
-                            }
-                            className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
-                          />
-                        </div>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPricing({
-                            ...pricing,
-                            fellow: {
-                              ...pricing.fellow,
-                              onlineMemberType: pricing.fellow.onlineMemberType === 'free' ? 'paid' : 'free',
-                              onlineMemberText: 'Free ที่สถาบัน',
-                            },
-                          })
-                        }
-                        className={`text-[10px] font-bold px-1.5 py-1.5 rounded border transition cursor-pointer whitespace-nowrap shrink-0 ${pricing.fellow.onlineMemberType === 'free'
-                            ? 'bg-pink-100 text-pink-700 border-pink-200 hover:bg-pink-200'
-                            : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
-                          }`}
-                        title="คลิกเพื่อสลับระหว่าง 'ฟรีที่สถาบัน' หรือ 'ระบุราคาบาท'"
-                      >
-                        {pricing.fellow.onlineMemberType === 'free' ? 'ฟรี' : '฿'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-
-                {/* Row 3: Format Change Fee */}
+                {/* Row 2: Format Change Fee */}
                 <tr className="hover:bg-slate-50/50 transition bg-amber-50/30">
                   <td className="py-2 px-3 font-extrabold text-slate-900">
                     <div className="flex items-center gap-1.5">
@@ -3283,24 +3235,37 @@ function MeetingHistoryPanel({
   onNavigateTab,
   onUpdateStatus,
   onDeleteMeeting,
+  onEditMeeting,
 }: {
   meetings: MeetingItem[];
   onNavigateTab?: (tab: AdminTab) => void;
   onUpdateStatus?: (id: string, status: 'upcoming' | 'ongoing' | 'completed') => void;
   onDeleteMeeting?: (id: string) => void;
+  onEditMeeting?: (meeting: MeetingItem) => void;
 }) {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'ongoing' | 'upcoming' | 'completed'>('all');
 
   const filteredMeetings = useMemo(() => {
-    return meetings.filter((m) => {
-      const matchText =
-        m.titleTh.toLowerCase().includes(search.toLowerCase()) ||
-        m.location.toLowerCase().includes(search.toLowerCase()) ||
-        m.id.toLowerCase().includes(search.toLowerCase());
-      const matchStatus = filterStatus === 'all' || m.status === filterStatus;
-      return matchText && matchStatus;
-    });
+    return meetings
+      .filter((m) => {
+        const matchText =
+          m.titleTh.toLowerCase().includes(search.toLowerCase()) ||
+          m.location.toLowerCase().includes(search.toLowerCase()) ||
+          m.id.toLowerCase().includes(search.toLowerCase());
+        const matchStatus = filterStatus === 'all' || m.status === filterStatus;
+        return matchText && matchStatus;
+      })
+      .sort((a, b) => {
+        const STATUS_PRIORITY: Record<string, number> = { ongoing: 1, upcoming: 2, completed: 3 };
+        const pA = STATUS_PRIORITY[a.status] || 99;
+        const pB = STATUS_PRIORITY[b.status] || 99;
+        if (pA !== pB) return pA - pB;
+        const numA = parseInt((a.id.match(/\d+/) || ['0'])[0], 10);
+        const numB = parseInt((b.id.match(/\d+/) || ['0'])[0], 10);
+        if (numA !== numB) return numB - numA;
+        return b.id.localeCompare(a.id);
+      });
   }, [meetings, search, filterStatus]);
 
   const handleExportMeetingsExcel = () => {
@@ -3505,6 +3470,17 @@ function MeetingHistoryPanel({
                           <span>รายงานรายได้</span>
                         </button>
                       </>
+                    )}
+                    {onEditMeeting && (
+                      <button
+                        type="button"
+                        onClick={() => onEditMeeting(m)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold border border-amber-200 transition cursor-pointer"
+                        title="แก้ไขการประชุม"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span>แก้ไข</span>
+                      </button>
                     )}
                     {onDeleteMeeting && (
                       <button
@@ -4745,11 +4721,48 @@ export default function AdminPage() {
       const res = await fetch('/api/meetings?limit=100&sort_by=meeting_date&order=desc');
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
+        const formatRangeFromDates = (start?: string | null, end?: string | null) => {
+          if (!start) return '';
+          const dStart = new Date(start);
+          if (isNaN(dStart.getTime())) return '';
+          const yStart = dStart.getUTCFullYear() + 543;
+          const mStart = dStart.getUTCMonth();
+          const dayStart = dStart.getUTCDate();
+
+          const THAI_MONTHS_FULL = [
+            'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+            'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+          ];
+
+          if (!end) {
+            return `${dayStart} ${THAI_MONTHS_FULL[mStart]} ${yStart}`;
+          }
+
+          const dEnd = new Date(end);
+          if (isNaN(dEnd.getTime()) || dStart.toISOString().slice(0, 10) === dEnd.toISOString().slice(0, 10)) {
+            return `${dayStart} ${THAI_MONTHS_FULL[mStart]} ${yStart}`;
+          }
+
+          const yEnd = dEnd.getUTCFullYear() + 543;
+          const mEnd = dEnd.getUTCMonth();
+          const dayEnd = dEnd.getUTCDate();
+
+          if (yStart === yEnd && mStart === mEnd) {
+            return `${dayStart} - ${dayEnd} ${THAI_MONTHS_FULL[mStart]} ${yStart}`;
+          } else if (yStart === yEnd) {
+            return `${dayStart} ${THAI_MONTHS_FULL[mStart]} - ${dayEnd} ${THAI_MONTHS_FULL[mEnd]} ${yStart}`;
+          } else {
+            return `${dayStart} ${THAI_MONTHS_FULL[mStart]} ${yStart} - ${dayEnd} ${THAI_MONTHS_FULL[mEnd]} ${yEnd}`;
+          }
+        };
+
         const mapped: MeetingItem[] = json.data.map((m: Record<string, unknown>) => ({
           id: m.meeting_id as string,
           titleTh: m.meeting_name as string,
           titleEn: m.meeting_name as string,
-          date: m.meeting_date ? new Date(m.meeting_date as string).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : '',
+          date: (m.pricing_tiers as any)?.dateRange?.formatted
+            || formatRangeFromDates((m.start_date || m.meeting_date) as string, m.end_date as string)
+            || (m.meeting_date ? new Date(m.meeting_date as string).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) : ''),
           time: (m.meeting_time as string) || '08:30 - 17:00 น.',
           location: (m.location as string) || '',
           type: ((m.meeting_type as string) || 'onsite') as 'hybrid' | 'onsite' | 'online',
@@ -4757,11 +4770,24 @@ export default function AdminPage() {
           maxSeats: (m.max_seats as number) || 0,
           basePrice: (m.base_price as number) || 0,
           pricingTiers: m.pricing_tiers as MeetingPricingTiers | undefined,
+          activities: (m.activities as any[]) || undefined,
+          description: (m.description as string) || '',
           registered: ((m._count as Record<string, number>)?.meeting_attendances) || 0,
           attended: 0,
           revenue: 0,
           status: ((m.status as string) || 'upcoming') as 'upcoming' | 'ongoing' | 'completed',
         }));
+        // Sort by status priority (ongoing -> upcoming -> completed) then newest sequence
+        const STATUS_PRIORITY: Record<string, number> = { ongoing: 1, upcoming: 2, completed: 3 };
+        mapped.sort((a, b) => {
+          const pA = STATUS_PRIORITY[a.status] || 99;
+          const pB = STATUS_PRIORITY[b.status] || 99;
+          if (pA !== pB) return pA - pB;
+          const numA = parseInt((a.id.match(/\d+/) || ['0'])[0], 10);
+          const numB = parseInt((b.id.match(/\d+/) || ['0'])[0], 10);
+          if (numA !== numB) return numB - numA;
+          return b.id.localeCompare(a.id);
+        });
         setMeetings(mapped);
       }
     } catch (err) {
@@ -5112,6 +5138,24 @@ export default function AdminPage() {
     setIsGlobalReceiptOpen(true);
   };
 
+  // Meeting Edit Modal State
+  const [editingMeeting, setEditingMeeting] = useState<MeetingItem | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [globalToastMessage, setGlobalToastMessage] = useState<string | null>(null);
+
+  const handleEditMeeting = (m: MeetingItem) => {
+    setEditingMeeting(m);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEditedMeeting = (updatedMeeting: MeetingItem) => {
+    setMeetings((prev) =>
+      prev.map((m) => (m.id === updatedMeeting.id ? updatedMeeting : m))
+    );
+    setGlobalToastMessage(`บันทึกการแก้ไขการประชุม "${updatedMeeting.titleTh}" สำเร็จเรียบร้อยแล้ว!`);
+    setTimeout(() => setGlobalToastMessage(null), 5000);
+  };
+
   const renderActivePanel = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -5121,6 +5165,7 @@ export default function AdminPage() {
             meetings={meetings}
             slips={slips}
             attendees={attendees}
+            onEditMeeting={handleEditMeeting}
           />
         );
       case 'members':
@@ -5151,6 +5196,7 @@ export default function AdminPage() {
             onNavigateTab={setActiveTab}
             onUpdateStatus={handleUpdateMeetingStatus}
             onDeleteMeeting={handleDeleteMeeting}
+            onEditMeeting={handleEditMeeting}
           />
         );
       case 'verify-slip':
@@ -5180,6 +5226,9 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans selection:bg-[#0026b3] selection:text-white">
+      {/* Global Toast Notification */}
+      <ToastNotification message={globalToastMessage} />
+
       {/* Navigation Sidebar (desktop) & Top bar (mobile) */}
       <AdminNavbar
         activeTab={activeTab}
@@ -5211,6 +5260,17 @@ export default function AdminPage() {
           setIsGlobalReceiptOpen(false);
           setActiveTab('receipts');
         }}
+      />
+
+      {/* Meeting Edit Modal */}
+      <MeetingEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingMeeting(null);
+        }}
+        meeting={editingMeeting}
+        onSave={handleSaveEditedMeeting}
       />
     </div>
   );

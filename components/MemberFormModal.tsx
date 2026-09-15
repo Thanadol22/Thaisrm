@@ -71,7 +71,7 @@ export function MemberFormModal({
   const [workPhone, setWorkPhone] = useState('');
   const [position, setPosition] = useState('');
   const [startDate, setStartDate] = useState('');
-  const [jobCategory, setJobCategory] = useState<string>('RM');
+  const [jobCategory, setJobCategory] = useState<string>('');
   const [jobCategoryOther, setJobCategoryOther] = useState('');
   const [membershipType, setMembershipType] = useState<string>('Regular');
   const [membershipStatus, setMembershipStatus] = useState<string>('Active');
@@ -100,7 +100,7 @@ export function MemberFormModal({
         setWorkPhone(member.work_phone || '');
         setPosition(member.position || '');
         setStartDate(member.start_date || '');
-        setJobCategory(member.job_category || 'RM');
+        setJobCategory(member.job_category || '');
         setJobCategoryOther(member.member_type_other || '');
         setMembershipType(member.membership_type || 'Regular');
         setMembershipStatus(member.membership_status || 'Active');
@@ -131,7 +131,7 @@ export function MemberFormModal({
         setWorkPhone('');
         setPosition('');
         setStartDate('');
-        setJobCategory('RM');
+        setJobCategory('');
         setJobCategoryOther('');
         setMembershipType('Regular');
         setMembershipStatus('Active');
@@ -235,7 +235,7 @@ export function MemberFormModal({
           workplace: workplace.trim() || null,
           work_phone: workPhone.trim() || null,
           position: position.trim() || null,
-          job_category: jobCategory === 'อื่นๆ' && jobCategoryOther.trim() ? jobCategoryOther.trim() : jobCategory,
+          job_category: jobCategory === 'อื่นๆ' && jobCategoryOther.trim() ? jobCategoryOther.trim() : jobCategory.trim() || null,
           member_type_other: jobCategory === 'อื่นๆ' ? jobCategoryOther.trim() : null,
           membership_type: membershipType,
           membership_status: membershipStatus,
@@ -271,7 +271,7 @@ export function MemberFormModal({
           workplace: workplace.trim() || null,
           work_phone: workPhone.trim() || null,
           position: position.trim() || null,
-          job_category: jobCategory === 'อื่นๆ' && jobCategoryOther.trim() ? jobCategoryOther.trim() : jobCategory,
+          job_category: jobCategory === 'อื่นๆ' && jobCategoryOther.trim() ? jobCategoryOther.trim() : jobCategory.trim() || null,
           member_type_other: jobCategory === 'อื่นๆ' ? jobCategoryOther.trim() : null,
           membership_type: membershipType,
           membership_status: membershipStatus,
@@ -520,13 +520,13 @@ export function MemberFormModal({
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
                     <span>ตำแหน่ง / กลุ่มวิชาชีพ</span>
-                    <span className="text-rose-500">*</span>
                   </label>
                   <select
                     value={jobCategory}
                     onChange={(e) => setJobCategory(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-medium bg-white focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent"
                   >
+                    <option value="">-- ไม่ระบุ --</option>
                     {JOB_CATEGORIES.map((cat) => (
                       <option key={cat} value={cat}>
                         {cat}

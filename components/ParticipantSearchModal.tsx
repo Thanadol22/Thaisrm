@@ -61,12 +61,11 @@ function normalizeField(raw: FieldData | string | null | undefined): FieldData {
 interface ParticipantSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectMember?: (member: MemberRecord) => void;
 }
 
 const INITIAL_DISPLAY_COUNT = 2;
 
-export function ParticipantSearchModal({ isOpen, onClose, onSelectMember }: ParticipantSearchModalProps) {
+export function ParticipantSearchModal({ isOpen, onClose }: ParticipantSearchModalProps) {
   const { lang } = useLanguage();
   const [mounted, setMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -420,19 +419,6 @@ export function ParticipantSearchModal({ isOpen, onClose, onSelectMember }: Part
               ))}
             </div>
           </div>
-
-          {/* Optional Action: Autofill to Form */}
-          {onSelectMember && (
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => onSelectMember(member)}
-                className="w-full py-2 px-3 bg-gradient-to-r from-[#0026b3] to-[#001c8c] hover:brightness-110 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-98"
-              >
-                <span>{lang === 'th' ? 'นำข้อมูลสมาชิกไปกรอกในฟอร์ม' : 'Autofill Member Info'}</span>
-              </button>
-            </div>
-          )}
         </div>
       </div>
     );

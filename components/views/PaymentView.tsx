@@ -12,13 +12,44 @@ import {
   FileText, 
   CheckCircle2, 
   Trash2, 
-  RotateCw
+  RotateCw,
+  User,
+  Building2,
+  MapPin,
+  Monitor,
+  Award,
+  Hash,
+  Tag,
+  AlertTriangle
 } from 'lucide-react';
 import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 import { useLanguage } from '@/context/LanguageContext';
 
+export interface ItemizedActivity {
+  id: string;
+  name: string;
+  type: string;
+  date?: string;
+  price: number;
+  rateBadgeTh?: string;
+  rateBadgeEn?: string;
+}
+
 interface PaymentViewProps {
   paymentType?: 'registration' | 'membership';
+  customAmount?: number;
+  isMember?: boolean;
+  isExpiredMember?: boolean;
+  expireDate?: string | null;
+  meetingName?: string;
+  attendeeName?: string;
+  attendeePosition?: string;
+  attendeeWorkplace?: string;
+  attendeeMemberNo?: string;
+  attendanceType?: 'onsite' | 'online';
+  itemizedActivities?: ItemizedActivity[];
+  selectedActivities?: Array<{ id: string; name: string; price: number; type?: string }>;
+  submitting?: boolean;
   onNavigateBack?: () => void;
   onOpenUploadModal: () => void;
   onCopyBank: () => void;
@@ -31,6 +62,19 @@ interface PaymentViewProps {
 
 export function PaymentView({
   paymentType = 'membership',
+  customAmount,
+  isMember = true,
+  isExpiredMember = false,
+  expireDate,
+  meetingName,
+  attendeeName,
+  attendeePosition,
+  attendeeWorkplace,
+  attendeeMemberNo,
+  attendanceType = 'onsite',
+  itemizedActivities,
+  selectedActivities,
+  submitting = false,
   onNavigateBack,
   onOpenUploadModal,
   onCopyBank,
@@ -40,6 +84,7 @@ export function PaymentView({
   onRemoveSlip,
   onConfirmPayment
 }: PaymentViewProps) {
+
   const router = useRouter();
   const { lang, toggleLang, t } = useLanguage();
   const isRegistration = paymentType === 'registration';
@@ -55,14 +100,33 @@ export function PaymentView({
   };
 
   // Determine amount and program label
-  const totalAmount = isRegistration ? '3,500' : '1,000';
-  const displayProgramName = isRegistration
+  const totalAmount = customAmount !== undefined 
+    ? customAmount.toLocaleString() 
+    : (isRegistration ? (isMember ? '3,500' : '4,500') : '1,000');
+
+  const displayProgramName = meetingName || (isRegistration
     ? ((t.payment as any).regPassName || (lang === 'th' ? 'THAISRM Congress Pass' : 'THAISRM Congress Pass'))
-    : t.payment.passName;
+    : t.payment.passName);
 
   const displayBadge = isRegistration
-    ? ((t.payment as any).regPassBadge || (lang === 'th' ? 'ลงทะเบียนเข้าร่วมงาน' : 'CONFERENCE REGISTRATION'))
+    ? (isExpiredMember
+        ? (lang === 'th' ? 'สมาชิกหมดอายุ (อัตราบุคคลทั่วไป)' : 'EXPIRED MEMBER (NON-MEMBER RATE)')
+        : (isMember ? (lang === 'th' ? 'สมาชิกสมาคม' : 'MEMBER RATE') : (lang === 'th' ? 'บุคคลทั่วไป' : 'NON-MEMBER RATE')))
     : t.payment.passBadge;
+
+  // Activities to render in invoice breakdown
+  const displayItems: ItemizedActivity[] = (itemizedActivities && itemizedActivities.length > 0)
+    ? itemizedActivities
+    : (selectedActivities && selectedActivities.length > 0)
+      ? selectedActivities.map(a => ({
+          id: a.id,
+          name: a.name,
+          type: a.type || 'main',
+          price: a.price,
+          rateBadgeTh: isMember ? 'ราคาสมาชิก' : 'ราคาบุคคลทั่วไป',
+          rateBadgeEn: isMember ? 'Member Rate' : 'Standard Rate',
+        }))
+      : [];
 
   return (
     <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[640px]">
@@ -119,12 +183,12 @@ export function PaymentView({
           <div className="mt-5 sm:mt-6 space-y-1">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
               {isRegistration
-                ? ((t.payment as any).registrationTitle || 'ชำระเงินค่าลงทะเบียนเข้าร่วมงาน')
+                ? (lang === 'th' ? 'สรุปยอดและชำระเงินค่าลงทะเบียน' : 'Registration Payment & Summary')
                 : t.payment.title}
             </h1>
             <p className="text-xs sm:text-sm text-blue-100/90 leading-relaxed font-normal max-w-2xl">
               {isRegistration
-                ? ((t.payment as any).registrationSubtitle || 'ชำระเงินและอัปโหลดหลักฐานการโอนเงิน (สลิป) เพื่อยืนยันการลงทะเบียนเข้าร่วมงานประชุม TSRM 2026')
+                ? (lang === 'th' ? 'ตรวจสอบรายละเอียดข้อมูลและรายการค่าใช้จ่ายก่อนทำการโอนเงินและอัปโหลดสลิป' : 'Review your registration details and pricing breakdown before transferring and uploading receipt slip.')
                 : t.payment.subtitle}
             </p>
           </div>
@@ -133,7 +197,99 @@ export function PaymentView({
 
       {/* Body Content */}
       <div className="px-4 sm:px-8 lg:px-12 py-5 sm:py-6 flex-1 flex flex-col justify-between space-y-4 max-w-3xl sm:max-w-4xl mx-auto w-full">
-        {/* Pass Details White Card */}
+        
+        {/* Attendee Profile & Registration Info Box (For Conference Registration) */}
+        {isRegistration && attendeeName && (
+          <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#0026b3] flex items-center justify-center">
+                  <User className="w-4 h-4" />
+                </div>
+                <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                  {lang === 'th' ? 'ข้อมูลผู้ลงทะเบียน' : 'Attendee Information'}
+                </span>
+              </div>
+
+              {/* Attendance Format Badge (Onsite vs Online) */}
+              <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black shadow-2xs border ${
+                attendanceType === 'online'
+                  ? 'bg-purple-50 text-purple-700 border-purple-200'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              }`}>
+                {attendanceType === 'online' ? (
+                  <>
+                    <Monitor className="w-3.5 h-3.5 shrink-0" />
+                    <span>{lang === 'th' ? 'เข้าร่วมแบบ Online (ออนไลน์)' : 'Online Attendance'}</span>
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="w-3.5 h-3.5 shrink-0" />
+                    <span>{lang === 'th' ? 'เข้าร่วมแบบ Onsite (ที่งาน)' : 'Onsite Attendance'}</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+              <div className="flex items-center gap-2 text-slate-700">
+                <span className="font-bold text-slate-400 shrink-0">{lang === 'th' ? 'ชื่อ-นามสกุล:' : 'Name:'}</span>
+                <span className="font-extrabold text-slate-900 truncate">{attendeeName}</span>
+              </div>
+              {attendeePosition && (
+                <div className="flex items-center gap-2 text-slate-700">
+                  <span className="font-bold text-slate-400 shrink-0">{lang === 'th' ? 'ตำแหน่ง:' : 'Position:'}</span>
+                  <span className="font-bold text-slate-800 truncate">{attendeePosition}</span>
+                </div>
+              )}
+              {attendeeWorkplace && (
+                <div className="flex items-center gap-2 text-slate-700">
+                  <span className="font-bold text-slate-400 shrink-0">{lang === 'th' ? 'หน่วยงาน:' : 'Workplace:'}</span>
+                  <span className="font-medium text-slate-800 truncate">{attendeeWorkplace}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-slate-700">
+                <span className="font-bold text-slate-400 shrink-0">{lang === 'th' ? 'สถานะสมาชิก:' : 'Status:'}</span>
+                {isExpiredMember ? (
+                  <span className="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                    <AlertTriangle className="w-3 h-3 text-amber-600" />
+                    <span>{lang === 'th' ? `สมาชิกหมดอายุ (${attendeeMemberNo}) • คิดอัตราบุคคลทั่วไป` : `Expired (${attendeeMemberNo}) • Standard Rate`}</span>
+                  </span>
+                ) : attendeeMemberNo ? (
+                  <span className="inline-flex items-center gap-1 font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+                    <Hash className="w-3 h-3" />
+                    <span>{lang === 'th' ? `สมาชิก TSRM (${attendeeMemberNo})` : `TSRM Member (${attendeeMemberNo})`}</span>
+                  </span>
+                ) : (
+                  <span className="font-medium text-slate-600">
+                    {lang === 'th' ? 'บุคคลทั่วไป (Non-member)' : 'Non-member'}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Expired Member Notification Banner */}
+        {isRegistration && isExpiredMember && (
+          <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-3.5 sm:p-4 flex items-start gap-3 shadow-2xs animate-fade-in">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0 mt-0.5 border border-amber-200">
+              <AlertTriangle className="w-4 h-4 stroke-[2.5]" />
+            </div>
+            <div className="space-y-0.5 min-w-0">
+              <h4 className="text-xs sm:text-sm font-extrabold text-amber-900 leading-tight">
+                {lang === 'th' ? 'สถานะสมาชิกของคุณหมดอายุแล้ว' : 'Your TSRM Membership Has Expired'}
+              </h4>
+              <p className="text-[11px] sm:text-xs text-amber-700 leading-relaxed font-normal">
+                {lang === 'th'
+                  ? 'ระบบได้คำนวณอัตราค่าธรรมเนียมการลงทะเบียนเป็นราคาสำหรับบุคคลทั่วไป (Non-member Rate) ท่านสามารถต่ออายุสมาชิก TSRM ภายหลังเพื่อรับสิทธิ์ประโยชน์สมาชิกอย่างต่อเนื่อง'
+                  : 'Your registration fees are calculated at Non-member rates because your membership has expired. You may renew your membership at any time.'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Pass Details White Card & Invoice Breakdown */}
         <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-sm space-y-4">
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-extrabold text-[#0026b3] text-base sm:text-lg tracking-tight truncate">
@@ -144,13 +300,58 @@ export function PaymentView({
             </span>
           </div>
 
-          {/* Features List */}
+          {/* Itemized Price Breakdown Table */}
           <div className="space-y-2.5 pt-1">
             {isRegistration ? (
               <>
+                {displayItems.length > 0 ? (
+                  <div className="space-y-2 pb-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                      {lang === 'th' ? 'สรุปรายการและค่าธรรมเนียมตามที่เลือก:' : 'Fee Breakdown by Selection:'}
+                    </span>
+                    <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-2xl overflow-hidden bg-slate-50/50">
+                      {displayItems.map((act, idx) => (
+                        <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:px-4 gap-2 bg-white hover:bg-slate-50/80 transition">
+                          <div className="space-y-0.5 min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
+                                act.type === 'main'
+                                  ? 'bg-[#0026b3] text-white'
+                                  : 'bg-indigo-600 text-white'
+                              }`}>
+                                {act.type === 'main' ? (lang === 'th' ? 'หลักสูตรหลัก' : 'Main') : (lang === 'th' ? 'เวิร์กช็อป' : 'Workshop')}
+                              </span>
+                              <h4 className="font-bold text-xs sm:text-sm text-slate-900 truncate">
+                                {act.name}
+                              </h4>
+                            </div>
+                            {(act.rateBadgeTh || act.rateBadgeEn) && (
+                              <p className="text-[11px] text-slate-500 font-medium">
+                                {lang === 'th' ? act.rateBadgeTh : act.rateBadgeEn}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            {act.price === 0 ? (
+                              <span className="inline-flex items-center text-xs sm:text-sm font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                {lang === 'th' ? 'ฟรี (0 บาท)' : 'FREE (0 THB)'}
+                              </span>
+                            ) : (
+                              <span className="text-xs sm:text-sm font-black text-[#0026b3]">
+                                {act.price.toLocaleString()} <span className="text-[11px] font-bold text-slate-600">{lang === 'th' ? 'บาท' : 'THB'}</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700">
                   <Check className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#0026b3] flex-shrink-0 mt-0.5 stroke-[2.5]" />
-                  <span>{(t.payment as any).regFeature1 || 'สิทธิ์เข้าร่วมงานประชุมวิชาการประจำปีและเวิร์กช็อป TSRM 2026'}</span>
+                  <span>{(t.payment as any).regFeature1 || 'สิทธิ์เข้าร่วมงานประชุมวิชาการประจำปีและเวิร์กช็อป TSRM'}</span>
                 </div>
                 <div className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700">
                   <Check className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#0026b3] flex-shrink-0 mt-0.5 stroke-[2.5]" />
@@ -179,11 +380,19 @@ export function PaymentView({
             )}
           </div>
 
-          <div className="border-t border-slate-100 pt-3.5 flex items-baseline justify-between">
-            <span className="text-xs sm:text-sm font-bold text-slate-600">{t.payment.totalDue}</span>
+          {/* Grand Total Amount Due */}
+          <div className="border-t border-slate-200/90 pt-4 flex items-baseline justify-between bg-blue-50/40 -mx-5 sm:-mx-6 -mb-5 sm:-mb-6 p-4 sm:p-5 rounded-b-3xl">
+            <div>
+              <span className="text-xs sm:text-sm font-extrabold text-slate-700 block">{t.payment.totalDue}</span>
+              {isRegistration && (
+                <span className="text-[11px] text-slate-500 font-medium">
+                  {lang === 'th' ? `คำนวณตามรูปแบบ: ${attendanceType === 'online' ? 'Online' : 'Onsite'}` : `Calculated for: ${attendanceType === 'online' ? 'Online' : 'Onsite'}`}
+                </span>
+              )}
+            </div>
             <div className="text-right">
-              <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                {totalAmount} {t.payment.currency}
+              <span className="text-2xl sm:text-3xl font-black text-[#0026b3] tracking-tight">
+                {totalAmount} <span className="text-base sm:text-lg font-bold text-slate-700">{t.payment.currency}</span>
               </span>
             </div>
           </div>

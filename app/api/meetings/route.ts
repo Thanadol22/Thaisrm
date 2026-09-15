@@ -24,6 +24,19 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
 
+    const action = searchParams.get('action');
+    if (action === 'next_id') {
+      const { getNextMeetingId } = await import('@/lib/services/meetingService');
+      const nextId = await getNextMeetingId();
+      return NextResponse.json({ success: true, nextMeetingId: nextId });
+    }
+
+    if (action === 'latest' || action === 'active') {
+      const { getLatestActiveMeeting } = await import('@/lib/services/meetingService');
+      const meeting = await getLatestActiveMeeting();
+      return NextResponse.json({ success: true, data: meeting });
+    }
+
     const search = searchParams.get('search') || undefined;
     const status = searchParams.get('status') || undefined;
     const meeting_type = searchParams.get('meeting_type') || undefined;
@@ -69,11 +82,11 @@ export async function POST(req: NextRequest) {
     const body: CreateMeetingInput = await req.json();
 
     // Basic validation
-    if (!body.meeting_id || !body.meeting_name || !body.meeting_date) {
+    if (!body.meeting_name || !body.meeting_date) {
       return NextResponse.json(
         {
           success: false,
-          error: 'กรุณากรอกข้อมูลที่จำเป็น: meeting_id, meeting_name, meeting_date',
+          error: 'กรุณากรอกข้อมูลที่จำเป็น: ชื่อการประชุม (meeting_name) และวันที่จัดงาน (meeting_date)',
         },
         { status: 400 }
       );

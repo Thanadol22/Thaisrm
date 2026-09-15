@@ -78,7 +78,9 @@ COMMENT ON TABLE member_educations IS 'ประวัติการศึก�
 CREATE TABLE IF NOT EXISTS meetings (
     meeting_id           VARCHAR(50) PRIMARY KEY,           -- รหัสการประชุม (เช่น AGM-2024, SYM-01)
     meeting_name         VARCHAR(255) NOT NULL,             -- ชื่องานประชุม/สัมมนา
-    meeting_date         DATE NOT NULL,                     -- วันที่จัดประชุม
+    meeting_date         DATE NOT NULL,                     -- วันที่จัดประชุม (วันเริ่มต้น)
+    start_date           DATE,                              -- วันที่เริ่มการประชุม
+    end_date             DATE,                              -- วันที่สิ้นสุดการประชุม
     counts_toward_active BOOLEAN NOT NULL DEFAULT true      -- นับเป็นการเข้าร่วมเพื่อคงสถานะ Active หรือไม่
 );
 

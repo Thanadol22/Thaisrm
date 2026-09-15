@@ -17,11 +17,163 @@ function PaymentContent() {
   const [notification, setNotification] = useState<string | null>(null);
   const [uploadedSlipData, setUploadedSlipData] = useState<{ fileName: string; fileUrl: string } | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Router determines the payment type: 'registration' vs 'membership'
   const typeParam = searchParams.get('type');
   const paymentType: 'registration' | 'membership' = 
     typeParam === 'registration' || typeParam === 'conference' ? 'registration' : 'membership';
+
+// Load conference registration payload if available
+  const [regData, setRegData] = useState<{
+    category?: string;
+    meetingId?: string;
+    meetingName?: string;
+    meetingDate?: string;
+    meetingLocation?: string;
+    pricingTiers?: any;
+    basePrice?: number;
+    selectedProgramIds?: string[];
+    selectedActivities?: Array<{
+      id: string;
+      name: string;
+      type?: string;
+      date?: string;
+      memberPrice?: number;
+      nonMemberPrice?: number;
+      price?: number;
+    }>;
+    activities?: Array<{
+      id: string;
+      name: string;
+      type?: string;
+      date?: string;
+      memberPrice?: number;
+      nonMemberPrice?: number;
+    }>;
+    attendanceType?: 'onsite' | 'online';
+    memberNo?: string;
+    isMember?: boolean;
+    isExpiredMember?: boolean;
+    memberStatus?: string;
+    expireDate?: string | null;
+    nameTh?: string;
+    nameEn?: string;
+    email?: string;
+    workplace?: string;
+    position?: string;
+    positionCode?: string;
+    specialCode?: string;
+    registeredAt?: string;
+  } | null>(null);
+
+  React.useEffect(() => {
+    if (paymentType === 'registration') {
+      try {
+        const saved = localStorage.getItem('conference_registration');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setRegData(parsed);
+        }
+      } catch (err) {
+        console.error('Failed to parse conference_registration from localStorage', err);
+      }
+    }
+  }, [paymentType]);
+
+  // Dynamic Pricing Calculation (Main Program uses Participant pricing + Workshops)
+  const calculationResult = React.useMemo(() => {
+    if (paymentType !== 'registration' || !regData) {
+      return {
+        totalAmount: 1000,
+        items: [] as Array<{
+          id: string;
+          name: string;
+          type: string;
+          date?: string;
+          price: number;
+          rateBadgeTh: string;
+          rateBadgeEn: string;
+        }>,
+        isMemberUser: true,
+        attendType: 'onsite' as const,
+      };
+    }
+
+    // A member is only granted member rate if active (not expired) and isMember is true
+    const isMemberUser = Boolean(regData.isMember) && !regData.isExpiredMember && Boolean(regData.memberNo?.trim());
+    const pricingTiers = regData.pricingTiers;
+    const basePrice = regData.basePrice ?? 0;
+
+    // Get list of activity items to evaluate
+    const allActivities = (regData.selectedActivities && regData.selectedActivities.length > 0)
+      ? regData.selectedActivities
+      : (regData.activities && regData.activities.length > 0)
+        ? regData.activities
+        : [
+            { id: 'main', type: 'main', name: regData.meetingName || 'Main Program' }
+          ];
+
+    const selectedIds = regData.selectedProgramIds || allActivities.map(a => a.id);
+    const activitiesToCalculate = allActivities.filter(a => selectedIds.includes(a.id));
+
+    // Enforce attendance rule:
+    // 1. If any workshop selected -> force 'onsite'
+    // 2. If Main program only -> only active member is allowed 'online'
+    const hasWorkshop = activitiesToCalculate.some(a => a.type === 'workshop');
+    const isOnlineEligible = !hasWorkshop && isMemberUser;
+    const attendType: 'onsite' | 'online' = (regData.attendanceType === 'online' && isOnlineEligible) ? 'online' : 'onsite';
+
+    // Calculate each item
+    const items = activitiesToCalculate.map((act) => {
+      let price = 0;
+      let rateBadgeTh = '';
+      let rateBadgeEn = '';
+
+      if (act.type === 'main') {
+        if (attendType === 'online') {
+          price = isMemberUser
+            ? (pricingTiers?.participant?.onlineMember ?? basePrice ?? 4000)
+            : (pricingTiers?.participant?.onsiteNonMember ?? (basePrice ? basePrice + 1000 : 5000));
+          rateBadgeTh = isMemberUser ? 'Online (ราคาสมาชิก)' : 'Online (ราคาบุคคลทั่วไป)';
+          rateBadgeEn = isMemberUser ? 'Online (Member Rate)' : 'Online (Non-Member Rate)';
+        } else {
+          // Onsite
+          price = isMemberUser
+            ? (pricingTiers?.participant?.onsiteMember ?? basePrice ?? 4000)
+            : (pricingTiers?.participant?.onsiteNonMember ?? (basePrice ? basePrice + 1000 : 5000));
+          rateBadgeTh = isMemberUser ? 'Onsite (ราคาสมาชิก)' : 'Onsite (ราคาบุคคลทั่วไป)';
+          rateBadgeEn = isMemberUser ? 'Onsite (Member Rate)' : 'Onsite (Non-Member Rate)';
+        }
+      } else {
+        // Workshop
+        const mPrice = typeof act.memberPrice === 'number' ? act.memberPrice : 0;
+        const nonMPrice = typeof act.nonMemberPrice === 'number' ? act.nonMemberPrice : mPrice;
+        price = isMemberUser ? mPrice : nonMPrice;
+        rateBadgeTh = isMemberUser ? 'Workshop (ราคาสมาชิก)' : 'Workshop (ราคาบุคคลทั่วไป)';
+        rateBadgeEn = isMemberUser ? 'Workshop (Member Rate)' : 'Workshop (Non-Member Rate)';
+      }
+
+      return {
+        id: act.id,
+        name: act.name,
+        type: act.type || 'main',
+        date: act.date,
+        price,
+        rateBadgeTh,
+        rateBadgeEn,
+      };
+    });
+
+    const totalAmount = items.reduce((sum, item) => sum + item.price, 0);
+
+    return {
+      totalAmount,
+      items,
+      isMemberUser,
+      attendType,
+    };
+  }, [paymentType, regData]);
 
   const bankAccountNumber = "020-8-16398-1";
 
@@ -46,13 +198,69 @@ function PaymentContent() {
     setUploadedSlipData(null);
   };
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
     if (!uploadedSlipData) {
       triggerNotification(t.payment.noSlipWarning);
       setUploadModalOpen(true);
       return;
     }
-    setShowSuccessModal(true);
+
+    if (paymentType === 'registration') {
+      const meetingId = regData?.meetingId;
+      if (!meetingId) {
+        triggerNotification(lang === 'th' ? 'ไม่พบรหัสการประชุม กรุณาลองลงทะเบียนใหม่อีกครั้ง' : 'Meeting ID not found. Please register again.');
+        return;
+      }
+
+      setSubmitting(true);
+      try {
+        const isMember = calculationResult.isMemberUser;
+        const selectedActivitiesPayload = calculationResult.items.map(item => ({
+          id: item.id,
+          name: item.name,
+          type: item.type,
+          price: item.price,
+          date: item.date,
+        }));
+
+        const res = await fetch(`/api/meetings/${meetingId}/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            isMember: isMember,
+            memberNo: isMember ? regData?.memberNo : undefined,
+            guestName: !isMember ? (regData?.nameTh || regData?.nameEn || 'Guest Attendee') : undefined,
+            guestEmail: !isMember ? (regData?.email || 'guest@thaisrm.org') : undefined,
+            guestPhone: undefined,
+            guestWorkplace: !isMember ? (regData?.workplace || null) : undefined,
+            amount: calculationResult.totalAmount,
+            bank: 'Kasikorn (KBANK)',
+            slipUrl: uploadedSlipData.fileUrl,
+            selectedActivities: selectedActivitiesPayload,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Failed to submit conference registration');
+        }
+
+        // Successfully registered
+        try {
+          localStorage.removeItem('conference_registration');
+        } catch (e) {}
+
+        setShowSuccessModal(true);
+      } catch (err: any) {
+        console.error('Registration submission error:', err);
+        triggerNotification(err.message || (lang === 'th' ? 'เกิดข้อผิดพลาดในการบันทึกข้อมูลการลงทะเบียน' : 'Failed to submit registration. Please try again.'));
+      } finally {
+        setSubmitting(false);
+      }
+    } else {
+      // Membership payment
+      setShowSuccessModal(true);
+    }
   };
 
   const handleCloseSuccessModal = () => {
@@ -60,12 +268,16 @@ function PaymentContent() {
     router.push('/login');
   };
 
+  const totalAmountValue = paymentType === 'registration'
+    ? calculationResult.totalAmount
+    : 1000;
+
   const amountDueText = paymentType === 'registration'
-    ? (lang === 'th' ? 'จำนวน 3,500 บาท' : 'Amount: 3,500 THB')
+    ? (lang === 'th' ? `จำนวน ${totalAmountValue.toLocaleString()} บาท` : `Amount: ${totalAmountValue.toLocaleString()} THB`)
     : (lang === 'th' ? 'จำนวน 1,000 บาท' : 'Amount: 1,000 THB');
 
   const successModalTitle = paymentType === 'registration'
-    ? (t.successModal as any).paymentSuccessTitle || t.successModal.title
+    ? (t.successModal as any).paymentSuccessTitle || (lang === 'th' ? 'ลงทะเบียนเข้าร่วมงานประชุมสำเร็จ' : 'Conference Registration Submitted')
     : (t.successModal as any).membershipSuccessTitle || t.successModal.loginTitle || t.successModal.title;
 
   return (
@@ -81,6 +293,17 @@ function PaymentContent() {
       <main className="w-full min-h-screen bg-[#f6f8fc] shadow-2xl flex flex-col justify-between relative border-x border-slate-200/80 overflow-hidden transition-all duration-300">
         <PaymentView
           paymentType={paymentType}
+          customAmount={paymentType === 'registration' ? calculationResult.totalAmount : undefined}
+          isMember={paymentType === 'registration' ? calculationResult.isMemberUser : true}
+          meetingName={regData?.meetingName}
+          attendeeName={regData?.nameTh || regData?.nameEn}
+          attendeePosition={regData?.position}
+          attendeeWorkplace={regData?.workplace}
+          attendeeMemberNo={regData?.memberNo}
+          isExpiredMember={regData?.isExpiredMember}
+          attendanceType={calculationResult.attendType}
+          itemizedActivities={calculationResult.items}
+          submitting={submitting}
           onOpenUploadModal={() => setUploadModalOpen(true)}
           onCopyBank={handleCopyBank}
           copiedBank={copiedBank}
@@ -101,6 +324,7 @@ function PaymentContent() {
     </div>
   );
 }
+
 
 export default function PaymentPage() {
   return (

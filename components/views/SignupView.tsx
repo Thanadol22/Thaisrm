@@ -514,6 +514,7 @@ export function SignupView({
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       {t.signup.workplaceLabel} <span className="text-red-500">*</span>
                     </label>
+                    {/* Workplace Input */}
                     <div className="relative flex items-center">
                       <Building className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none shrink-0" />
                       <input
@@ -525,27 +526,6 @@ export function SignupView({
                         onChange={(e) => handleInputChange('workplace', e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 transition outline-none font-medium"
                       />
-                    </div>
-                    {/* Quick Workplace Chips */}
-                    <div className="flex items-center gap-1 flex-wrap pt-1.5">
-                      <span className="text-[10px] font-bold text-slate-400">เลือกด่วน:</span>
-                      {[
-                        'รพ.จุฬาลงกรณ์',
-                        'รพ.ศิริราช',
-                        'รพ.รามาธิบดี',
-                        'รพ.ธรรมศาสตร์',
-                        'BORN IVF Center',
-                        'รพ.กรุงเทพ',
-                      ].map((w) => (
-                        <button
-                          key={w}
-                          type="button"
-                          onClick={() => handleInputChange('workplace', w)}
-                          className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-[#0026b3] border border-blue-200 transition cursor-pointer"
-                        >
-                          {w}
-                        </button>
-                      ))}
                     </div>
                   </div>
 
