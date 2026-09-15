@@ -506,6 +506,26 @@ export function LoginView({
       registeredAt: new Date().toISOString(),
     };
 
+    // Check for duplicate registration for this meeting
+    try {
+      const emailToCheck = formData.email.trim() || memberDataFound?.email || '';
+      const checkRes = await fetch(
+        `/api/meetings/${encodeURIComponent(activeMeeting.meeting_id)}/check-registration?memberNo=${encodeURIComponent(rawMemberNo)}&email=${encodeURIComponent(emailToCheck)}`
+      );
+      const checkData = await checkRes.json();
+      if (checkData.success && checkData.isRegistered) {
+        alert(
+          checkData.message ||
+            (lang === 'th'
+              ? 'ท่านได้ลงทะเบียนเข้าร่วมงานประชุมนี้ในระบบเรียบร้อยแล้ว ไม่สามารถลงทะเบียนซ้ำได้'
+              : 'You have already registered for this conference.')
+        );
+        return;
+      }
+    } catch (checkErr) {
+      console.error('Error checking duplicate registration:', checkErr);
+    }
+
     // If member status is expired, prompt with ExpiredMemberModal before proceeding to payment
     if (isExpiredMember) {
       setExpiredMemberInfo({

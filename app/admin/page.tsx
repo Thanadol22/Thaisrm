@@ -54,7 +54,8 @@ import {
   Coins,
   Tag,
   BadgePercent,
-  Pencil
+  Pencil,
+  ChevronLeft
 } from 'lucide-react';
 import { ThaiDateRangePicker } from '@/components/ThaiDateRangePicker';
 import { ThaiTimeRangePicker } from '@/components/ThaiTimeRangePicker';
@@ -64,6 +65,7 @@ import { ReceiptModal } from '@/components/ReceiptModal';
 import { MemberManagementPanel } from '@/components/MemberManagementPanel';
 import { ToastNotification } from '@/components/ToastNotification';
 import { MeetingEditModal } from '@/components/MeetingEditModal';
+import { AdminSlipsView } from '@/components/views/AdminSlipsView';
 
 /* ─── Data Types & Interfaces ─────────────────────────────────────────── */
 
@@ -178,13 +180,107 @@ interface DashboardOverviewProps {
 }
 
 function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onEditMeeting }: DashboardOverviewProps) {
-  const pendingSlips = slips.filter((s) => s.status === 'pending');
-  const checkedInAttendees = attendees.filter((a) => a.checkInStatus === 'checked_in');
-  const ongoingMeetingsCount = meetings.filter((m) => m.status === 'ongoing').length;
-  const totalRegistered = meetings.reduce((sum, m) => sum + m.registered, 0);
-  const totalAttended = meetings.reduce((sum, m) => sum + m.attended, 0);
-  const totalRevenue = meetings.reduce((sum, m) => sum + m.revenue, 0);
+  // Find current ongoing meeting (or first upcoming, or fallback to first meeting)
+  const currentOngoingMeeting = useMemo(() => {
+    return meetings.find((m) => m.status === 'ongoing') || meetings.find((m) => m.status === 'upcoming') || meetings[0];
+  }, [meetings]);
+
+  // Selected meeting round on dashboard (defaults to current ongoing round, or 'all')
+  const [selectedDashboardMeetingId, setSelectedDashboardMeetingId] = useState<string>('default');
+
+  const activeMeetingId = selectedDashboardMeetingId === 'default' 
+    ? (currentOngoingMeeting ? currentOngoingMeeting.id : 'all') 
+    : selectedDashboardMeetingId;
+
+  const currentSelectedMeeting = meetings.find((m) => m.id === activeMeetingId);
+
+  // Filter attendees & slips by the active meeting selection
+  const displayedAttendees = useMemo(() => {
+    if (activeMeetingId === 'all') return attendees;
+    return attendees.filter(
+      (a) => a.meetingId === activeMeetingId || (currentSelectedMeeting && a.meetingTitle === currentSelectedMeeting.titleTh)
+    );
+  }, [attendees, activeMeetingId, currentSelectedMeeting]);
+
+  const displayedSlips = useMemo(() => {
+    if (activeMeetingId === 'all') return slips;
+    return slips.filter((s) => s.meetingId === activeMeetingId);
+  }, [slips, activeMeetingId]);
+
+  const pendingSlips = useMemo(() => displayedSlips.filter((s) => s.status === 'pending'), [displayedSlips]);
+  const approvedSlips = useMemo(() => displayedSlips.filter((s) => s.status === 'approved'), [displayedSlips]);
+  const totalRevenue = useMemo(() => approvedSlips.reduce((sum, s) => sum + s.amount, 0), [approvedSlips]);
+  const totalRegistered = displayedAttendees.length;
+  const checkedInAttendees = useMemo(() => displayedAttendees.filter((a) => a.checkInStatus === 'checked_in'), [displayedAttendees]);
+  const totalAttended = checkedInAttendees.length;
   const checkInRate = totalRegistered > 0 ? Math.round((totalAttended / totalRegistered) * 100) : 0;
+  const ongoingMeetingsCount = useMemo(() => meetings.filter((m) => m.status === 'ongoing').length, [meetings]);
+
+  // 1. Dynamic check-in time slots calculation from real attendees
+  const checkInTimeSlots = useMemo(() => {
+    if (checkedInAttendees.length === 0) return [];
+
+    const slotBuckets = [
+      { key: '07:30 - 08:00 น.', label: '07:30 - 08:00 น.', count: 0 },
+      { key: '08:00 - 08:30 น.', label: '08:00 - 08:30 น.', count: 0 },
+      { key: '08:30 - 09:00 น.', label: '08:30 - 09:00 น.', count: 0 },
+      { key: '09:00 - 09:30 น.', label: '09:00 - 09:30 น.', count: 0 },
+      { key: '09:30 - 10:00 น.', label: '09:30 - 10:00 น.', count: 0 },
+      { key: '10:00 - 12:00 น.', label: '10:00 - 12:00 น.', count: 0 },
+      { key: '12:00 - 17:00 น.', label: '12:00 - 17:00 น.', count: 0 },
+    ];
+
+    checkedInAttendees.forEach((a) => {
+      const timeStr = a.checkInTime || '';
+      const match = timeStr.match(/(\d{1,2})[:.](\d{2})/);
+      if (match) {
+        const hour = parseInt(match[1], 10);
+        const min = parseInt(match[2], 10);
+        const totalMins = hour * 60 + min;
+
+        if (totalMins < 8 * 60) slotBuckets[0].count++;
+        else if (totalMins < 8 * 60 + 30) slotBuckets[1].count++;
+        else if (totalMins < 9 * 60) slotBuckets[2].count++;
+        else if (totalMins < 9 * 60 + 30) slotBuckets[3].count++;
+        else if (totalMins < 10 * 60) slotBuckets[4].count++;
+        else if (totalMins < 12 * 60) slotBuckets[5].count++;
+        else slotBuckets[6].count++;
+      } else {
+        slotBuckets[2].count++;
+      }
+    });
+
+    const activeSlots = slotBuckets.filter((s) => s.count > 0);
+    if (activeSlots.length === 0) return [];
+
+    const maxCount = Math.max(...activeSlots.map((s) => s.count), 1);
+    return activeSlots.map((s) => ({
+      time: s.label,
+      count: s.count,
+      percent: `${Math.round((s.count / maxCount) * 100)}%`,
+      highlight: s.count === maxCount && s.count > 0,
+    }));
+  }, [checkedInAttendees]);
+
+  // 2. Dynamic Member Type Proportions calculation from real attendees
+  const memberProportions = useMemo(() => {
+    if (displayedAttendees.length === 0) return [];
+
+    const typeMap = new Map<string, number>();
+    displayedAttendees.forEach((a) => {
+      const type = a.memberType || 'สมาชิกทั่วไป';
+      typeMap.set(type, (typeMap.get(type) || 0) + 1);
+    });
+
+    const COLORS = ['bg-[#0026b3]', 'bg-[#4ade80]', 'bg-[#0284c7]', 'bg-amber-500', 'bg-rose-500', 'bg-purple-600'];
+
+    return Array.from(typeMap.entries()).map(([label, count], idx) => ({
+      label,
+      count,
+      percent: `${Math.round((count / displayedAttendees.length) * 100)}%`,
+      color: COLORS[idx % COLORS.length],
+    }));
+  }, [displayedAttendees]);
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -227,6 +323,58 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onE
         </div>
       </div>
 
+      {/* ─── Meeting Round Selector Filter Bar (Defaults to Ongoing Round) ─── */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-blue-50 text-[#0026b3] border border-blue-100">
+              <Filter className="w-5 h-5 text-[#0026b3]" />
+            </div>
+            <div>
+              <div className="text-xs sm:text-sm font-extrabold text-slate-800 flex items-center gap-2 flex-wrap">
+                <span>เลือกรอบการประชุมเพื่อดูสถิติ:</span>
+                {currentSelectedMeeting && currentSelectedMeeting.status === 'ongoing' && (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    ● รอบปัจจุบัน (กำลังจัดงาน)
+                  </span>
+                )}
+                {activeMeetingId === 'all' && (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-[#0026b3] border border-blue-200">
+                    🌐 ทุกรอบรวมกัน
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xl">
+                {activeMeetingId === 'all'
+                  ? `รวมสถิติจากทุกรอบการประชุมในระบบ (${meetings.length} โครงการ)`
+                  : `กำลังแสดงข้อมูล: ${currentSelectedMeeting?.titleTh || activeMeetingId} (${currentSelectedMeeting?.date || ''})`}
+              </p>
+            </div>
+          </div>
+
+          <div className="relative shrink-0">
+            <select
+              value={activeMeetingId}
+              onChange={(e) => setSelectedDashboardMeetingId(e.target.value)}
+              className="w-full md:w-auto min-w-[280px] appearance-none bg-slate-50 border border-slate-300 text-slate-900 text-xs sm:text-sm font-bold rounded-xl pl-9 pr-9 py-2.5 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition cursor-pointer shadow-xs"
+            >
+              {meetings.map((m) => {
+                const isOngoing = m.status === 'ongoing';
+                return (
+                  <option key={m.id} value={m.id}>
+                    {isOngoing ? '🟢 [รอบปัจจุบัน] ' : '📅 '}
+                    [{m.id}] {m.titleTh}
+                  </option>
+                );
+              })}
+              <option value="all">🌐 รวมทุกรอบการประชุม (All Rounds - รวม {attendees.length} คน)</option>
+            </select>
+            <CalendarDays className="w-4 h-4 text-[#0026b3] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
+      </div>
+
       {/* 4 Core KPI Summary Cards (Brand Primary & Accent High Contrast) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
         {/* Card 1: Total Meetings */}
@@ -259,7 +407,9 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onE
           className="group cursor-pointer bg-white hover:bg-blue-50/40 border border-slate-200/90 hover:border-[#0026b3]/40 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all duration-200"
         >
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-bold text-slate-600">ผู้ลงทะเบียนทั้งหมด</span>
+            <span className="text-sm font-bold text-slate-600">
+              {activeMeetingId === 'all' ? 'ผู้ลงทะเบียนทั้งหมด' : 'ผู้ลงทะเบียนในรอบนี้'}
+            </span>
             <div className="p-2.5 rounded-xl bg-blue-50 text-[#0026b3] border border-blue-100">
               <Users className="w-5 h-5" />
             </div>
@@ -269,8 +419,9 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onE
             <span className="text-sm font-medium text-slate-500">ที่นั่ง</span>
           </div>
           <div className="mt-3 flex items-center justify-between text-xs sm:text-sm pt-3 border-t border-slate-100">
-            <span className="text-[#0026b3] font-bold flex items-center gap-1">
-              <TrendingUp className="w-4 h-4" /> รวม {meetings.length} รอบการประชุม
+            <span className="text-[#0026b3] font-bold flex items-center gap-1 truncate max-w-[200px]">
+              <TrendingUp className="w-4 h-4 shrink-0" />
+              <span className="truncate">{activeMeetingId === 'all' ? `รวม ${meetings.length} รอบ` : currentSelectedMeeting?.titleTh}</span>
             </span>
           </div>
         </div>
@@ -340,49 +491,48 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onE
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-500">แสดงความหนาแน่นของผู้เข้าร่วมงานที่สแกนเช็คอินในแต่ละช่วงเวลา</p>
               </div>
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold">
-                <span className="px-3 py-1.5 rounded-lg bg-[#0026b3] text-white shadow-xs">วันนี้ (10 ก.ย.)</span>
-                <span className="px-3 py-1.5 text-slate-600 hover:text-slate-900 cursor-pointer">7 วันที่ผ่านมา</span>
-              </div>
             </div>
 
-            {/* Custom Bar Visualization */}
-            <div className="pt-3 pb-1 space-y-3.5">
-              {[
-                { time: '07:30 - 08:00 น.', count: 45, max: 180, percent: '25%' },
-                { time: '08:00 - 08:30 น.', count: 142, max: 180, percent: '78%' },
-                { time: '08:30 - 09:00 น.', count: 178, max: 180, percent: '98%', highlight: true },
-                { time: '09:00 - 09:30 น.', count: 86, max: 180, percent: '48%' },
-                { time: '09:30 - 10:00 น.', count: 24, max: 180, percent: '13%' },
-              ].map((slot) => (
-                <div key={slot.time} className="space-y-1.5">
-                  <div className="flex justify-between text-xs sm:text-sm font-bold">
-                    <span className="text-slate-700">{slot.time}</span>
-                    <span className={slot.highlight ? 'text-emerald-700 font-extrabold' : 'text-slate-600'}>
-                      {slot.count} คน {slot.highlight && '(ช่วงคนหนาแน่นสูงสุด)'}
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-100 rounded-full h-3.5 overflow-hidden p-0.5 border border-slate-200/80">
-                    <div
-                      className={`h-full rounded-full transition-all duration-700 ${slot.highlight
-                          ? 'bg-gradient-to-r from-[#0026b3] via-emerald-500 to-[#4ade80]'
-                          : 'bg-[#0026b3]'
+            {/* Dynamic Check-in Visualization or Empty State */}
+            {checkInTimeSlots.length > 0 ? (
+              <div className="pt-3 pb-1 space-y-3.5">
+                {checkInTimeSlots.map((slot) => (
+                  <div key={slot.time} className="space-y-1.5">
+                    <div className="flex justify-between text-xs sm:text-sm font-bold">
+                      <span className="text-slate-700">{slot.time}</span>
+                      <span className={slot.highlight ? 'text-emerald-700 font-extrabold' : 'text-slate-600'}>
+                        {slot.count} คน {slot.highlight && '(ช่วงคนหนาแน่นสูงสุด)'}
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-3.5 overflow-hidden p-0.5 border border-slate-200/80">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${
+                          slot.highlight
+                            ? 'bg-gradient-to-r from-[#0026b3] via-emerald-500 to-[#4ade80]'
+                            : 'bg-[#0026b3]'
                         }`}
-                      style={{ width: slot.percent }}
-                    ></div>
+                        style={{ width: slot.percent }}
+                      ></div>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-slate-50/70 rounded-2xl border border-dashed border-slate-200 space-y-1.5">
+                <Clock className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-xs sm:text-sm font-bold text-slate-600">ยังไม่มีข้อมูลการเช็คอินหน้างานในขณะนี้</p>
+                <p className="text-[11px] text-slate-400">ระบบจะแสดงความหนาแน่นของช่วงเวลาเมื่อมีผู้เข้าร่วมสแกน QR Code เช็คอิน</p>
+              </div>
+            )}
 
-            <div className="flex items-center justify-between text-xs sm:text-sm text-slate-600 pt-3 border-t border-slate-100">
+            <div className="flex items-center justify-between text-xs sm:text-sm text-slate-600 pt-3 border-t border-slate-100 flex-wrap gap-2">
               <span className="flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-[#0026b3]" />
-                จุดสแกน QR Code หน้างาน 4 จุด ทำงานปกติ
+                เช็คอินแล้ว {totalAttended} จาก {totalRegistered} คน
               </span>
               <span className="font-bold text-emerald-700 flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-[#4ade80]"></span>
-                อัตราความสำเร็จ 99.4%
+                อัตราการเข้าร่วม {checkInRate}%
               </span>
             </div>
           </div>
@@ -402,56 +552,90 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onE
               </button>
             </div>
 
-            <div className="space-y-3">
-              {meetings.map((m) => (
-                <div
-                  key={m.id}
-                  className="bg-slate-50/70 border border-slate-200 hover:border-slate-300 rounded-xl p-4 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                >
-                  <div className="space-y-1.5 min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${m.status === 'ongoing'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : m.status === 'upcoming'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-slate-100 text-slate-700 border-slate-200'
-                        }`}>
-                        {m.status === 'ongoing' ? '● กำลังจัดประชุม' : m.status === 'upcoming' ? 'เร็วๆ นี้' : 'เสร็จสิ้น'}
-                      </span>
-                      <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-[#0026b3]" /> {m.date}
-                      </span>
+            {meetings.length > 0 ? (
+              <div className="space-y-3">
+                {meetings.slice(0, 2).map((m) => (
+                  <div
+                    key={m.id}
+                    className="bg-slate-50/70 border border-slate-200 hover:border-slate-300 rounded-xl p-4 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1.5 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                            m.status === 'ongoing'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : m.status === 'upcoming'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          {m.status === 'ongoing' ? '● กำลังจัดประชุม' : m.status === 'upcoming' ? 'เร็วๆ นี้' : 'เสร็จสิ้น'}
+                        </span>
+                        <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5 text-[#0026b3]" /> {m.date}
+                        </span>
+                      </div>
+                      <h4 className="text-sm sm:text-base font-bold text-slate-900 truncate">{m.titleTh}</h4>
+                      <p className="text-xs sm:text-sm text-slate-500 truncate flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {m.location}
+                      </p>
                     </div>
-                    <h4 className="text-sm sm:text-base font-bold text-slate-900 truncate">{m.titleTh}</h4>
-                    <p className="text-xs sm:text-sm text-slate-500 truncate flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {m.location}
-                    </p>
-                  </div>
 
-                  <div className="flex items-center gap-3 shrink-0 sm:border-l sm:border-slate-200 sm:pl-4">
-                    <div className="text-right">
-                      <div className="text-xs text-slate-500">เช็คอิน/ที่นั่ง</div>
-                      <div className="text-sm sm:text-base font-extrabold text-slate-900">{m.attended}/{m.registered} <span className="text-xs font-medium text-slate-500">({Math.round((m.attended / m.registered) * 100)}%)</span></div>
+                    <div className="flex items-center gap-3 shrink-0 sm:border-l sm:border-slate-200 sm:pl-4">
+                      <div className="text-right">
+                        <div className="text-xs text-slate-500">เช็คอิน/ที่นั่ง</div>
+                        <div className="text-sm sm:text-base font-extrabold text-slate-900">
+                          {m.attended}/{m.registered}{' '}
+                          <span className="text-xs font-medium text-slate-500">
+                            ({m.registered > 0 ? Math.round((m.attended / m.registered) * 100) : 0}%)
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-slate-500">ยอดเงินรวม</div>
+                        <div className="text-sm sm:text-base font-extrabold text-emerald-700">
+                          ฿{m.revenue.toLocaleString()}
+                        </div>
+                      </div>
+                      {onEditMeeting && (
+                        <button
+                          type="button"
+                          onClick={() => onEditMeeting(m)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold border border-amber-200 transition cursor-pointer"
+                          title="แก้ไขการประชุม"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>แก้ไข</span>
+                        </button>
+                      )}
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs text-slate-500">ยอดเงินรวม</div>
-                      <div className="text-sm sm:text-base font-extrabold text-emerald-700">฿{m.revenue.toLocaleString()}</div>
-                    </div>
-                    {onEditMeeting && (
-                      <button
-                        type="button"
-                        onClick={() => onEditMeeting(m)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold border border-amber-200 transition cursor-pointer"
-                        title="แก้ไขการประชุม"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                        <span>แก้ไข</span>
-                      </button>
-                    )}
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+
+                {meetings.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab('meeting-history')}
+                    className="w-full py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-blue-50/60 hover:border-blue-200 text-xs sm:text-sm font-bold text-slate-600 hover:text-[#0026b3] transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span>ดูรายการประชุมทั้งหมด ({meetings.length} โครงการ)</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-slate-50/70 rounded-2xl border border-dashed border-slate-200 space-y-2">
+                <CalendarDays className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-xs sm:text-sm font-bold text-slate-600">ยังไม่มีโครงการประชุมในระบบ</p>
+                <button
+                  onClick={() => onNavigateTab('add-meeting')}
+                  className="text-xs text-[#0026b3] font-bold hover:underline"
+                >
+                  + สร้างการประชุมใหม่
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -464,25 +648,29 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onE
               สัดส่วนประเภทสมาชิก
             </h3>
 
-            <div className="space-y-3 pt-1">
-              {[
-                { label: 'แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)', count: 590, percent: '47%', color: 'bg-[#0026b3]' },
-                { label: 'นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อน', count: 480, percent: '38%', color: 'bg-[#4ade80]' },
-                { label: 'Fellow RM / สูตินรีแพทย์', count: 80, percent: '6%', color: 'bg-[#0284c7]' },
-                { label: 'พยาบาลผู้เชี่ยวชาญ IVF', count: 40, percent: '3%', color: 'bg-amber-500' },
-                { label: 'บุคคลทั่วไป / องค์กรเอกชน', count: 80, percent: '6%', color: 'bg-rose-500' },
-              ].map((item) => (
-                <div key={item.label} className="space-y-1">
-                  <div className="flex justify-between text-xs sm:text-sm font-bold">
-                    <span className="text-slate-700 truncate">{item.label}</span>
-                    <span className="text-slate-900 shrink-0 ml-2">{item.count} คน ({item.percent})</span>
+            {memberProportions.length > 0 ? (
+              <div className="space-y-3 pt-1">
+                {memberProportions.map((item) => (
+                  <div key={item.label} className="space-y-1">
+                    <div className="flex justify-between text-xs sm:text-sm font-bold">
+                      <span className="text-slate-700 truncate">{item.label}</span>
+                      <span className="text-slate-900 shrink-0 ml-2">
+                        {item.count} คน ({item.percent})
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                      <div className={`h-full ${item.color} rounded-full`} style={{ width: item.percent }}></div>
+                    </div>
                   </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                    <div className={`h-full ${item.color} rounded-full`} style={{ width: item.percent }}></div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-slate-50/70 rounded-2xl border border-dashed border-slate-200 space-y-1.5">
+                <Users className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-xs sm:text-sm font-bold text-slate-600">ยังไม่มีข้อมูลผู้ลงทะเบียนในระบบ</p>
+                <p className="text-[11px] text-slate-400">สัดส่วนประเภทสมาชิกจะคำนวณจากผู้ลงทะเบียนจริงในฐานข้อมูล</p>
+              </div>
+            )}
           </div>
 
           {/* Quick Shortcuts / Recent Activity */}
@@ -603,51 +791,98 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
   const displayPaidCount = selectedMeetingId === 'all' ? totalPaidCount : (filteredMeetings.find((m) => m.id === selectedMeetingId)?.registered || 0);
   const avgPerPerson = displayPaidCount > 0 ? Math.round(displayRevenue / displayPaidCount) : 0;
 
-  // Breakdown tiers for demonstration
+  // Dynamic Breakdown tiers computed from real database slips & meetings
   const ticketTiers = useMemo(() => {
-    if (selectedMeetingId === 'MTG-2026-002') {
-      // Hands-on Workshop
-      return [
-        { name: 'นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อน (Hands-on Pass)', price: 5000, count: 65, total: 325000, color: '#059669', bgClass: 'bg-emerald-600', fill: 'rgb(5, 150, 105)' },
-        { name: 'Fellow RM / แพทย์ประจำบ้านต่อยอด', price: 5000, count: 15, total: 75000, color: '#2563eb', bgClass: 'bg-blue-600', fill: 'rgb(37, 99, 235)' },
-      ];
-    } else if (selectedMeetingId === 'MTG-2026-003') {
-      // General Meeting Webinar
-      return [
-        { name: 'สมาชิกสามัญ (แพทย์ RM)', price: 2000, count: 350, total: 700000, color: '#2563eb', bgClass: 'bg-blue-600', fill: 'rgb(37, 99, 235)' },
-        { name: 'สมาชิกสมทบ (นักวิทย์/พยาบาล)', price: 1500, count: 280, total: 420000, color: '#059669', bgClass: 'bg-emerald-600', fill: 'rgb(5, 150, 105)' },
-        { name: 'ผู้สนใจทั่วไป (Online Pass)', price: 3000, count: 60, total: 180000, color: '#d97706', bgClass: 'bg-amber-600', fill: 'rgb(217, 119, 6)' },
-      ];
-    } else if (selectedMeetingId === 'MTG-2026-001') {
-      // THAISRM Congress 2026
-      return [
-        { name: 'แพทย์เวชศาสตร์การเจริญพันธุ์ (RM Full Pass)', price: 3500, count: 240, total: 840000, color: '#2563eb', bgClass: 'bg-blue-600', fill: 'rgb(37, 99, 235)' },
-        { name: 'นักวิทยาศาสตร์ตัวอ่อน (Embryologist Pass)', price: 2500, count: 135, total: 337500, color: '#059669', bgClass: 'bg-emerald-600', fill: 'rgb(5, 150, 105)' },
-        { name: 'Fellow RM / สูตินรีแพทย์', price: 3000, count: 65, total: 195000, color: '#9333ea', bgClass: 'bg-purple-600', fill: 'rgb(147, 51, 234)' },
-        { name: 'พยาบาลผู้เชี่ยวชาญ IVF (Nurse Pass)', price: 2000, count: 40, total: 80000, color: '#d97706', bgClass: 'bg-amber-600', fill: 'rgb(217, 119, 6)' },
-        { name: 'บุคคลทั่วไป / องค์กรเอกชน', price: 4500, count: 20, total: 90000, color: '#e11d48', bgClass: 'bg-rose-600', fill: 'rgb(225, 29, 72)' },
-      ];
-    } else {
-      // Grand Total (All Rounds)
-      return [
-        { name: 'แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)', price: 3500, count: 590, total: 1540000, color: '#2563eb', bgClass: 'bg-blue-600', fill: 'rgb(37, 99, 235)' },
-        { name: 'นักวิทยาศาสตร์ตัวอ่อน (Embryologist)', price: 2500, count: 480, total: 1082500, color: '#059669', bgClass: 'bg-emerald-600', fill: 'rgb(5, 150, 105)' },
-        { name: 'Fellow RM / สูตินรีแพทย์', price: 3000, count: 80, total: 270000, color: '#9333ea', bgClass: 'bg-purple-600', fill: 'rgb(147, 51, 234)' },
-        { name: 'พยาบาลผู้เชี่ยวชาญ IVF (Nurse)', price: 2000, count: 40, total: 80000, color: '#d97706', bgClass: 'bg-amber-600', fill: 'rgb(217, 119, 6)' },
-        { name: 'บุคคลทั่วไป / องค์กรเอกชน', price: 4500, count: 80, total: 477500, color: '#e11d48', bgClass: 'bg-rose-600', fill: 'rgb(225, 29, 72)' },
-      ];
+    const approvedSlips = selectedMeetingId === 'all'
+      ? slips.filter((s) => s.status === 'approved')
+      : slips.filter((s) => s.status === 'approved' && s.meetingId === selectedMeetingId);
+
+    const tierMap = new Map<string, { count: number; total: number }>();
+    approvedSlips.forEach((s) => {
+      const type = s.ticketType || (s.memberCode ? 'สมาชิกสมาคม (Member Pass)' : 'บุคคลทั่วไป (Non-Member Pass)');
+      const cur = tierMap.get(type) || { count: 0, total: 0 };
+      tierMap.set(type, { count: cur.count + 1, total: cur.total + s.amount });
+    });
+
+    if (tierMap.size === 0) {
+      const activeMeeting = meetings.find((m) => m.id === selectedMeetingId);
+      const totalRev = selectedMeetingId === 'all' ? grandTotalRevenue : (activeMeeting?.revenue || 0);
+      const totalReg = selectedMeetingId === 'all' ? totalPaidCount : (activeMeeting?.registered || 0);
+
+      if (totalReg > 0 || totalRev > 0) {
+        return [
+          {
+            name: activeMeeting?.titleTh || 'บัตรลงทะเบียน (Registration Pass)',
+            price: totalReg > 0 ? Math.round(totalRev / totalReg) : (activeMeeting?.basePrice || 3500),
+            count: totalReg,
+            total: totalRev,
+            color: '#0026b3',
+            bgClass: 'bg-[#0026b3]',
+            fill: 'rgb(0, 38, 179)',
+          },
+        ];
+      }
+
+      return [];
     }
-  }, [selectedMeetingId]);
+
+    const COLORS = ['#0026b3', '#059669', '#9333ea', '#d97706', '#e11d48', '#0284c7'];
+    const BG_CLASSES = ['bg-[#0026b3]', 'bg-emerald-600', 'bg-purple-600', 'bg-amber-600', 'bg-rose-600', 'bg-sky-600'];
+
+    return Array.from(tierMap.entries()).map(([name, data], idx) => ({
+      name,
+      price: data.count > 0 ? Math.round(data.total / data.count) : 0,
+      count: data.count,
+      total: data.total,
+      color: COLORS[idx % COLORS.length],
+      bgClass: BG_CLASSES[idx % BG_CLASSES.length],
+      fill: COLORS[idx % COLORS.length],
+    }));
+  }, [selectedMeetingId, slips, meetings, grandTotalRevenue, totalPaidCount]);
 
   const totalTierRevenue = ticketTiers.reduce((s, t) => s + t.total, 0);
 
-  // Bank Channels Breakdown
-  const bankBreakdown = [
-    { bank: 'SCB (ไทยพาณิชย์)', amount: 1580000, percent: 45, color: 'bg-purple-600' },
-    { bank: 'KBANK (กสิกรไทย)', amount: 1140000, percent: 33, color: 'bg-emerald-600' },
-    { bank: 'BBL (กรุงเทพ)', amount: 480000, percent: 14, color: 'bg-blue-600' },
-    { bank: 'KTB (กรุงไทย)', amount: 250000, percent: 8, color: 'bg-sky-500' },
-  ];
+  // Dynamic Bank Channels Breakdown computed from real database slips
+  const bankBreakdown = useMemo(() => {
+    const approvedSlips = selectedMeetingId === 'all'
+      ? slips.filter((s) => s.status === 'approved')
+      : slips.filter((s) => s.status === 'approved' && s.meetingId === selectedMeetingId);
+
+    const bankMap = new Map<string, number>();
+    let totalAmt = 0;
+    approvedSlips.forEach((s) => {
+      const b = s.bank || 'ธนาคารไทยพาณิชย์ (SCB)';
+      bankMap.set(b, (bankMap.get(b) || 0) + s.amount);
+      totalAmt += s.amount;
+    });
+
+    if (bankMap.size === 0) {
+      return [
+        { bank: 'SCB (ไทยพาณิชย์)', amount: grandTotalRevenue, percent: 100, color: 'bg-purple-600' },
+      ];
+    }
+
+    const BANK_COLORS: Record<string, string> = {
+      SCB: 'bg-purple-600',
+      KBANK: 'bg-emerald-600',
+      BBL: 'bg-blue-600',
+      KTB: 'bg-sky-500',
+      BAY: 'bg-amber-500',
+      TTB: 'bg-blue-700',
+    };
+
+    return Array.from(bankMap.entries()).map(([bank, amount]) => {
+      const percent = totalAmt > 0 ? Math.round((amount / totalAmt) * 100) : 0;
+      let color = 'bg-blue-600';
+      for (const [k, c] of Object.entries(BANK_COLORS)) {
+        if (bank.toUpperCase().includes(k)) {
+          color = c;
+          break;
+        }
+      }
+      return { bank, amount, percent, color };
+    });
+  }, [selectedMeetingId, slips, grandTotalRevenue]);
 
   // Helper for Donut SVG circumference calculation
   const donutRadius = 70;
@@ -799,8 +1034,8 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                 type="button"
                 onClick={() => setFilterType('all')}
                 className={`px-3 py-1.5 rounded-lg transition ${filterType === 'all'
-                    ? 'bg-[#0026b3] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[#0026b3] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
                 ทุกรูปแบบ
@@ -809,8 +1044,8 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                 type="button"
                 onClick={() => setFilterType('hybrid')}
                 className={`px-3 py-1.5 rounded-lg transition ${filterType === 'hybrid'
-                    ? 'bg-[#0026b3] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[#0026b3] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
                 Hybrid
@@ -819,8 +1054,8 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                 type="button"
                 onClick={() => setFilterType('onsite')}
                 className={`px-3 py-1.5 rounded-lg transition ${filterType === 'onsite'
-                    ? 'bg-[#0026b3] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[#0026b3] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
                 Onsite
@@ -829,8 +1064,8 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                 type="button"
                 onClick={() => setFilterType('online')}
                 className={`px-3 py-1.5 rounded-lg transition ${filterType === 'online'
-                    ? 'bg-[#0026b3] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[#0026b3] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
                 Online
@@ -884,15 +1119,15 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
               type="button"
               onClick={() => setSelectedMeetingId('all')}
               className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap flex items-center gap-2 shrink-0 ${selectedMeetingId === 'all'
-                  ? 'bg-[#0026b3] text-white shadow-md shadow-[#0026b3]/25'
-                  : 'bg-slate-100 text-slate-700 hover:bg-blue-50/70 hover:text-[#0026b3]'
+                ? 'bg-[#0026b3] text-white shadow-md shadow-[#0026b3]/25'
+                : 'bg-slate-100 text-slate-700 hover:bg-blue-50/70 hover:text-[#0026b3]'
                 }`}
             >
               <Layers className="w-4 h-4" />
               <span>รวมทุกรอบที่กรอง (Grand Total)</span>
               <span className={`text-[11px] px-2 py-0.5 rounded-full ${selectedMeetingId === 'all'
-                  ? 'bg-[#4ade80] text-slate-950 font-black'
-                  : 'bg-blue-50 text-[#0026b3] font-bold'
+                ? 'bg-[#4ade80] text-slate-950 font-black'
+                : 'bg-blue-50 text-[#0026b3] font-bold'
                 }`}>
                 ฿{(grandTotalRevenue / 1000000).toFixed(2)}M
               </span>
@@ -905,15 +1140,15 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                 type="button"
                 onClick={() => setSelectedMeetingId(m.id)}
                 className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap flex items-center gap-2 shrink-0 ${selectedMeetingId === m.id
-                    ? 'bg-[#0026b3] text-white shadow-md shadow-[#0026b3]/25'
-                    : 'bg-slate-100 text-slate-700 hover:bg-blue-50/70 hover:text-[#0026b3]'
+                  ? 'bg-[#0026b3] text-white shadow-md shadow-[#0026b3]/25'
+                  : 'bg-slate-100 text-slate-700 hover:bg-blue-50/70 hover:text-[#0026b3]'
                   }`}
               >
                 <CalendarDays className="w-4 h-4" />
                 <span className="truncate max-w-[220px]">{m.titleTh}</span>
                 <span className={`text-[11px] px-2 py-0.5 rounded-full ${selectedMeetingId === m.id
-                    ? 'bg-[#4ade80] text-slate-950 font-black'
-                    : 'bg-slate-200 text-slate-700 font-bold'
+                  ? 'bg-[#4ade80] text-slate-950 font-black'
+                  : 'bg-slate-200 text-slate-700 font-bold'
                   }`}>
                   ฿{(m.revenue / 1000).toFixed(0)}k
                 </span>
@@ -1029,8 +1264,8 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
             <button
               onClick={() => setActiveChartTab('layered')}
               className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${activeChartTab === 'layered'
-                  ? 'bg-white text-[#0026b3] shadow-xs border border-slate-200/80 font-black'
-                  : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-white text-[#0026b3] shadow-xs border border-slate-200/80 font-black'
+                : 'text-slate-600 hover:text-slate-900'
                 }`}
             >
               <TrendingUp className="w-4 h-4 text-[#0026b3]" />
@@ -1039,8 +1274,8 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
             <button
               onClick={() => setActiveChartTab('comparison')}
               className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${activeChartTab === 'comparison'
-                  ? 'bg-white text-[#0026b3] shadow-xs border border-slate-200/80 font-black'
-                  : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-white text-[#0026b3] shadow-xs border border-slate-200/80 font-black'
+                : 'text-slate-600 hover:text-slate-900'
                 }`}
             >
               <Users className="w-4 h-4 text-[#0026b3]" />
@@ -1049,8 +1284,8 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
             <button
               onClick={() => setActiveChartTab('donut')}
               className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${activeChartTab === 'donut'
-                  ? 'bg-white text-[#0026b3] shadow-xs border border-slate-200/80 font-black'
-                  : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-white text-[#0026b3] shadow-xs border border-slate-200/80 font-black'
+                : 'text-slate-600 hover:text-slate-900'
                 }`}
             >
               <PieChart className="w-4 h-4 text-[#0026b3]" />
@@ -1067,8 +1302,8 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
               <div
                 onClick={() => setSelectedMeetingId(selectedMeetingId === 'MTG-2026-001' ? 'all' : 'MTG-2026-001')}
                 className={`flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer transition ${selectedMeetingId === 'MTG-2026-001' || selectedMeetingId === 'all'
-                    ? 'text-slate-800'
-                    : 'text-slate-400 opacity-60'
+                  ? 'text-slate-800'
+                  : 'text-slate-400 opacity-60'
                   }`}
               >
                 <span className="w-4 h-4 rounded-sm bg-[#0026b3] shrink-0 shadow-xs" />
@@ -1078,8 +1313,8 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
               <div
                 onClick={() => setSelectedMeetingId(selectedMeetingId === 'MTG-2026-002' ? 'all' : 'MTG-2026-002')}
                 className={`flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer transition ${selectedMeetingId === 'MTG-2026-002' || selectedMeetingId === 'all'
-                    ? 'text-slate-800'
-                    : 'text-slate-400 opacity-60'
+                  ? 'text-slate-800'
+                  : 'text-slate-400 opacity-60'
                   }`}
               >
                 <span className="w-4 h-4 rounded-sm bg-[#16a34a] shrink-0 shadow-xs" />
@@ -1089,8 +1324,8 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
               <div
                 onClick={() => setSelectedMeetingId(selectedMeetingId === 'MTG-2026-003' ? 'all' : 'MTG-2026-003')}
                 className={`flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer transition ${selectedMeetingId === 'MTG-2026-003' || selectedMeetingId === 'all'
-                    ? 'text-slate-800'
-                    : 'text-slate-400 opacity-60'
+                  ? 'text-slate-800'
+                  : 'text-slate-400 opacity-60'
                   }`}
               >
                 <span className="w-4 h-4 rounded-sm bg-[#0284c7] shrink-0 shadow-xs" />
@@ -1359,16 +1594,16 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                       <div
                         key={m.id}
                         className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:px-4 rounded-xl transition border gap-3 ${selectedMeetingId === m.id
-                            ? 'bg-blue-50/70 border-[#0026b3]/40 ring-1 ring-[#0026b3]/20'
-                            : 'bg-slate-50/70 hover:bg-blue-50/40 border-slate-200/70'
+                          ? 'bg-blue-50/70 border-[#0026b3]/40 ring-1 ring-[#0026b3]/20'
+                          : 'bg-slate-50/70 hover:bg-blue-50/40 border-slate-200/70'
                           }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isHybrid
-                              ? 'bg-blue-100/80 text-[#0026b3]'
-                              : isOnsite
-                                ? 'bg-emerald-100/80 text-[#16a34a]'
-                                : 'bg-sky-100/80 text-[#0284c7]'
+                            ? 'bg-blue-100/80 text-[#0026b3]'
+                            : isOnsite
+                              ? 'bg-emerald-100/80 text-[#16a34a]'
+                              : 'bg-sky-100/80 text-[#0284c7]'
                             }`}>
                             {isHybrid ? <Sparkles className="w-4.5 h-4.5" /> : isOnsite ? <Award className="w-4.5 h-4.5" /> : <CalendarDays className="w-4.5 h-4.5" />}
                           </div>
@@ -1378,10 +1613,10 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                             </div>
                             <div className="text-xs text-slate-500 flex flex-wrap items-center gap-2 mt-0.5">
                               <span className={`px-2 py-0.5 rounded-md font-semibold text-[11px] ${isHybrid
-                                  ? 'bg-blue-100 text-[#0026b3]'
-                                  : isOnsite
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : 'bg-sky-100 text-sky-800'
+                                ? 'bg-blue-100 text-[#0026b3]'
+                                : isOnsite
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-sky-100 text-sky-800'
                                 }`}>
                                 {isHybrid ? 'Hybrid' : isOnsite ? 'Onsite Workshop' : 'Online Webinar'}
                               </span>
@@ -1545,108 +1780,116 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
         {/* ── 3. SVG DONUT / RING CHART (By Member / Ticket Category) ── */}
         {activeChartTab === 'donut' && (
           <div className="space-y-6 animate-fade-in">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-              {/* Donut SVG Illustration */}
-              <div className="lg:col-span-5 flex flex-col items-center justify-center p-6 bg-slate-50/70 border border-slate-200/80 rounded-2xl relative">
-                <svg className="w-56 h-56 transform -rotate-90 drop-shadow-xs" viewBox="0 0 180 180">
-                  {/* Background Circle */}
-                  <circle
-                    cx="90"
-                    cy="90"
-                    r={donutRadius}
-                    fill="transparent"
-                    stroke="#e2e8f0"
-                    strokeWidth="24"
-                  />
+            {ticketTiers.length > 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                {/* Donut SVG Illustration */}
+                <div className="lg:col-span-5 flex flex-col items-center justify-center p-6 bg-slate-50/70 border border-slate-200/80 rounded-2xl relative">
+                  <svg className="w-56 h-56 transform -rotate-90 drop-shadow-xs" viewBox="0 0 180 180">
+                    {/* Background Circle */}
+                    <circle
+                      cx="90"
+                      cy="90"
+                      r={donutRadius}
+                      fill="transparent"
+                      stroke="#e2e8f0"
+                      strokeWidth="24"
+                    />
 
-                  {/* Dynamic Donut Segments */}
-                  {ticketTiers.map((tier) => {
-                    const tierPercent = totalTierRevenue > 0 ? (tier.total / totalTierRevenue) * 100 : 0;
-                    const strokeLength = (tierPercent / 100) * donutCircumference;
-                    const strokeOffset = -(accumulatedDonutPercent / 100) * donutCircumference;
-                    accumulatedDonutPercent += tierPercent;
+                    {/* Dynamic Donut Segments */}
+                    {ticketTiers.map((tier) => {
+                      const tierPercent = totalTierRevenue > 0 ? (tier.total / totalTierRevenue) * 100 : 0;
+                      const strokeLength = (tierPercent / 100) * donutCircumference;
+                      const strokeOffset = -(accumulatedDonutPercent / 100) * donutCircumference;
+                      accumulatedDonutPercent += tierPercent;
 
-                    const isHovered = hoveredTier === tier.name;
+                      const isHovered = hoveredTier === tier.name;
 
-                    return (
-                      <circle
-                        key={tier.name}
-                        cx="90"
-                        cy="90"
-                        r={donutRadius}
-                        fill="transparent"
-                        stroke={tier.color}
-                        strokeWidth={isHovered ? 28 : 24}
-                        strokeDasharray={`${strokeLength} ${donutCircumference}`}
-                        strokeDashoffset={strokeOffset}
-                        strokeLinecap="round"
-                        className="transition-all duration-300 cursor-pointer"
-                        onMouseEnter={() => setHoveredTier(tier.name)}
-                        onMouseLeave={() => setHoveredTier(null)}
-                      />
-                    );
-                  })}
-                </svg>
+                      return (
+                        <circle
+                          key={tier.name}
+                          cx="90"
+                          cy="90"
+                          r={donutRadius}
+                          fill="transparent"
+                          stroke={tier.color}
+                          strokeWidth={isHovered ? 28 : 24}
+                          strokeDasharray={`${strokeLength} ${donutCircumference}`}
+                          strokeDashoffset={strokeOffset}
+                          strokeLinecap="round"
+                          className="transition-all duration-300 cursor-pointer"
+                          onMouseEnter={() => setHoveredTier(tier.name)}
+                          onMouseLeave={() => setHoveredTier(null)}
+                        />
+                      );
+                    })}
+                  </svg>
 
-                {/* Central Inner Badge */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    {selectedMeetingId === 'all' ? 'รวมทุกรอบ' : 'ยอดรอบนี้'}
-                  </span>
-                  <span className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">
-                    ฿{(totalTierRevenue / 1000000).toFixed(2)}M
-                  </span>
-                  <span className="text-[11px] font-bold text-[#0026b3] bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200 mt-1">
-                    {ticketTiers.reduce((s, t) => s + t.count, 0)} ที่นั่ง
-                  </span>
+                  {/* Central Inner Badge */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      {selectedMeetingId === 'all' ? 'รวมทุกรอบ' : 'ยอดรอบนี้'}
+                    </span>
+                    <span className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">
+                      ฿{(totalTierRevenue / 1000000).toFixed(2)}M
+                    </span>
+                    <span className="text-[11px] font-bold text-[#0026b3] bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200 mt-1">
+                      {ticketTiers.reduce((s, t) => s + t.count, 0)} ที่นั่ง
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Donut Legend & Proportions Table */}
-              <div className="lg:col-span-7 space-y-3">
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  จำแนกตามประเภทบัตรลงทะเบียน:
-                </div>
-                <div className="space-y-2.5">
-                  {ticketTiers.map((tier) => {
-                    const percent = totalTierRevenue > 0 ? Math.round((tier.total / totalTierRevenue) * 100) : 0;
-                    const isHovered = hoveredTier === tier.name;
+                {/* Donut Legend & Proportions Table */}
+                <div className="lg:col-span-7 space-y-3">
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    จำแนกตามประเภทบัตรลงทะเบียน:
+                  </div>
+                  <div className="space-y-2.5">
+                    {ticketTiers.map((tier) => {
+                      const percent = totalTierRevenue > 0 ? Math.round((tier.total / totalTierRevenue) * 100) : 0;
+                      const isHovered = hoveredTier === tier.name;
 
-                    return (
-                      <div
-                        key={tier.name}
-                        onMouseEnter={() => setHoveredTier(tier.name)}
-                        onMouseLeave={() => setHoveredTier(null)}
-                        className={`p-3.5 rounded-xl border transition cursor-pointer flex items-center justify-between ${isHovered
+                      return (
+                        <div
+                          key={tier.name}
+                          onMouseEnter={() => setHoveredTier(tier.name)}
+                          onMouseLeave={() => setHoveredTier(null)}
+                          className={`p-3.5 rounded-xl border transition cursor-pointer flex items-center justify-between ${isHovered
                             ? 'bg-blue-50/50 border-[#0026b3]/30 ring-1 ring-[#0026b3]/30'
                             : 'bg-white border-slate-200 hover:bg-slate-50'
-                          }`}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span
-                            className="w-3.5 h-3.5 rounded-full shrink-0"
-                            style={{ backgroundColor: tier.color }}
-                          />
-                          <div className="min-w-0">
-                            <div className="text-sm font-bold text-slate-900 truncate">{tier.name}</div>
-                            <div className="text-xs text-slate-500">
-                              ฿{tier.price.toLocaleString()} / ที่นั่ง • {tier.count} ที่นั่ง
+                            }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span
+                              className="w-3.5 h-3.5 rounded-full shrink-0"
+                              style={{ backgroundColor: tier.color }}
+                            />
+                            <div className="min-w-0">
+                              <div className="text-sm font-bold text-slate-900 truncate">{tier.name}</div>
+                              <div className="text-xs text-slate-500">
+                                ฿{tier.price.toLocaleString()} / ที่นั่ง • {tier.count} ที่นั่ง
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="text-right shrink-0">
-                          <div className="text-sm sm:text-base font-extrabold text-slate-900">
-                            ฿{tier.total.toLocaleString()}
+                          <div className="text-right shrink-0">
+                            <div className="text-sm sm:text-base font-extrabold text-slate-900">
+                              ฿{tier.total.toLocaleString()}
+                            </div>
+                            <div className="text-xs font-bold text-[#0026b3]">{percent}%</div>
                           </div>
-                          <div className="text-xs font-bold text-[#0026b3]">{percent}%</div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="p-8 text-center bg-slate-50/70 rounded-2xl border border-dashed border-slate-200 space-y-2">
+                <PieChart className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-xs sm:text-sm font-bold text-slate-600">ยังไม่มีข้อมูลรายได้ตามประเภทบัตร</p>
+                <p className="text-[11px] text-slate-400">ระบบจะแสดงสัดส่วนเมื่อมีรายการสลิปชำระเงินที่ผ่านการอนุมัติ</p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1794,7 +2037,7 @@ function AddMeetingPanel({
           }));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const [activities, setActivities] = useState<ActivityItem[]>([
@@ -2082,7 +2325,7 @@ function AddMeetingPanel({
       setTimeout(() => setToastMessage(null), 5000);
       try {
         window.scrollTo({ top: 0, behavior: 'smooth' });
-      } catch {}
+      } catch { }
     } catch (err) {
       console.error('Failed to create meeting:', err);
       alert('เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์ กรุณาลองใหม่อีกครั้ง');
@@ -2401,17 +2644,15 @@ function AddMeetingPanel({
                           setFormData({ ...formData, type: isOnline ? 'hybrid' : 'onsite' });
                         }
                       }}
-                      className={`relative flex items-center justify-between p-3.5 rounded-xl transition border-2 text-left cursor-pointer ${
-                        isOnsite
+                      className={`relative flex items-center justify-between p-3.5 rounded-xl transition border-2 text-left cursor-pointer ${isOnsite
                           ? 'bg-emerald-50 text-emerald-900 border-emerald-400 ring-2 ring-emerald-200 shadow-xs'
                           : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition ${
-                            isOnsite ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-200 text-slate-500'
-                          }`}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition ${isOnsite ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-200 text-slate-500'
+                            }`}
                         >
                           <MapPin className="w-4 h-4" />
                         </div>
@@ -2421,11 +2662,10 @@ function AddMeetingPanel({
                         </div>
                       </div>
                       <div
-                        className={`w-5 h-5 rounded-md border flex items-center justify-center transition shrink-0 ${
-                          isOnsite
+                        className={`w-5 h-5 rounded-md border flex items-center justify-center transition shrink-0 ${isOnsite
                             ? 'bg-emerald-600 border-emerald-600 text-white'
                             : 'border-slate-300 bg-white'
-                        }`}
+                          }`}
                       >
                         {isOnsite && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                       </div>
@@ -2442,17 +2682,15 @@ function AddMeetingPanel({
                           setFormData({ ...formData, type: isOnsite ? 'hybrid' : 'online' });
                         }
                       }}
-                      className={`relative flex items-center justify-between p-3.5 rounded-xl transition border-2 text-left cursor-pointer ${
-                        isOnline
+                      className={`relative flex items-center justify-between p-3.5 rounded-xl transition border-2 text-left cursor-pointer ${isOnline
                           ? 'bg-blue-50 text-[#0026b3] border-[#0026b3]/50 ring-2 ring-blue-200 shadow-xs'
                           : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition ${
-                            isOnline ? 'bg-[#0026b3] text-white shadow-xs' : 'bg-slate-200 text-slate-500'
-                          }`}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition ${isOnline ? 'bg-[#0026b3] text-white shadow-xs' : 'bg-slate-200 text-slate-500'
+                            }`}
                         >
                           <ExternalLink className="w-4 h-4" />
                         </div>
@@ -2462,11 +2700,10 @@ function AddMeetingPanel({
                         </div>
                       </div>
                       <div
-                        className={`w-5 h-5 rounded-md border flex items-center justify-center transition shrink-0 ${
-                          isOnline
+                        className={`w-5 h-5 rounded-md border flex items-center justify-center transition shrink-0 ${isOnline
                             ? 'bg-[#0026b3] border-[#0026b3] text-white'
                             : 'border-slate-300 bg-white'
-                        }`}
+                          }`}
                       >
                         {isOnline && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                       </div>
@@ -2666,11 +2903,10 @@ function AddMeetingPanel({
                                   key={choice.id}
                                   type="button"
                                   onClick={() => handleToggleActivityDay(activity.id, choice.id)}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 border select-none ${
-                                    isChoiceSelected
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 border select-none ${isChoiceSelected
                                       ? 'bg-[#0026b3] text-white border-[#0026b3] shadow-xs ring-1 ring-blue-300'
                                       : 'bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-[#0026b3] border-slate-200 hover:border-blue-200'
-                                  }`}
+                                    }`}
                                 >
                                   <Calendar className="w-3 h-3" />
                                   <span>{choice.label}</span>
@@ -2718,11 +2954,10 @@ function AddMeetingPanel({
                                       key={choice.id}
                                       type="button"
                                       onClick={() => handleToggleActivityDay(activity.id, choice.id)}
-                                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 border select-none ${
-                                        isChoiceSelected
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 border select-none ${isChoiceSelected
                                           ? 'bg-violet-600 text-white border-violet-600 shadow-xs ring-1 ring-violet-300'
                                           : 'bg-slate-50 hover:bg-violet-50 text-slate-700 hover:text-violet-700 border-slate-200 hover:border-violet-200'
-                                      }`}
+                                        }`}
                                     >
                                       <Calendar className="w-3 h-3" />
                                       <span>{choice.label}</span>
@@ -3212,11 +3447,10 @@ function AddMeetingPanel({
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 font-bold text-sm px-8 py-3 rounded-xl shadow-md transition active:scale-95 cursor-pointer ${
-                isSubmitting
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 font-bold text-sm px-8 py-3 rounded-xl shadow-md transition active:scale-95 cursor-pointer ${isSubmitting
                   ? 'bg-slate-400 text-white shadow-slate-300/20 cursor-not-allowed'
                   : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-[#0026b3]/20'
-              }`}
+                }`}
             >
               <Check className="w-4 h-4 text-[#4ade80]" />
               <span>{isSubmitting ? 'กำลังบันทึก...' : 'บันทึกและเปิดรับลงทะเบียน'}</span>
@@ -3349,8 +3583,8 @@ function MeetingHistoryPanel({
               key={tab.id}
               onClick={() => setFilterStatus(tab.id as any)}
               className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap ${filterStatus === tab.id
-                  ? 'bg-[#0026b3] text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                ? 'bg-[#0026b3] text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white'
                 }`}
             >
               {tab.label}
@@ -3380,10 +3614,10 @@ function MeetingHistoryPanel({
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-mono font-bold text-[#0026b3] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{m.id}</span>
                       <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${m.status === 'ongoing'
-                          ? 'bg-[#4ade80]/15 text-emerald-800 border-[#4ade80]/40'
-                          : m.status === 'upcoming'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-slate-100 text-slate-700 border-slate-200'
+                        ? 'bg-[#4ade80]/15 text-emerald-800 border-[#4ade80]/40'
+                        : m.status === 'upcoming'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : 'bg-slate-100 text-slate-700 border-slate-200'
                         }`}>
                         {m.status === 'ongoing' ? '● กำลังดำเนินการ' : m.status === 'upcoming' ? 'รอเริ่มงาน' : 'เสร็จสิ้น'}
                       </span>
@@ -3593,8 +3827,8 @@ function VerifySlipsPanel({
               key={tab.id}
               onClick={() => setFilterTab(tab.id as any)}
               className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap ${filterTab === tab.id
-                  ? 'bg-[#0026b3] text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                ? 'bg-[#0026b3] text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white'
                 }`}
             >
               {tab.label}
@@ -3632,10 +3866,10 @@ function VerifySlipsPanel({
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm sm:text-base font-extrabold text-slate-900">{slip.nameTh}</span>
                     <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${slip.status === 'approved'
-                        ? 'bg-[#4ade80]/20 text-emerald-800 border-[#4ade80]/40 font-bold'
-                        : slip.status === 'rejected'
-                          ? 'bg-rose-50 text-rose-700 border-rose-200'
-                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      ? 'bg-[#4ade80]/20 text-emerald-800 border-[#4ade80]/40 font-bold'
+                      : slip.status === 'rejected'
+                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
                       }`}>
                       {slip.status === 'approved' ? 'อนุมัติแล้ว' : slip.status === 'rejected' ? 'ปฏิเสธ' : 'รอตรวจสอบ'}
                     </span>
@@ -3850,11 +4084,27 @@ function VerifyAttendeesPanel({
   onAddAttendee?: (newAttendee: AttendeeItem) => void;
   onPrintReceipt?: (attendee: AttendeeItem) => void;
 }) {
-  const [selectedMeetingId, setSelectedMeetingId] = useState<string>('all');
+  // Find current ongoing meeting (or first upcoming, or fallback to first meeting)
+  const currentOngoingMeeting = useMemo(() => {
+    return meetings.find((m) => m.status === 'ongoing') || meetings.find((m) => m.status === 'upcoming') || meetings[0];
+  }, [meetings]);
+
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string>('default');
+
+  const activeMeetingId = selectedMeetingId === 'default'
+    ? (currentOngoingMeeting ? currentOngoingMeeting.id : 'all')
+    : selectedMeetingId;
+
+  const currentMeeting = meetings.find((m) => m.id === activeMeetingId);
+
   const [search, setSearch] = useState('');
   const [filterCheckIn, setFilterCheckIn] = useState<'all' | 'checked_in' | 'not_checked_in'>('all');
   const [filterPayment, setFilterPayment] = useState<'all' | 'paid' | 'pending'>('all');
   const [selectedAttendee, setSelectedAttendee] = useState<AttendeeItem | null>(null);
+
+  // Pagination state (default: 5 items per page to reduce heavy DOM loads)
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(5);
 
   // Walk-in modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -3917,18 +4167,15 @@ function VerifyAttendeesPanel({
     });
   };
 
-  // Selected meeting object
-  const currentMeeting = meetings.find((m) => m.id === selectedMeetingId);
-
   // Filter attendees by selected round first
   const roundAttendees = useMemo(() => {
-    if (selectedMeetingId === 'all') return attendees;
+    if (activeMeetingId === 'all') return attendees;
     return attendees.filter(
       (a) =>
-        a.meetingId === selectedMeetingId ||
+        a.meetingId === activeMeetingId ||
         (currentMeeting && a.meetingTitle === currentMeeting.titleTh)
     );
-  }, [attendees, selectedMeetingId, currentMeeting]);
+  }, [attendees, activeMeetingId, currentMeeting]);
 
   // Secondary filtering (search, check-in status, payment status)
   const filteredAttendees = useMemo(() => {
@@ -3948,6 +4195,20 @@ function VerifyAttendeesPanel({
       return matchStatus && matchPayment && matchSearch;
     });
   }, [roundAttendees, filterCheckIn, filterPayment, search]);
+
+  // Total pages and Paginated Slice (5 items per page default)
+  const totalPages = Math.max(1, Math.ceil(filteredAttendees.length / pageSize));
+  
+  // Reset current page when filters change or if current page exceeds total pages
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedMeetingId, filterCheckIn, filterPayment, search, pageSize]);
+
+  const paginatedAttendees = useMemo(() => {
+    const validPage = Math.min(Math.max(1, currentPage), totalPages);
+    const startIndex = (validPage - 1) * pageSize;
+    return filteredAttendees.slice(startIndex, startIndex + pageSize);
+  }, [filteredAttendees, currentPage, pageSize, totalPages]);
 
   // Statistics for the selected round
   const totalInRound = roundAttendees.length;
@@ -4021,69 +4282,46 @@ function VerifyAttendeesPanel({
         </div>
       </div>
 
-      {/* ─── Meeting Round Filter Selector ───────────────────────────────── */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs space-y-3">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2 text-xs font-extrabold text-slate-600 uppercase tracking-wider">
+      {/* ─── Meeting Round Filter Selector (Dropdown Format) ─────────────── */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <label className="flex items-center gap-2 text-xs sm:text-sm font-extrabold text-slate-700 uppercase tracking-wider">
             <Filter className="w-4 h-4 text-[#0026b3]" />
             <span>เลือกรอบการประชุม (Select Meeting Round):</span>
-          </div>
+          </label>
           <span className="text-xs text-slate-500 font-medium">
-            กำลังแสดง: <strong className="text-slate-800">{selectedMeetingId === 'all' ? 'ทุกรอบการประชุม' : currentMeeting?.titleTh}</strong>
+            ผู้ลงทะเบียนในรอบที่เลือก: <strong className="text-[#0026b3] font-bold">{roundAttendees.length}</strong> คน • เช็คอินแล้ว <strong className="text-emerald-700 font-bold">{checkedInInRound}</strong> คน
           </span>
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          {/* All Rounds Pill */}
-          <button
-            onClick={() => setSelectedMeetingId('all')}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap flex items-center gap-2.5 shrink-0 ${selectedMeetingId === 'all'
-                ? 'bg-[#0026b3] text-white shadow-md shadow-[#0026b3]/20'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+        <div className="relative">
+          <select
+            value={activeMeetingId}
+            onChange={(e) => setSelectedMeetingId(e.target.value)}
+            className="w-full appearance-none bg-slate-50 border border-slate-300 text-slate-900 text-xs sm:text-sm font-bold rounded-xl pl-11 pr-10 py-3 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition cursor-pointer shadow-xs"
           >
-            <Layers className="w-4 h-4" />
-            <span>ทุกรอบการประชุม (All Rounds)</span>
-            <span
-              className={`text-xs px-2 py-0.5 rounded-full font-bold ${selectedMeetingId === 'all'
-                  ? 'bg-[#4ade80] text-slate-950 font-black'
-                  : 'bg-blue-100 text-[#0026b3]'
-                }`}
-            >
-              {attendees.length} คน
-            </span>
-          </button>
-
-          {/* Individual Meeting Pills */}
-          {meetings.map((m) => {
-            const mAttendees = attendees.filter(
-              (a) => a.meetingId === m.id || a.meetingTitle === m.titleTh
-            );
-            const mChecked = mAttendees.filter((a) => a.checkInStatus === 'checked_in').length;
-            const isSelected = selectedMeetingId === m.id;
-
-            return (
-              <button
-                key={m.id}
-                onClick={() => setSelectedMeetingId(m.id)}
-                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap flex items-center gap-2.5 shrink-0 ${isSelected
-                    ? 'bg-[#0026b3] text-white shadow-md shadow-[#0026b3]/20'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-              >
-                <CalendarDays className="w-4 h-4" />
-                <span className="max-w-[200px] truncate">{m.titleTh}</span>
-                <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-bold ${isSelected
-                      ? 'bg-[#4ade80] text-slate-950 font-black'
-                      : 'bg-slate-200 text-slate-700'
-                    }`}
-                >
-                  {mChecked}/{mAttendees.length || m.registered}
-                </span>
-              </button>
-            );
-          })}
+            {meetings.map((m) => {
+              const isOngoing = m.status === 'ongoing';
+              const isUpcoming = m.status === 'upcoming';
+              const mAttendees = attendees.filter(
+                (a) => a.meetingId === m.id || a.meetingTitle === m.titleTh
+              );
+              const mChecked = mAttendees.filter((a) => a.checkInStatus === 'checked_in').length;
+              return (
+                <option key={m.id} value={m.id}>
+                  {isOngoing ? '🟢 [รอบปัจจุบัน] ' : isUpcoming ? '🟡 [เร็วๆ นี้] ' : '📅 '}
+                  [{m.id}] {m.titleTh} ({m.date}) — เช็คอิน {mChecked}/{mAttendees.length || m.registered} คน
+                </option>
+              );
+            })}
+            <option value="all">
+              🌐 รวมทุกรอบการประชุม (All Rounds) — รวมทั้งหมด {attendees.length} คน
+            </option>
+          </select>
+          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#0026b3]">
+            <CalendarDays className="w-5 h-5" />
+          </div>
+          <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
       </div>
 
@@ -4098,10 +4336,10 @@ function VerifyAttendeesPanel({
                 </span>
                 <span
                   className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${currentMeeting.status === 'ongoing'
-                      ? 'bg-[#4ade80]/15 text-emerald-800 border-[#4ade80]/40'
-                      : currentMeeting.status === 'upcoming'
-                        ? 'bg-amber-50 text-amber-700 border-amber-200'
-                        : 'bg-slate-100 text-slate-700 border-slate-200'
+                    ? 'bg-[#4ade80]/15 text-emerald-800 border-[#4ade80]/40'
+                    : currentMeeting.status === 'upcoming'
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-slate-100 text-slate-700 border-slate-200'
                     }`}
                 >
                   {currentMeeting.status === 'ongoing'
@@ -4249,8 +4487,8 @@ function VerifyAttendeesPanel({
                 key={tab.id}
                 onClick={() => setFilterCheckIn(tab.id as any)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${filterCheckIn === tab.id
-                    ? 'bg-[#0026b3] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                  ? 'bg-[#0026b3] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white'
                   }`}
               >
                 {tab.label}
@@ -4295,7 +4533,7 @@ function VerifyAttendeesPanel({
                 </td>
               </tr>
             ) : (
-              filteredAttendees.map((a) => {
+              paginatedAttendees.map((a) => {
                 const meeting = meetings.find((m) => m.id === a.meetingId || m.titleTh === a.meetingTitle);
 
                 return (
@@ -4323,8 +4561,8 @@ function VerifyAttendeesPanel({
                     <td className="px-5 py-4 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap ${a.paymentStatus === 'paid'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
                           }`}
                       >
                         {a.paymentStatus === 'paid' ? 'ชำระแล้ว' : 'รอชำระ'}
@@ -4358,8 +4596,8 @@ function VerifyAttendeesPanel({
                         <button
                           onClick={() => onToggleCheckIn(a.id)}
                           className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${a.checkInStatus === 'checked_in'
-                              ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
-                              : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-xs'
+                            ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                            : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-xs'
                             }`}
                         >
                           {a.checkInStatus === 'checked_in' ? 'ยกเลิก' : 'เช็คอิน'}
@@ -4379,6 +4617,87 @@ function VerifyAttendeesPanel({
           </tbody>
         </table>
       </div>
+
+      {/* ─── Pagination Controls Bar (Default 5 items) ───────────────────── */}
+      {filteredAttendees.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-white border border-slate-200/90 rounded-2xl shadow-xs">
+          <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-600 font-medium">
+            <span>
+              แสดง <strong className="text-slate-900 font-bold">{(currentPage - 1) * pageSize + 1}</strong> - <strong className="text-slate-900 font-bold">{Math.min(currentPage * pageSize, filteredAttendees.length)}</strong> จากทั้งหมด <strong className="text-slate-900 font-bold">{filteredAttendees.length.toLocaleString()}</strong> รายชื่อ
+            </span>
+            <span className="text-slate-300">|</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-500">แสดงหน้าละ:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#0026b3] cursor-pointer"
+              >
+                <option value={5}>5 รายชื่อ</option>
+                <option value={10}>10 รายชื่อ</option>
+                <option value={20}>20 รายชื่อ</option>
+                <option value={50}>50 รายชื่อ</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 self-end sm:self-auto">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition ${
+                currentPage === 1
+                  ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 cursor-pointer shadow-xs'
+              }`}
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">ก่อนหน้า</span>
+            </button>
+
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .map((p, idx, arr) => {
+                  const prev = arr[idx - 1];
+                  const showEllipsis = prev && p - prev > 1;
+
+                  return (
+                    <React.Fragment key={p}>
+                      {showEllipsis && <span className="px-1 text-slate-400 text-xs">...</span>}
+                      <button
+                        onClick={() => setCurrentPage(p)}
+                        className={`min-w-[32px] h-8 px-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                          currentPage === p
+                            ? 'bg-[#0026b3] text-white shadow-xs'
+                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    </React.Fragment>
+                  );
+                })}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition ${
+                currentPage === totalPages
+                  ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 cursor-pointer shadow-xs'
+              }`}
+            >
+              <span className="hidden sm:inline">ถัดไป</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ─── Attendee Details Modal ──────────────────────────────────────── */}
       {selectedAttendee && typeof document !== 'undefined' && createPortal(
@@ -4470,8 +4789,8 @@ function VerifyAttendeesPanel({
                   setSelectedAttendee(null);
                 }}
                 className={`px-4 py-2.5 rounded-xl font-bold text-sm cursor-pointer shadow-xs transition ${selectedAttendee.checkInStatus === 'checked_in'
-                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                    : 'bg-[#0026b3] hover:bg-[#001f94] text-white'
+                  ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  : 'bg-[#0026b3] hover:bg-[#001f94] text-white'
                   }`}
               >
                 {selectedAttendee.checkInStatus === 'checked_in' ? 'ยกเลิกการเช็คอิน' : 'เช็คอินผู้เข้าร่วมทันที'}
@@ -4714,8 +5033,9 @@ export default function AdminPage() {
   const [slips, setSlips] = useState<SlipItem[]>(INITIAL_SLIPS);
   const [attendees, setAttendees] = useState<AttendeeItem[]>(INITIAL_ATTENDEES);
   const [receipts, setReceipts] = useState<ReceiptData[]>(INITIAL_RECEIPTS);
+  const [membersCount, setMembersCount] = useState<number>(0);
 
-  // ─── Fetch meetings from API on mount ───
+  // ─── 1. Fetch meetings from API on mount ───
   const fetchMeetings = useCallback(async () => {
     try {
       const res = await fetch('/api/meetings?limit=100&sort_by=meeting_date&order=desc');
@@ -4773,8 +5093,8 @@ export default function AdminPage() {
           activities: (m.activities as any[]) || undefined,
           description: (m.description as string) || '',
           registered: ((m._count as Record<string, number>)?.meeting_attendances) || 0,
-          attended: 0,
-          revenue: 0,
+          attended: (m.attended_count as number) || 0,
+          revenue: (m.approved_revenue as number) || 0,
           status: ((m.status as string) || 'upcoming') as 'upcoming' | 'ongoing' | 'completed',
         }));
         // Sort by status priority (ongoing -> upcoming -> completed) then newest sequence
@@ -4795,142 +5115,212 @@ export default function AdminPage() {
     }
   }, []);
 
+  // ─── 2. Fetch slips from API ───
+  const fetchSlips = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/slips');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        const mapped: SlipItem[] = json.data.map((s: any) => ({
+          id: s.id,
+          refNo: s.refNo,
+          nameTh: s.nameTh,
+          nameEn: s.nameEn || '',
+          email: s.email,
+          phone: s.phone,
+          memberCode: s.memberNo || undefined,
+          workplace: s.workplace,
+          ticketType: s.ticketType,
+          meetingId: s.meetingId,
+          amount: s.amount,
+          bank: s.bank,
+          transferDate: s.transferDate,
+          transferTime: s.transferTime,
+          slipUrl: s.slipUrl,
+          status: s.status,
+          rejectionReason: s.notes,
+        }));
+        setSlips(mapped);
+      }
+    } catch (err) {
+      console.error('Failed to fetch slips:', err);
+    }
+  }, []);
+
+  // ─── 3. Fetch attendees from real DB API ───
+  const fetchAttendees = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/attendees');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setAttendees(json.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch attendees:', err);
+    }
+  }, []);
+
+  // ─── 4. Fetch total members count from DB ───
+  const fetchMembersCount = useCallback(async () => {
+    try {
+      const res = await fetch('/api/members?limit=1');
+      const json = await res.json();
+      if (json.success) {
+        setMembersCount(json.stats?.total || json.pagination?.total || 0);
+      }
+    } catch (err) {
+      console.error('Failed to fetch members count:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchMeetings();
-  }, [fetchMeetings]);
+    fetchSlips();
+    fetchAttendees();
+    fetchMembersCount();
+  }, [fetchMeetings, fetchSlips, fetchAttendees, fetchMembersCount]);
+
+  // ─── 5. Auto-populate Receipts from approved slips ───
+  useEffect(() => {
+    const approvedSlips = slips.filter((s) => s.status === 'approved');
+    if (approvedSlips.length > 0) {
+      const generatedReceipts: ReceiptData[] = approvedSlips.map((slip) => {
+        const m = meetings.find((mtg) => mtg.id === slip.meetingId);
+        return {
+          id: `REC-${slip.id}`,
+          receiptNo: `2569/${slip.id.slice(0, 8).toUpperCase()}`,
+          receiptDate: slip.transferDate || new Date().toLocaleDateString('th-TH'),
+          purposeText: 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',
+          payerType: 'individual',
+          payerName: slip.nameTh,
+          payerAddressLine1: slip.workplace || 'กรุงเทพมหานคร',
+          payerAddressLine2: 'กรุงเทพมหานคร 10330',
+          payerPhone: slip.phone,
+          items: [
+            {
+              id: `item-${slip.id}`,
+              itemNumber: 1,
+              title: `ค่าลงทะเบียน ${slip.ticketType}`,
+              subDetails: [
+                m ? m.titleTh : 'การประชุมวิชาการประจำปี THAISRM Congress 2026',
+                m ? `จัดขึ้นวันที่ ${m.date}` : 'จัดขึ้นวันที่ 10-12 มีนาคม 2569',
+                m ? m.location : 'โรงแรมอีสติน แกรนด์ พญาไท กรุงเทพฯ',
+              ],
+              amount: slip.amount,
+            },
+          ],
+          totalAmount: slip.amount,
+          payerSignerRole: 'ผู้จ่ายเงิน',
+          authorizedSignerName: 'แพทย์หญิงพิมพกา ชวนะเวสน์',
+          authorizedSignerRole: '',
+          preparedByName: 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม',
+          preparedByRole: 'ผู้จัดทำ',
+          meetingId: slip.meetingId,
+          slipId: slip.id,
+          createdAt: new Date().toISOString().split('T')[0],
+          status: 'issued',
+        };
+      });
+
+      setReceipts((prev) => {
+        const customOnes = prev.filter((r) => !r.slipId);
+        const uniqueKeys = new Set();
+        const merged: ReceiptData[] = [];
+        [...customOnes, ...generatedReceipts].forEach((r) => {
+          const key = r.slipId || r.id;
+          if (!uniqueKeys.has(key)) {
+            uniqueKeys.add(key);
+            merged.push(r);
+          }
+        });
+        return merged;
+      });
+    }
+  }, [slips, meetings]);
 
   // Global Receipt Modal for quick print from attendees/slips
   const [globalReceipt, setGlobalReceipt] = useState<ReceiptData | null>(null);
   const [isGlobalReceiptOpen, setIsGlobalReceiptOpen] = useState(false);
 
+  // Find current ongoing meeting for global badges
+  const currentOngoingMeeting = useMemo(() => {
+    return meetings.find((m) => m.status === 'ongoing') || meetings.find((m) => m.status === 'upcoming') || meetings[0];
+  }, [meetings]);
+
+  const ongoingAttendees = useMemo(() => {
+    if (!currentOngoingMeeting) return attendees;
+    return attendees.filter(
+      (a) => a.meetingId === currentOngoingMeeting.id || a.meetingTitle === currentOngoingMeeting.titleTh
+    );
+  }, [attendees, currentOngoingMeeting]);
+
   const pendingSlipsCount = slips.filter((s) => s.status === 'pending').length;
-  const checkedInCount = attendees.filter((a) => a.checkInStatus === 'checked_in').length;
+  const ongoingCheckedInCount = ongoingAttendees.filter((a) => a.checkInStatus === 'checked_in').length;
 
-  const handleApproveSlip = (slipId: string) => {
-    const targetSlip = slips.find((s) => s.id === slipId);
-    if (!targetSlip) return;
-
-    setSlips((prev) =>
-      prev.map((s) => (s.id === slipId ? { ...s, status: 'approved' } : s))
-    );
-
-    // Update meeting revenue & registered count
-    setMeetings((prev) =>
-      prev.map((m) => {
-        if (m.id === targetSlip.meetingId) {
-          return {
-            ...m,
-            revenue: m.revenue + targetSlip.amount,
-            registered: m.registered + 1,
-          };
-        }
-        return m;
-      })
-    );
-
-    // Update attendee payment status or create attendee if not present
-    setAttendees((prev) => {
-      const existingIndex = prev.findIndex(
-        (a) => a.phone === targetSlip.phone || a.code === targetSlip.memberCode
-      );
-      if (existingIndex >= 0) {
-        const updated = [...prev];
-        updated[existingIndex] = {
-          ...updated[existingIndex],
-          paymentStatus: 'paid',
-          meetingId: targetSlip.meetingId,
-          ticketType: targetSlip.ticketType,
-        };
-        return updated;
-      } else {
-        const targetMeeting = meetings.find((m) => m.id === targetSlip.meetingId);
-        const newAtt: AttendeeItem = {
-          id: `ATT-${Date.now()}`,
-          code: targetSlip.memberCode || Math.floor(100100 + Math.random() * 9000).toString(),
-          nameTh: targetSlip.nameTh,
-          nameEn: targetSlip.nameTh,
-          id4Digits: targetSlip.phone.slice(-4),
-          email: 'attendee@thaisrm.org',
-          phone: targetSlip.phone,
-          workplace: targetSlip.workplace,
-          memberType: 'สมาชิกทั่วไป',
-          ticketType: targetSlip.ticketType,
-          ticketCode: `TSRM-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-          meetingId: targetSlip.meetingId,
-          meetingTitle: targetMeeting?.titleTh || 'การประชุมวิชาการประจำปี THAISRM Congress 2026',
-          registeredDate: targetSlip.transferDate || '10 ก.ย. 2569',
-          paymentStatus: 'paid',
-          checkInStatus: 'not_checked_in',
-        };
-        return [newAtt, ...prev];
+  const handleApproveSlip = async (slipId: string) => {
+    try {
+      const res = await fetch('/api/admin/slips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slipId, action: 'approve' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        fetchSlips();
+        fetchMeetings();
+        fetchAttendees();
+        setGlobalToastMessage('อนุมัติสลิปและปรับปรุงสถานะผู้เข้าร่วมเรียบร้อยแล้ว');
+        setTimeout(() => setGlobalToastMessage(null), 4000);
       }
-    });
-  };
-
-  const handleRejectSlip = (slipId: string, reason: string) => {
-    const targetSlip = slips.find((s) => s.id === slipId);
-    setSlips((prev) =>
-      prev.map((s) => (s.id === slipId ? { ...s, status: 'rejected', rejectionReason: reason } : s))
-    );
-
-    // If slip was previously approved, reduce meeting revenue & registered count
-    if (targetSlip && targetSlip.status === 'approved') {
-      setMeetings((prev) =>
-        prev.map((m) => {
-          if (m.id === targetSlip.meetingId) {
-            return {
-              ...m,
-              revenue: Math.max(0, m.revenue - targetSlip.amount),
-              registered: Math.max(0, m.registered - 1),
-            };
-          }
-          return m;
-        })
-      );
-    }
-
-    // Update matching attendee if present to pending
-    if (targetSlip) {
-      setAttendees((prev) =>
-        prev.map((a) => {
-          if (a.phone === targetSlip.phone || a.code === targetSlip.memberCode) {
-            return { ...a, paymentStatus: 'pending' };
-          }
-          return a;
-        })
-      );
+    } catch (err) {
+      console.error('Failed to approve slip:', err);
     }
   };
 
-  const handleResetSlip = (slipId: string) => {
-    const targetSlip = slips.find((s) => s.id === slipId);
-    if (!targetSlip) return;
-
-    if (targetSlip.status === 'approved') {
-      setMeetings((prev) =>
-        prev.map((m) => {
-          if (m.id === targetSlip.meetingId) {
-            return {
-              ...m,
-              revenue: Math.max(0, m.revenue - targetSlip.amount),
-              registered: Math.max(0, m.registered - 1),
-            };
-          }
-          return m;
-        })
-      );
+  const handleRejectSlip = async (slipId: string, reason: string) => {
+    try {
+      const res = await fetch('/api/admin/slips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slipId, action: 'reject', notes: reason }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        fetchSlips();
+        fetchMeetings();
+        fetchAttendees();
+        setGlobalToastMessage('ปฏิเสธสลิปและส่งอีเมลแจ้งผู้สมัครแล้ว');
+        setTimeout(() => setGlobalToastMessage(null), 4000);
+      }
+    } catch (err) {
+      console.error('Failed to reject slip:', err);
     }
-
-    setSlips((prev) =>
-      prev.map((s) => (s.id === slipId ? { ...s, status: 'pending', rejectionReason: undefined } : s))
-    );
   };
 
-  const handleToggleCheckIn = (attendeeId: string) => {
+  const handleResetSlip = async (slipId: string) => {
+    try {
+      const res = await fetch('/api/admin/slips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slipId, action: 'reset' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        fetchSlips();
+        fetchMeetings();
+        fetchAttendees();
+      }
+    } catch (err) {
+      console.error('Failed to reset slip:', err);
+    }
+  };
+
+  const handleToggleCheckIn = async (attendeeId: string) => {
     const targetAttendee = attendees.find((a) => a.id === attendeeId);
     if (!targetAttendee) return;
     const nextStatus = targetAttendee.checkInStatus === 'checked_in' ? 'not_checked_in' : 'checked_in';
 
+    // Optimistic UI update
     setAttendees((prev) =>
       prev.map((a) => {
         if (a.id === attendeeId) {
@@ -4947,42 +5337,58 @@ export default function AdminPage() {
       })
     );
 
-    // Sync meeting attended count
-    setMeetings((prev) =>
-      prev.map((m) => {
-        if (m.id === targetAttendee.meetingId || m.titleTh === targetAttendee.meetingTitle) {
-          const delta = nextStatus === 'checked_in' ? 1 : -1;
-          return {
-            ...m,
-            attended: Math.max(0, m.attended + delta),
-          };
-        }
-        return m;
-      })
-    );
+    // Sync to backend DB
+    try {
+      const res = await fetch('/api/admin/attendees', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attendanceId: attendeeId,
+          action: nextStatus === 'checked_in' ? 'checkin' : 'checkout',
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        fetchMeetings();
+      }
+    } catch (err) {
+      console.error('Failed to update check-in in DB:', err);
+    }
   };
 
-  const handleAddAttendee = (newAttendee: AttendeeItem) => {
+  const handleAddAttendee = async (newAttendee: AttendeeItem) => {
+    // Optimistic UI update
     setAttendees((prev) => [newAttendee, ...prev]);
 
-    // Update meeting registered, attended, and revenue counts
-    setMeetings((prev) =>
-      prev.map((m) => {
-        if (m.id === newAttendee.meetingId || m.titleTh === newAttendee.meetingTitle) {
-          let ticketPrice = m.basePrice || 3500;
-          if (newAttendee.ticketType.includes('Workshop')) ticketPrice = 5000;
-          if (newAttendee.ticketType.includes('Day')) ticketPrice = 2000;
-
-          return {
-            ...m,
-            registered: m.registered + 1,
-            attended: newAttendee.checkInStatus === 'checked_in' ? m.attended + 1 : m.attended,
-            revenue: newAttendee.paymentStatus === 'paid' ? m.revenue + ticketPrice : m.revenue,
-          };
-        }
-        return m;
-      })
-    );
+    // Persist to real DB
+    try {
+      const res = await fetch('/api/admin/attendees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          meetingId: newAttendee.meetingId,
+          nameTh: newAttendee.nameTh,
+          nameEn: newAttendee.nameEn,
+          phone: newAttendee.phone,
+          email: newAttendee.email,
+          workplace: newAttendee.workplace,
+          memberType: newAttendee.memberType,
+          ticketType: newAttendee.ticketType,
+          paymentStatus: newAttendee.paymentStatus,
+          checkInNow: newAttendee.checkInStatus === 'checked_in',
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        fetchAttendees();
+        fetchMeetings();
+        fetchSlips();
+        setGlobalToastMessage(`บันทึกผู้เข้าร่วม "${newAttendee.nameTh}" ลงฐานข้อมูลเรียบร้อยแล้ว!`);
+        setTimeout(() => setGlobalToastMessage(null), 4000);
+      }
+    } catch (err) {
+      console.error('Failed to save walk-in attendee to DB:', err);
+    }
   };
 
   const handleUpdateMeetingStatus = async (meetingId: string, status: 'upcoming' | 'ongoing' | 'completed') => {
@@ -4997,6 +5403,7 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
+      fetchMeetings();
     } catch (err) {
       console.error('Failed to update meeting status:', err);
     }
@@ -5008,6 +5415,7 @@ export default function AdminPage() {
     // Sync to API
     try {
       await fetch(`/api/meetings/${meetingId}`, { method: 'DELETE' });
+      fetchMeetings();
     } catch (err) {
       console.error('Failed to delete meeting:', err);
     }
@@ -5015,6 +5423,7 @@ export default function AdminPage() {
 
   const handleMeetingCreated = (newMeeting: MeetingItem) => {
     setMeetings((prev) => [newMeeting, ...prev]);
+    fetchMeetings();
   };
 
   // Receipt Handlers
@@ -5152,6 +5561,7 @@ export default function AdminPage() {
     setMeetings((prev) =>
       prev.map((m) => (m.id === updatedMeeting.id ? updatedMeeting : m))
     );
+    fetchMeetings();
     setGlobalToastMessage(`บันทึกการแก้ไขการประชุม "${updatedMeeting.titleTh}" สำเร็จเรียบร้อยแล้ว!`);
     setTimeout(() => setGlobalToastMessage(null), 5000);
   };
@@ -5200,15 +5610,7 @@ export default function AdminPage() {
           />
         );
       case 'verify-slip':
-        return (
-          <VerifySlipsPanel
-            slips={slips}
-            onApprove={handleApproveSlip}
-            onReject={handleRejectSlip}
-            onResetToPending={handleResetSlip}
-            onPrintReceipt={handlePrintSlipReceipt}
-          />
-        );
+        return <AdminSlipsView />;
       case 'verify-attendees':
         return (
           <VerifyAttendeesPanel
@@ -5234,9 +5636,10 @@ export default function AdminPage() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         pendingSlipsCount={pendingSlipsCount}
-        totalAttendeesCount={attendees.length}
-        checkedInCount={checkedInCount}
+        totalAttendeesCount={ongoingAttendees.length}
+        checkedInCount={ongoingCheckedInCount}
         receiptsCount={receipts.length}
+        membersCount={membersCount}
         onLogout={() => {
           if (typeof window !== 'undefined') {
             window.location.href = '/login';

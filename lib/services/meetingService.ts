@@ -200,6 +200,72 @@ export async function getMeetings(params: GetMeetingsParams = {}) {
     prisma.meetings.count({ where }),
   ]);
 
+  // Aggregate attended count and approved revenue from DB
+  const meetingIds = meetings.map((m) => m.meeting_id);
+  let attendedMap = new Map<string, number>();
+  let revenueMap = new Map<string, number>();
+
+  if (meetingIds.length > 0) {
+    try {
+      const p = prisma as any;
+      const tasks: Promise<any>[] = [];
+      if (p.meeting_attendances?.groupBy) {
+        tasks.push(
+          p.meeting_attendances.groupBy({
+            by: ['meeting_id'],
+            where: {
+              meeting_id: { in: meetingIds },
+              OR: [
+                { checkin_time: { not: null } },
+                { attendance_status: 'Attended' },
+              ],
+            },
+            _count: { attendance_id: true },
+          })
+        );
+      } else {
+        tasks.push(Promise.resolve([]));
+      }
+
+      if (p.payment_slips?.groupBy) {
+        tasks.push(
+          p.payment_slips.groupBy({
+            by: ['meeting_id'],
+            where: {
+              meeting_id: { in: meetingIds },
+              status: 'approved',
+            },
+            _sum: { amount: true },
+          })
+        );
+      } else {
+        tasks.push(Promise.resolve([]));
+      }
+
+      const [attendancesStats, revenueStats] = await Promise.all(tasks);
+
+      if (Array.isArray(attendancesStats)) {
+        attendancesStats.forEach((st: any) => {
+          attendedMap.set(st.meeting_id, st._count?.attendance_id || 0);
+        });
+      }
+
+      if (Array.isArray(revenueStats)) {
+        revenueStats.forEach((rev: any) => {
+          revenueMap.set(rev.meeting_id, rev._sum?.amount || 0);
+        });
+      }
+    } catch (aggErr) {
+      console.error('Error aggregating meeting stats:', aggErr);
+    }
+  }
+
+  const enhancedMeetings = meetings.map((m) => ({
+    ...m,
+    attended_count: attendedMap.get(m.meeting_id) || 0,
+    approved_revenue: revenueMap.get(m.meeting_id) || 0,
+  }));
+
   // Sort meetings by status priority (ongoing > upcoming > completed) then newest first
   const STATUS_PRIORITY: Record<string, number> = {
     ongoing: 1,
@@ -207,7 +273,7 @@ export async function getMeetings(params: GetMeetingsParams = {}) {
     completed: 3,
   };
 
-  meetings.sort((a, b) => {
+  enhancedMeetings.sort((a, b) => {
     const pA = a.status ? (STATUS_PRIORITY[a.status] || 99) : 99;
     const pB = b.status ? (STATUS_PRIORITY[b.status] || 99) : 99;
     if (pA !== pB) return pA - pB;
@@ -223,7 +289,7 @@ export async function getMeetings(params: GetMeetingsParams = {}) {
   });
 
   return {
-    data: meetings,
+    data: enhancedMeetings,
     pagination: {
       page,
       limit,

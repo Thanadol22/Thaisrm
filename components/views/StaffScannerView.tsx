@@ -1,7 +1,30 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Html5Qrcode } from 'html5-qrcode';
-import { Camera, QrCode, Search, CheckCircle2, AlertTriangle, XCircle, Users, UserCheck, AlertCircle, Video, VideoOff, ShieldCheck, Sparkles, Globe, Lock, Delete } from 'lucide-react';
+import {
+  Camera,
+  QrCode,
+  Search,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Users,
+  UserCheck,
+  AlertCircle,
+  Video,
+  VideoOff,
+  ShieldCheck,
+  Sparkles,
+  Globe,
+  Lock,
+  Delete,
+  Calendar,
+  MapPin,
+  RefreshCw,
+  Clock,
+  ExternalLink,
+  ChevronRight
+} from 'lucide-react';
 import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -14,6 +37,16 @@ interface CheckInRecord {
   status: 'success' | 'duplicate' | 'invalid';
 }
 
+interface ActiveMeetingInfo {
+  id: string;
+  name: string;
+  date?: string | Date;
+  time?: string;
+  location?: string;
+  type?: string;
+  status?: string;
+}
+
 export function StaffScannerView() {
   const router = useRouter();
   const { lang, toggleLang, t } = useLanguage();
@@ -22,12 +55,18 @@ export function StaffScannerView() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [pin, setPin] = useState('');
+  const [savedPin, setSavedPin] = useState<string>('');
   const [pinError, setPinError] = useState(false);
+  const [pinErrorMessage, setPinErrorMessage] = useState<string>('');
   const [isShake, setIsShake] = useState(false);
+
+  // Active Meeting context from Database
+  const [activeMeeting, setActiveMeeting] = useState<ActiveMeetingInfo | null>(null);
 
   const [manualCode, setManualCode] = useState('');
   const [lastScanned, setLastScanned] = useState<CheckInRecord | null>(null);
   const [stats, setStats] = useState({ total: 0, checkedIn: 0 });
+  const [isRefreshingStats, setIsRefreshingStats] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [cameraPermissionError, setCameraPermissionError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -36,18 +75,67 @@ export function StaffScannerView() {
   const readerId = "html5-qr-reader";
   const cameraPermErrorRef = useRef<string>('');
 
-  // Check saved staff session on mount to keep staff logged in on refresh
+  // Fetch / Refresh Stats from Database
+  const fetchMeetingStats = useCallback(async (meetingId?: string, staffPinVal?: string) => {
+    try {
+      setIsRefreshingStats(true);
+      const queryParams = new URLSearchParams();
+      if (meetingId) queryParams.set('meetingId', meetingId);
+      if (staffPinVal) queryParams.set('pin', staffPinVal);
+
+      const res = await fetch(`/api/staff/stats?${queryParams.toString()}`);
+      const json = await res.json();
+      if (json.success) {
+        if (json.stats) {
+          setStats(json.stats);
+        }
+        if (json.meeting && !activeMeeting) {
+          setActiveMeeting(json.meeting);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching staff stats:', err);
+    } finally {
+      setIsRefreshingStats(false);
+    }
+  }, [activeMeeting]);
+
+  // Check saved staff session on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const isAuthed = localStorage.getItem('thaisrm_staff_authed') === 'true' || sessionStorage.getItem('thaisrm_staff_authed') === 'true';
+      const storedMeeting = localStorage.getItem('thaisrm_staff_meeting');
+      const storedPin = localStorage.getItem('thaisrm_staff_pin') || '';
+
       if (isAuthed) {
         setIsAuthenticated(true);
+        if (storedPin) setSavedPin(storedPin);
+        if (storedMeeting) {
+          try {
+            const parsed = JSON.parse(storedMeeting);
+            setActiveMeeting(parsed);
+            fetchMeetingStats(parsed.id, storedPin);
+          } catch {
+            fetchMeetingStats(undefined, storedPin);
+          }
+        } else {
+          fetchMeetingStats(undefined, storedPin);
+        }
       }
     }
     setIsAuthChecking(false);
-  }, []);
+  }, [fetchMeetingStats]);
 
-  // Shared Web Audio API Beep Generator for Instant Audio Feedback (Zero Latency)
+  // Periodic stats polling every 20 seconds to sync check-ins across multiple staff devices
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const interval = setInterval(() => {
+      fetchMeetingStats(activeMeeting?.id, savedPin);
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, activeMeeting?.id, savedPin, fetchMeetingStats]);
+
+  // Shared Web Audio API Beep Generator for Instant Audio Feedback
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   const getAudioContext = () => {
@@ -79,12 +167,12 @@ export function StaffScannerView() {
         osc.start();
         osc.stop(audioCtx.currentTime + 0.15);
       } else if (type === 'warning') {
-        osc.frequency.setValueAtTime(440, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(440, audioCtx.currentTime); // Mid pitch
+        gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
         osc.start();
         osc.stop(audioCtx.currentTime + 0.3);
       } else {
-        osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(220, audioCtx.currentTime); // Low pitch error
         gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
         osc.start();
         osc.stop(audioCtx.currentTime + 0.4);
@@ -94,11 +182,12 @@ export function StaffScannerView() {
     }
   };
 
-  // Handle PIN verification via Server API
+  // Handle PIN verification via Server API (Validates against meetings.staff_code in DB)
   const [isVerifying, setIsVerifying] = useState(false);
 
   const handleVerifyPin = async (inputPin: string) => {
     setIsVerifying(true);
+    setPinErrorMessage('');
     try {
       const res = await fetch('/api/staff/verify-pin', {
         method: 'POST',
@@ -112,12 +201,24 @@ export function StaffScannerView() {
         if (typeof window !== 'undefined') {
           localStorage.setItem('thaisrm_staff_authed', 'true');
           sessionStorage.setItem('thaisrm_staff_authed', 'true');
+          localStorage.setItem('thaisrm_staff_pin', inputPin);
+          if (data.meeting) {
+            localStorage.setItem('thaisrm_staff_meeting', JSON.stringify(data.meeting));
+          }
+        }
+        setSavedPin(inputPin);
+        if (data.meeting) {
+          setActiveMeeting(data.meeting);
+        }
+        if (data.stats) {
+          setStats(data.stats);
         }
         setIsAuthenticated(true);
         setPinError(false);
       } else {
         playBeepSound('error');
         setPinError(true);
+        setPinErrorMessage(data.error || t.staff.passcodeIncorrect);
         setIsShake(true);
         setPin('');
         setTimeout(() => setIsShake(false), 500);
@@ -125,6 +226,7 @@ export function StaffScannerView() {
     } catch {
       playBeepSound('error');
       setPinError(true);
+      setPinErrorMessage(t.staff.passcodeIncorrect);
       setIsShake(true);
       setPin('');
       setTimeout(() => setIsShake(false), 500);
@@ -152,18 +254,17 @@ export function StaffScannerView() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('thaisrm_staff_authed');
       sessionStorage.removeItem('thaisrm_staff_authed');
+      localStorage.removeItem('thaisrm_staff_meeting');
+      localStorage.removeItem('thaisrm_staff_pin');
     }
     setIsAuthenticated(false);
+    setActiveMeeting(null);
+    setSavedPin('');
     setPin('');
   };
 
   const handleBackToLogin = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('thaisrm_staff_authed');
-      sessionStorage.removeItem('thaisrm_staff_authed');
-    }
-    setIsAuthenticated(false);
-    setPin('');
+    handleLockSystem();
     router.push('/login');
   };
 
@@ -172,7 +273,80 @@ export function StaffScannerView() {
     cameraPermErrorRef.current = t.staff.cameraPermissionError;
   }, [t.staff.cameraPermissionError]);
 
-  // Initialize html5-qrcode real camera scanner (strictly Environment / Back Camera)
+  // Real Database Scan Processing Function
+  const handleProcessScan = useCallback(async (decodedText: string) => {
+    const trimmed = (decodedText || '').trim();
+    if (!trimmed) return;
+
+    setIsProcessing(true);
+
+    try {
+      const res = await fetch('/api/staff/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          meetingId: activeMeeting?.id,
+          code: trimmed,
+          staffPin: savedPin,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (json.success && json.record) {
+        // Play appropriate sound feedback
+        if (json.status === 'success') {
+          playBeepSound('success');
+        } else if (json.status === 'duplicate') {
+          playBeepSound('warning');
+        } else {
+          playBeepSound('error');
+        }
+
+        setLastScanned({
+          id: json.record.id,
+          name: json.record.name,
+          ticketType: json.record.ticketType,
+          email: json.record.email,
+          checkInTime: json.record.checkInTime,
+          status: json.record.status,
+        });
+
+        // Update real-time stats count from database
+        if (json.stats) {
+          setStats(json.stats);
+        }
+      } else {
+        playBeepSound('error');
+        setLastScanned({
+          id: trimmed,
+          name: json.error || t.staff.unidentified,
+          ticketType: 'N/A',
+          email: 'N/A',
+          checkInTime: 'N/A',
+          status: 'invalid',
+        });
+      }
+    } catch (err) {
+      console.error('Scan processing error:', err);
+      playBeepSound('error');
+      setLastScanned({
+        id: trimmed,
+        name: 'เกิดข้อผิดพลาดในการเชื่อมต่อ',
+        ticketType: 'N/A',
+        email: 'N/A',
+        checkInTime: 'N/A',
+        status: 'invalid',
+      });
+    } finally {
+      // Pause for 1.8 seconds before allowing next camera frame scan
+      setTimeout(() => {
+        setIsProcessing(false);
+      }, 1800);
+    }
+  }, [activeMeeting?.id, savedPin, t.staff.unidentified]);
+
+  // Initialize html5-qrcode real camera scanner (strictly Back Camera)
   useEffect(() => {
     let html5QrcodeScanner: Html5Qrcode | null = null;
 
@@ -218,142 +392,7 @@ export function StaffScannerView() {
           .catch((err: unknown) => console.error("Error stopping scanner:", err));
       }
     };
-  }, [isCameraOn, isAuthenticated]);
-
-const KNOWN_ATTENDEES: Record<string, { name: string; email: string; ticketType: string }> = {
-  'TSRM-2026-8891': {
-    name: 'ธนดล จำปาเต็ม',
-    email: 'thanadolpetch22@gmail.com',
-    ticketType: 'THAISRM Congress Full Pass',
-  },
-  'TSRM-2026-0012': {
-    name: 'นพ. วรวัฒน์ เกียรติอนันต์',
-    email: 'worawat.k@chula.md.ac.th',
-    ticketType: 'THAISRM Congress Full Pass',
-  },
-  'TSRM-2026-0034': {
-    name: 'พญ. นภัสสร สุวรรณเวช',
-    email: 'napassorn.s@med.tu.ac.th',
-    ticketType: 'THAISRM Congress Full Pass',
-  },
-  'TSRM-2026-0089': {
-    name: 'นว. ปรียานุช รัตนศิลป์',
-    email: 'preeyanuch.r@ivfcenter.co.th',
-    ticketType: 'Embryology Workshop Only',
-  },
-  'TSRM-2026-0005': {
-    name: 'นพ. ธนกฤต วิเศษไพบูลย์',
-    email: 'thanakrit.w@siriraj.ac.th',
-    ticketType: 'THAISRM Congress Full Pass',
-  },
-  'TSRM-2026-0104': {
-    name: 'ภญ. พัชราภา วงศ์มณี',
-    email: 'patcharapa.w@pharma.com',
-    ticketType: 'Day Pass (Day 2 Only)',
-  },
-  'TSRM-2026-0168': {
-    name: 'พว. กัลยา สุขสำราญ',
-    email: 'kanlaya.s@bnh.co.th',
-    ticketType: 'THAISRM Congress Full Pass',
-  },
-};
-
-  // Process Scanned Code or Manual Pass Token
-  const handleProcessScan = (decodedText: string) => {
-    setIsProcessing(true);
-    const trimmed = (decodedText || '').trim();
-    if (!trimmed) {
-      setIsProcessing(false);
-      return;
-    }
-
-    // Support JSON encoded QR codes
-    let parsedJson: any = null;
-    try {
-      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-        parsedJson = JSON.parse(trimmed);
-      }
-    } catch {
-      // not JSON
-    }
-
-    const inputCode = parsedJson?.code || parsedJson?.id || trimmed;
-    const upperCode = inputCode.toUpperCase();
-
-    if (upperCode.includes('DUP') || upperCode === 'TICKET-DUP') {
-      playBeepSound('warning');
-      setLastScanned({
-        id: 'TSRM-2026-0042',
-        name: 'สมชาย ใจดี',
-        ticketType: 'THAISRM Premium Pass',
-        email: 'somchai@example.com',
-        checkInTime: new Date().toLocaleTimeString(lang === 'th' ? 'th-TH' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
-        status: 'duplicate'
-      });
-    } else if (upperCode.includes('ERR') || upperCode === 'INVALID') {
-      playBeepSound('error');
-      setLastScanned({
-        id: inputCode,
-        name: t.staff.unidentified,
-        ticketType: 'N/A',
-        email: 'N/A',
-        checkInTime: 'N/A',
-        status: 'invalid'
-      });
-    } else {
-      // Lookup in known attendees
-      let matched = KNOWN_ATTENDEES[upperCode];
-
-      // Support partial search (e.g. "8891", "0012", "0034")
-      if (!matched) {
-        const foundKey = Object.keys(KNOWN_ATTENDEES).find(
-          k => k.endsWith(upperCode) || k.includes(upperCode) || upperCode.endsWith(k.split('-').pop() || '')
-        );
-        if (foundKey) {
-          matched = KNOWN_ATTENDEES[foundKey];
-        }
-      }
-
-      // Check current user from local storage
-      if (!matched && typeof window !== 'undefined') {
-        try {
-          const stored = localStorage.getItem('user_data');
-          if (stored) {
-            const u = JSON.parse(stored);
-            if (u?.name || u?.email) {
-              matched = {
-                name: u.name || 'สมาชิก TSRM',
-                email: u.email || 'member@thaisrm.or.th',
-                ticketType: 'Full Congress Pass'
-              };
-            }
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      const finalName = parsedJson?.name || matched?.name || (lang === 'th' ? 'ธนดล จำปาเต็ม' : 'Thanadol Jampatem');
-      const finalEmail = parsedJson?.email || matched?.email || 'thanadolpetch22@gmail.com';
-      const finalTicketType = parsedJson?.ticketType || matched?.ticketType || 'THAISRM Congress Full Pass';
-
-      playBeepSound('success');
-      setLastScanned({
-        id: inputCode.startsWith('TSRM-') ? inputCode : `TSRM-2026-${inputCode}`,
-        name: finalName,
-        ticketType: finalTicketType,
-        email: finalEmail,
-        checkInTime: new Date().toLocaleTimeString(lang === 'th' ? 'th-TH' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
-        status: 'success'
-      });
-      setStats(prev => ({ ...prev, checkedIn: Math.min(prev.total, prev.checkedIn + 1) }));
-    }
-
-    // Pause for 2 seconds before allowing next camera frame scan
-    setTimeout(() => {
-      setIsProcessing(false);
-    }, 2000);
-  };
+  }, [isCameraOn, isAuthenticated, isProcessing, handleProcessScan]);
 
   const handleManualCheckIn = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -418,7 +457,9 @@ const KNOWN_ATTENDEES: Record<string, { name: string; email: string; ticketType:
                 {t.staff.passcodeTitle}
               </h1>
               <p className="text-xs text-blue-100/90 leading-relaxed font-normal max-w-xs mx-auto">
-                {t.staff.passcodeSubtitle}
+                {lang === 'th'
+                  ? 'กรอกรหัส PIN 6 หลัก ประจำรอบการประชุม (ตั้งค่าได้จากเมนู Admin)'
+                  : 'Enter 6-digit staff PIN configured for the active conference'}
               </p>
             </div>
           </div>
@@ -466,9 +507,9 @@ const KNOWN_ATTENDEES: Record<string, { name: string; email: string; ticketType:
 
           {/* Error Feedback */}
           {pinError && (
-            <div className="flex items-center gap-1.5 text-rose-600 bg-rose-50 border border-rose-200 px-4 py-1.5 rounded-full text-xs font-extrabold animate-bounce my-1">
+            <div className="flex items-center gap-1.5 text-rose-600 bg-rose-50 border border-rose-200 px-4 py-1.5 rounded-full text-xs font-extrabold animate-bounce my-1 text-center">
               <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{t.staff.passcodeIncorrect}</span>
+              <span>{pinErrorMessage || t.staff.passcodeIncorrect}</span>
             </div>
           )}
 
@@ -504,8 +545,9 @@ const KNOWN_ATTENDEES: Record<string, { name: string; email: string; ticketType:
           </div>
 
           {isVerifying && (
-            <p className="text-[11px] text-[#0026b3] font-bold text-center pb-2 animate-pulse">
-              {t.staff.verifying}
+            <p className="text-[11px] text-[#0026b3] font-bold text-center pb-2 animate-pulse flex items-center justify-center gap-1.5">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <span>{t.staff.verifying}</span>
             </p>
           )}
         </div>
@@ -517,12 +559,12 @@ const KNOWN_ATTENDEES: Record<string, { name: string; email: string; ticketType:
   return (
     <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[640px]">
       {/* Header Blue Card Section with Green Ambient Accent */}
-      <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-4 sm:px-7 pt-5 sm:pt-7 pb-7 sm:pb-9 rounded-b-[32px] sm:rounded-b-[40px] shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-4 sm:px-7 pt-4 sm:pt-6 pb-5 sm:pb-7 rounded-b-[32px] sm:rounded-b-[40px] shadow-xl relative overflow-hidden">
         {/* Glowing Green & Blue Ambient Accents */}
         <div className="absolute -top-12 -right-12 w-48 h-48 bg-[#4ade80]/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 -left-12 w-44 h-44 bg-[#0026b3]/40 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="relative z-10 space-y-3">
+        <div className="relative z-10 space-y-2.5">
           <div className="flex items-center justify-between gap-2">
             <div
               onClick={handleBackToLogin}
@@ -540,7 +582,7 @@ const KNOWN_ATTENDEES: Record<string, { name: string; email: string; ticketType:
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {/* Language Switcher Pill */}
               <button
                 onClick={toggleLang}
@@ -553,38 +595,49 @@ const KNOWN_ATTENDEES: Record<string, { name: string; email: string; ticketType:
                 <span className={lang === 'en' ? 'text-white font-black' : 'text-blue-200/60'}>EN</span>
               </button>
 
-              {/* Lock System Button */}
+              {/* Lock / Exit Staff Mode Button */}
               <button
                 onClick={handleLockSystem}
-                className="flex items-center gap-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold transition cursor-pointer active:scale-95 shrink-0"
-                title="ล็อคระบบเจ้าหน้าที่ / Lock Staff View"
+                className="flex items-center gap-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold transition cursor-pointer active:scale-95 shrink-0"
+                title="ออกจากระบบเจ้าหน้าที่ / Lock Staff View"
               >
                 <Lock className="w-3 h-3 text-rose-300 shrink-0" />
                 <span>{t.staff.passcodeLock}</span>
               </button>
-
-              {/* Green Accent Badge */}
-              <span className="bg-[#4ade80] text-[#061d08] text-[10px] sm:text-[11px] font-black px-2.5 sm:px-3 py-1 rounded-full shadow-sm flex items-center gap-1 shrink-0 whitespace-nowrap">
-                <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>{t.staff.badge}</span>
-              </span>
             </div>
           </div>
 
-          <div className="pt-1 sm:pt-2">
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
-              <span>{t.staff.title}</span>
+          {/* Active Meeting Context Banner in Header */}
+          <div className="pt-1">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="bg-[#4ade80] text-[#061d08] text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-md shadow-xs flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3 stroke-[2.5]" />
+                <span>จุดเช็คอินสตาฟ (STAFF)</span>
+              </span>
+              {activeMeeting?.id && (
+                <span className="bg-white/20 text-white font-mono text-[9px] sm:text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-white/20">
+                  {activeMeeting.id}
+                </span>
+              )}
+            </div>
+
+            <h1 className="text-base sm:text-lg font-black text-white tracking-tight leading-snug truncate" title={activeMeeting?.name || t.staff.title}>
+              {activeMeeting?.name || t.staff.title}
             </h1>
-            <p className="text-[11px] sm:text-xs text-blue-100/90 leading-relaxed mt-1 font-normal">
-              {t.staff.subtitle}
-            </p>
+
+            {activeMeeting?.location && (
+              <p className="text-[11px] text-blue-100/80 leading-tight flex items-center gap-1 mt-0.5 truncate" title={activeMeeting.location}>
+                <MapPin className="w-3 h-3 text-[#4ade80] shrink-0" />
+                <span className="truncate">{activeMeeting.location}</span>
+              </p>
+            )}
           </div>
         </div>
       </div>
 
       {/* Main Content Body */}
-      <div className="px-4 sm:px-6 py-4 sm:py-6 space-y-4 flex-1 flex flex-col justify-between">
-        <div className="space-y-4">
+      <div className="px-4 sm:px-6 py-3.5 sm:py-5 space-y-3.5 flex-1 flex flex-col justify-between">
+        <div className="space-y-3.5">
           {/* Real-time Stats Card with Green/Blue Accent Border */}
           <div className="bg-gradient-to-r from-blue-50/60 via-white to-emerald-50/50 border-l-4 border-l-[#0026b3] border-y border-r border-slate-200/90 rounded-2xl sm:rounded-3xl p-3 sm:p-4 flex items-center justify-between gap-2 shadow-sm">
             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
@@ -592,9 +645,20 @@ const KNOWN_ATTENDEES: Record<string, { name: string; email: string; ticketType:
                 <Users className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-[11px] sm:text-xs text-slate-500 font-extrabold whitespace-nowrap">{t.staff.statsTotal}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[11px] sm:text-xs text-slate-500 font-extrabold whitespace-nowrap">{t.staff.statsTotal}</p>
+                  <button
+                    type="button"
+                    onClick={() => fetchMeetingStats(activeMeeting?.id, savedPin)}
+                    disabled={isRefreshingStats}
+                    className="text-slate-400 hover:text-[#0026b3] transition cursor-pointer p-0.5"
+                    title="รีเฟรชสถิติล่าสุด"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isRefreshingStats ? 'animate-spin text-[#0026b3]' : ''}`} />
+                  </button>
+                </div>
                 <p className="text-base sm:text-xl font-black text-slate-900 leading-tight whitespace-nowrap">
-                  {stats.checkedIn} <span className="text-[10px] sm:text-xs text-slate-500 font-medium">/ {stats.total}</span>
+                  {stats.checkedIn} <span className="text-[10px] sm:text-xs text-slate-500 font-medium">/ {stats.total} คน</span>
                 </p>
               </div>
             </div>
@@ -605,13 +669,15 @@ const KNOWN_ATTENDEES: Record<string, { name: string; email: string; ticketType:
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-950 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-slate-950" />
                 </span>
-                <span className="whitespace-nowrap">{Math.round((stats.checkedIn / stats.total) * 100)}% {t.staff.checkedInPercent}</span>
+                <span className="whitespace-nowrap">
+                  {stats.total > 0 ? Math.round((stats.checkedIn / stats.total) * 100) : 0}% {t.staff.checkedInPercent}
+                </span>
               </span>
             </div>
           </div>
 
           {/* Live Camera Scanner Viewport with Green Accent Border */}
-          <div className="relative rounded-3xl overflow-hidden bg-slate-950 border-2 border-[#4ade80]/60 aspect-square max-h-[320px] mx-auto flex items-center justify-center shadow-[0_0_25px_rgba(74,222,128,0.15)]">
+          <div className="relative rounded-3xl overflow-hidden bg-slate-950 border-2 border-[#4ade80]/60 aspect-square max-h-[300px] mx-auto flex items-center justify-center shadow-[0_0_25px_rgba(74,222,128,0.15)]">
             {!isCameraOn ? (
               /* Standby Screen when Camera is Paused */
               <div className="text-center p-6 space-y-3 animate-fade-in">
@@ -649,26 +715,27 @@ const KNOWN_ATTENDEES: Record<string, { name: string; email: string; ticketType:
 
                 {/* Laser Frame Overlay */}
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="w-52 h-52 border-2 border-[#4ade80] rounded-3xl relative shadow-[0_0_35px_rgba(74,222,128,0.4)] animate-pulse-glow">
+                  <div className="w-48 h-48 sm:w-52 sm:h-52 border-2 border-[#4ade80] rounded-3xl relative shadow-[0_0_35px_rgba(74,222,128,0.4)] animate-pulse-glow">
                     {/* Animated Scanner Laser */}
                     <div className="w-full h-0.5 bg-[#4ade80] shadow-[0_0_18px_#4ade80] absolute animate-scan-laser" />
                   </div>
                 </div>
 
                 {isProcessing && (
-                  <div className="absolute inset-0 bg-[#0026b3]/90 backdrop-blur-xs flex items-center justify-center text-xs font-bold text-[#4ade80] z-10 animate-scale-up">
-                    {t.staff.processingScan}
+                  <div className="absolute inset-0 bg-[#0026b3]/90 backdrop-blur-xs flex items-center justify-center text-xs sm:text-sm font-bold text-[#4ade80] z-10 animate-scale-up gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>{t.staff.processingScan}</span>
                   </div>
                 )}
               </div>
             )}
           </div>
 
-          {/* Camera Power Toggle Button (Positioned Directly Under Scanner Frame) */}
+          {/* Camera Power Toggle Button */}
           <div className="pt-0.5">
             <button
               onClick={() => setIsCameraOn(!isCameraOn)}
-              className={`w-full py-3.5 px-4 rounded-2xl text-xs font-extrabold transition flex items-center justify-center gap-2 border cursor-pointer active:scale-[0.99] shadow-sm ${isCameraOn
+              className={`w-full py-2.5 sm:py-3 px-4 rounded-2xl text-xs font-extrabold transition flex items-center justify-center gap-2 border cursor-pointer active:scale-[0.99] shadow-sm ${isCameraOn
                 ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
                 : 'bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] border-transparent shadow-md'
                 }`}
@@ -678,32 +745,14 @@ const KNOWN_ATTENDEES: Record<string, { name: string; email: string; ticketType:
             </button>
           </div>
 
-          {/* Quick Test Action Buttons for Demo */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => handleProcessScan('TSRM-2026-8891')}
-              className="flex-1 py-2.5 sm:py-3 px-2 sm:px-3 rounded-2xl bg-[#4ade80]/20 hover:bg-[#4ade80]/30 text-emerald-950 border border-[#4ade80]/50 text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer shadow-2xs whitespace-nowrap"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-700 shrink-0" />
-              <span>{t.staff.statusSuccess} (8891)</span>
-            </button>
-            <button
-              onClick={() => handleProcessScan('TICKET-DUP')}
-              className="flex-1 py-2.5 sm:py-3 px-2 sm:px-3 rounded-2xl bg-amber-100/80 hover:bg-amber-200/80 text-amber-950 border border-amber-300/90 text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer shadow-2xs whitespace-nowrap"
-            >
-              <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-700 shrink-0" />
-              <span>{t.staff.statusDuplicate}</span>
-            </button>
-          </div>
-
           {/* Scan Result Feedback Card */}
           {lastScanned && (
             <div
-              className={`rounded-2xl p-3.5 sm:p-4 border animate-scale-up shadow-sm ${lastScanned.status === 'success'
-                ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+              className={`rounded-2xl p-3.5 sm:p-4 border animate-scale-up shadow-sm transition-all ${lastScanned.status === 'success'
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-950 ring-2 ring-emerald-200'
                 : lastScanned.status === 'duplicate'
-                  ? 'bg-amber-50 border-amber-300 text-amber-950'
-                  : 'bg-rose-50 border-rose-300 text-rose-950'
+                  ? 'bg-amber-50 border-amber-300 text-amber-950 ring-2 ring-amber-200'
+                  : 'bg-rose-50 border-rose-300 text-rose-950 ring-2 ring-rose-200'
                 }`}
             >
               <div className="flex items-start justify-between gap-2">
@@ -725,30 +774,40 @@ const KNOWN_ATTENDEES: Record<string, { name: string; email: string; ticketType:
                       : 'bg-rose-600 text-white border-rose-700'
                     }`}
                 >
-                  {lastScanned.status === 'success' && t.staff.statusSuccess}
-                  {lastScanned.status === 'duplicate' && t.staff.statusDuplicate}
-                  {lastScanned.status === 'invalid' && t.staff.statusInvalid}
+                  {lastScanned.status === 'success' && (lang === 'th' ? '✓ สำเร็จ' : 'Success')}
+                  {lastScanned.status === 'duplicate' && (lang === 'th' ? '⚠️ สแกนซ้ำแล้ว' : 'Duplicate')}
+                  {lastScanned.status === 'invalid' && (lang === 'th' ? '✗ ไม่พบข้อมูล' : 'Invalid')}
                 </span>
               </div>
 
-              <div className="mt-3 pt-2.5 border-t border-slate-200/80 text-[11px] sm:text-xs flex flex-wrap justify-between items-end text-slate-600 font-semibold gap-2">
+              {lastScanned.status === 'duplicate' && (
+                <div className="mt-2 text-[11px] text-amber-800 bg-amber-100/70 p-2 rounded-xl border border-amber-200 font-medium">
+                  📌 ข้อมูลถูกบันทึกสำเร็จไปแล้วเมื่อ <strong>{lastScanned.checkInTime}</strong> (ระบบคงเวลาเช็คอินเดิมไว้)
+                </div>
+              )}
+
+              <div className="mt-2.5 pt-2 border-t border-slate-200/80 text-[11px] sm:text-xs flex flex-wrap justify-between items-end text-slate-600 font-semibold gap-2">
                 <div className="min-w-0">
                   <span className="truncate block">{t.staff.participantName} {lastScanned.name}</span>
                   {lastScanned.id && (
                     <span className="inline-flex items-center gap-1 font-mono text-[10px] text-blue-900 bg-blue-100/80 font-black px-2 py-0.5 rounded-md mt-1">
-                      Token: {lastScanned.id}
+                      Token / Code: {lastScanned.id}
                     </span>
                   )}
                 </div>
-                <span className="shrink-0 whitespace-nowrap text-slate-500 font-medium">{t.staff.checkInTimeLabel} {lastScanned.checkInTime}</span>
+                <span className="shrink-0 whitespace-nowrap text-slate-500 font-medium">
+                  {t.staff.checkInTimeLabel} {lastScanned.checkInTime}
+                </span>
               </div>
             </div>
           )}
         </div>
 
         {/* Manual Code Search Fallback Input */}
-        <form onSubmit={handleManualCheckIn} className="space-y-1.5 pt-2 pb-2">
-          <label className="text-[11px] sm:text-xs font-extrabold text-slate-600 block">{t.staff.manualTitle}</label>
+        <form onSubmit={handleManualCheckIn} className="space-y-1.5 pt-2 pb-1">
+          <label className="text-[11px] sm:text-xs font-extrabold text-slate-600 block">
+            {lang === 'th' ? 'ค้นหาหรือป้อนเลขสมาชิก / รหัสตั๋วด้วยตนเอง' : t.staff.manualTitle}
+          </label>
           <div className="flex gap-2">
             <div className="relative flex-1 bg-white border border-slate-200 focus-within:border-[#0026b3] focus-within:ring-2 focus-within:ring-[#0026b3]/20 rounded-2xl flex items-center px-3 sm:px-3.5 shadow-2xs transition min-w-0">
               <Search className="w-4 h-4 text-[#0026b3] mr-2 shrink-0" />
@@ -756,13 +815,18 @@ const KNOWN_ATTENDEES: Record<string, { name: string; email: string; ticketType:
                 type="text"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
-                placeholder={t.staff.manualPlaceholder}
+                placeholder={lang === 'th' ? 'เช่น 0123, TSRM-2026-8891, หรือเบอร์โทร' : t.staff.manualPlaceholder}
                 className="bg-transparent w-full text-[11px] sm:text-xs text-slate-800 outline-none py-2.5 sm:py-3 placeholder:text-slate-400 font-medium min-w-0"
               />
             </div>
             <button
               type="submit"
-              className="bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] text-[11px] sm:text-xs font-black px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl transition cursor-pointer active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
+              disabled={!manualCode.trim() || isProcessing}
+              className={`text-[11px] sm:text-xs font-black px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl transition shadow-sm shrink-0 whitespace-nowrap ${
+                !manualCode.trim() || isProcessing
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] cursor-pointer active:scale-95'
+              }`}
             >
               {t.staff.checkInButton}
             </button>
@@ -772,4 +836,3 @@ const KNOWN_ATTENDEES: Record<string, { name: string; email: string; ticketType:
     </div>
   );
 }
-

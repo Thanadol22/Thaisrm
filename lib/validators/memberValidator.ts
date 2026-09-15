@@ -163,6 +163,17 @@ export async function validateCreateMember(
         field: 'mobile',
         message: 'เบอร์โทรศัพท์ต้องเป็นตัวเลข 9 หรือ 10 หลัก และขึ้นต้นด้วย 0 หรือ +66 (เช่น 0812345678, 021234567)',
       });
+    } else if (options.checkDuplicates) {
+      const existingMobile = await prisma.member.findFirst({
+        where: { mobile: cleanPhone },
+        select: { member_no: true },
+      });
+      if (existingMobile) {
+        errors.push({
+          field: 'mobile',
+          message: `เบอร์โทรศัพท์นี้ (${input.mobile}) มีผู้ใช้งานในระบบแล้ว (รหัสสมาชิก: ${existingMobile.member_no})`,
+        });
+      }
     }
   }
 

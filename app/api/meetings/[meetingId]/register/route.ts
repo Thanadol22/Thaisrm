@@ -77,11 +77,83 @@ export async function POST(
       }
 
       validMemberNo = member.member_no;
+
+      // Duplicate registration check for member
+      const memberSlips = await prisma.$queryRaw<Array<{ slip_id: string; status: string }>>`
+        SELECT slip_id, status 
+        FROM payment_slips 
+        WHERE meeting_id = ${meetingId} 
+          AND member_no = ${validMemberNo} 
+          AND status IN ('pending', 'approved') 
+        LIMIT 1
+      `;
+      const existingSlip = memberSlips?.[0];
+
+      const memberAttendances = await prisma.$queryRaw<Array<{ attendance_id: any; attendance_status: string }>>`
+        SELECT attendance_id, attendance_status 
+        FROM meeting_attendances 
+        WHERE meeting_id = ${meetingId} 
+          AND member_no = ${validMemberNo} 
+          AND attendance_status NOT IN ('Cancelled', 'Rejected') 
+        LIMIT 1
+      `;
+      const existingAttendance = memberAttendances?.[0];
+
+      if (existingSlip || existingAttendance) {
+        const isApproved = existingSlip?.status === 'approved' || existingAttendance?.attendance_status === 'Registered';
+        return NextResponse.json(
+          {
+            success: false,
+            error: isApproved
+              ? 'สมาชิกท่านนี้ได้ลงทะเบียนและได้รับการยืนยันเข้าร่วมงานประชุมนี้แล้ว ไม่สามารถลงทะเบียนซ้ำได้'
+              : 'สมาชิกท่านนี้มีรายการลงทะเบียนเข้าร่วมงานประชุมนี้แล้ว กำลังอยู่ระหว่างรอเจ้าหน้าที่ตรวจสอบ ไม่สามารถลงทะเบียนซ้ำได้',
+            code: 'DUPLICATE_REGISTRATION',
+          },
+          { status: 400 }
+        );
+      }
     } else {
       // Non-member validation
       if (!guestName || !guestEmail) {
         return NextResponse.json(
           { success: false, error: 'Full name and email are required for non-member registration' },
+          { status: 400 }
+        );
+      }
+
+      // Duplicate registration check for non-member
+      const cleanGuestEmail = guestEmail.trim().toLowerCase();
+      const guestSlips = await prisma.$queryRaw<Array<{ slip_id: string; status: string }>>`
+        SELECT slip_id, status 
+        FROM payment_slips 
+        WHERE meeting_id = ${meetingId} 
+          AND is_member = false 
+          AND LOWER(guest_email) = ${cleanGuestEmail} 
+          AND status IN ('pending', 'approved') 
+        LIMIT 1
+      `;
+      const existingGuestSlip = guestSlips?.[0];
+
+      const guestAttendances = await prisma.$queryRaw<Array<{ attendance_id: any; attendance_status: string }>>`
+        SELECT attendance_id, attendance_status 
+        FROM meeting_attendances 
+        WHERE meeting_id = ${meetingId} 
+          AND LOWER(attendee_email) = ${cleanGuestEmail} 
+          AND attendance_status NOT IN ('Cancelled', 'Rejected') 
+        LIMIT 1
+      `;
+      const existingGuestAttendance = guestAttendances?.[0];
+
+      if (existingGuestSlip || existingGuestAttendance) {
+        const isApproved = existingGuestSlip?.status === 'approved' || existingGuestAttendance?.attendance_status === 'Registered';
+        return NextResponse.json(
+          {
+            success: false,
+            error: isApproved
+              ? `อีเมลนี้ (${guestEmail}) ได้ลงทะเบียนและได้รับการยืนยันเข้าร่วมงานประชุมนี้แล้ว ไม่สามารถลงทะเบียนซ้ำได้`
+              : `อีเมลนี้ (${guestEmail}) มีรายการลงทะเบียนเข้าร่วมงานประชุมนี้แล้ว กำลังอยู่ระหว่างรอเจ้าหน้าที่ตรวจสอบ ไม่สามารถลงทะเบียนซ้ำได้`,
+            code: 'DUPLICATE_REGISTRATION',
+          },
           { status: 400 }
         );
       }

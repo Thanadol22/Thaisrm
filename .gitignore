@@ -45,3 +45,7 @@ next-env.d.ts
 *.csv
 /db/neon_export_data.sql
 export.sql
+
+# user uploads
+/public/uploads/
+

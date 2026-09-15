@@ -49,22 +49,38 @@ export async function uploadImageToStorage(
       isBlob: true,
     };
   } catch (error: any) {
-    console.warn('Vercel Blob upload failed or token not set. Falling back to local Base64/DataURL for development:', error);
+    console.warn('Vercel Blob upload failed or token not set. Uploading to local storage (/api/upload-local):', error?.message || error);
 
-    // Fallback to data URL for local offline development if token is not available
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        resolve({
-          url: reader.result as string,
-          fileName: file.name,
-          originalSize,
-          compressedSize,
-          isBlob: false,
-        });
+    // Fallback to local server upload (/api/upload-local) for development
+    try {
+      const formData = new FormData();
+      formData.append('file', compressedFile, sanitizedName);
+      formData.append('folder', folder);
+
+      const res = await fetch('/api/upload-local', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error(`Local upload API returned status ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (!data.success || !data.url) {
+        throw new Error(data.error || 'Failed to get local upload URL');
+      }
+
+      return {
+        url: data.url,
+        fileName: file.name,
+        originalSize,
+        compressedSize,
+        isBlob: false,
       };
-      reader.onerror = (err) => reject(err);
-      reader.readAsDataURL(compressedFile);
-    });
+    } catch (localErr: any) {
+      console.error('Local fallback upload failed:', localErr);
+      throw new Error(`Upload failed: ${localErr?.message || 'Unable to store file'}`);
+    }
   }
 }

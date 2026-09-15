@@ -47,7 +47,7 @@ export interface SlipRecord {
   createdAt?: string;
 }
 
-export function StaffSlipsView() {
+export function AdminSlipsView() {
   const { lang } = useLanguage();
   const [mounted, setMounted] = useState(false);
   const [slips, setSlips] = useState<SlipRecord[]>([]);
@@ -70,7 +70,7 @@ export function StaffSlipsView() {
   const fetchSlips = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/staff/slips');
+      const res = await fetch('/api/admin/slips');
       const json = await res.json();
       if (json.success) {
         setSlips(json.data || []);
@@ -91,7 +91,7 @@ export function StaffSlipsView() {
     if (e) e.stopPropagation();
     try {
       setIsProcessing(true);
-      const res = await fetch('/api/staff/slips', {
+      const res = await fetch('/api/admin/slips', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slipId: id, action: 'approve' }),
@@ -124,7 +124,7 @@ export function StaffSlipsView() {
     if (!rejectingSlipId) return;
     try {
       setIsProcessing(true);
-      const res = await fetch('/api/staff/slips', {
+      const res = await fetch('/api/admin/slips', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -197,7 +197,7 @@ export function StaffSlipsView() {
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white p-4 sm:p-6 rounded-3xl shadow-xl relative overflow-hidden">
         <div className="absolute -top-12 -right-12 w-48 h-48 bg-[#4ade80]/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="relative z-10 flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <div className="p-2 rounded-xl bg-white/10 backdrop-blur-md text-[#4ade80]">
@@ -360,19 +360,41 @@ export function StaffSlipsView() {
             >
               {/* Left Details */}
               <div className="flex items-start gap-3.5 min-w-0">
-                {/* Status Indicator Icon */}
+                {/* Slip Thumbnail Preview & Status Overlay */}
                 <div
-                  className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-                    slip.status === 'approved'
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : slip.status === 'pending'
-                      ? 'bg-amber-100 text-amber-700'
-                      : 'bg-rose-100 text-rose-700'
-                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedSlip(slip);
+                  }}
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 cursor-pointer hover:border-[#0026b3] transition shadow-2xs relative group"
+                  title="คลิกเพื่อดูรูปสลิปขนาดใหญ่"
                 >
-                  {slip.status === 'approved' && <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />}
-                  {slip.status === 'pending' && <Clock className="w-5 h-5 sm:w-6 sm:h-6" />}
-                  {slip.status === 'rejected' && <XCircle className="w-5 h-5 sm:w-6 sm:h-6" />}
+                  {slip.slipUrl ? (
+                    <img
+                      src={slip.slipUrl}
+                      alt="Slip Thumbnail"
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <Receipt className="w-5 h-5 text-slate-400" />
+                  )}
+                  {/* Small corner status badge */}
+                  <span
+                    className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-tl-lg flex items-center justify-center ${
+                      slip.status === 'approved'
+                        ? 'bg-emerald-500 text-white'
+                        : slip.status === 'pending'
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-rose-500 text-white'
+                    }`}
+                  >
+                    {slip.status === 'approved' && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                    {slip.status === 'pending' && <Clock className="w-2.5 h-2.5" />}
+                    {slip.status === 'rejected' && <X className="w-2.5 h-2.5 stroke-[3]" />}
+                  </span>
                 </div>
 
                 {/* Main Information */}
@@ -426,6 +448,12 @@ export function StaffSlipsView() {
                       <CreditCard className="w-3.5 h-3.5 text-slate-400" />
                       {slip.bank}
                     </span>
+                    {slip.meetingName && (
+                      <>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-blue-700 font-medium">{slip.meetingName}</span>
+                      </>
+                    )}
                   </div>
 
                   <p className="text-[11px] text-slate-400 font-normal">
@@ -455,8 +483,8 @@ export function StaffSlipsView() {
                     className="p-2 sm:px-3 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
                     title={lang === 'th' ? 'ดูหลักฐานสลิป' : 'View Slip'}
                   >
-                    <Eye className="w-4 h-4" />
-                    <span className="hidden sm:inline">{lang === 'th' ? 'ดูรูป' : 'View'}</span>
+                    <Eye className="w-4 h-4 text-[#0026b3]" />
+                    <span className="hidden sm:inline">{lang === 'th' ? 'ดูสลิป' : 'View'}</span>
                   </button>
 
                   {slip.status === 'pending' && (
@@ -493,7 +521,7 @@ export function StaffSlipsView() {
         selectedSlip &&
         createPortal(
           <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fade-in">
-            <div className="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 flex flex-col">
+            <div className="bg-white rounded-3xl max-w-md sm:max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 flex flex-col">
               {/* Modal Header */}
               <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-10">
                 <div className="flex items-center gap-2.5">
@@ -517,58 +545,87 @@ export function StaffSlipsView() {
               </div>
 
               {/* Modal Body */}
-              <div className="p-4 sm:p-6 space-y-4">
-                {/* Slip Viewport */}
-                {selectedSlip.slipUrl && (selectedSlip.slipUrl.startsWith('data:') || selectedSlip.slipUrl.startsWith('http')) ? (
-                  <div className="bg-slate-900 rounded-2xl p-2 flex items-center justify-center max-h-72 overflow-hidden border border-slate-800">
+              <div className="p-4 sm:p-5 space-y-3.5">
+                {/* Slip Viewport - Compact Display */}
+                {selectedSlip.slipUrl ? (
+                  <div className="bg-slate-950 rounded-2xl p-2.5 flex flex-col items-center justify-center border border-slate-800/80">
                     <img
                       src={selectedSlip.slipUrl}
                       alt="Bank Slip"
-                      className="max-h-72 object-contain rounded-xl"
+                      className="max-h-56 sm:max-h-64 w-auto object-contain rounded-lg shadow-md"
                     />
+                    <div className="mt-2 flex items-center gap-2">
+                      <a
+                        href={selectedSlip.slipUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold transition flex items-center gap-1 backdrop-blur-md cursor-pointer border border-white/15 active:scale-95"
+                      >
+                        <ExternalLink className="w-3 h-3 text-[#4ade80]" />
+                        <span>เปิดดูภาพขนาดเต็ม</span>
+                      </a>
+                    </div>
                   </div>
                 ) : (
-                  <div className="bg-slate-900 rounded-2xl p-4 flex flex-col items-center justify-center text-center text-white space-y-3 relative overflow-hidden border border-slate-800">
-                    <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20">
-                      <Receipt className="w-7 h-7 text-[#4ade80]" />
+                  <div className="bg-slate-900 rounded-2xl p-4 flex flex-col items-center justify-center text-center text-white space-y-2 relative overflow-hidden border border-slate-800">
+                    <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20">
+                      <Receipt className="w-5 h-5 text-[#4ade80]" />
                     </div>
                     <div>
-                      <span className="text-[10px] font-black uppercase text-[#4ade80] tracking-wider block">
+                      <span className="text-[9px] font-black uppercase text-[#4ade80] tracking-wider block">
                         BANK TRANSFER SLIP PROOF
                       </span>
-                      <p className="text-2xl font-black text-white mt-1">
+                      <p className="text-xl font-black text-white mt-0.5">
                         ฿{selectedSlip.amount.toLocaleString()} THB
                       </p>
-                      <p className="text-xs text-slate-300 mt-1">{selectedSlip.bank}</p>
+                      <p className="text-[11px] text-slate-300">{selectedSlip.bank}</p>
                     </div>
                   </div>
                 )}
 
                 {/* Participant & Ticket Info */}
-                <div className="bg-slate-50 rounded-2xl p-3.5 space-y-2 text-xs border border-slate-200">
-                  <div className="flex justify-between py-1 border-b border-slate-200">
-                    <span className="text-slate-500 font-bold">
+                <div className="bg-slate-50/90 rounded-2xl p-4 sm:p-5 space-y-3 border border-slate-200 text-sm">
+                  <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
+                    <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
                       {lang === 'th' ? 'ชื่อผู้เข้าร่วม' : 'Attendee Name'}
                     </span>
-                    <span className="font-extrabold text-slate-900">{selectedSlip.nameTh}</span>
+                    <span className="font-black text-sm sm:text-base text-slate-900 text-right">
+                      {selectedSlip.nameTh}
+                    </span>
                   </div>
-                  <div className="flex justify-between py-1 border-b border-slate-200">
-                    <span className="text-slate-500 font-bold">{lang === 'th' ? 'สถานะผู้สมัคร' : 'Status'}</span>
-                    <span className={`font-extrabold ${selectedSlip.isMember ? 'text-blue-700' : 'text-amber-700'}`}>
+                  <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
+                    <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
+                      {lang === 'th' ? 'สถานะผู้สมัคร' : 'Status'}
+                    </span>
+                    <span
+                      className={`font-black text-xs sm:text-sm text-right ${
+                        selectedSlip.isMember ? 'text-[#0026b3]' : 'text-amber-800'
+                      }`}
+                    >
                       {selectedSlip.isMember ? `สมาชิกสมาคม (#${selectedSlip.memberNo})` : 'บุคคลทั่วไป (Non-Member)'}
                     </span>
                   </div>
-                  <div className="flex justify-between py-1 border-b border-slate-200">
-                    <span className="text-slate-500 font-bold">{lang === 'th' ? 'รหัสตั๋ว' : 'Ticket ID'}</span>
-                    <span className="font-extrabold font-mono text-slate-900">{selectedSlip.ticketCode}</span>
+                  <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
+                    <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
+                      {lang === 'th' ? 'รหัสตั๋ว' : 'Ticket ID'}
+                    </span>
+                    <span className="font-black font-mono text-sm sm:text-base text-slate-900 tracking-wide text-right">
+                      {selectedSlip.ticketCode}
+                    </span>
                   </div>
-                  <div className="flex justify-between py-1 border-b border-slate-200">
-                    <span className="text-slate-500 font-bold">{lang === 'th' ? 'หน่วยงาน' : 'Workplace'}</span>
-                    <span className="font-medium text-slate-800">{selectedSlip.workplace || '-'}</span>
+                  <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
+                    <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
+                      {lang === 'th' ? 'หน่วยงาน' : 'Workplace'}
+                    </span>
+                    <span className="font-bold text-xs sm:text-sm text-slate-800 text-right">
+                      {selectedSlip.workplace || '-'}
+                    </span>
                   </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-slate-500 font-bold">{lang === 'th' ? 'อีเมล / เบอร์ติดต่อ' : 'Contact'}</span>
-                    <span className="font-medium text-slate-800">
+                  <div className="flex items-center justify-between py-1.5 gap-3">
+                    <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
+                      {lang === 'th' ? 'อีเมล / เบอร์ติดต่อ' : 'Contact'}
+                    </span>
+                    <span className="font-bold text-xs sm:text-sm text-slate-800 text-right break-all">
                       {selectedSlip.email} {selectedSlip.phone ? `(${selectedSlip.phone})` : ''}
                     </span>
                   </div>
@@ -576,10 +633,10 @@ export function StaffSlipsView() {
 
                 {/* Status & Rejection Notes */}
                 {selectedSlip.notes && (
-                  <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 text-xs text-rose-800 flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3.5 text-xs sm:text-sm text-rose-800 flex items-start gap-2.5">
+                    <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                     <div>
-                      <span className="font-bold">{lang === 'th' ? 'หมายเหตุการปฏิเสธ' : 'Rejection Reason'}: </span>
+                      <span className="font-bold">{lang === 'th' ? 'หมายเหตุการปฏิเสธ: ' : 'Rejection Reason: '}</span>
                       <span>{selectedSlip.notes}</span>
                     </div>
                   </div>
