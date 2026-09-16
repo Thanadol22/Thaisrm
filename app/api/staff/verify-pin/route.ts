@@ -18,10 +18,11 @@ export async function POST(req: NextRequest) {
     const cleanPin = pin.trim();
 
     // 1. Search for active meeting matching this staff_code
-    // Prioritize upcoming or ongoing meetings, then latest
-    const matchedMeeting = await prisma.meetings.findFirst({
+    // Prioritize ongoing or upcoming meetings first, then any latest
+    let matchedMeeting = await prisma.meetings.findFirst({
       where: {
         staff_code: cleanPin,
+        status: { in: ['ongoing', 'upcoming'] },
       },
       orderBy: [
         { meeting_date: 'desc' },
@@ -38,6 +39,28 @@ export async function POST(req: NextRequest) {
         max_seats: true,
       },
     });
+
+    if (!matchedMeeting) {
+      matchedMeeting = await prisma.meetings.findFirst({
+        where: {
+          staff_code: cleanPin,
+        },
+        orderBy: [
+          { meeting_date: 'desc' },
+        ],
+        select: {
+          meeting_id: true,
+          meeting_name: true,
+          meeting_date: true,
+          meeting_time: true,
+          location: true,
+          meeting_type: true,
+          staff_code: true,
+          status: true,
+          max_seats: true,
+        },
+      });
+    }
 
     // 2. Fallback check master PIN from .env (if configured)
     const masterStaffPin = process.env.STAFF_PIN;

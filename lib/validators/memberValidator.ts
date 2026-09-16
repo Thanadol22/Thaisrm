@@ -62,44 +62,79 @@ export function sanitizeMemberInput<T extends CreateMemberInput | UpdateMemberIn
   if (sanitized.full_name_th !== undefined && sanitized.full_name_th !== null) {
     sanitized.full_name_th = sanitizeString(sanitized.full_name_th);
   }
-  if (sanitized.full_name_en !== undefined && sanitized.full_name_en !== null) {
-    sanitized.full_name_en = sanitizeString(sanitized.full_name_en);
+  if (sanitized.full_name_en !== undefined) {
+    const cleaned = sanitizeString(sanitized.full_name_en);
+    sanitized.full_name_en = cleaned !== '' ? cleaned : null;
   }
-  if (sanitized.id_last4 !== undefined && sanitized.id_last4 !== null) {
-    sanitized.id_last4 = sanitizeString(sanitized.id_last4);
+  if (sanitized.id_last4 !== undefined) {
+    const cleaned = sanitizeString(sanitized.id_last4);
+    sanitized.id_last4 = cleaned !== '' ? cleaned : null;
   }
-  if (sanitized.mobile !== undefined && sanitized.mobile !== null) {
-    // ลบช่องว่างและขีดออก เพื่อเก็บเป็นตัวเลขมาตรฐาน
-    sanitized.mobile = sanitized.mobile.replace(/[\s\-]/g, '').trim();
+  if (sanitized.mobile !== undefined) {
+    if (sanitized.mobile === null) {
+      sanitized.mobile = null;
+    } else {
+      const cleaned = sanitized.mobile.replace(/[\s\-]/g, '').trim();
+      sanitized.mobile = cleaned !== '' ? cleaned : null;
+    }
   }
-  if (sanitized.email !== undefined && sanitized.email !== null) {
-    sanitized.email = sanitizeString(sanitized.email).toLowerCase();
+  if (sanitized.email !== undefined) {
+    const cleaned = sanitizeString(sanitized.email).toLowerCase();
+    sanitized.email = cleaned !== '' ? cleaned : null;
   }
-  if (sanitized.line_id !== undefined && sanitized.line_id !== null) {
-    sanitized.line_id = sanitizeString(sanitized.line_id);
+  if (sanitized.line_id !== undefined) {
+    const cleaned = sanitizeString(sanitized.line_id);
+    sanitized.line_id = cleaned !== '' ? cleaned : null;
   }
-  if (sanitized.workplace !== undefined && sanitized.workplace !== null) {
-    sanitized.workplace = sanitizeString(sanitized.workplace);
+  if (sanitized.address !== undefined) {
+    const cleaned = sanitizeString(sanitized.address);
+    sanitized.address = cleaned !== '' ? cleaned : null;
   }
-  if (sanitized.position !== undefined && sanitized.position !== null) {
-    sanitized.position = sanitizeString(sanitized.position);
+  if (sanitized.workplace !== undefined) {
+    const cleaned = sanitizeString(sanitized.workplace);
+    sanitized.workplace = cleaned !== '' ? cleaned : null;
   }
-  if (sanitized.member_type_other !== undefined && sanitized.member_type_other !== null) {
-    sanitized.member_type_other = sanitizeString(sanitized.member_type_other);
+  if (sanitized.work_phone !== undefined) {
+    const cleaned = sanitizeString(sanitized.work_phone);
+    sanitized.work_phone = cleaned !== '' ? cleaned : null;
   }
-  if (sanitized.scientist_reg_no !== undefined && sanitized.scientist_reg_no !== null) {
-    sanitized.scientist_reg_no = sanitizeString(sanitized.scientist_reg_no);
+  if (sanitized.start_date !== undefined) {
+    const cleaned = sanitizeString(sanitized.start_date);
+    sanitized.start_date = cleaned !== '' ? cleaned : null;
   }
-  if (sanitized.scientist_reg_nw !== undefined && sanitized.scientist_reg_nw !== null) {
-    sanitized.scientist_reg_nw = sanitizeString(sanitized.scientist_reg_nw);
+  if (sanitized.position !== undefined) {
+    const cleaned = sanitizeString(sanitized.position);
+    sanitized.position = cleaned !== '' ? cleaned : null;
+  }
+  if (sanitized.job_category !== undefined) {
+    const cleaned = sanitizeString(sanitized.job_category);
+    sanitized.job_category = cleaned !== '' ? cleaned : null;
+  }
+  if (sanitized.member_type_other !== undefined) {
+    const cleaned = sanitizeString(sanitized.member_type_other);
+    sanitized.member_type_other = cleaned !== '' ? cleaned : null;
+  }
+  if (sanitized.scientist_reg_no !== undefined) {
+    const cleaned = sanitizeString(sanitized.scientist_reg_no);
+    sanitized.scientist_reg_no = cleaned !== '' ? cleaned : null;
+  }
+  if (sanitized.scientist_reg_nw !== undefined) {
+    const cleaned = sanitizeString(sanitized.scientist_reg_nw);
+    sanitized.scientist_reg_nw = cleaned !== '' ? cleaned : null;
+  }
+  if (sanitized.photo_path !== undefined) {
+    const cleaned = sanitizeString(sanitized.photo_path);
+    sanitized.photo_path = cleaned !== '' ? cleaned : null;
   }
 
   if (sanitized.educations && Array.isArray(sanitized.educations)) {
-    sanitized.educations = sanitized.educations.map((edu) => ({
-      ...edu,
-      degree: edu.degree ? sanitizeString(edu.degree) : null,
-      institution: edu.institution ? sanitizeString(edu.institution) : null,
-    }));
+    sanitized.educations = sanitized.educations
+      .map((edu) => ({
+        ...edu,
+        degree: edu.degree ? sanitizeString(edu.degree) || null : null,
+        institution: edu.institution ? sanitizeString(edu.institution) || null : null,
+      }))
+      .filter((edu) => edu.degree !== null || edu.institution !== null);
   }
 
   return sanitized;

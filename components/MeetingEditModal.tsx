@@ -199,7 +199,7 @@ export function MeetingEditModal({
         time: meeting.time || '08:30 - 17:00 น.',
         location: meeting.location || '',
         type: meeting.type || 'onsite',
-        staffCode: meeting.staffCode || generateRandomPin(),
+        staffCode: meeting.staffCode || '',
         basePrice: meeting.basePrice || 0,
         maxSeats: meeting.maxSeats || 500,
         status: meeting.status || 'upcoming',
@@ -344,6 +344,11 @@ export function MeetingEditModal({
 
     if (!formData.date.trim()) {
       alert('กรุณาเลือกวันที่จัดงาน');
+      return;
+    }
+
+    if (formData.staffCode && formData.staffCode.trim().length !== 6) {
+      alert('รหัส Staff PIN ต้องเป็นตัวเลข 6 หลัก (เช่น 810773) หรือลบให้ว่างหากยังไม่ต้องการตั้ง');
       return;
     }
 
@@ -677,6 +682,15 @@ export function MeetingEditModal({
                     <Dices className="w-3.5 h-3.5 text-white" />
                     <span>สุ่มรหัสใหม่</span>
                   </button>
+                  {formData.staffCode ? (
+                    <span className="text-xs font-bold text-emerald-700">
+                      {formData.staffCode.length === 6 ? '✓ รหัส 6 หลักพร้อมใช้งาน' : `(กรอกแล้ว ${formData.staffCode.length}/6 หลัก)`}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-400 font-normal">
+                      (ยังไม่กำหนดรหัส - กดสุ่มหรือพิมพ์ 6 หลัก)
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

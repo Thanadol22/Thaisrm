@@ -67,6 +67,44 @@ function PaymentContent() {
     registeredAt?: string;
   } | null>(null);
 
+  const [membershipData, setMembershipData] = useState<{
+    member_no?: string;
+    full_name_th?: string;
+    full_name_en?: string;
+    position?: string;
+    workplace?: string;
+    email?: string;
+  } | null>(null);
+
+  const [systemSettings, setSystemSettings] = useState<{
+    bank_name: string;
+    bank_account_no: string;
+    bank_account_name: string;
+    annual_membership_fee: number;
+  }>({
+    bank_name: 'Kasikorn (KBANK)',
+    bank_account_no: '020-8-16398-1',
+    bank_account_name: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+    annual_membership_fee: 1000,
+  });
+
+  // Fetch dynamic system settings
+  React.useEffect(() => {
+    fetch('/api/admin/settings')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data) {
+          setSystemSettings({
+            bank_name: json.data.bank_name || 'Kasikorn (KBANK)',
+            bank_account_no: json.data.bank_account_no || '020-8-16398-1',
+            bank_account_name: json.data.bank_account_name || 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+            annual_membership_fee: Number(json.data.annual_membership_fee) || 1000,
+          });
+        }
+      })
+      .catch((err) => console.warn('Could not load dynamic settings in payment page:', err));
+  }, []);
+
   React.useEffect(() => {
     if (paymentType === 'registration') {
       try {
@@ -78,6 +116,15 @@ function PaymentContent() {
       } catch (err) {
         console.error('Failed to parse conference_registration from localStorage', err);
       }
+    } else if (paymentType === 'membership') {
+      try {
+        const saved = localStorage.getItem('membership_registration');
+        if (saved) {
+          setMembershipData(JSON.parse(saved));
+        }
+      } catch (err) {
+        console.error('Failed to parse membership_registration from localStorage', err);
+      }
     }
   }, [paymentType]);
 
@@ -85,7 +132,7 @@ function PaymentContent() {
   const calculationResult = React.useMemo(() => {
     if (paymentType !== 'registration' || !regData) {
       return {
-        totalAmount: 1000,
+        totalAmount: systemSettings.annual_membership_fee,
         items: [] as Array<{
           id: string;
           name: string;
@@ -175,7 +222,7 @@ function PaymentContent() {
     };
   }, [paymentType, regData]);
 
-  const bankAccountNumber = "020-8-16398-1";
+  const bankAccountNumber = systemSettings.bank_account_no;
 
   const triggerNotification = (msg: string) => {
     setNotification(msg);
@@ -234,7 +281,7 @@ function PaymentContent() {
             guestPhone: undefined,
             guestWorkplace: !isMember ? (regData?.workplace || null) : undefined,
             amount: calculationResult.totalAmount,
-            bank: 'Kasikorn (KBANK)',
+            bank: systemSettings.bank_name,
             slipUrl: uploadedSlipData.fileUrl,
             selectedActivities: selectedActivitiesPayload,
           }),
@@ -270,11 +317,11 @@ function PaymentContent() {
 
   const totalAmountValue = paymentType === 'registration'
     ? calculationResult.totalAmount
-    : 1000;
+    : systemSettings.annual_membership_fee;
 
-  const amountDueText = paymentType === 'registration'
-    ? (lang === 'th' ? `จำนวน ${totalAmountValue.toLocaleString()} บาท` : `Amount: ${totalAmountValue.toLocaleString()} THB`)
-    : (lang === 'th' ? 'จำนวน 1,000 บาท' : 'Amount: 1,000 THB');
+  const amountDueText = lang === 'th'
+    ? `จำนวน ${totalAmountValue.toLocaleString()} บาท`
+    : `Amount: ${totalAmountValue.toLocaleString()} THB`;
 
   const successModalTitle = paymentType === 'registration'
     ? (t.successModal as any).paymentSuccessTitle || (lang === 'th' ? 'ลงทะเบียนเข้าร่วมงานประชุมสำเร็จ' : 'Conference Registration Submitted')
@@ -295,11 +342,26 @@ function PaymentContent() {
           paymentType={paymentType}
           customAmount={paymentType === 'registration' ? calculationResult.totalAmount : undefined}
           isMember={paymentType === 'registration' ? calculationResult.isMemberUser : true}
-          meetingName={regData?.meetingName}
-          attendeeName={regData?.nameTh || regData?.nameEn}
-          attendeePosition={regData?.position}
-          attendeeWorkplace={regData?.workplace}
-          attendeeMemberNo={regData?.memberNo}
+          attendeeName={
+            paymentType === 'registration'
+              ? (regData?.nameTh || regData?.nameEn)
+              : (membershipData?.full_name_th || membershipData?.full_name_en)
+          }
+          attendeePosition={
+            paymentType === 'registration'
+              ? regData?.position
+              : membershipData?.position
+          }
+          attendeeWorkplace={
+            paymentType === 'registration'
+              ? regData?.workplace
+              : membershipData?.workplace
+          }
+          attendeeMemberNo={
+            paymentType === 'registration'
+              ? regData?.memberNo
+              : membershipData?.member_no
+          }
           isExpiredMember={regData?.isExpiredMember}
           attendanceType={calculationResult.attendType}
           itemizedActivities={calculationResult.items}

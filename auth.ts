@@ -37,7 +37,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       }
 
-      // If relative URL (e.g. /agenda), prepend effective base URL
+      // If relative URL (e.g. /login), prepend effective base URL
       if (url.startsWith("/")) {
         return `${effectiveBaseUrl}${url}`;
       }

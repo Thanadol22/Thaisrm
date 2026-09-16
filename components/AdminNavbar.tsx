@@ -17,10 +17,11 @@ import {
   Activity,
   FileText,
   DollarSign,
-  Users
+  Users,
+  Settings
 } from 'lucide-react';
 
-export type AdminTab = 'dashboard' | 'revenue-report' | 'members' | 'add-meeting' | 'meeting-history' | 'verify-slip' | 'verify-attendees' | 'receipts';
+export type AdminTab = 'dashboard' | 'revenue-report' | 'members' | 'add-meeting' | 'meeting-history' | 'verify-slip' | 'verify-attendees' | 'receipts' | 'settings';
 
 interface AdminNavbarProps {
   activeTab: AdminTab;
@@ -91,6 +92,12 @@ const navItems: {
     labelEn: 'Verify Attendees',
     icon: UserCheck,
     badgeKey: 'attendees',
+  },
+  {
+    id: 'settings',
+    labelTh: 'ตั้งค่าระบบ',
+    labelEn: 'System Settings',
+    icon: Settings,
   },
 ];
 

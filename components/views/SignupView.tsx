@@ -24,15 +24,19 @@ import {
   Check,
   ArrowRight,
   ArrowLeft,
-  Sparkles
+  Sparkles,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { GoogleIcon } from '@/components/GoogleIcon';
 import { useLanguage } from '@/context/LanguageContext';
 import { parseGoogleName } from '@/lib/utils';
+import { uploadImageToStorage } from '@/lib/blobUpload';
+import { CreateMemberInput } from '@/types/member';
 
 interface SignupViewProps {
   onNavigateToLogin: () => void;
-  onSubmitSignup: () => void;
+  onSubmitSignup?: (createdMember?: any) => void;
   onGoogleSignUp: () => void;
   onClearForm?: () => void;
   initialUserData?: {
@@ -91,8 +95,12 @@ export function SignupView({
   ]);
 
   const [photoPreview, setPhotoPreview] = useState<string | null>(initialUserData?.picture || null);
+  const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const goToStep = (step: 1 | 2 | 3) => {
+    setSubmitError(null);
     setCurrentStep(step);
   };
 
@@ -131,6 +139,7 @@ export function SignupView({
         scientistNo: '',
       });
       setPhotoPreview(null);
+      setSelectedPhotoFile(null);
       setAutofillSuccess(false);
     }
   }, [initialUserData]);
@@ -160,7 +169,9 @@ export function SignupView({
       { id: '1', degree: '', institution: '', year: '' },
     ]);
     setPhotoPreview(null);
+    setSelectedPhotoFile(null);
     setConsentChecked(false);
+    setSubmitError(null);
     setCurrentStep(1);
 
     if (typeof window !== 'undefined') {
@@ -217,14 +228,108 @@ export function SignupView({
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedPhotoFile(file);
       const url = URL.createObjectURL(file);
       setPhotoPreview(url);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmitSignup();
+    if (submitting) return;
+
+    // Validate Thai Name (Required)
+    if (!formData.nameTh || !formData.nameTh.trim()) {
+      setSubmitError(lang === 'th' ? 'กรุณากรอกชื่อ-นามสกุล (ภาษาไทย)' : 'Please enter your full name in Thai');
+      setCurrentStep(2);
+      return;
+    }
+
+    // Validate Consent (Required)
+    if (!consentChecked) {
+      setSubmitError(lang === 'th' ? 'กรุณายอมรับข้อกำหนดและข้อบังคับสมาคมฯ' : 'Please agree to the association terms and conditions');
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      // 1. Upload photo to storage if user picked a new file
+      let finalPhotoUrl: string | null = photoPreview && !photoPreview.startsWith('blob:') ? photoPreview : null;
+      if (selectedPhotoFile) {
+        try {
+          const uploadRes = await uploadImageToStorage(selectedPhotoFile, 'avatars');
+          if (uploadRes?.url) {
+            finalPhotoUrl = uploadRes.url;
+          }
+        } catch (uploadErr) {
+          console.warn('Photo upload failed, continuing registration without photo:', uploadErr);
+        }
+      }
+
+      // 2. Prepare payload - directly matching existing database fields
+      // Unfilled fields are sent as null / empty without creating new fields
+      const payload: CreateMemberInput = {
+        full_name_th: formData.nameTh.trim(),
+        full_name_en: formData.nameEn.trim() || null,
+        id_last4: formData.id4Digits.trim() || null,
+        mobile: formData.mobile.trim() || null,
+        email: formData.email.trim() || null,
+        line_id: formData.lineId.trim() || null,
+        workplace: formData.workplace.trim() || null,
+        start_date: formData.startDate || null,
+        position: (formData.position === '0 อื่นๆ' || formData.position === '0 Other')
+          ? (formData.positionOther.trim() || 'อื่นๆ')
+          : formData.position,
+        job_category: formData.position,
+        member_type_other: (formData.position === '0 อื่นๆ' || formData.position === '0 Other')
+          ? (formData.positionOther.trim() || null)
+          : null,
+        scientist_reg_no: formData.scientistNo.trim() || null,
+        photo_path: finalPhotoUrl,
+        membership_type: 'Regular',
+        membership_status: 'Active',
+        educations: educationList
+          .filter(edu => edu.degree.trim() !== '' || edu.institution.trim() !== '')
+          .map(edu => ({
+            degree: edu.degree.trim() || null,
+            institution: edu.institution.trim() || null,
+            graduation_year: edu.year.trim() ? parseInt(edu.year.trim(), 10) : null,
+            display_order: 1,
+          })),
+      };
+
+      // 3. Directly POST to /api/members (No summary view shown)
+      const res = await fetch('/api/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const resData = await res.json();
+      if (!res.ok || !resData.success) {
+        throw new Error(resData.error || (lang === 'th' ? 'เกิดข้อผิดพลาดในการบันทึกข้อมูลสมาชิก' : 'Failed to register member'));
+      }
+
+      const createdMember = resData.data;
+
+      // Store in localStorage for user session and subsequent payment step
+      try {
+        localStorage.setItem('membership_registration', JSON.stringify(createdMember));
+        localStorage.setItem('thaisrm_user', JSON.stringify(createdMember));
+      } catch (e) {}
+
+      // Trigger callback
+      if (onSubmitSignup) {
+        onSubmitSignup(createdMember);
+      }
+    } catch (err: any) {
+      console.error('Signup submit error:', err);
+      setSubmitError(err.message || (lang === 'th' ? 'ไม่สามารถส่งใบสมัครได้ กรุณาตรวจสอบข้อมูลและลองใหม่อีกครั้ง' : 'Registration failed. Please try again.'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -365,7 +470,10 @@ export function SignupView({
                   {photoPreview && (
                     <button
                       type="button"
-                      onClick={() => setPhotoPreview(null)}
+                      onClick={() => {
+                        setPhotoPreview(null);
+                        setSelectedPhotoFile(null);
+                      }}
                       className="text-xs text-red-500 hover:text-red-700 font-bold px-2.5 py-1.5 rounded-lg border border-red-200 hover:bg-red-50 transition shrink-0 whitespace-nowrap"
                     >
                       {t.signup.photoDelete}
@@ -753,16 +861,38 @@ export function SignupView({
 
               {/* Step 3 Form Action Buttons */}
               <div className="space-y-3 pt-2">
+                {/* Submit Error Banner */}
+                {submitError && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-600 font-bold flex items-start gap-2 animate-fade-in">
+                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                    <span>{submitError}</span>
+                  </div>
+                )}
+
                 {/* Primary Submit Button */}
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-[#4ade80] via-[#38d172] to-[#22c55e] hover:brightness-105 text-[#061d08] font-black text-sm sm:text-base py-3.5 sm:py-4 px-4 rounded-2xl shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/35 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-3 border border-emerald-300/80 relative overflow-hidden group"
+                  disabled={submitting}
+                  className={`w-full bg-gradient-to-r from-[#4ade80] via-[#38d172] to-[#22c55e] hover:brightness-105 text-[#061d08] font-black text-sm sm:text-base py-3.5 sm:py-4 px-4 rounded-2xl shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/35 transition-all active:scale-[0.99] flex items-center justify-center gap-3 border border-emerald-300/80 relative overflow-hidden group ${
+                    submitting ? 'opacity-75 cursor-wait' : 'cursor-pointer'
+                  }`}
                 >
                   <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/70 opacity-90" />
-                  <span className="tracking-wide whitespace-nowrap">{t.signup.submitButton}</span>
-                  <div className="w-7 h-7 rounded-xl bg-emerald-950/15 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
-                    <Check className="w-4.5 h-4.5 stroke-[3] text-[#061d08]" />
-                  </div>
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin text-[#061d08]" />
+                      <span className="tracking-wide whitespace-nowrap">
+                        {lang === 'th' ? 'กำลังบันทึกข้อมูลสมาชิก...' : 'Submitting Application...'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="tracking-wide whitespace-nowrap">{t.signup.submitButton}</span>
+                      <div className="w-7 h-7 rounded-xl bg-emerald-950/15 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
+                        <Check className="w-4.5 h-4.5 stroke-[3] text-[#061d08]" />
+                      </div>
+                    </>
+                  )}
                 </button>
 
                 {/* Secondary Action Buttons: Back & Reset */}

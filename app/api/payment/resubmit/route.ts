@@ -105,6 +105,21 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Synchronize meeting_attendances status back to pending
+    if (slip.member_no) {
+      await prisma.$executeRaw`
+        UPDATE meeting_attendances
+        SET attendance_status = 'Pending_Payment'
+        WHERE meeting_id = ${slip.meeting_id} AND member_no = ${slip.member_no}
+      `;
+    } else if (slip.guest_email) {
+      await prisma.$executeRaw`
+        UPDATE meeting_attendances
+        SET attendance_status = 'Non-Member-Pending'
+        WHERE meeting_id = ${slip.meeting_id} AND attendee_email = ${slip.guest_email}
+      `;
+    }
+
     return NextResponse.json({
       success: true,
       data: {

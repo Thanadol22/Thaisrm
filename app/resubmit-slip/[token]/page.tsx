@@ -135,10 +135,10 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
             {error || 'ไม่พบรายการที่ต้องแนบสลิปใหม่ หรือรายการนี้ได้รับการอนุมัติเรียบร้อยแล้ว'}
           </p>
           <button
-            onClick={() => router.push('/agenda')}
+            onClick={() => router.push('/login')}
             className="w-full bg-[#0026b3] text-white py-3 rounded-2xl font-bold text-xs hover:bg-[#001f8f] transition"
           >
-            กลับสู่หน้ารายละเอียดการประชุม
+            กลับสู่หน้าหลัก
           </button>
         </div>
       </div>
@@ -169,10 +169,10 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
             </div>
           </div>
           <button
-            onClick={() => router.push('/agenda')}
+            onClick={() => router.push('/login')}
             className="w-full bg-[#0026b3] text-white py-3 rounded-2xl font-bold text-xs hover:bg-[#001f8f] transition shadow-md"
           >
-            กลับสู่หน้ารายละเอียดการประชุม
+            กลับสู่หน้าหลัก
           </button>
         </div>
       </div>

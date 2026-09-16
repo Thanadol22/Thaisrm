@@ -66,6 +66,9 @@ import { MemberManagementPanel } from '@/components/MemberManagementPanel';
 import { ToastNotification } from '@/components/ToastNotification';
 import { MeetingEditModal } from '@/components/MeetingEditModal';
 import { AdminSlipsView } from '@/components/views/AdminSlipsView';
+import { AdminLoginView } from '@/components/views/AdminLoginView';
+import { AdminSettingsPanel } from '@/components/AdminSettingsPanel';
+import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 
 /* ─── Data Types & Interfaces ─────────────────────────────────────────── */
 
@@ -2234,6 +2237,11 @@ function AddMeetingPanel({
       return;
     }
 
+    if (formData.staffCode && formData.staffCode.trim().length !== 6) {
+      alert('รหัส Staff PIN ต้องเป็นตัวเลข 6 หลัก (เช่น 810773) หรือลบให้ว่างหากยังไม่ต้องการตั้ง');
+      return;
+    }
+
     setIsSubmitting(true);
 
     // Format meeting ID: Ensure it follows TSRM<sequence>
@@ -3624,9 +3632,13 @@ function MeetingHistoryPanel({
                       <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-blue-50 text-[#0026b3] border border-blue-200 uppercase">
                         {m.type}
                       </span>
-                      {m.staffCode && (
-                        <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                      {m.staffCode ? (
+                        <span className="text-[11px] font-mono font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">
                           Staff PIN: {m.staffCode}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                          ยังไม่ได้ตั้ง Staff PIN
                         </span>
                       )}
                     </div>
@@ -3742,332 +3754,7 @@ function MeetingHistoryPanel({
   );
 }
 
-/* ─── 4. VERIFY SLIPS PANEL (Light Theme) ─────────────────────────────────── */
-
-function VerifySlipsPanel({
-  slips,
-  onApprove,
-  onReject,
-  onResetToPending,
-  onPrintReceipt,
-}: {
-  slips: SlipItem[];
-  onApprove: (id: string) => void;
-  onReject: (id: string, reason: string) => void;
-  onResetToPending?: (id: string) => void;
-  onPrintReceipt?: (slip: SlipItem) => void;
-}) {
-  const [filterTab, setFilterTab] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
-  const [search, setSearch] = useState('');
-  const [selectedSlip, setSelectedSlip] = useState<SlipItem | null>(null);
-  const [rejectReasonInput, setRejectReasonInput] = useState('');
-  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
-
-  const filteredSlips = useMemo(() => {
-    return slips.filter((s) => {
-      const matchStatus = filterTab === 'all' || s.status === filterTab;
-      const matchSearch =
-        s.nameTh.toLowerCase().includes(search.toLowerCase()) ||
-        s.refNo.toLowerCase().includes(search.toLowerCase()) ||
-        s.workplace.toLowerCase().includes(search.toLowerCase());
-      return matchStatus && matchSearch;
-    });
-  }, [slips, filterTab, search]);
-
-  const handleOpenReject = (slip: SlipItem) => {
-    setSelectedSlip(slip);
-    setRejectReasonInput('ยอดเงินไม่ตรงกับค่าลงทะเบียน');
-    setIsRejectModalOpen(true);
-  };
-
-  const handleConfirmReject = () => {
-    if (selectedSlip) {
-      onReject(selectedSlip.id, rejectReasonInput || 'ไม่ผ่านการตรวจสอบ');
-      setIsRejectModalOpen(false);
-      setSelectedSlip(null);
-    }
-  };
-
-  return (
-    <div className="space-y-6 animate-fade-in pb-12">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[#0026b3] text-xs font-bold mb-2">
-            <Receipt className="w-4 h-4 text-[#0026b3]" />
-            <span>ศูนย์ตรวจสอบสลิปและหลักฐานการโอนเงิน</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">ตรวจสอบสลิปการโอนเงิน</h1>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            ตรวจสอบความถูกต้องของยอดเงิน บัญชีปลายทาง และอนุมัติสิทธิ์การเข้างานอัตโนมัติ
-          </p>
-        </div>
-      </div>
-
-      {/* Filter Tabs & Search */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 w-full sm:w-80 shadow-xs focus-within:ring-2 focus-within:ring-[#0026b3]/20 focus-within:border-[#0026b3]">
-          <Search className="w-4 h-4 text-slate-400 shrink-0" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหาชื่อ, เลขที่ธุรกรรม..."
-            className="bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none w-full"
-          />
-        </div>
-
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200 w-full sm:w-auto overflow-x-auto">
-          {[
-            { id: 'pending', label: `รอตรวจสอบ (${slips.filter((s) => s.status === 'pending').length})` },
-            { id: 'approved', label: `อนุมัติแล้ว (${slips.filter((s) => s.status === 'approved').length})` },
-            { id: 'rejected', label: `ปฏิเสธ (${slips.filter((s) => s.status === 'rejected').length})` },
-            { id: 'all', label: `ทั้งหมด (${slips.length})` },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setFilterTab(tab.id as any)}
-              className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap ${filterTab === tab.id
-                ? 'bg-[#0026b3] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white'
-                }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Slips Cards */}
-      <div className="space-y-3.5">
-        {filteredSlips.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center text-slate-500 space-y-2 shadow-xs">
-            <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
-            <div className="text-base font-bold text-slate-900">ไม่มีรายการสลิปในหมวดนี้</div>
-            <p className="text-xs sm:text-sm">ทุกรายการได้รับการตรวจสอบเรียบร้อยแล้ว</p>
-          </div>
-        ) : (
-          filteredSlips.map((slip) => (
-            <div
-              key={slip.id}
-              className="bg-white border border-slate-200/90 hover:border-slate-300 rounded-2xl p-4 sm:p-5 shadow-xs transition flex flex-col md:flex-row md:items-center justify-between gap-4"
-            >
-              {/* Left Side: Attendee Info */}
-              <div className="flex items-start gap-3.5 sm:gap-4 min-w-0 flex-1">
-                {/* Thumbnail */}
-                <div
-                  onClick={() => setSelectedSlip(slip)}
-                  className="w-14 sm:w-16 h-16 sm:h-18 bg-slate-50 border border-slate-200 rounded-xl flex flex-col items-center justify-center shrink-0 cursor-pointer hover:border-[#0026b3]/40 hover:bg-blue-50/50 transition group p-1.5"
-                >
-                  <Receipt className="w-5 sm:w-6 h-5 sm:h-6 text-[#0026b3] group-hover:scale-110 transition-transform" />
-                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 mt-1">ดูสลิป</span>
-                </div>
-
-                <div className="space-y-1.5 min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm sm:text-base font-extrabold text-slate-900">{slip.nameTh}</span>
-                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${slip.status === 'approved'
-                      ? 'bg-[#4ade80]/20 text-emerald-800 border-[#4ade80]/40 font-bold'
-                      : slip.status === 'rejected'
-                        ? 'bg-rose-50 text-rose-700 border-rose-200'
-                        : 'bg-amber-50 text-amber-700 border-amber-200'
-                      }`}>
-                      {slip.status === 'approved' ? 'อนุมัติแล้ว' : slip.status === 'rejected' ? 'ปฏิเสธ' : 'รอตรวจสอบ'}
-                    </span>
-                    <span className="text-xs text-slate-500 font-mono">Ref: {slip.refNo}</span>
-                  </div>
-
-                  <div className="text-xs sm:text-sm text-slate-600 truncate">{slip.ticketType} • {slip.workplace}</div>
-                  <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-500 flex-wrap">
-                    <span className="font-extrabold text-emerald-700">฿{slip.amount.toLocaleString()}</span>
-                    <span>{slip.bank}</span>
-                    <span>{slip.transferDate} {slip.transferTime}</span>
-                  </div>
-
-                  {slip.rejectionReason && (
-                    <div className="text-xs sm:text-sm text-rose-600 font-semibold mt-1">
-                      เหตุผลที่ปฏิเสธ: {slip.rejectionReason}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Right Side: Action Buttons */}
-              <div className="flex flex-wrap items-center gap-2 shrink-0 md:border-l md:border-slate-100 md:pl-4 pt-3 md:pt-0 border-t md:border-t-0 border-slate-100 w-full md:w-auto justify-end">
-                <button
-                  onClick={() => setSelectedSlip(slip)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs sm:text-sm font-bold border border-slate-200 transition cursor-pointer"
-                >
-                  <Eye className="w-4 h-4 text-[#0026b3]" />
-                  <span>ตรวจสลิป</span>
-                </button>
-
-                {slip.status === 'approved' && onPrintReceipt && (
-                  <button
-                    onClick={() => onPrintReceipt(slip)}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#0026b3] border border-blue-200 text-xs sm:text-sm font-bold transition cursor-pointer"
-                    title="พิมพ์ใบเสร็จรับเงิน"
-                  >
-                    <Printer className="w-4 h-4" />
-                    <span>พิมพ์ใบเสร็จ</span>
-                  </button>
-                )}
-
-                {slip.status === 'pending' && (
-                  <>
-                    <button
-                      onClick={() => onApprove(slip.id)}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold shadow-xs transition active:scale-95 cursor-pointer"
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>อนุมัติ</span>
-                    </button>
-                    <button
-                      onClick={() => handleOpenReject(slip)}
-                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs sm:text-sm font-bold transition cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                      <span>ปฏิเสธ</span>
-                    </button>
-                  </>
-                )}
-
-                {(slip.status === 'approved' || slip.status === 'rejected') && onResetToPending && (
-                  <button
-                    onClick={() => onResetToPending(slip.id)}
-                    className="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold border border-slate-200 transition cursor-pointer"
-                    title="รีเซ็ตกลับเป็นรอตรวจสอบ"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-                    <span>ตรวจใหม่</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Slip Preview Modal (Light Theme) */}
-      {selectedSlip && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl space-y-4 p-6">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Receipt className="w-5 h-5 text-[#0026b3]" />
-                <h3 className="text-base sm:text-lg font-extrabold text-slate-900">ตรวจสอบหลักฐานการโอนเงิน</h3>
-              </div>
-              <button onClick={() => setSelectedSlip(null)} className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Simulated Slip Preview Image */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center space-y-3">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto border border-emerald-200">
-                <CheckCircle2 className="w-8 h-8" />
-              </div>
-              <div className="text-xs sm:text-sm text-slate-600">สลิปโอนเงินสำเร็จจาก {selectedSlip.bank}</div>
-              <div className="text-3xl font-extrabold text-slate-900">฿{selectedSlip.amount.toLocaleString()}</div>
-              <div className="text-xs font-mono text-slate-500">Ref: {selectedSlip.refNo}</div>
-              <div className="text-xs sm:text-sm text-slate-500">{selectedSlip.transferDate} {selectedSlip.transferTime}</div>
-            </div>
-
-            {/* Slip Details */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs sm:text-sm">
-              <div className="flex justify-between"><span className="text-slate-500">ผู้โอน:</span><span className="font-bold text-slate-900">{selectedSlip.nameTh}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">บัตรลงทะเบียน:</span><span className="font-bold text-[#0026b3]">{selectedSlip.ticketType}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">สถานที่ทำงาน:</span><span className="text-slate-700 font-medium">{selectedSlip.workplace}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">เบอร์โทร:</span><span className="text-slate-700 font-medium">{selectedSlip.phone}</span></div>
-            </div>
-
-            {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-3 pt-2">
-              {selectedSlip.status === 'approved' && onPrintReceipt && (
-                <button
-                  onClick={() => {
-                    onPrintReceipt(selectedSlip);
-                    setSelectedSlip(null);
-                  }}
-                  className="flex-1 py-2.5 rounded-xl bg-[#0026b3] hover:bg-[#001f94] text-white font-bold text-sm shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Printer className="w-4 h-4" />
-                  <span>พิมพ์ใบเสร็จรับเงิน</span>
-                </button>
-              )}
-              {selectedSlip.status === 'pending' && (
-                <>
-                  <button
-                    onClick={() => {
-                      onApprove(selectedSlip.id);
-                      setSelectedSlip(null);
-                    }}
-                    className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-xs transition cursor-pointer"
-                  >
-                    อนุมัติการชำระเงิน
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleOpenReject(selectedSlip);
-                    }}
-                    className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-sm transition cursor-pointer"
-                  >
-                    ปฏิเสธ
-                  </button>
-                </>
-              )}
-              <button
-                onClick={() => setSelectedSlip(null)}
-                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition cursor-pointer"
-              >
-                ปิด
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Reject Reason Modal */}
-      {isRejectModalOpen && selectedSlip && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <h3 className="text-base sm:text-lg font-extrabold text-slate-900 flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-rose-600" />
-              ระบุเหตุผลในการปฏิเสธสลิป
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-500">ระบบจะส่งข้อความแจ้งเตือนไปยังผู้ลงทะเบียนเพื่อให้ดำเนินการแนบสลิปใหม่</p>
-
-            <div className="space-y-1.5">
-              <label className="text-xs sm:text-sm font-bold text-slate-700">เหตุผล</label>
-              <textarea
-                rows={3}
-                value={rejectReasonInput}
-                onChange={(e) => setRejectReasonInput(e.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2.5 pt-2">
-              <button
-                onClick={() => setIsRejectModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold cursor-pointer"
-              >
-                ยกเลิก
-              </button>
-              <button
-                onClick={handleConfirmReject}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold cursor-pointer shadow-xs"
-              >
-                ยืนยันการปฏิเสธ
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-}
+// Note: Slip verification is handled by <AdminSlipsView /> (components/views/AdminSlipsView.tsx)
 
 /* ─── 5. VERIFY ATTENDEES PANEL (Light Theme with Round Filter) ───────────── */
 
@@ -5035,6 +4722,46 @@ export default function AdminPage() {
   const [receipts, setReceipts] = useState<ReceiptData[]>(INITIAL_RECEIPTS);
   const [membersCount, setMembersCount] = useState<number>(0);
 
+  // ─── Admin Authentication State ───
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
+  const [adminUser, setAdminUser] = useState<{ username: string; role: string } | null>(null);
+
+  // Check Admin Session on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/admin/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.authenticated && isMounted) {
+            setIsAuthenticated(true);
+            setAdminUser(data.user);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to verify admin auth:', e);
+      } finally {
+        if (isMounted) setIsCheckingAuth(false);
+      }
+    }
+    checkAuth();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/admin/auth/logout', { method: 'POST' });
+    } catch (e) {
+      console.error('Failed to logout admin:', e);
+    }
+    setIsAuthenticated(false);
+    setAdminUser(null);
+  };
+
   // ─── 1. Fetch meetings from API on mount ───
   const fetchMeetings = useCallback(async () => {
     try {
@@ -5621,10 +5348,44 @@ export default function AdminPage() {
             onAddAttendee={handleAddAttendee}
           />
         );
+      case 'settings':
+        return (
+          <AdminSettingsPanel
+            onShowToast={(msg) => {
+              setGlobalToastMessage(msg);
+              setTimeout(() => setGlobalToastMessage(null), 4000);
+            }}
+          />
+        );
       default:
         return null;
     }
   };
+
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white font-sans">
+        <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 p-2.5 flex items-center justify-center animate-pulse mb-4">
+          <ThaiSrmLogo className="w-full h-full object-contain" />
+        </div>
+        <div className="flex items-center gap-2 text-slate-400 text-xs sm:text-sm font-medium">
+          <span className="w-2 h-2 rounded-full bg-[#4ade80] animate-ping" />
+          <span>กำลังตรวจสอบสิทธิ์การเข้าถึงระบบผู้ดูแล...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <AdminLoginView
+        onLoginSuccess={(user) => {
+          setIsAuthenticated(true);
+          setAdminUser(user);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans selection:bg-[#0026b3] selection:text-white">
@@ -5640,11 +5401,7 @@ export default function AdminPage() {
         checkedInCount={ongoingCheckedInCount}
         receiptsCount={receipts.length}
         membersCount={membersCount}
-        onLogout={() => {
-          if (typeof window !== 'undefined') {
-            window.location.href = '/login';
-          }
-        }}
+        onLogout={handleLogout}
       />
 
       {/* Main Content Area */}

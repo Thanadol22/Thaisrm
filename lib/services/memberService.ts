@@ -201,37 +201,63 @@ export async function getMemberStats(): Promise<MemberStats> {
 export async function createMember(rawInput: CreateMemberInput): Promise<Member> {
   const input = sanitizeMemberInput(rawInput);
 
-  // ดึงรหัสสมาชิกอัตโนมัติ
+  // ดึงรหัสสมาชิกอัตโนมัติ (เช่น 1283)
   const { member_no } = await getNextMemberCodes();
 
   // Parse start_date if provided
   const parsedStartDate = input.start_date ? new Date(input.start_date) : null;
 
+  // Generate QR Code data URL
+  let qrCodeUrl: string | null = null;
+  try {
+    qrCodeUrl = await generateQrCode(member_no);
+  } catch (qrErr) {
+    console.warn('Failed to generate QR Code:', qrErr);
+  }
+
+  // Calculate default 1-year expire date for Regular membership
+  const defaultExpireDate = new Date();
+  defaultExpireDate.setFullYear(defaultExpireDate.getFullYear() + 1);
+
+  // Filter valid educations (having at least degree or institution)
+  const validEducations = (input.educations || []).filter(
+    (edu) => (edu.degree && edu.degree.trim() !== '') || (edu.institution && edu.institution.trim() !== '')
+  );
+
   const newMember = await prisma.member.create({
     data: {
       member_no,
       fullNameTh: input.full_name_th,
-      fullNameEn: input.full_name_en ?? null,
-      idLast4: input.id_last4 ?? null,
-      mobile: input.mobile ?? null,
-      email: input.email ?? null,
-      lineId: input.line_id ?? null,
-      address: input.address ?? null,
-      workplace: input.workplace ?? null,
-      work_phone: input.work_phone ?? null,
+      fullNameEn: input.full_name_en || null,
+      idLast4: input.id_last4 || null,
+      mobile: input.mobile || null,
+      email: input.email || null,
+      lineId: input.line_id || null,
+      address: input.address || null,
+      workplace: input.workplace || null,
+      work_phone: input.work_phone || null,
       work_start_date: parsedStartDate,
-      position: input.position ?? null,
+      position: input.position || null,
       job_category: input.job_category || (input.member_type !== undefined && input.member_type !== null ? (MEMBER_TYPE_LABELS[input.member_type as MemberType] || String(input.member_type)) : null),
-      job_category_other: input.member_type_other ?? null,
-      membership_type: input.membership_type ?? 'Regular',
-      membership_status: input.membership_status ?? 'Active',
-      scientist_license_no: input.scientist_reg_no ?? null,
-      photo_url: input.photo_path ?? null,
+      job_category_other: input.member_type_other || null,
+      scientist_license_no: input.scientist_reg_no || null,
+      username: input.email || member_no,
+      password_hash: null,
+      referees: null,
+      photo_url: input.photo_path || null,
+      id_card_doc: null,
+      degree_cert_doc: null,
+      work_cert_doc: null,
+      membership_status: input.membership_status || 'Active',
+      membership_type: input.membership_type || 'Regular',
+      applied_at: new Date(),
+      expire_date: defaultExpireDate,
+      special_expire_date: null,
       qr_code_data: { member_no },
       qr_code_image_url: null,
-      member_educations: input.educations && input.educations.length > 0
+      member_educations: validEducations.length > 0
         ? {
-            create: input.educations.map((edu) => ({
+            create: validEducations.map((edu) => ({
               degree: edu.degree || '',
               institution: edu.institution || '',
               graduation_year: edu.graduation_year ? String(edu.graduation_year) : null,
@@ -510,6 +536,7 @@ export async function updateMember(id: string | number | bigint, rawInput: Updat
     if (input.id_last4 !== undefined) updateData.idLast4 = input.id_last4;
     if (input.mobile !== undefined) updateData.mobile = input.mobile;
     if (input.email !== undefined) updateData.email = input.email;
+    if (input.line_id !== undefined) updateData.lineId = input.line_id;
     if (input.address !== undefined) updateData.address = input.address;
     if (input.workplace !== undefined) updateData.workplace = input.workplace;
     if (input.work_phone !== undefined) updateData.work_phone = input.work_phone;

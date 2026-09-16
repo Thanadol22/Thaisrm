@@ -13,6 +13,16 @@ export function middleware(req: NextRequest) {
     const ip = getClientIp(req);
     const method = req.method;
 
+    // ข้าม Rate Limit สำหรับ Local Development หรือ Localhost เพื่อไม่ให้บล็อกการทำงานในเครื่อง
+    if (
+      process.env.NODE_ENV === 'development' ||
+      ip === '127.0.0.1' ||
+      ip === '::1' ||
+      ip === 'localhost'
+    ) {
+      return NextResponse.next();
+    }
+
     // เลือกระดับความเข้มงวดตามประเภท Endpoint
     let profile = RATE_LIMIT_PROFILES.GENERAL_API;
     let identifier = `api:${ip}`;
@@ -23,6 +33,24 @@ export function middleware(req: NextRequest) {
     } else if (pathname.startsWith('/api/members/verify')) {
       profile = RATE_LIMIT_PROFILES.VERIFY_QR;
       identifier = `verify:${ip}`;
+    } else if (pathname === '/api/staff/verify-pin') {
+      // ตรวจสอบรหัส Staff PIN (จำกัด 30 ครั้ง/นาที ป้องกันการสุ่มรหัส)
+      profile = {
+        maxRequests: 30,
+        windowSeconds: 60,
+        banDurationSeconds: 120,
+        maxViolationsBeforeBan: 3,
+      };
+      identifier = `staff-pin:${ip}`;
+    } else if (pathname.startsWith('/api/staff')) {
+      // สำหรับการสแกนและ polling สถิติหน้างาน (ไม่บล็อกเจ้าหน้าที่จุดลงทะเบียนใน Wi-Fi เดียวกัน)
+      profile = {
+        maxRequests: 600,
+        windowSeconds: 60,
+        banDurationSeconds: 60,
+        maxViolationsBeforeBan: 5,
+      };
+      identifier = `staff-portal:${ip}`;
     }
 
     const result = checkRateLimit(identifier, profile);

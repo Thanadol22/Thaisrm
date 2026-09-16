@@ -48,4 +48,5 @@ export.sql
 
 # user uploads
 /public/uploads/
+scratch/
 

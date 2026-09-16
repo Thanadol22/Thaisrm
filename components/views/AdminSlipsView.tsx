@@ -65,6 +65,14 @@ export function AdminSlipsView() {
   useEffect(() => {
     setMounted(true);
     fetchSlips();
+    fetch('/api/admin/settings')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data?.slip_rejection_reason) {
+          setRejectReason(json.data.slip_rejection_reason);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const fetchSlips = async () => {
