@@ -339,7 +339,6 @@ export function AdminNavbar({
                         </div>
                         <div className="text-left">
                           <div className="text-sm font-bold">{item.labelTh}</div>
-                          <div className={`text-xs ${isActive ? 'text-blue-600' : 'text-blue-200/70'}`}>{item.labelEn}</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

@@ -383,7 +383,7 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onE
                   </option>
                 );
               })}
-              <option value="all">🌐 รวมทุกรอบการประชุม (All Rounds - รวม {attendees.length} คน)</option>
+              <option value="all">🌐 รวมทุกรอบการประชุม (รวม {attendees.length} คน)</option>
             </select>
             <CalendarDays className="w-4 h-4 text-[#0026b3] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -503,7 +503,7 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onE
               <div className="space-y-0.5">
                 <h3 className="text-base sm:text-lg font-extrabold text-slate-900 flex items-center gap-2">
                   <BarChart3 className="w-5 h-5 text-[#0026b3]" />
-                  สถิติการเช็คอินตามช่วงเวลา (Peak Hours Check-in)
+                  สถิติการเช็คอินตามช่วงเวลา
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-500">แสดงความหนาแน่นของผู้เข้าร่วมงานที่สแกนเช็คอินในแต่ละช่วงเวลา</p>
               </div>
@@ -851,7 +851,7 @@ function RevenueReportPanel({ meetings, slips, attendees = [] }: RevenueReportPr
 
     const tierMap = new Map<string, { count: number; total: number }>();
     relevantSlips.forEach((s) => {
-      const type = s.ticketType || (s.memberCode ? 'สมาชิกสมาคม (Member Pass)' : 'บุคคลทั่วไป (Non-Member Pass)');
+      const type = s.ticketType || (s.memberCode ? 'สมาชิกสมาคม' : 'บุคคลทั่วไป');
       const cur = tierMap.get(type) || { count: 0, total: 0 };
       tierMap.set(type, { count: cur.count + 1, total: cur.total + s.amount });
     });
@@ -1163,7 +1163,7 @@ function RevenueReportPanel({ meetings, slips, attendees = [] }: RevenueReportPr
         <div className="space-y-1">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[#0026b3] text-xs font-bold">
             <DollarSign className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
-            <span className="truncate">รายงานการเงินและรายได้ค่าลงทะเบียน (Financial Analytics)</span>
+            <span className="truncate">รายงานการเงินและรายได้ค่าลงทะเบียน</span>
           </div>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900 tracking-tight">
             รายงานรายได้จากการลงทะเบียน
@@ -1400,7 +1400,7 @@ function RevenueReportPanel({ meetings, slips, attendees = [] }: RevenueReportPr
               >
                 <option value="all">ทุกสถานะโครงการ</option>
                 <option value="ongoing">กำลังจัดงาน / เปิดรับ</option>
-                <option value="upcoming">เร็วๆ นี้ (Upcoming)</option>
+                <option value="upcoming">รอเริ่มงาน</option>
                 <option value="completed">เสร็จสิ้นแล้ว</option>
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -1442,7 +1442,7 @@ function RevenueReportPanel({ meetings, slips, attendees = [] }: RevenueReportPr
                 className="w-full appearance-none bg-slate-50 hover:bg-slate-100/80 border border-slate-200 text-slate-800 text-xs sm:text-sm font-bold rounded-xl pl-10 pr-10 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition cursor-pointer shadow-2xs truncate"
               >
                 <option value="all">
-                  🌐 รวมทุกรอบที่กรอง (Grand Total) — ฿{grandTotalRevenue >= 1000000 ? `${(grandTotalRevenue / 1000000).toFixed(2)}M` : grandTotalRevenue.toLocaleString()}
+                  🌐 รวมทุกรอบที่กรอง — ฿{grandTotalRevenue >= 1000000 ? `${(grandTotalRevenue / 1000000).toFixed(2)}M` : grandTotalRevenue.toLocaleString()}
                 </option>
                 {filteredMeetings.map((m) => {
                   const mRev = getMeetingRevenue(m);
@@ -1514,10 +1514,10 @@ function RevenueReportPanel({ meetings, slips, attendees = [] }: RevenueReportPr
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-slate-500">
-              {activeChartTab === 'programs' && 'กราฟแท่งแสดงรายได้จริงแยกแท่งเดี่ยวตามรายชื่อหลักสูตรที่เปิดในฐานข้อมูล (Revenue by Real Course / Program)'}
-              {activeChartTab === 'rounds' && 'กราฟแท่งแยกแท่งคู่เปรียบเทียบ Main vs Workshop แยกตามรอบโครงการ (Grouped Bars by Round)'}
-              {activeChartTab === 'comparison' && 'กราฟแท่งคู่เปรียบเทียบจำนวนผู้ลงทะเบียน vs ผู้เข้าร่วมงานจริงในแต่ละรอบ (Attendee Comparison)'}
-              {activeChartTab === 'donut' && 'กราฟวงแหวนสัดส่วนรายได้แยกตามประเภทสมาชิกและบัตร (Donut Ring Chart)'}
+              {activeChartTab === 'programs' && 'กราฟแท่งแสดงรายได้จริงแยกตามรายชื่อหลักสูตรที่เปิดในฐานข้อมูล'}
+              {activeChartTab === 'rounds' && 'กราฟแท่งแยกแท่งคู่เปรียบเทียบ Main vs Workshop แยกตามรอบโครงการ'}
+              {activeChartTab === 'comparison' && 'กราฟแท่งคู่เปรียบเทียบจำนวนผู้ลงทะเบียน vs ผู้เข้าร่วมงานจริงในแต่ละรอบ'}
+              {activeChartTab === 'donut' && 'กราฟวงแหวนสัดส่วนรายได้แยกตามประเภทสมาชิกและบัตร'}
             </p>
           </div>
 
@@ -1582,7 +1582,7 @@ function RevenueReportPanel({ meetings, slips, attendees = [] }: RevenueReportPr
                 </div>
                 <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800">
                   <span className="w-3.5 h-3.5 rounded-xs bg-amber-400 shrink-0 shadow-xs" />
-                  <span>ยอดรอตรวจสลิป (Pending)</span>
+                  <span>ยอดรอตรวจสลิป</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-500">
                   <span className="w-3.5 h-3.5 rounded-xs bg-slate-200 border border-slate-300 shrink-0" />
@@ -1905,11 +1905,11 @@ function RevenueReportPanel({ meetings, slips, attendees = [] }: RevenueReportPr
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800">
                   <span className="w-3.5 h-3.5 rounded-xs bg-[#0026b3] shrink-0 shadow-xs" />
-                  <span>จำนวนผู้ลงทะเบียนทั้งหมด (Total Registered)</span>
+                  <span>จำนวนผู้ลงทะเบียนทั้งหมด</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800">
                   <span className="w-3.5 h-3.5 rounded-xs bg-[#4ade80] shrink-0 shadow-xs" />
-                  <span>จำนวนผู้เช็คอินเข้าร่วมจริง (Checked-in Attendees)</span>
+                  <span>จำนวนผู้เช็คอินเข้าร่วมจริง</span>
                 </div>
               </div>
 
@@ -2114,7 +2114,7 @@ function RevenueReportPanel({ meetings, slips, attendees = [] }: RevenueReportPr
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
-                ตารางสรุปรายได้แยกตามหลักสูตรจริงในฐานข้อมูล (Course Program Breakdown)
+                ตารางสรุปรายได้แยกตามหลักสูตรจริงในฐานข้อมูล
               </h3>
               <p className="text-xs text-slate-500">
                 แจกแจงรายได้จริง จำนวนที่นั่ง และสลิปที่อนุมัติแล้วของแต่ละหลักสูตร
@@ -2230,7 +2230,7 @@ function RevenueReportPanel({ meetings, slips, attendees = [] }: RevenueReportPr
                 <Landmark className="w-4.5 h-4.5" />
               </div>
               <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
-                ช่องทางการชำระเงิน (Bank Channels Breakdown)
+                ช่องทางการชำระเงิน
               </h3>
             </div>
             <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
@@ -2282,7 +2282,7 @@ function RevenueReportPanel({ meetings, slips, attendees = [] }: RevenueReportPr
                 <Tag className="w-4.5 h-4.5" />
               </div>
               <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
-                สัดส่วนประเภทบัตรและสมาชิก (Ticket & Member Tiers)
+                สัดส่วนประเภทบัตรและสมาชิก
               </h3>
             </div>
             <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
@@ -2341,7 +2341,7 @@ function RevenueReportPanel({ meetings, slips, attendees = [] }: RevenueReportPr
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
-                รายการสลิปและธุรกรรมรายได้ล่าสุด (Recent Revenue Slips)
+                รายการสลิปและธุรกรรมรายได้ล่าสุด
               </h3>
               <p className="text-xs text-slate-500">
                 ตรวจสอบความถูกต้องของรายการโอนเงินและสลิปที่ส่งเข้ามาในรอบที่เลือก
@@ -2934,7 +2934,7 @@ function AddMeetingPanel({
             {/* Meeting Summary Card */}
             <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 text-left space-y-2.5 text-xs text-slate-700">
               <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
-                <span className="font-bold text-slate-500">รหัสการประชุม (Meeting ID)</span>
+                <span className="font-bold text-slate-500">รหัสการประชุม</span>
                 <span className="font-mono font-black text-[#0026b3] bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-200 text-xs">
                   {savedMeetingDetails.id}
                 </span>
@@ -3086,7 +3086,7 @@ function AddMeetingPanel({
             {/* รหัสการประชุม (Meeting ID) */}
             <div className="space-y-1.5 md:col-span-1">
               <div className="flex justify-between items-center">
-                <label className="text-sm font-bold text-slate-700">รหัสการประชุม (ID) *</label>
+                <label className="text-sm font-bold text-slate-700">รหัสการประชุม *</label>
                 <span className="text-[10px] text-[#0026b3] font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                   TSRM + รอบ
                 </span>
@@ -3157,7 +3157,7 @@ function AddMeetingPanel({
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-1.5">
               <label className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
-                <span>รูปแบบการจัดงาน (Attendance Format)</span>
+                <span>รูปแบบการจัดงาน</span>
                 <span className="text-xs font-normal text-slate-500">(เลือกได้ทั้ง 2 ตัวเลือก)</span>
               </label>
               <div className="text-xs font-semibold">
@@ -3414,7 +3414,7 @@ function AddMeetingPanel({
                     {/* Activity Name */}
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-700">
-                        ชื่อหัวข้อ / หลักสูตร {isMain ? '(Main Program)' : '(Workshop)'} *
+                        ชื่อหัวข้อ / หลักสูตร {isMain ? '(หลักสูตรหลัก)' : '(เวิร์กช็อป)'} *
                       </label>
                       <input
                         type="text"
@@ -3545,7 +3545,7 @@ function AddMeetingPanel({
                           <div className="flex items-center justify-between">
                             <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                               <Coins className="w-3.5 h-3.5 text-violet-600" />
-                              <span>กำหนดค่าลงทะเบียนเวิร์กช็อป (Registration Fee)</span>
+                              <span>กำหนดค่าลงทะเบียนเวิร์กช็อป</span>
                             </label>
                             <span className="text-[10px] text-slate-400">ระบุ 0 หากไม่มีค่าใช้จ่าย</span>
                           </div>
@@ -3636,7 +3636,7 @@ function AddMeetingPanel({
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                 <Coins className="w-4 h-4 text-[#0026b3]" />
-                3. กำหนดอัตราค่าลงทะเบียน (Registration Fee)
+                3. กำหนดอัตราค่าลงทะเบียน
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
                 กรอกตัวเลขราคา (บาท) ลงในตารางได้โดยตรง ระบบจะนำไปคำนวณและแสดงผลในหน้าลงทะเบียน
@@ -3881,7 +3881,7 @@ function AddMeetingPanel({
                 <table className="w-full text-left border-collapse text-xs sm:text-sm">
                   <thead>
                     <tr className="bg-violet-50/90 border-b border-violet-200 text-violet-950 font-bold text-[11px] sm:text-xs">
-                      <th className="py-2.5 px-3 w-[40%]">ชื่อหลักสูตร / เวิร์กช็อป (WS)</th>
+                      <th className="py-2.5 px-3 w-[40%]">ชื่อหลักสูตร / เวิร์กช็อป</th>
                       <th className="py-2.5 px-3 text-center border-l border-violet-200 w-[24%] text-[#0026b3]">
                         Member<span className="text-rose-500 font-bold">*</span>
                       </th>
@@ -4235,9 +4235,9 @@ function MeetingHistoryPanel({
                       onChange={(e) => onUpdateStatus?.(m.id, e.target.value as any)}
                       className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-700 cursor-pointer focus:outline-none focus:border-[#0026b3]"
                     >
-                      <option value="upcoming">รอเริ่มงาน (Upcoming)</option>
-                      <option value="ongoing">กำลังดำเนินการ (Ongoing)</option>
-                      <option value="completed">เสร็จสิ้นแล้ว (Completed)</option>
+                      <option value="upcoming">รอเริ่มงาน</option>
+                      <option value="ongoing">กำลังดำเนินการ</option>
+                      <option value="completed">เสร็จสิ้นแล้ว</option>
                     </select>
                   </div>
 
@@ -4519,7 +4519,7 @@ function VerifyAttendeesPanel({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <label className="flex items-center gap-2 text-xs sm:text-sm font-extrabold text-slate-700 uppercase tracking-wider">
             <Filter className="w-4 h-4 text-[#0026b3]" />
-            <span>เลือกรอบการประชุม (Select Meeting Round):</span>
+            <span>เลือกรอบการประชุม:</span>
           </label>
           <span className="text-xs text-slate-500 font-medium">
             ผู้ลงทะเบียนในรอบที่เลือก: <strong className="text-[#0026b3] font-bold">{roundAttendees.length}</strong> คน • เช็คอินแล้ว <strong className="text-emerald-700 font-bold">{checkedInInRound}</strong> คน
@@ -4547,7 +4547,7 @@ function VerifyAttendeesPanel({
               );
             })}
             <option value="all">
-              🌐 รวมทุกรอบการประชุม (All Rounds) — รวมทั้งหมด {attendees.length} คน
+              🌐 รวมทุกรอบการประชุม — รวมทั้งหมด {attendees.length} คน
             </option>
           </select>
           <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#0026b3]">
@@ -5136,7 +5136,7 @@ function VerifyAttendeesPanel({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    อีเมล (Email)
+                    อีเมล
                   </label>
                   <input
                     type="email"
@@ -5172,7 +5172,7 @@ function VerifyAttendeesPanel({
                   >
                     <option value="แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)">แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)</option>
                     <option value="สูตินรีแพทย์ทั่วไป (OB-GYN)">สูตินรีแพทย์ทั่วไป (OB-GYN)</option>
-                    <option value="นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อน (Embryologist)">นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อน (Embryologist)</option>
+                    <option value="นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อน">นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อน</option>
                     <option value="พยาบาลและบุคลากรทางการแพทย์">พยาบาลและบุคลากรทางการแพทย์</option>
                     <option value="สมาชิกทั่วไป">สมาชิกทั่วไป</option>
                   </select>
@@ -5204,7 +5204,7 @@ function VerifyAttendeesPanel({
                       onChange={() => setWalkInData({ ...walkInData, paymentStatus: 'paid' })}
                       className="accent-[#0026b3]"
                     />
-                    <span className="text-xs font-bold text-emerald-700">ชำระเงินแล้ว (Paid)</span>
+                    <span className="text-xs font-bold text-emerald-700">ชำระเงินแล้ว</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -5214,7 +5214,7 @@ function VerifyAttendeesPanel({
                       onChange={() => setWalkInData({ ...walkInData, paymentStatus: 'pending' })}
                       className="accent-[#0026b3]"
                     />
-                    <span className="text-xs font-bold text-amber-700">รอชำระ (Pending)</span>
+                    <span className="text-xs font-bold text-amber-700">รอชำระ</span>
                   </label>
                 </div>
 

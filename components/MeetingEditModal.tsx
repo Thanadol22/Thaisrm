@@ -503,7 +503,7 @@ export function MeetingEditModal({
               {/* Row: Meeting ID & Status */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm font-bold text-slate-700">รหัสการประชุม (Meeting ID)</label>
+                  <label className="text-xs sm:text-sm font-bold text-slate-700">รหัสการประชุม</label>
                   <div className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-700">
                     <Tag className="w-4 h-4 text-slate-400" />
                     <span>{meeting.id}</span>
@@ -518,9 +518,9 @@ export function MeetingEditModal({
                     onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
                     className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition cursor-pointer"
                   >
-                    <option value="upcoming">รอเริ่มงาน (Upcoming)</option>
-                    <option value="ongoing">กำลังดำเนินการ / จัดงานอยู่ (Ongoing)</option>
-                    <option value="completed">เสร็จสิ้นแล้ว (Completed)</option>
+                    <option value="upcoming">รอเริ่มงาน</option>
+                    <option value="ongoing">กำลังดำเนินการ</option>
+                    <option value="completed">เสร็จสิ้นแล้ว</option>
                   </select>
                 </div>
               </div>
@@ -528,7 +528,7 @@ export function MeetingEditModal({
               {/* Meeting Title */}
               <div className="space-y-1.5">
                 <label className="text-xs sm:text-sm font-bold text-slate-700">
-                  ชื่อโครงการประชุม (Title) <span className="text-rose-500">*</span>
+                  ชื่อโครงการประชุม <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -892,7 +892,7 @@ export function MeetingEditModal({
                 <div>
                   <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                     <Coins className="w-4 h-4 text-[#0026b3]" />
-                    อัตราค่าลงทะเบียนและการเปลี่ยนประเภท (Pricing Matrix)
+                    อัตราค่าลงทะเบียนและการเปลี่ยนประเภท
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
                     กำหนดอัตราค่าลงทะเบียนหลักตามสิทธิ์สมาชิก
@@ -903,7 +903,7 @@ export function MeetingEditModal({
               {/* Participant Pricing Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-3.5 space-y-1.5">
-                  <label className="text-xs font-bold text-[#0026b3]">Onsite - สมาชิก (Member)</label>
+                  <label className="text-xs font-bold text-[#0026b3]">Onsite - สมาชิก</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
                     <input
@@ -926,7 +926,7 @@ export function MeetingEditModal({
                 </div>
 
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Onsite - บุคคลทั่วไป (Non-Member)</label>
+                  <label className="text-xs font-bold text-slate-700">Onsite - บุคคลทั่วไป</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
                     <input
@@ -949,7 +949,7 @@ export function MeetingEditModal({
                 </div>
 
                 <div className="bg-indigo-50/60 border border-indigo-200 rounded-xl p-3.5 space-y-1.5">
-                  <label className="text-xs font-bold text-indigo-700">Online - สมาชิก (Online Pass)</label>
+                  <label className="text-xs font-bold text-indigo-700">Online - สมาชิก</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
                     <input

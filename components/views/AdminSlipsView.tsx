@@ -610,7 +610,7 @@ export function AdminSlipsView() {
                         selectedSlip.isMember ? 'text-[#0026b3]' : 'text-amber-800'
                       }`}
                     >
-                      {selectedSlip.isMember ? `สมาชิกสมาคม (#${selectedSlip.memberNo})` : 'บุคคลทั่วไป (Non-Member)'}
+                      {selectedSlip.isMember ? `สมาชิกสมาคม (#${selectedSlip.memberNo})` : (lang === 'th' ? 'บุคคลทั่วไป' : 'Non-Member')}
                     </span>
                   </div>
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">

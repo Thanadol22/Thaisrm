@@ -88,7 +88,7 @@ export function SlipRejectionPreviewModal({
             }`}
           >
             <Mail className="w-3.5 h-3.5 text-blue-600" />
-            <span>1. อีเมลแจ้งเตือนผู้สมัคร (Email Notice)</span>
+            <span>1. อีเมลแจ้งเตือนผู้สมัคร</span>
           </button>
 
           <button
@@ -101,7 +101,7 @@ export function SlipRejectionPreviewModal({
             }`}
           >
             <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
-            <span>2. หน้าแนบสลิปใหม่ (Resubmit Page)</span>
+            <span>2. หน้าแนบสลิปใหม่</span>
           </button>
 
           <button
@@ -114,7 +114,7 @@ export function SlipRejectionPreviewModal({
             }`}
           >
             <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-            <span>3. กล่องแจ้งเตือนของแอดมิน (Admin Dialog)</span>
+            <span>3. กล่องแจ้งเตือนของแอดมิน</span>
           </button>
         </div>
 
@@ -184,7 +184,7 @@ export function SlipRejectionPreviewModal({
                     <div className="flex justify-center py-2">
                       <div className="px-6 py-3 rounded-xl bg-[#0026b3] text-white text-xs font-bold shadow-md flex items-center gap-2">
                         <UploadCloud className="w-4 h-4 text-emerald-400" />
-                        <span>คลิกเพื่อแนบสลิปใหม่ (Re-upload Slip)</span>
+                        <span>คลิกเพื่อแนบสลิปใหม่</span>
                       </div>
                     </div>
                     <p className="text-[11px] text-slate-400 text-center">

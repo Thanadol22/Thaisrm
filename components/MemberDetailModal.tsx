@@ -396,7 +396,7 @@ export function MemberDetailModal({
                 <div className="flex items-center justify-between py-1 border-b border-slate-200/60">
                   <span className="text-slate-500 text-xs">ประเภทสมาชิก:</span>
                   <span className="font-bold text-slate-800">
-                    {member.membership_type === 'Lifelong' ? 'สมาชิกตลอดชีพ (Lifelong)' : 'สมาชิกสามัญ (Regular)'}
+                    {member.membership_type === 'Lifelong' ? 'สมาชิกตลอดชีพ' : 'สมาชิกสามัญ'}
                   </span>
                 </div>
 
@@ -407,7 +407,7 @@ export function MemberDetailModal({
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                       : 'bg-slate-100 text-slate-600'
                   }`}>
-                    {member.membership_status === 'Active' ? 'ปกติ (Active)' : (member.membership_status || 'Inactive')}
+                    {member.membership_status === 'Active' ? 'ปกติ' : (member.membership_status || 'ไม่ใช้งาน')}
                   </span>
                 </div>
 

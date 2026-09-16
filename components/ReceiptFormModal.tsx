@@ -271,7 +271,7 @@ export function ReceiptFormModal({
             </div>
             <div>
               <h2 className="text-lg font-bold">
-                {initialData ? 'แก้ไขใบเสร็จรับเงิน' : 'ออกใบเสร็จรับเงิน (THAISRM)'}
+                {initialData ? 'แก้ไขใบเสร็จรับเงิน' : 'ออกใบเสร็จรับเงิน'}
               </h2>
               <p className="text-xs text-blue-100">
                 สมาคมเวชศาสตร์การเจริญพันธุ์ไทย
@@ -494,7 +494,7 @@ export function ReceiptFormModal({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  เบอร์โทรศัพท์ (Tel)
+                  เบอร์โทรศัพท์
                 </label>
                 <input
                   type="text"
@@ -507,7 +507,7 @@ export function ReceiptFormModal({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  เลขประจำตัวผู้เสียภาษี (Tax ID)
+                  เลขประจำตัวผู้เสียภาษี
                 </label>
                 <input
                   type="text"

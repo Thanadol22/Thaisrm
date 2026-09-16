@@ -473,7 +473,7 @@ export function MemberFormModal({
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
                     <Mail className="w-3.5 h-3.5 text-slate-400" />
-                    <span>อีเมล (Email)</span>
+                    <span>อีเมล</span>
                   </label>
                   <input
                     type="email"
@@ -572,7 +572,7 @@ export function MemberFormModal({
                 {/* ตำแหน่งงาน / สายงานย่อย */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700">
-                    ชื่อตำแหน่งงานเฉพาะทาง (Position title)
+                    ชื่อตำแหน่งงานเฉพาะทาง
                   </label>
                   <input
                     type="text"

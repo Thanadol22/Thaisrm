@@ -129,7 +129,7 @@ export function AdminLoginView({ onLoginSuccess }: AdminLoginViewProps) {
           {/* Username Field */}
           <div>
             <label className="block text-xs font-bold text-slate-300 mb-1.5">
-              ชื่อผู้ใช้งาน (Username)
+              ชื่อผู้ใช้งาน
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -152,7 +152,7 @@ export function AdminLoginView({ onLoginSuccess }: AdminLoginViewProps) {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-bold text-slate-300">
-                รหัสผ่าน (Password)
+                รหัสผ่าน
               </label>
             </div>
             <div className="relative">
@@ -222,7 +222,7 @@ export function AdminLoginView({ onLoginSuccess }: AdminLoginViewProps) {
             href="/staff"
             className="flex items-center gap-1.5 hover:text-[#4ade80] transition"
           >
-            <span>ระบบสแกนเจ้าหน้าที่ (Staff)</span>
+            <span>ระบบสแกนเจ้าหน้าที่</span>
           </Link>
         </div>
       </div>

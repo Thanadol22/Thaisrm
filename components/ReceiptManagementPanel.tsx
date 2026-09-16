@@ -192,7 +192,7 @@ export function ReceiptManagementPanel({
           <div>
             <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               <Receipt className="w-5 h-5 text-[#0026b3]" />
-              <span>ระบบพิมพ์และออกใบเสร็จรับเงิน (Receipt Issuing)</span>
+              <span>ระบบพิมพ์และออกใบเสร็จรับเงิน</span>
             </h2>
             <p className="text-xs text-slate-500">
               สร้าง พิมพ์ และส่งออกใบเสร็จตามแบบมาตรฐานสมาคมเวชศาสตร์การเจริญพันธุ์ไทย 100%
@@ -364,7 +364,7 @@ export function ReceiptManagementPanel({
                           type="button"
                           onClick={() => handleDirectPrint(r)}
                           className="p-1.5 bg-blue-50 text-[#0026b3] hover:bg-[#0026b3] hover:text-white rounded-lg transition-colors cursor-pointer"
-                          title="พิมพ์ใบเสร็จ (Print)"
+                          title="พิมพ์ใบเสร็จ"
                         >
                           <Printer className="w-4 h-4" />
                         </button>
@@ -373,7 +373,7 @@ export function ReceiptManagementPanel({
                           type="button"
                           onClick={() => handleOpenPreview(r)}
                           className="p-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-                          title="ดูตัวอย่าง (Preview)"
+                          title="ดูตัวอย่าง"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -382,7 +382,7 @@ export function ReceiptManagementPanel({
                           type="button"
                           onClick={() => handleOpenEdit(r)}
                           className="p-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-                          title="แก้ไขข้อมูล (Edit)"
+                          title="แก้ไขข้อมูล"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
@@ -391,7 +391,7 @@ export function ReceiptManagementPanel({
                           type="button"
                           onClick={() => handleDuplicate(r)}
                           className="p-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-                          title="คัดลอก (Duplicate)"
+                          title="คัดลอก"
                         >
                           <Copy className="w-4 h-4" />
                         </button>

@@ -286,7 +286,7 @@ export function ParticipantSearchModal({ isOpen, onClose }: ParticipantSearchMod
       return (
         <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200/90 px-2 py-0.5 rounded-lg text-[11px] font-bold shadow-2xs">
           <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-pulse shrink-0" />
-          <span>{lang === 'th' ? 'ปกติ (Active)' : 'Active'}</span>
+          <span>{lang === 'th' ? 'ปกติ' : 'Active'}</span>
         </span>
       );
     }
@@ -295,7 +295,7 @@ export function ParticipantSearchModal({ isOpen, onClose }: ParticipantSearchMod
       return (
         <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200/90 px-2 py-0.5 rounded-lg text-[11px] font-bold shadow-2xs">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-          <span>{lang === 'th' ? 'รอตรวจสอบ (Pending)' : 'Pending'}</span>
+          <span>{lang === 'th' ? 'รอตรวจสอบ' : 'Pending'}</span>
         </span>
       );
     }
@@ -304,7 +304,7 @@ export function ParticipantSearchModal({ isOpen, onClose }: ParticipantSearchMod
       return (
         <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-200/90 px-2 py-0.5 rounded-lg text-[11px] font-bold shadow-2xs">
           <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
-          <span>{lang === 'th' ? 'หมดอายุ (Expired)' : 'Expired'}</span>
+          <span>{lang === 'th' ? 'หมดอายุ' : 'Expired'}</span>
         </span>
       );
     }

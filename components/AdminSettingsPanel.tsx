@@ -338,7 +338,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
             </div>
             <div>
               <h3 className="text-base font-extrabold text-slate-900">
-                1. ข้อมูลบัญชีธนาคารและการชำระเงิน (Bank & Payment Settings)
+                1. ข้อมูลบัญชีธนาคารและการชำระเงิน
               </h3>
               <p className="text-xs text-slate-500">
                 แสดงผลในหน้าชำระเงิน (/payment) สำหรับผู้สมัครสมาชิกและผู้ลงทะเบียนการประชุม
@@ -349,7 +349,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                ชื่อธนาคาร (Bank Name)
+                ชื่อธนาคาร
               </label>
               <input
                 type="text"
@@ -362,7 +362,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                เลขที่บัญชีธนาคาร (Bank Account No.)
+                เลขที่บัญชีธนาคาร
               </label>
               <input
                 type="text"
@@ -375,7 +375,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                ชื่อบัญชีผู้รับเงิน (Account Name)
+                ชื่อบัญชีผู้รับเงิน
               </label>
               <input
                 type="text"
@@ -416,7 +416,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
               </div>
               <div>
                 <h3 className="text-base font-extrabold text-slate-900">
-                  2. การตรวจสอบสลิปและข้อความเริ่มต้น (Slip Verification Defaults)
+                  2. การตรวจสอบสลิปและข้อความเริ่มต้น
                 </h3>
                 <p className="text-xs text-slate-500">
                   ข้อความที่เติมอัตโนมัติในหน้าตรวจสอบสลิปเมื่อผู้ดูแลกดปฏิเสธรายการ
@@ -436,7 +436,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              ข้อความเหตุผลการปฏิเสธสลิปเริ่มต้น (Default Slip Rejection Reason)
+              ข้อความเหตุผลการปฏิเสธสลิปเริ่มต้น
             </label>
             <textarea
               rows={3}
@@ -460,7 +460,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
               </div>
               <div>
                 <h3 className="text-base font-extrabold text-slate-900">
-                  3. ข้อมูลสมาคมและผู้ลงนามใบเสร็จ (Association & Signatures)
+                  3. ข้อมูลสมาคมและผู้ลงนามใบเสร็จ
                 </h3>
                 <p className="text-xs text-slate-500">
                   ข้อมูลหัวเอกสารใบเสร็จรับเงินและชื่อผู้ลงนามตามระเบียบสมาคม
@@ -496,7 +496,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
 
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                ที่อยู่สมาคม (Association Address)
+                ที่อยู่สมาคม
               </label>
               <input
                 type="text"
@@ -520,7 +520,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                ชื่อผู้ลงนามอนุมัติ (Authorized Signer)
+                ชื่อผู้ลงนามอนุมัติ
               </label>
               <input
                 type="text"
@@ -533,7 +533,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                ตำแหน่งผู้ลงนาม (Authorized Role)
+                ตำแหน่งผู้ลงนาม
               </label>
               <input
                 type="text"
@@ -546,7 +546,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                ชื่อผู้จัดทำใบเสร็จ (Prepared By)
+                ชื่อผู้จัดทำใบเสร็จ
               </label>
               <input
                 type="text"
@@ -559,7 +559,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                ตำแหน่งผู้จัดทำ (Prepared Role)
+                ตำแหน่งผู้จัดทำ
               </label>
               <input
                 type="text"
@@ -581,7 +581,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
               </div>
               <div>
                 <h3 className="text-base font-extrabold text-slate-900">
-                  4. การตั้งค่ารูปแบบใบเสร็จแต่ละแบบ (Receipt Templates Settings)
+                  4. การตั้งค่ารูปแบบใบเสร็จแต่ละแบบ
                 </h3>
                 <p className="text-xs text-slate-500">
                   กำหนดข้อความเริ่มต้น วัตถุประสงค์ และราคากลางสำหรับใบเสร็จแต่ละประเภท
@@ -655,7 +655,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
             <div className="space-y-4 p-5 bg-blue-50/40 rounded-2xl border border-blue-100 animate-in fade-in duration-200">
               <div className="flex items-center justify-between pb-2 border-b border-blue-200/60">
                 <span className="text-xs font-black text-blue-900 uppercase">
-                  รูปแบบที่ 1: ค่าลงทะเบียนเข้าร่วมประชุม (Conference Registration)
+                  รูปแบบที่ 1: ค่าลงทะเบียนเข้าร่วมประชุม
                 </span>
                 <span className="text-[11px] text-blue-700 font-medium">
                   ใช้สำหรับผู้ลงทะเบียนเข้าร่วมประชุมวิชาการประจำปี
@@ -665,7 +665,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    ชื่อเรียกรูปแบบ (Label)
+                    ชื่อเรียกรูปแบบ
                   </label>
                   <input
                     type="text"
@@ -678,7 +678,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    ชื่อรายการหลักในใบเสร็จ (Item Title)
+                    ชื่อรายการหลักในใบเสร็จ
                   </label>
                   <input
                     type="text"
@@ -740,7 +740,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
             <div className="space-y-4 p-5 bg-indigo-50/40 rounded-2xl border border-indigo-100 animate-in fade-in duration-200">
               <div className="flex items-center justify-between pb-2 border-b border-indigo-200/60">
                 <span className="text-xs font-black text-indigo-900 uppercase">
-                  รูปแบบที่ 2: ค่าสมัคร / ต่ออายุสมาชิก (Membership Fee)
+                  รูปแบบที่ 2: ค่าสมัคร / ต่ออายุสมาชิก
                 </span>
                 <span className="text-[11px] text-indigo-700 font-medium">
                   ใช้สำหรับค่าสมัครสมาชิกสมาคมเวชศาสตร์การเจริญพันธุ์ไทย
@@ -750,7 +750,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    ชื่อเรียกรูปแบบ (Label)
+                    ชื่อเรียกรูปแบบ
                   </label>
                   <input
                     type="text"
@@ -763,7 +763,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    ชื่อรายการหลักในใบเสร็จ (Item Title)
+                    ชื่อรายการหลักในใบเสร็จ
                   </label>
                   <input
                     type="text"
@@ -822,7 +822,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
             <div className="space-y-4 p-5 bg-emerald-50/40 rounded-2xl border border-emerald-100 animate-in fade-in duration-200">
               <div className="flex items-center justify-between pb-2 border-b border-emerald-200/60">
                 <span className="text-xs font-black text-emerald-900 uppercase">
-                  รูปแบบที่ 3: ค่าสนับสนุนการจัดงาน (Sponsorship / Company Support)
+                  รูปแบบที่ 3: ค่าสนับสนุนการจัดงาน
                 </span>
                 <span className="text-[11px] text-emerald-700 font-medium">
                   ใช้สำหรับบริษัทคู่ค้า นิติบุคคล หรือสปอนเซอร์สนับสนุนการจัดงาน
@@ -832,7 +832,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    ชื่อเรียกรูปแบบ (Label)
+                    ชื่อเรียกรูปแบบ
                   </label>
                   <input
                     type="text"
@@ -845,7 +845,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    ชื่อรายการหลักในใบเสร็จ (Item Title)
+                    ชื่อรายการหลักในใบเสร็จ
                   </label>
                   <input
                     type="text"
