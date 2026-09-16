@@ -29,6 +29,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { GoogleIcon } from '@/components/GoogleIcon';
+import { PositionSelect } from '@/components/PositionSelect';
 import { useLanguage } from '@/context/LanguageContext';
 import { parseGoogleName } from '@/lib/utils';
 import { uploadImageToStorage } from '@/lib/blobUpload';
@@ -36,15 +37,15 @@ import { CreateMemberInput } from '@/types/member';
 
 interface SignupViewProps {
   onNavigateToLogin: () => void;
-  onSubmitSignup?: (createdMember?: any) => void;
-  onGoogleSignUp: () => void;
+  onSubmitSignup?: (memberData: any) => void;
+  onGoogleSignUp?: () => void;
   onClearForm?: () => void;
   initialUserData?: {
-    name?: string;
-    email?: string;
-    picture?: string;
-    given_name?: string;
-    family_name?: string;
+    name?: string | null;
+    email?: string | null;
+    picture?: string | null;
+    given_name?: string | null;
+    family_name?: string | null;
   } | null;
   isEmbedded?: boolean;
 }
@@ -85,7 +86,7 @@ export function SignupView({
     lineId: '',
     workplace: '',
     startDate: '',
-    position: '1 RM',
+    position: '',
     positionOther: '',
     scientistNo: '',
   });
@@ -134,7 +135,7 @@ export function SignupView({
         lineId: '',
         workplace: '',
         startDate: '',
-        position: '1 RM',
+        position: '',
         positionOther: '',
         scientistNo: '',
       });
@@ -161,7 +162,7 @@ export function SignupView({
       lineId: '',
       workplace: '',
       startDate: '',
-      position: '1 RM',
+      position: '',
       positionOther: '',
       scientistNo: '',
     });
@@ -192,16 +193,6 @@ export function SignupView({
       onClearForm();
     }
   };
-
-  const positionOptions = [
-    { value: '1 RM', label: '1 RM' },
-    { value: '2 Fellow RM', label: '2 Fellow RM' },
-    { value: '3 Embryologist', label: '3 Embryologist' },
-    { value: '4 Technologist for Andrology', label: '4 Technologist for Andrology' },
-    { value: '5 Molecular Geneticist', label: '5 Molecular Geneticist' },
-    { value: '6 Nurse', label: '6 Nurse' },
-    { value: '0 อื่นๆ', label: lang === 'th' ? '0 อื่นๆ' : '0 Other' },
-  ];
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -658,61 +649,40 @@ export function SignupView({
 
               {/* Position Selection */}
               <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-2xs space-y-3">
-                <h3 className="font-extrabold text-[#0026b3] text-xs sm:text-sm flex items-center gap-2 border-b border-slate-100 pb-2">
-                  <Award className="w-4 h-4 text-[#0026b3] shrink-0" />
-                  <span>{t.signup.positionTitle}</span>
-                </h3>
-
-                <div className="relative pt-1">
-                  <select
-                    name="position"
-                    autoComplete="organization-title"
-                    value={formData.position}
-                    onChange={(e) => handleInputChange('position', e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 sm:py-3 text-xs sm:text-sm text-slate-800 font-semibold focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 transition outline-none appearance-none cursor-pointer pr-10 shadow-2xs"
-                  >
-                    {positionOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-
-                {/* If 0 อื่นๆ is selected */}
-                {(formData.position === '0 อื่นๆ' || formData.position === '0 Other') && (
-                  <div className="pt-2 animate-fade-in">
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      {t.signup.positionOtherLabel}
-                    </label>
-                    <input
-                      type="text"
-                      name="positionOther"
-                      autoComplete="off"
-                      placeholder={t.signup.positionOtherPlaceholder}
-                      value={formData.positionOther}
-                      onChange={(e) => handleInputChange('positionOther', e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 outline-none font-medium"
-                    />
-                  </div>
-                )}
+                <PositionSelect
+                  value={formData.position}
+                  onChange={(val) => handleInputChange('position', val)}
+                  otherValue={formData.positionOther}
+                  onOtherChange={(val) => handleInputChange('positionOther', val)}
+                  showIcon={false}
+                  showLabel={true}
+                  label={
+                    <span className="font-extrabold text-[#0026b3] text-xs sm:text-sm flex items-center gap-2 border-b border-slate-100 pb-2 w-full">
+                      <Award className="w-4 h-4 text-[#0026b3] shrink-0" />
+                      <span>{t.signup.positionTitle}</span>
+                    </span>
+                  }
+                  otherLabel={t.signup.positionOtherLabel}
+                  otherPlaceholder={t.signup.positionOtherPlaceholder}
+                  selectClassName="px-3.5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold shadow-2xs"
+                />
               </div>
 
-              {/* Scientist License No. */}
-              <div className="bg-amber-50/90 border-2 border-amber-300 rounded-2xl p-4 sm:p-5 shadow-xs space-y-2">
-                <label className="block text-xs font-extrabold text-amber-950">
-                  {t.signup.scientistNoTitle} <span className="text-red-500">*</span>
+              {/* Scientist License No. (Optional) */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-2">
+                <label className="block text-xs font-bold text-slate-700 flex items-center justify-between">
+                  <span>{t.signup.scientistNoTitle}</span>
+                  <span className="text-[11px] font-medium text-slate-400">({lang === 'th' ? 'ถ้ามี' : 'Optional'})</span>
                 </label>
                 <div className="relative">
                   <input
                     type="text"
                     name="scientistNo"
                     autoComplete="off"
-                    placeholder={t.signup.scientistNoPlaceholder}
+                    placeholder={lang === 'th' ? 'กรอกเลขทะเบียนนักวิทย์ (ถ้ามี)...' : 'Enter scientist registration number (optional)...'}
                     value={formData.scientistNo}
                     onChange={(e) => handleInputChange('scientistNo', e.target.value)}
-                    className="w-full bg-white border border-amber-300 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium placeholder:text-amber-400"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent font-medium placeholder:text-slate-400"
                   />
                 </div>
               </div>

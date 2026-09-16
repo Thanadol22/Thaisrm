@@ -12,6 +12,7 @@ import {
   MemberEducation,
 } from '@/types/member';
 import { MemberAvatar } from '@/components/MemberAvatar';
+import { PositionSelect } from '@/components/PositionSelect';
 import {
   X,
   User,
@@ -555,41 +556,18 @@ export function MemberFormModal({
             <div className="space-y-4 animate-fade-in">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* กลุ่มตำแหน่ง / สาขาวิชาชีพ */}
-                <div className="space-y-1 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                    <span>ตำแหน่ง / กลุ่มวิชาชีพ</span>
-                  </label>
-                  <select
+                <div className="sm:col-span-2">
+                  <PositionSelect
                     value={jobCategory}
-                    onChange={(e) => setJobCategory(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-medium bg-white focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent"
-                  >
-                    <option value="">-- ไม่ระบุ --</option>
-                    {JOB_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setJobCategory}
+                    otherValue={jobCategoryOther}
+                    onOtherChange={setJobCategoryOther}
+                    showIcon={false}
+                    selectClassName="bg-white text-sm"
+                    otherPlaceholder="กรุณาระบุตำแหน่ง/สาขาวิชาชีพ"
+                    otherInputClassName="border-amber-300 bg-amber-50/40 focus:ring-amber-500"
+                  />
                 </div>
-
-                {/* ระบุอื่นๆ หากเลือกอื่นๆ */}
-                {jobCategory === 'อื่นๆ' && (
-                  <div className="space-y-1 sm:col-span-2 animate-fade-in">
-                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                      <span>ระบุกลุ่มวิชาชีพ / ตำแหน่งอื่นๆ</span>
-                      <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={jobCategoryOther}
-                      onChange={(e) => setJobCategoryOther(e.target.value)}
-                      placeholder="กรุณาระบุตำแหน่ง/สาขาวิชาชีพ"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-amber-300 bg-amber-50/40 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                      required
-                    />
-                  </div>
-                )}
 
                 {/* ตำแหน่งงาน / สายงานย่อย */}
                 <div className="space-y-1 sm:col-span-2">

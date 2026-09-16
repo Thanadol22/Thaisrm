@@ -162,7 +162,7 @@ export async function POST(
     // Generate unique Ticket Code: TSRM-YYYY-XXXX
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const ticketCode = `TSRM-${new Date().getFullYear()}-${randomSuffix}`;
-    const slipId = `SLIP-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    const slipId = `SLIP-${Date.now().toString(36).toUpperCase()}`;
 
     // 1. Record payment slip in payment_slips table
     let slip: any = null;

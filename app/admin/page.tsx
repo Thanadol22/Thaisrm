@@ -55,11 +55,16 @@ import {
   Tag,
   BadgePercent,
   Pencil,
-  ChevronLeft
+  ChevronLeft,
+  CreditCard,
+  Landmark,
+  Wallet,
+  Percent
 } from 'lucide-react';
 import { ThaiDateRangePicker } from '@/components/ThaiDateRangePicker';
 import { ThaiTimeRangePicker } from '@/components/ThaiTimeRangePicker';
 import { ReceiptData } from '@/types/receipt';
+import { generateReceiptNo } from '@/lib/receiptNumber';
 import { ReceiptManagementPanel } from '@/components/ReceiptManagementPanel';
 import { ReceiptModal } from '@/components/ReceiptModal';
 import { MemberManagementPanel } from '@/components/MemberManagementPanel';
@@ -118,6 +123,7 @@ interface MeetingItem {
   maxSeats: number;
   basePrice?: number;
   pricingTiers?: MeetingPricingTiers;
+  activities?: any[];
   registered: number;
   attended: number;
   revenue: number;
@@ -144,6 +150,13 @@ interface SlipItem {
   slipUrl: string;
   status: 'pending' | 'approved' | 'rejected';
   rejectionReason?: string;
+  selectedActivities?: Array<{
+    id: string;
+    name: string;
+    type?: string;
+    price: number;
+    date?: string;
+  }>;
 }
 
 const INITIAL_SLIPS: SlipItem[] = [];
@@ -191,8 +204,8 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onE
   // Selected meeting round on dashboard (defaults to current ongoing round, or 'all')
   const [selectedDashboardMeetingId, setSelectedDashboardMeetingId] = useState<string>('default');
 
-  const activeMeetingId = selectedDashboardMeetingId === 'default' 
-    ? (currentOngoingMeeting ? currentOngoingMeeting.id : 'all') 
+  const activeMeetingId = selectedDashboardMeetingId === 'default'
+    ? (currentOngoingMeeting ? currentOngoingMeeting.id : 'all')
     : selectedDashboardMeetingId;
 
   const currentSelectedMeeting = meetings.find((m) => m.id === activeMeetingId);
@@ -509,11 +522,10 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onE
                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-3.5 overflow-hidden p-0.5 border border-slate-200/80">
                       <div
-                        className={`h-full rounded-full transition-all duration-700 ${
-                          slot.highlight
-                            ? 'bg-gradient-to-r from-[#0026b3] via-emerald-500 to-[#4ade80]'
-                            : 'bg-[#0026b3]'
-                        }`}
+                        className={`h-full rounded-full transition-all duration-700 ${slot.highlight
+                          ? 'bg-gradient-to-r from-[#0026b3] via-emerald-500 to-[#4ade80]'
+                          : 'bg-[#0026b3]'
+                          }`}
                         style={{ width: slot.percent }}
                       ></div>
                     </div>
@@ -565,13 +577,12 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onE
                     <div className="space-y-1.5 min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span
-                          className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
-                            m.status === 'ongoing'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : m.status === 'upcoming'
+                          className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${m.status === 'ongoing'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : m.status === 'upcoming'
                               ? 'bg-amber-50 text-amber-700 border-amber-200'
                               : 'bg-slate-100 text-slate-700 border-slate-200'
-                          }`}
+                            }`}
                         >
                           {m.status === 'ongoing' ? '● กำลังจัดประชุม' : m.status === 'upcoming' ? 'เร็วๆ นี้' : 'เสร็จสิ้น'}
                         </span>
@@ -731,20 +742,19 @@ interface RevenueReportProps {
   attendees?: AttendeeItem[];
 }
 
-function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) {
+function RevenueReportPanel({ meetings, slips, attendees = [] }: RevenueReportProps) {
   const [selectedMeetingId, setSelectedMeetingId] = useState<string>('all');
   const [filterType, setFilterType] = useState<'all' | 'hybrid' | 'onsite' | 'online'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'ongoing' | 'upcoming' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeChartTab, setActiveChartTab] = useState<'layered' | 'comparison' | 'donut'>('layered');
-  const [hoveredPointIdx, setHoveredPointIdx] = useState<number | null>(null);
+  const [activeChartTab, setActiveChartTab] = useState<'programs' | 'rounds' | 'comparison' | 'donut'>('programs');
   const [hoveredTier, setHoveredTier] = useState<string | null>(null);
+  const [txFilter, setTxFilter] = useState<'all' | 'approved' | 'pending'>('all');
 
   // Filtered Meetings based on comprehensive filters (sorted newest first)
   const filteredMeetings = useMemo(() => {
     return meetings
       .filter((m) => {
-        const matchRound = selectedMeetingId === 'all' || m.id === selectedMeetingId;
         const matchType = filterType === 'all' || m.type === filterType;
         const matchStatus = filterStatus === 'all' || m.status === filterStatus;
         const q = searchQuery.toLowerCase().trim();
@@ -754,7 +764,7 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
           m.titleEn.toLowerCase().includes(q) ||
           m.location.toLowerCase().includes(q) ||
           m.id.toLowerCase().includes(q);
-        return matchRound && matchType && matchStatus && matchSearch;
+        return matchType && matchStatus && matchSearch;
       })
       .sort((a, b) => {
         const STATUS_PRIORITY: Record<string, number> = { ongoing: 1, upcoming: 2, completed: 3 };
@@ -766,7 +776,7 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
         if (numA !== numB) return numB - numA;
         return b.id.localeCompare(a.id);
       });
-  }, [meetings, selectedMeetingId, filterType, filterStatus, searchQuery]);
+  }, [meetings, filterType, filterStatus, searchQuery]);
 
   const hasActiveFilters = selectedMeetingId !== 'all' || filterType !== 'all' || filterStatus !== 'all' || searchQuery.trim() !== '';
 
@@ -777,60 +787,81 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
     setSearchQuery('');
   };
 
-  // Total Calculations based on filtered meetings
-  const grandTotalRevenue = filteredMeetings.reduce((sum, m) => sum + m.revenue, 0);
-  const totalPaidCount = filteredMeetings.reduce((sum, m) => sum + m.registered, 0);
-  const totalAttendedCount = filteredMeetings.reduce((sum, m) => sum + m.attended, 0);
-  const pendingAmount = slips
-    .filter((s) => s.status === 'pending')
-    .reduce((sum, s) => sum + s.amount, 0);
-  const pendingCount = slips.filter((s) => s.status === 'pending').length;
+  // Helper to compute effective revenue: strictly approved database revenue
+  const getMeetingRevenue = useCallback((m: MeetingItem) => {
+    return m.revenue || 0;
+  }, []);
+
+  const approvedSlips = useMemo(() => slips.filter((s) => s.status === 'approved'), [slips]);
+
+  // Grand total of approved revenue across all filtered courses/rounds
+  const grandTotalRevenue = useMemo(() => {
+    return filteredMeetings.reduce((sum, m) => sum + getMeetingRevenue(m), 0);
+  }, [filteredMeetings, getMeetingRevenue]);
+
+  // Total count of verified paid transactions (from approved slips)
+  const totalPaidCount = useMemo(() => {
+    return approvedSlips.length;
+  }, [approvedSlips]);
 
   // Selected Meeting / Round data
   const currentMeeting = meetings.find((m) => m.id === selectedMeetingId);
 
-  // Active revenue to display
-  const displayRevenue = selectedMeetingId === 'all' ? grandTotalRevenue : (filteredMeetings.find((m) => m.id === selectedMeetingId)?.revenue || 0);
-  const displayPaidCount = selectedMeetingId === 'all' ? totalPaidCount : (filteredMeetings.find((m) => m.id === selectedMeetingId)?.registered || 0);
+  // Active revenue to display (real data only)
+  const displayRevenue = useMemo(() => {
+    if (selectedMeetingId === 'all') return grandTotalRevenue;
+    const target = filteredMeetings.find((m) => m.id === selectedMeetingId) || currentMeeting;
+    return target ? getMeetingRevenue(target) : 0;
+  }, [selectedMeetingId, grandTotalRevenue, filteredMeetings, currentMeeting, getMeetingRevenue]);
+
+  // Verified paid attendees count
+  const displayPaidCount = useMemo(() => {
+    if (selectedMeetingId === 'all') return totalPaidCount;
+    return approvedSlips.filter((s) => s.meetingId === selectedMeetingId).length;
+  }, [selectedMeetingId, totalPaidCount, approvedSlips]);
+
   const avgPerPerson = displayPaidCount > 0 ? Math.round(displayRevenue / displayPaidCount) : 0;
 
-  // Dynamic Breakdown tiers computed from real database slips & meetings
+  // Pending slips amount and count
+  const pendingAmount = useMemo(() => {
+    if (selectedMeetingId === 'all') {
+      return slips.filter((s) => s.status === 'pending').reduce((sum, s) => sum + s.amount, 0);
+    }
+    return slips
+      .filter((s) => s.status === 'pending' && s.meetingId === selectedMeetingId)
+      .reduce((sum, s) => sum + s.amount, 0);
+  }, [selectedMeetingId, slips]);
+
+  const pendingCount = useMemo(() => {
+    if (selectedMeetingId === 'all') {
+      return slips.filter((s) => s.status === 'pending').length;
+    }
+    return slips.filter((s) => s.status === 'pending' && s.meetingId === selectedMeetingId).length;
+  }, [selectedMeetingId, slips]);
+
+  // Total Inflow & Collection Rate
+  const totalInflow = displayRevenue + pendingAmount;
+  const collectionRate = totalInflow > 0 ? Math.round((displayRevenue / totalInflow) * 100) : (displayRevenue > 0 ? 100 : 0);
+
+  // Dynamic Breakdown tiers computed strictly from approved slips
   const ticketTiers = useMemo(() => {
-    const approvedSlips = selectedMeetingId === 'all'
-      ? slips.filter((s) => s.status === 'approved')
-      : slips.filter((s) => s.status === 'approved' && s.meetingId === selectedMeetingId);
+    const relevantSlips = selectedMeetingId === 'all'
+      ? approvedSlips
+      : approvedSlips.filter((s) => s.meetingId === selectedMeetingId);
 
     const tierMap = new Map<string, { count: number; total: number }>();
-    approvedSlips.forEach((s) => {
+    relevantSlips.forEach((s) => {
       const type = s.ticketType || (s.memberCode ? 'สมาชิกสมาคม (Member Pass)' : 'บุคคลทั่วไป (Non-Member Pass)');
       const cur = tierMap.get(type) || { count: 0, total: 0 };
       tierMap.set(type, { count: cur.count + 1, total: cur.total + s.amount });
     });
 
     if (tierMap.size === 0) {
-      const activeMeeting = meetings.find((m) => m.id === selectedMeetingId);
-      const totalRev = selectedMeetingId === 'all' ? grandTotalRevenue : (activeMeeting?.revenue || 0);
-      const totalReg = selectedMeetingId === 'all' ? totalPaidCount : (activeMeeting?.registered || 0);
-
-      if (totalReg > 0 || totalRev > 0) {
-        return [
-          {
-            name: activeMeeting?.titleTh || 'บัตรลงทะเบียน (Registration Pass)',
-            price: totalReg > 0 ? Math.round(totalRev / totalReg) : (activeMeeting?.basePrice || 3500),
-            count: totalReg,
-            total: totalRev,
-            color: '#0026b3',
-            bgClass: 'bg-[#0026b3]',
-            fill: 'rgb(0, 38, 179)',
-          },
-        ];
-      }
-
       return [];
     }
 
-    const COLORS = ['#0026b3', '#059669', '#9333ea', '#d97706', '#e11d48', '#0284c7'];
-    const BG_CLASSES = ['bg-[#0026b3]', 'bg-emerald-600', 'bg-purple-600', 'bg-amber-600', 'bg-rose-600', 'bg-sky-600'];
+    const COLORS = ['#0026b3', '#16a34a', '#0284c7', '#d97706', '#9333ea', '#e11d48'];
+    const BG_CLASSES = ['bg-[#0026b3]', 'bg-emerald-600', 'bg-sky-600', 'bg-amber-600', 'bg-purple-600', 'bg-rose-600'];
 
     return Array.from(tierMap.entries()).map(([name, data], idx) => ({
       name,
@@ -841,115 +872,264 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
       bgClass: BG_CLASSES[idx % BG_CLASSES.length],
       fill: COLORS[idx % COLORS.length],
     }));
-  }, [selectedMeetingId, slips, meetings, grandTotalRevenue, totalPaidCount]);
+  }, [selectedMeetingId, approvedSlips]);
 
   const totalTierRevenue = ticketTiers.reduce((s, t) => s + t.total, 0);
 
-  // Dynamic Bank Channels Breakdown computed from real database slips
+  // Dynamic Bank Channels Breakdown computed strictly from approved slips
   const bankBreakdown = useMemo(() => {
-    const approvedSlips = selectedMeetingId === 'all'
-      ? slips.filter((s) => s.status === 'approved')
-      : slips.filter((s) => s.status === 'approved' && s.meetingId === selectedMeetingId);
+    const relevantSlips = selectedMeetingId === 'all'
+      ? approvedSlips
+      : approvedSlips.filter((s) => s.meetingId === selectedMeetingId);
 
-    const bankMap = new Map<string, number>();
+    const bankMap = new Map<string, { amount: number; count: number }>();
     let totalAmt = 0;
-    approvedSlips.forEach((s) => {
+    relevantSlips.forEach((s) => {
       const b = s.bank || 'ธนาคารไทยพาณิชย์ (SCB)';
-      bankMap.set(b, (bankMap.get(b) || 0) + s.amount);
+      const cur = bankMap.get(b) || { amount: 0, count: 0 };
+      bankMap.set(b, { amount: cur.amount + s.amount, count: cur.count + 1 });
       totalAmt += s.amount;
     });
 
     if (bankMap.size === 0) {
-      return [
-        { bank: 'SCB (ไทยพาณิชย์)', amount: grandTotalRevenue, percent: 100, color: 'bg-purple-600' },
-      ];
+      return [];
     }
 
-    const BANK_COLORS: Record<string, string> = {
-      SCB: 'bg-purple-600',
-      KBANK: 'bg-emerald-600',
-      BBL: 'bg-blue-600',
-      KTB: 'bg-sky-500',
-      BAY: 'bg-amber-500',
-      TTB: 'bg-blue-700',
+    const BANK_COLORS: Record<string, { bg: string; text: string; hex: string }> = {
+      SCB: { bg: 'bg-purple-50 text-purple-700 border-purple-200', text: 'text-purple-700', hex: '#7e22ce' },
+      KBANK: { bg: 'bg-emerald-50 text-emerald-800 border-emerald-200', text: 'text-emerald-800', hex: '#166534' },
+      BBL: { bg: 'bg-blue-50 text-blue-700 border-blue-200', text: 'text-blue-700', hex: '#1d4ed8' },
+      KTB: { bg: 'bg-sky-50 text-sky-700 border-sky-200', text: 'text-sky-700', hex: '#0369a1' },
+      BAY: { bg: 'bg-amber-50 text-amber-800 border-amber-200', text: 'text-amber-800', hex: '#92400e' },
+      TTB: { bg: 'bg-indigo-50 text-indigo-700 border-indigo-200', text: 'text-indigo-700', hex: '#4338ca' },
     };
 
-    return Array.from(bankMap.entries()).map(([bank, amount]) => {
-      const percent = totalAmt > 0 ? Math.round((amount / totalAmt) * 100) : 0;
-      let color = 'bg-blue-600';
-      for (const [k, c] of Object.entries(BANK_COLORS)) {
+    return Array.from(bankMap.entries()).map(([bank, data]) => {
+      const percent = totalAmt > 0 ? Math.round((data.amount / totalAmt) * 100) : 0;
+      let styling = { bg: 'bg-slate-50 text-slate-700 border-slate-200', text: 'text-slate-700', hex: '#475569' };
+      for (const [k, s] of Object.entries(BANK_COLORS)) {
         if (bank.toUpperCase().includes(k)) {
-          color = c;
+          styling = s;
           break;
         }
       }
-      return { bank, amount, percent, color };
+      return { bank, amount: data.amount, count: data.count, percent, styling };
     });
-  }, [selectedMeetingId, slips, grandTotalRevenue]);
+  }, [selectedMeetingId, approvedSlips]);
 
   // Helper for Donut SVG circumference calculation
   const donutRadius = 70;
   const donutCircumference = 2 * Math.PI * donutRadius;
-  let accumulatedDonutPercent = 0;
 
-  // ─── Multi-Round Layered Curve Chart Data (Design Match) ────────────────
-  const timeLabels = ['9/4', '9/5', '9/5', '9/6', '9/6', '9/7', '9/7', '9/8', '9/8', '9/9', '9/9', '9/10'];
-  const svgWidth = 840;
-  const svgHeight = 260;
-  const baselineY = 220;
-  const topPadding = 25;
-  const stepX = svgWidth / (timeLabels.length - 1);
+  // ─── Bar Chart Data: Broken down by opened course/program in each round ───
+  const courseBarChartData = useMemo(() => {
+    return filteredMeetings.map((m) => {
+      const meetingSlips = slips.filter((s) => s.meetingId === m.id);
+      const approvedMeetingSlips = meetingSlips.filter((s) => s.status === 'approved');
+      const pendingMeetingSlips = meetingSlips.filter((s) => s.status === 'pending');
 
-  // Smooth spline path generator using Catmull-Rom to Cubic Bezier conversion
-  const generateSpline = (pts: { x: number; y: number }[]) => {
-    if (pts.length === 0) return '';
-    let d = `M ${pts[0].x},${pts[0].y}`;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i === 0 ? 0 : i - 1];
-      const p1 = pts[i];
-      const p2 = pts[i + 1];
-      const p3 = pts[i + 2 >= pts.length ? i + 1 : i + 2];
-      const cp1x = p1.x + (p2.x - p0.x) / 6;
-      const cp1y = p1.y + (p2.y - p0.y) / 6;
-      const cp2x = p2.x - (p3.x - p1.x) / 6;
-      const cp2y = p3.y - (p3.y - p1.y) / 6;
-      d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+      let approvedMainRev = 0;
+      let approvedWorkshopRev = 0;
+
+      approvedMeetingSlips.forEach((s) => {
+        const acts = Array.isArray(s.selectedActivities) && s.selectedActivities.length > 0 ? s.selectedActivities : null;
+        if (acts) {
+          acts.forEach((a) => {
+            const price = Number(a.price) || 0;
+            const type = (a.type || '').toLowerCase();
+            const name = (a.name || '').toLowerCase();
+            if (type === 'workshop' || type === 'ws' || name.includes('workshop') || name.includes('ws') || name.includes('nurse')) {
+              approvedWorkshopRev += price;
+            } else {
+              approvedMainRev += price;
+            }
+          });
+        } else {
+          approvedMainRev += (s.amount || 0);
+        }
+      });
+
+      let pendingMainRev = 0;
+      let pendingWorkshopRev = 0;
+
+      pendingMeetingSlips.forEach((s) => {
+        const acts = Array.isArray(s.selectedActivities) && s.selectedActivities.length > 0 ? s.selectedActivities : null;
+        if (acts) {
+          acts.forEach((a) => {
+            const price = Number(a.price) || 0;
+            const type = (a.type || '').toLowerCase();
+            const name = (a.name || '').toLowerCase();
+            if (type === 'workshop' || type === 'ws' || name.includes('workshop') || name.includes('ws') || name.includes('nurse')) {
+              pendingWorkshopRev += price;
+            } else {
+              pendingMainRev += price;
+            }
+          });
+        } else {
+          pendingMainRev += (s.amount || 0);
+        }
+      });
+
+      const calculatedApproved = approvedMainRev + approvedWorkshopRev;
+      const approvedRev = calculatedApproved > 0 ? calculatedApproved : getMeetingRevenue(m);
+      const pendingRev = pendingMainRev + pendingWorkshopRev;
+
+      return {
+        id: m.id,
+        titleTh: m.titleTh,
+        titleEn: m.titleEn,
+        date: m.date,
+        type: m.type,
+        status: m.status,
+        maxSeats: m.maxSeats,
+        registered: m.registered,
+        attended: m.attended,
+        approvedRevenue: approvedRev,
+        approvedMainRevenue: approvedMainRev,
+        approvedWorkshopRevenue: approvedWorkshopRev,
+        pendingRevenue: pendingRev,
+        pendingMainRevenue: pendingMainRev,
+        pendingWorkshopRevenue: pendingWorkshopRev,
+        totalInflow: approvedRev + pendingRev,
+        approvedSlipCount: approvedMeetingSlips.length,
+        pendingSlipCount: pendingMeetingSlips.length,
+      };
+    });
+  }, [filteredMeetings, getMeetingRevenue, slips]);
+
+  // Benchmark max revenue for scaling bar heights proportionally
+  const maxBarRevenue = useMemo(() => {
+    const max = Math.max(...courseBarChartData.map((d) => d.totalInflow), 0);
+    return max > 0 ? max : 10000;
+  }, [courseBarChartData]);
+
+  // ─── Real Individual Course Programs from Database ───
+  const allCoursePrograms = useMemo(() => {
+    const list: Array<{
+      id: string;
+      meetingId: string;
+      meetingName: string;
+      programName: string;
+      programType: 'main' | 'workshop';
+      dateText: string;
+      approvedRevenue: number;
+      pendingRevenue: number;
+      totalInflow: number;
+      approvedSlipCount: number;
+      pendingSlipCount: number;
+      maxSeats?: number;
+    }> = [];
+
+    const targetMeetings = selectedMeetingId === 'all'
+      ? filteredMeetings
+      : filteredMeetings.filter((m) => m.id === selectedMeetingId);
+
+    targetMeetings.forEach((m) => {
+      const meetingSlips = slips.filter((s) => s.meetingId === m.id);
+      const approvedMeetingSlips = meetingSlips.filter((s) => s.status === 'approved');
+      const pendingMeetingSlips = meetingSlips.filter((s) => s.status === 'pending');
+
+      const mActivities = Array.isArray(m.activities) && m.activities.length > 0 ? m.activities : null;
+
+      if (mActivities) {
+        mActivities.forEach((act: any, actIdx: number) => {
+          const actName = act.name || `หลักสูตร ${actIdx + 1}`;
+          const actType = (act.type || '').toLowerCase() === 'workshop' ? 'workshop' : 'main';
+
+          // Match approved slips
+          let approvedRev = 0;
+          let approvedCount = 0;
+          approvedMeetingSlips.forEach((s) => {
+            const sActs = Array.isArray(s.selectedActivities) ? s.selectedActivities : [];
+            const matched = sActs.find((sa: any) =>
+              sa.id === act.id ||
+              (sa.name && act.name && sa.name.trim().toLowerCase() === act.name.trim().toLowerCase()) ||
+              (sActs.length === 1 && sa.type && act.type && sa.type.toLowerCase() === act.type.toLowerCase())
+            );
+            if (matched) {
+              approvedRev += (Number(matched.price) || 0);
+              approvedCount += 1;
+            }
+          });
+
+          // Match pending slips
+          let pendingRev = 0;
+          let pendingCount = 0;
+          pendingMeetingSlips.forEach((s) => {
+            const sActs = Array.isArray(s.selectedActivities) ? s.selectedActivities : [];
+            const matched = sActs.find((sa: any) =>
+              sa.id === act.id ||
+              (sa.name && act.name && sa.name.trim().toLowerCase() === act.name.trim().toLowerCase()) ||
+              (sActs.length === 1 && sa.type && act.type && sa.type.toLowerCase() === act.type.toLowerCase())
+            );
+            if (matched) {
+              pendingRev += (Number(matched.price) || 0);
+              pendingCount += 1;
+            }
+          });
+
+          list.push({
+            id: `${m.id}_${act.id || actName}`,
+            meetingId: m.id,
+            meetingName: m.titleTh,
+            programName: actName,
+            programType: actType,
+            dateText: act.date || m.date,
+            approvedRevenue: approvedRev,
+            pendingRevenue: pendingRev,
+            totalInflow: approvedRev + pendingRev,
+            approvedSlipCount: approvedCount,
+            pendingSlipCount: pendingCount,
+            maxSeats: act.maxSeats || 0,
+          });
+        });
+      } else {
+        let approvedRev = getMeetingRevenue(m);
+        let pendingRev = pendingMeetingSlips.reduce((sum, s) => sum + s.amount, 0);
+
+        list.push({
+          id: `${m.id}_main`,
+          meetingId: m.id,
+          meetingName: m.titleTh,
+          programName: m.titleTh,
+          programType: 'main',
+          dateText: m.date,
+          approvedRevenue: approvedRev,
+          pendingRevenue: pendingRev,
+          totalInflow: approvedRev + pendingRev,
+          approvedSlipCount: approvedMeetingSlips.length,
+          pendingSlipCount: pendingMeetingSlips.length,
+          maxSeats: m.maxSeats || 0,
+        });
+      }
+    });
+
+    return list;
+  }, [filteredMeetings, selectedMeetingId, slips, getMeetingRevenue]);
+
+  // Benchmark max revenue for individual programs
+  const maxProgramRevenue = useMemo(() => {
+    const max = Math.max(...allCoursePrograms.map((d) => d.totalInflow), 0);
+    return max > 0 ? max : 10000;
+  }, [allCoursePrograms]);
+
+  const programsWithRevenueCount = useMemo(() => {
+    return allCoursePrograms.filter((d) => d.approvedRevenue > 0).length;
+  }, [allCoursePrograms]);
+
+  // Slips to display in the recent transaction audit section
+  const scopedRecentSlips = useMemo(() => {
+    let filtered = slips;
+    if (selectedMeetingId !== 'all') {
+      filtered = filtered.filter((s) => s.meetingId === selectedMeetingId);
     }
-    return d;
-  };
-
-  // 3 Distinct Series matching the layered purple wave in the user's design
-  // Series 1: Top Wave - THAISRM Congress 2026 (Deep Purple)
-  const series1Values = [185, 120, 135, 145, 125, 45, 75, 105, 80, 22, 28, 48];
-  const series1Points = series1Values.map((val, idx) => ({
-    x: idx * stepX,
-    y: val,
-    revenue: [280, 560, 690, 850, 990, 1350, 1220, 1100, 1280, 1750, 1680, 1590][idx],
-  }));
-
-  // Series 2: Middle Wave - Clinical Embryology Workshop (Medium Violet)
-  const series2Values = [200, 190, 180, 165, 160, 185, 180, 145, 130, 128, 135, 160];
-  const series2Points = series2Values.map((val, idx) => ({
-    x: idx * stepX,
-    y: val,
-    revenue: [60, 90, 130, 180, 220, 190, 200, 290, 340, 400, 390, 360][idx],
-  }));
-
-  // Series 3: Bottom Wave - Extraordinary Meeting & Webinar (Light Lilac)
-  const series3Values = [212, 205, 200, 195, 205, 190, 198, 195, 180, 168, 172, 178];
-  const series3Points = series3Values.map((val, idx) => ({
-    x: idx * stepX,
-    y: val,
-    revenue: [90, 140, 180, 240, 210, 280, 260, 270, 450, 1300, 1250, 1180][idx],
-  }));
-
-  const path1 = generateSpline(series1Points);
-  const path2 = generateSpline(series2Points);
-  const path3 = generateSpline(series3Points);
-
-  const area1 = `${path1} L ${svgWidth},${baselineY} L 0,${baselineY} Z`;
-  const area2 = `${path2} L ${svgWidth},${baselineY} L 0,${baselineY} Z`;
-  const area3 = `${path3} L ${svgWidth},${baselineY} L 0,${baselineY} Z`;
+    if (txFilter === 'approved') {
+      filtered = filtered.filter((s) => s.status === 'approved');
+    } else if (txFilter === 'pending') {
+      filtered = filtered.filter((s) => s.status === 'pending');
+    }
+    return filtered.slice(0, 8);
+  }, [slips, selectedMeetingId, txFilter]);
 
   const handleExportFinancialExcel = () => {
     const headers = ['รหัสโครงการ', 'ชื่อการประชุม (ไทย)', 'ชื่อการประชุม (อังกฤษ)', 'รูปแบบ', 'วันที่จัดงาน', 'จำนวนที่นั่งสูงสุด', 'ผู้ลงทะเบียน (คน)', 'ผู้เข้าร่วมจริง (คน)', 'รายได้รวม (บาท)', 'สถานะ'];
@@ -962,7 +1142,7 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
       m.maxSeats,
       m.registered,
       m.attended,
-      m.revenue,
+      getMeetingRevenue(m),
       m.status === 'ongoing' ? 'กำลังจัดงาน' : m.status === 'upcoming' ? 'รอเริ่มงาน' : 'เสร็จสิ้น',
     ]);
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
@@ -978,45 +1158,181 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
-      {/* Header & Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[#0026b3] text-xs font-bold mb-2">
-            <DollarSign className="w-4 h-4 text-[#0026b3]" />
-            <span>รายงานการเงินและรายได้ค่าลงทะเบียน (Financial Analytics)</span>
+      {/* ─── 1. HEADER & ACTIONS ─── */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[#0026b3] text-xs font-bold">
+            <DollarSign className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
+            <span className="truncate">รายงานการเงินและรายได้ค่าลงทะเบียน (Financial Analytics)</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900 tracking-tight">
             รายงานรายได้จากการลงทะเบียน
           </h1>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            สรุปยอดรับชำระเงินค่าลงทะเบียน แสดงเป็นกราฟสถิติ Layered Spline Area แยกตามแต่ละรอบการประชุม
+          <p className="text-xs sm:text-sm text-slate-600">
+            วิเคราะห์รายได้ ยอดชำระเงิน และสถิติทางการเงินทุกหลักสูตรและรอบการประชุม
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+          {/* Active Scope Badge */}
+          <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200 max-w-full">
+            <Layers className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
+            <span className="truncate max-w-[180px] sm:max-w-[260px]">
+              {selectedMeetingId === 'all' ? `รวมทุกรอบ (${filteredMeetings.length} โครงการ)` : currentMeeting?.titleTh}
+            </span>
+          </div>
+
           <button
             onClick={handleExportFinancialExcel}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs sm:text-sm font-bold shadow-xs transition cursor-pointer"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs sm:text-sm font-bold shadow-xs transition cursor-pointer"
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span>Export ข้อมูล (Excel / CSV)</span>
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="whitespace-nowrap">Export ข้อมูล (Excel)</span>
           </button>
         </div>
       </div>
 
-      {/* ─── Comprehensive & Intuitive Filter Bar ─── */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+      {/* ─── 2. 5 CORE FINANCIAL KPI SCORECARDS ─── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
+        {/* Card 1: Approved Net Revenue (Hero Card) */}
+        <div className="bg-gradient-to-br from-blue-50/70 via-white to-indigo-50/40 border border-[#0026b3]/30 rounded-2xl p-4 sm:p-5 shadow-xs relative overflow-hidden flex flex-col justify-between">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-[#0026b3]/5 rounded-full blur-xl pointer-events-none" />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-500">
+                {selectedMeetingId === 'all' ? 'ยอดรายได้สุทธิรวม' : 'ยอดรายได้รอบนี้'}
+              </span>
+              <div className="p-2 rounded-xl bg-[#0026b3] text-white shadow-2xs">
+                <DollarSign className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xs font-extrabold text-[#0026b3]">฿</span>
+              <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                {displayRevenue.toLocaleString()}
+              </span>
+            </div>
+          </div>
+          {(() => {
+            const curBar = selectedMeetingId !== 'all' ? courseBarChartData.find((c) => c.id === selectedMeetingId) : null;
+            if (curBar && (curBar.approvedMainRevenue > 0 || curBar.approvedWorkshopRevenue > 0)) {
+              return (
+                <div className="flex items-center gap-1.5 text-[10px] font-bold mt-2 pt-2 border-t border-slate-100 flex-wrap">
+                  {curBar.approvedMainRevenue > 0 && (
+                    <span className="text-[#0026b3] bg-blue-100/70 px-1.5 py-0.5 rounded border border-blue-200 truncate">
+                      Main: ฿{curBar.approvedMainRevenue.toLocaleString()}
+                    </span>
+                  )}
+                  {curBar.approvedWorkshopRevenue > 0 && (
+                    <span className="text-emerald-800 bg-emerald-100/70 px-1.5 py-0.5 rounded border border-emerald-200 truncate">
+                      WS: ฿{curBar.approvedWorkshopRevenue.toLocaleString()}
+                    </span>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <div className="text-[11px] text-slate-500 font-medium pt-2 border-t border-slate-100/80 truncate mt-2">
+                {selectedMeetingId === 'all' ? `จาก ${meetings.length} รอบการประชุม` : currentMeeting?.id}
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* Card 2: Verified Slips */}
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500">สลิปที่อนุมัติแล้ว</span>
+            <div className="p-2 rounded-xl bg-blue-50 text-[#0026b3] border border-blue-100">
+              <Users className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{displayPaidCount.toLocaleString()}</span>
+            <span className="text-xs font-medium text-slate-500">รายการ</span>
+          </div>
+          <div className="text-[11px] text-emerald-800 font-bold pt-2 border-t border-slate-100 flex items-center gap-1">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span>สถานะชำระเงินเรียบร้อย 100%</span>
+          </div>
+        </div>
+
+        {/* Card 3: Avg per Attendee */}
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500">ค่าเฉลี่ยต่อผู้สมัคร</span>
+            <div className="p-2 rounded-xl bg-blue-50 text-[#0026b3] border border-blue-100">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span className="text-xs font-extrabold text-[#0026b3]">฿</span>
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{avgPerPerson.toLocaleString()}</span>
+            <span className="text-[11px] text-slate-500 font-normal">/ รายการ</span>
+          </div>
+          <div className="text-[11px] text-slate-500 pt-2 border-t border-slate-100 font-medium truncate">
+            คำนวณจากยอดสลิปจริงในระบบ
+          </div>
+        </div>
+
+        {/* Card 4: Pending Inflow */}
+        <div className="bg-white border border-amber-200/90 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between space-y-2 bg-amber-50/20">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-amber-800">ยอดเงินรอตรวจสลิป</span>
+            <div className="p-2 rounded-xl bg-amber-100 text-amber-800 border border-amber-200">
+              <Receipt className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span className="text-xs font-extrabold text-amber-800">฿</span>
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{pendingAmount.toLocaleString()}</span>
+          </div>
+          <div className="text-[11px] text-amber-800 font-bold pt-2 border-t border-amber-200/60 flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+            <span>จำนวน {pendingCount} รายการรอตรวจสอบ</span>
+          </div>
+        </div>
+
+        {/* Card 5: Collection Rate & Total Inflow */}
+        <div className="bg-white border border-emerald-200/90 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between space-y-2 bg-emerald-50/20 sm:col-span-2 lg:col-span-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-emerald-800">อัตราการจัดเก็บสำเร็จ</span>
+            <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-200">
+              <BadgePercent className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl sm:text-3xl font-black text-emerald-800 tracking-tight">{collectionRate}%</span>
+            <span className="text-[11px] text-slate-500 font-medium">สำเร็จ</span>
+          </div>
+          <div className="pt-2 border-t border-emerald-200/60 space-y-1">
+            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+              <div
+                className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                style={{ width: `${collectionRate}%` }}
+              />
+            </div>
+            <div className="text-[10px] text-slate-500 font-medium flex justify-between">
+              <span>รวมยอดเข้า:</span>
+              <span className="font-bold text-slate-700">฿{totalInflow.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── 3. SMART CONTROL & FILTER BAR ─── */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3.5">
         {/* Row 1: Search, Format Pills, Status Dropdown & Reset */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Search Box */}
-          <div className="relative flex-1 min-w-[240px]">
+          <div className="relative flex-1 w-full min-w-0">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="ค้นหาชื่อการประชุม, สถานที่, หรือรหัสโครงการ..."
-              className="w-full pl-10 pr-9 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition"
+              className="w-full pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition"
             />
             {searchQuery && (
               <button
@@ -1030,13 +1346,13 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
           </div>
 
           {/* Quick Filters Group */}
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             {/* Format Filter (Pills) */}
-            <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/70 text-xs font-bold">
+            <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/70 text-xs font-bold overflow-x-auto max-w-full">
               <button
                 type="button"
                 onClick={() => setFilterType('all')}
-                className={`px-3 py-1.5 rounded-lg transition ${filterType === 'all'
+                className={`px-2.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${filterType === 'all'
                   ? 'bg-[#0026b3] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
                   }`}
@@ -1046,7 +1362,7 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
               <button
                 type="button"
                 onClick={() => setFilterType('hybrid')}
-                className={`px-3 py-1.5 rounded-lg transition ${filterType === 'hybrid'
+                className={`px-2.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${filterType === 'hybrid'
                   ? 'bg-[#0026b3] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
                   }`}
@@ -1056,7 +1372,7 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
               <button
                 type="button"
                 onClick={() => setFilterType('onsite')}
-                className={`px-3 py-1.5 rounded-lg transition ${filterType === 'onsite'
+                className={`px-2.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${filterType === 'onsite'
                   ? 'bg-[#0026b3] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
                   }`}
@@ -1066,7 +1382,7 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
               <button
                 type="button"
                 onClick={() => setFilterType('online')}
-                className={`px-3 py-1.5 rounded-lg transition ${filterType === 'online'
+                className={`px-2.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${filterType === 'online'
                   ? 'bg-[#0026b3] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
                   }`}
@@ -1076,18 +1392,18 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
             </div>
 
             {/* Status Dropdown Filter */}
-            <div className="relative">
+            <div className="relative flex-1 sm:flex-none">
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value as any)}
-                className="appearance-none bg-slate-50 border border-slate-200 text-slate-700 text-xs sm:text-sm font-bold rounded-xl pl-3.5 pr-8 py-2.5 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition cursor-pointer"
+                className="w-full sm:w-auto appearance-none bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl pl-3 pr-8 py-2 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition cursor-pointer"
               >
                 <option value="all">ทุกสถานะโครงการ</option>
                 <option value="ongoing">กำลังจัดงาน / เปิดรับ</option>
                 <option value="upcoming">เร็วๆ นี้ (Upcoming)</option>
                 <option value="completed">เสร็จสิ้นแล้ว</option>
               </select>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
 
             {/* Reset All Filters Button */}
@@ -1095,595 +1411,497 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
               <button
                 type="button"
                 onClick={resetAllFilters}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-xs font-bold transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-xs font-bold transition cursor-pointer whitespace-nowrap"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-3.5 h-3.5 shrink-0" />
                 <span>ล้างตัวกรอง</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Row 2: Meeting Round Selector Tabs with revenue badges */}
-        <div className="pt-3 border-t border-slate-100 space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-[#0026b3]" />
-              <span>เลือกรอบการประชุมเจาะจง:</span>
-            </div>
-            <div className="text-xs font-bold text-slate-500">
-              แสดง <span className="text-[#0026b3] font-black">{filteredMeetings.length}</span> จาก {meetings.length} โครงการ
+        {/* Row 2: Meeting Round Dropdown Selector */}
+        <div className="pt-3 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex-1 w-full min-w-0">
+            <label htmlFor="revenue-meeting-select" className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
+                <span>เลือกรอบการประชุมเจาะจง:</span>
+              </div>
+              <span className="text-[11px] font-bold text-slate-500">
+                แสดง <span className="text-[#0026b3] font-black">{filteredMeetings.length}</span> จาก {meetings.length} โครงการ
+              </span>
+            </label>
+
+            <div className="relative">
+              <CalendarDays className="w-4 h-4 text-[#0026b3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <select
+                id="revenue-meeting-select"
+                value={selectedMeetingId}
+                onChange={(e) => setSelectedMeetingId(e.target.value)}
+                className="w-full appearance-none bg-slate-50 hover:bg-slate-100/80 border border-slate-200 text-slate-800 text-xs sm:text-sm font-bold rounded-xl pl-10 pr-10 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition cursor-pointer shadow-2xs truncate"
+              >
+                <option value="all">
+                  🌐 รวมทุกรอบที่กรอง (Grand Total) — ฿{grandTotalRevenue >= 1000000 ? `${(grandTotalRevenue / 1000000).toFixed(2)}M` : grandTotalRevenue.toLocaleString()}
+                </option>
+                {filteredMeetings.map((m) => {
+                  const mRev = getMeetingRevenue(m);
+                  return (
+                    <option key={m.id} value={m.id}>
+                      📅 {m.titleTh} ({m.id}) — ฿{mRev >= 1000000 ? `${(mRev / 1000000).toFixed(2)}M` : mRev.toLocaleString()}
+                    </option>
+                  );
+                })}
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            {/* All Meetings Pill */}
-            <button
-              type="button"
-              onClick={() => setSelectedMeetingId('all')}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap flex items-center gap-2 shrink-0 ${selectedMeetingId === 'all'
-                ? 'bg-[#0026b3] text-white shadow-md shadow-[#0026b3]/25'
-                : 'bg-slate-100 text-slate-700 hover:bg-blue-50/70 hover:text-[#0026b3]'
-                }`}
-            >
-              <Layers className="w-4 h-4" />
-              <span>รวมทุกรอบที่กรอง (Grand Total)</span>
-              <span className={`text-[11px] px-2 py-0.5 rounded-full ${selectedMeetingId === 'all'
-                ? 'bg-[#4ade80] text-slate-950 font-black'
-                : 'bg-blue-50 text-[#0026b3] font-bold'
-                }`}>
-                ฿{(grandTotalRevenue / 1000000).toFixed(2)}M
-              </span>
-            </button>
-
-            {/* Individual Meeting Pills */}
-            {filteredMeetings.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => setSelectedMeetingId(m.id)}
-                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap flex items-center gap-2 shrink-0 ${selectedMeetingId === m.id
-                  ? 'bg-[#0026b3] text-white shadow-md shadow-[#0026b3]/25'
-                  : 'bg-slate-100 text-slate-700 hover:bg-blue-50/70 hover:text-[#0026b3]'
-                  }`}
-              >
-                <CalendarDays className="w-4 h-4" />
-                <span className="truncate max-w-[220px]">{m.titleTh}</span>
-                <span className={`text-[11px] px-2 py-0.5 rounded-full ${selectedMeetingId === m.id
-                  ? 'bg-[#4ade80] text-slate-950 font-black'
-                  : 'bg-slate-200 text-slate-700 font-bold'
-                  }`}>
-                  ฿{(m.revenue / 1000).toFixed(0)}k
+          {/* Quick Active Meeting Pill */}
+          <div className="flex items-center gap-2 self-stretch sm:self-auto md:self-end md:mb-0.5">
+            {selectedMeetingId === 'all' ? (
+              <div className="w-full sm:w-auto inline-flex items-center justify-between sm:justify-start gap-2 px-3 py-2 rounded-xl bg-blue-50 text-[#0026b3] border border-blue-200 text-xs font-bold shadow-2xs">
+                <div className="flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 shrink-0" />
+                  <span>รวมรายได้ทั้งหมด:</span>
+                </div>
+                <span className="font-black text-xs sm:text-sm bg-white px-2 py-0.5 rounded-lg border border-blue-200 text-[#0026b3]">
+                  ฿{grandTotalRevenue.toLocaleString()}
                 </span>
-              </button>
-            ))}
-
-            {filteredMeetings.length === 0 && (
-              <div className="text-xs text-slate-500 py-1.5 px-3 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                ไม่มีรอบการประชุมที่ตรงกับตัวกรองนี้
               </div>
+            ) : (
+              (() => {
+                const sel = filteredMeetings.find((m) => m.id === selectedMeetingId) || currentMeeting;
+                const mRev = sel ? getMeetingRevenue(sel) : 0;
+                return (
+                  <div className="w-full sm:w-auto inline-flex items-center justify-between sm:justify-start gap-2 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-200 text-xs font-bold shadow-2xs">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <CalendarDays className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span className="truncate max-w-[140px] sm:max-w-[200px]">{sel?.titleTh || selectedMeetingId}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="font-black text-xs sm:text-sm bg-white px-2 py-0.5 rounded-lg border border-emerald-200 text-emerald-700">
+                        ฿{mRev.toLocaleString()}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMeetingId('all')}
+                        className="text-slate-400 hover:text-slate-700 p-0.5 rounded hover:bg-emerald-100 transition cursor-pointer"
+                        title="กลับไปดูภาพรวมทุกรอบ"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()
             )}
           </div>
         </div>
       </div>
 
-      {/* 4 Core Financial KPI Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
-        {/* Card 1: Revenue */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-bold text-slate-600">
-              {selectedMeetingId === 'all' ? 'ยอดรายได้รวมทุกรอบ' : 'ยอดรายได้รอบนี้'}
-            </span>
-            <div className="p-2.5 rounded-xl bg-blue-50 text-[#0026b3] border border-blue-100">
-              <DollarSign className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-sm font-bold text-[#0026b3]">฿</span>
-            <span className="text-3xl font-extrabold text-slate-900">{displayRevenue.toLocaleString()}</span>
-          </div>
-          <div className="text-xs text-slate-500 pt-2 border-t border-slate-100 font-medium truncate">
-            {selectedMeetingId === 'all' ? `จากทั้งหมด ${meetings.length} รอบการประชุม` : currentMeeting?.titleTh}
-          </div>
-        </div>
-
-        {/* Card 2: Paid Registrations */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-bold text-slate-600">ผู้ชำระเงินแล้ว</span>
-            <div className="p-2.5 rounded-xl bg-blue-50 text-[#0026b3] border border-blue-100">
-              <Users className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-slate-900">{displayPaidCount.toLocaleString()}</span>
-            <span className="text-sm font-medium text-slate-500">ที่นั่ง/คน</span>
-          </div>
-          <div className="text-xs text-emerald-700 font-bold pt-2 border-t border-slate-100 flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            สถานะชำระเงินเรียบร้อย 100%
-          </div>
-        </div>
-
-        {/* Card 3: Average per Attendee */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-bold text-slate-600">ค่าเฉลี่ยต่อผู้สมัคร</span>
-            <div className="p-2.5 rounded-xl bg-blue-50 text-[#0026b3] border border-blue-100">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-sm font-bold text-[#0026b3]">฿</span>
-            <span className="text-3xl font-extrabold text-slate-900">{avgPerPerson.toLocaleString()}</span>
-            <span className="text-xs text-slate-500 font-normal">/ คน</span>
-          </div>
-          <div className="text-xs text-slate-500 pt-2 border-t border-slate-100 font-medium">
-            คำนวณจากยอดรวมหารจำนวนที่นั่ง
-          </div>
-        </div>
-
-        {/* Card 4: Pending Verification Inflow */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-bold text-slate-600">ยอดเงินรอตรวจสลิป</span>
-            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
-              <Receipt className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-sm font-bold text-amber-700">฿</span>
-            <span className="text-3xl font-extrabold text-slate-900">{pendingAmount.toLocaleString()}</span>
-          </div>
-          <div className="text-xs text-amber-800 font-bold pt-2 border-t border-slate-100">
-            จำนวน {pendingCount} รายการสลิปที่รอตรวจ
-          </div>
-        </div>
-      </div>
-
-      {/* ─── MAIN GRAPH SECTION (Interactive Spline Area Chart) ─── */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 shadow-xs space-y-6">
-        {/* Chart Header & Toggle Options */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+      {/* ─── 4. MAIN VISUAL ANALYTICS SECTION (Interactive Charts Hub) ─── */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 lg:p-7 shadow-xs space-y-6">
+        {/* Chart Header & View Switcher */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <div className="p-2 rounded-xl bg-blue-50 text-[#0026b3]">
-                <Sparkles className="w-5 h-5 text-[#0026b3]" />
+                <BarChart3 className="w-5 h-5 text-[#0026b3]" />
               </div>
-              <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">
-                กราฟวิเคราะห์รายได้และแนวโน้มการเติบโต
+              <h2 className="text-base sm:text-lg lg:text-xl font-extrabold text-slate-900 tracking-tight">
+                กราฟวิเคราะห์รายได้และสถิติเชิงลึก
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-slate-500">
-              {activeChartTab === 'layered' && 'กราฟเส้นโค้งพื้นที่ซ้อนทับแยกตามแต่ละรอบการประชุม (Layered Spline Area Chart)'}
+              {activeChartTab === 'programs' && 'กราฟแท่งแสดงรายได้จริงแยกแท่งเดี่ยวตามรายชื่อหลักสูตรที่เปิดในฐานข้อมูล (Revenue by Real Course / Program)'}
+              {activeChartTab === 'rounds' && 'กราฟแท่งแยกแท่งคู่เปรียบเทียบ Main vs Workshop แยกตามรอบโครงการ (Grouped Bars by Round)'}
               {activeChartTab === 'comparison' && 'กราฟแท่งคู่เปรียบเทียบจำนวนผู้ลงทะเบียน vs ผู้เข้าร่วมงานจริงในแต่ละรอบ (Attendee Comparison)'}
               {activeChartTab === 'donut' && 'กราฟวงแหวนสัดส่วนรายได้แยกตามประเภทสมาชิกและบัตร (Donut Ring Chart)'}
             </p>
           </div>
 
           {/* Chart Type Toggle Tabs */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200 overflow-x-auto max-w-full scrollbar-none">
             <button
-              onClick={() => setActiveChartTab('layered')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${activeChartTab === 'layered'
+              onClick={() => setActiveChartTab('programs')}
+              className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${activeChartTab === 'programs'
                 ? 'bg-white text-[#0026b3] shadow-xs border border-slate-200/80 font-black'
                 : 'text-slate-600 hover:text-slate-900'
                 }`}
             >
-              <TrendingUp className="w-4 h-4 text-[#0026b3]" />
-              <span>กราฟแยกตามแต่ละรอบ</span>
+              <BarChart3 className="w-4 h-4 text-[#0026b3] shrink-0" />
+              <span>รายได้ตามหลักสูตรจริง</span>
+            </button>
+            <button
+              onClick={() => setActiveChartTab('rounds')}
+              className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${activeChartTab === 'rounds'
+                ? 'bg-white text-[#0026b3] shadow-xs border border-slate-200/80 font-black'
+                : 'text-slate-600 hover:text-slate-900'
+                }`}
+            >
+              <Layers className="w-4 h-4 text-[#0026b3] shrink-0" />
+              <span>แยกแท่งคู่ตามรอบ</span>
             </button>
             <button
               onClick={() => setActiveChartTab('comparison')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${activeChartTab === 'comparison'
+              className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${activeChartTab === 'comparison'
                 ? 'bg-white text-[#0026b3] shadow-xs border border-slate-200/80 font-black'
                 : 'text-slate-600 hover:text-slate-900'
                 }`}
             >
-              <Users className="w-4 h-4 text-[#0026b3]" />
-              <span>เปรียบเทียบจำนวนคน</span>
+              <Users className="w-4 h-4 text-[#0026b3] shrink-0" />
+              <span>เปรียบเทียบผู้ลงทะเบียน</span>
             </button>
             <button
               onClick={() => setActiveChartTab('donut')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${activeChartTab === 'donut'
+              className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${activeChartTab === 'donut'
                 ? 'bg-white text-[#0026b3] shadow-xs border border-slate-200/80 font-black'
                 : 'text-slate-600 hover:text-slate-900'
                 }`}
             >
-              <PieChart className="w-4 h-4 text-[#0026b3]" />
-              <span>สัดส่วนบัตร</span>
+              <PieChart className="w-4 h-4 text-[#0026b3] shrink-0" />
+              <span>สัดส่วนบัตร & ธนาคาร</span>
             </button>
           </div>
         </div>
 
-        {/* ── 1. LAYERED SPLINE AREA CHART (Brand Primary & Accent Styling) ── */}
-        {activeChartTab === 'layered' && (
+        {/* ── 1. BAR CHART: REAL INDIVIDUAL COURSE PROGRAMS ── */}
+        {activeChartTab === 'programs' && (
           <div className="space-y-6 animate-fade-in">
-            {/* Top Swatch Legend */}
-            <div className="flex items-center gap-6 flex-wrap px-2">
-              <div
-                onClick={() => setSelectedMeetingId(selectedMeetingId === 'MTG-2026-001' ? 'all' : 'MTG-2026-001')}
-                className={`flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer transition ${selectedMeetingId === 'MTG-2026-001' || selectedMeetingId === 'all'
-                  ? 'text-slate-800'
-                  : 'text-slate-400 opacity-60'
-                  }`}
-              >
-                <span className="w-4 h-4 rounded-sm bg-[#0026b3] shrink-0 shadow-xs" />
-                <span>THAISRM Congress 2026 (สีหลัก Primary)</span>
-              </div>
-
-              <div
-                onClick={() => setSelectedMeetingId(selectedMeetingId === 'MTG-2026-002' ? 'all' : 'MTG-2026-002')}
-                className={`flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer transition ${selectedMeetingId === 'MTG-2026-002' || selectedMeetingId === 'all'
-                  ? 'text-slate-800'
-                  : 'text-slate-400 opacity-60'
-                  }`}
-              >
-                <span className="w-4 h-4 rounded-sm bg-[#16a34a] shrink-0 shadow-xs" />
-                <span>Hands-on Workshop (สี Accent Green)</span>
-              </div>
-
-              <div
-                onClick={() => setSelectedMeetingId(selectedMeetingId === 'MTG-2026-003' ? 'all' : 'MTG-2026-003')}
-                className={`flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer transition ${selectedMeetingId === 'MTG-2026-003' || selectedMeetingId === 'all'
-                  ? 'text-slate-800'
-                  : 'text-slate-400 opacity-60'
-                  }`}
-              >
-                <span className="w-4 h-4 rounded-sm bg-[#0284c7] shrink-0 shadow-xs" />
-                <span>Extraordinary Meeting (Sky Blue)</span>
-              </div>
-            </div>
-
-            {/* SVG Wave Chart Container */}
-            <div className="relative pt-2 pb-2 bg-white rounded-2xl overflow-hidden">
-              <div className="relative w-full aspect-[840/270] min-h-[220px]">
-                <svg
-                  className="w-full h-full overflow-visible"
-                  viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-                  preserveAspectRatio="none"
-                >
-                  <defs>
-                    {/* Gradient 1: Primary Brand Blue #0026b3 */}
-                    <linearGradient id="brandBlueGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#0026b3" stopOpacity="0.48" />
-                      <stop offset="50%" stopColor="#001f94" stopOpacity="0.22" />
-                      <stop offset="100%" stopColor="#001a80" stopOpacity="0.02" />
-                    </linearGradient>
-
-                    {/* Gradient 2: Accent Mint Green #4ade80 / #16a34a */}
-                    <linearGradient id="brandAccentGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#4ade80" stopOpacity="0.45" />
-                      <stop offset="60%" stopColor="#16a34a" stopOpacity="0.20" />
-                      <stop offset="100%" stopColor="#15803d" stopOpacity="0.02" />
-                    </linearGradient>
-
-                    {/* Gradient 3: Light Sky Blue */}
-                    <linearGradient id="brandSkyGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.32" />
-                      <stop offset="70%" stopColor="#0284c7" stopOpacity="0.12" />
-                      <stop offset="100%" stopColor="#0369a1" stopOpacity="0.00" />
-                    </linearGradient>
-                  </defs>
-
-                  {/* ── Grid: Horizontal Dotted Lines ── */}
-                  {[35, 75, 115, 155, 195].map((yVal) => (
-                    <line
-                      key={yVal}
-                      x1="0"
-                      y1={yVal}
-                      x2={svgWidth}
-                      y2={yVal}
-                      stroke="#cbd5e1"
-                      strokeDasharray="3 4"
-                      strokeWidth="1.2"
-                      opacity="0.7"
-                    />
-                  ))}
-
-                  {/* ── Grid: Vertical Dotted Lines corresponding to date steps ── */}
-                  {timeLabels.map((_, idx) => (
-                    <line
-                      key={idx}
-                      x1={idx * stepX}
-                      y1={topPadding}
-                      x2={idx * stepX}
-                      y2={baselineY}
-                      stroke="#cbd5e1"
-                      strokeDasharray="3 4"
-                      strokeWidth="1.2"
-                      opacity="0.7"
-                    />
-                  ))}
-
-                  {/* ── Series 3 Layer (Bottom Curve - Sky Blue) ── */}
-                  {(selectedMeetingId === 'all' || selectedMeetingId === 'MTG-2026-003') && (
-                    <g className="transition-opacity duration-300">
-                      <path d={area3} fill="url(#brandSkyGradient)" />
-                      <path
-                        d={path3}
-                        fill="none"
-                        stroke="#0284c7"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </g>
-                  )}
-
-                  {/* ── Series 2 Layer (Middle Curve - Accent Mint Green) ── */}
-                  {(selectedMeetingId === 'all' || selectedMeetingId === 'MTG-2026-002') && (
-                    <g className="transition-opacity duration-300">
-                      <path d={area2} fill="url(#brandAccentGradient)" />
-                      <path
-                        d={path2}
-                        fill="none"
-                        stroke="#16a34a"
-                        strokeWidth="2.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </g>
-                  )}
-
-                  {/* ── Series 1 Layer (Top Curve - Deep Primary Blue) ── */}
-                  {(selectedMeetingId === 'all' || selectedMeetingId === 'MTG-2026-001') && (
-                    <g className="transition-opacity duration-300">
-                      <path d={area1} fill="url(#brandBlueGradient)" />
-                      <path
-                        d={path1}
-                        fill="none"
-                        stroke="#0026b3"
-                        strokeWidth="3.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </g>
-                  )}
-
-                  {/* ── Bottom Baseline Axis with Ticks ── */}
-                  <line
-                    x1="0"
-                    y1={baselineY}
-                    x2={svgWidth}
-                    y2={baselineY}
-                    stroke="#94a3b8"
-                    strokeWidth="1.5"
-                  />
-                  {timeLabels.map((_, idx) => (
-                    <line
-                      key={`tick-${idx}`}
-                      x1={idx * stepX}
-                      y1={baselineY}
-                      x2={idx * stepX}
-                      y2={baselineY + 6}
-                      stroke="#94a3b8"
-                      strokeWidth="1.5"
-                    />
-                  ))}
-
-                  {/* ── Interactive Hover Vertical Bar & Points ── */}
-                  {hoveredPointIdx !== null && (
-                    <g>
-                      <line
-                        x1={hoveredPointIdx * stepX}
-                        y1={topPadding}
-                        x2={hoveredPointIdx * stepX}
-                        y2={baselineY}
-                        stroke="#0026b3"
-                        strokeWidth="1.8"
-                        strokeDasharray="2 2"
-                      />
-                      {/* Dots on the 3 curves */}
-                      <circle
-                        cx={hoveredPointIdx * stepX}
-                        cy={series1Points[hoveredPointIdx].y}
-                        r="5.5"
-                        fill="#0026b3"
-                        stroke="#ffffff"
-                        strokeWidth="2.5"
-                      />
-                      <circle
-                        cx={hoveredPointIdx * stepX}
-                        cy={series2Points[hoveredPointIdx].y}
-                        r="5"
-                        fill="#16a34a"
-                        stroke="#ffffff"
-                        strokeWidth="2"
-                      />
-                      <circle
-                        cx={hoveredPointIdx * stepX}
-                        cy={series3Points[hoveredPointIdx].y}
-                        r="4.5"
-                        fill="#0284c7"
-                        stroke="#ffffff"
-                        strokeWidth="2"
-                      />
-                    </g>
-                  )}
-
-                  {/* Invisible Overlay Hover Catchers */}
-                  {timeLabels.map((_, idx) => (
-                    <rect
-                      key={`hover-${idx}`}
-                      x={idx * stepX - stepX / 2}
-                      y={0}
-                      width={stepX}
-                      height={baselineY + 10}
-                      fill="transparent"
-                      className="cursor-crosshair"
-                      onMouseEnter={() => setHoveredPointIdx(idx)}
-                      onMouseLeave={() => setHoveredPointIdx(null)}
-                    />
-                  ))}
-                </svg>
-
-                {/* X-Axis Date Labels underneath */}
-                <div className="flex justify-between text-xs font-bold text-slate-500 pt-2 px-1">
-                  {timeLabels.map((lbl, idx) => (
-                    <span
-                      key={idx}
-                      className={`text-center transition ${hoveredPointIdx === idx ? 'text-[#0026b3] font-extrabold scale-110' : ''
-                        }`}
-                    >
-                      {lbl}
-                    </span>
-                  ))}
+            {/* Top Bar Summary & Legend */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-1">
+              <div className="flex items-center gap-3 sm:gap-5 flex-wrap">
+                <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800">
+                  <span className="w-3.5 h-3.5 rounded-xs bg-[#0026b3] shrink-0 shadow-xs" />
+                  <span>Main Program (หลักสูตรหลัก)</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800">
+                  <span className="w-3.5 h-3.5 rounded-xs bg-emerald-500 shrink-0 shadow-xs" />
+                  <span>Workshop / WS (เวิร์กช็อป)</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800">
+                  <span className="w-3.5 h-3.5 rounded-xs bg-amber-400 shrink-0 shadow-xs" />
+                  <span>ยอดรอตรวจสลิป (Pending)</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-500">
+                  <span className="w-3.5 h-3.5 rounded-xs bg-slate-200 border border-slate-300 shrink-0" />
+                  <span>ยังไม่มีข้อมูลรายได้ (฿0)</span>
                 </div>
               </div>
 
-              {/* Floating Tooltip info on hover */}
-              {hoveredPointIdx !== null && (
-                <div className="mt-4 p-3 bg-slate-900 text-white rounded-xl text-xs sm:text-sm flex flex-wrap items-center justify-between gap-3 shadow-lg animate-fade-in">
-                  <div className="font-bold flex items-center gap-2">
-                    <CalendarDays className="w-4 h-4 text-blue-400" />
-                    <span>วันที่ {timeLabels[hoveredPointIdx]} (สถิติรายรอบ):</span>
-                  </div>
-                  <div className="flex items-center gap-4 flex-wrap">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#0026b3]" />
-                      Congress: <strong>฿{series1Points[hoveredPointIdx].revenue.toLocaleString()}k</strong>
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#16a34a]" />
-                      Workshop: <strong>฿{series2Points[hoveredPointIdx].revenue.toLocaleString()}k</strong>
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#0284c7]" />
-                      Webinar: <strong>฿{series3Points[hoveredPointIdx].revenue.toLocaleString()}k</strong>
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ─── METRIC LIST ROWS (Revenue by Event) ─── */}
-            <div className="pt-4 border-t border-slate-100 space-y-2.5">
-              <div className="flex items-center justify-between px-1 pb-1">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  สรุปรายได้แยกตามโครงการประชุม (Revenue Breakdown)
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 whitespace-nowrap">
+                  มีรายได้จริง {programsWithRevenueCount} จาก {allCoursePrograms.length} หลักสูตร
                 </span>
-                <span className="text-xs font-bold text-slate-500">
-                  สัดส่วนรายได้
-                </span>
-              </div>
-
-              {/* Empty State */}
-              {filteredMeetings.length === 0 ? (
-                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
-                  <Search className="w-8 h-8 text-slate-400 mx-auto" />
-                  <div className="text-sm font-bold text-slate-700">ไม่พบข้อมูลโครงการประชุมตามตัวกรองที่เลือก</div>
-                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                    กรุณาลองปรับคำค้นหา เปลี่ยนรูปแบบการจัดงาน หรือคลิกล้างตัวกรองเพื่อดูข้อมูลทั้งหมด
-                  </p>
+                {selectedMeetingId !== 'all' && (
                   <button
                     type="button"
-                    onClick={resetAllFilters}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0026b3] text-white text-xs font-bold hover:bg-blue-800 transition cursor-pointer shadow-xs"
+                    onClick={() => setSelectedMeetingId('all')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 text-[#0026b3] border border-blue-200 hover:bg-blue-100 text-xs font-bold transition cursor-pointer whitespace-nowrap"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>ล้างตัวกรองทั้งหมด</span>
+                    <RotateCcw className="w-3 h-3" />
+                    <span>ดูภาพรวมทุกรอบ</span>
                   </button>
-                </div>
-              ) : (
-                <>
-                  {filteredMeetings.map((m, idx) => {
-                    const pct = grandTotalRevenue > 0 ? ((m.revenue / grandTotalRevenue) * 100).toFixed(1) : '0';
-                    const isHybrid = m.type === 'hybrid';
-                    const isOnsite = m.type === 'onsite';
+                )}
+              </div>
+            </div>
 
-                    return (
-                      <div
-                        key={m.id}
-                        className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:px-4 rounded-xl transition border gap-3 ${selectedMeetingId === m.id
-                          ? 'bg-blue-50/70 border-[#0026b3]/40 ring-1 ring-[#0026b3]/20'
-                          : 'bg-slate-50/70 hover:bg-blue-50/40 border-slate-200/70'
-                          }`}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isHybrid
-                            ? 'bg-blue-100/80 text-[#0026b3]'
-                            : isOnsite
-                              ? 'bg-emerald-100/80 text-[#16a34a]'
-                              : 'bg-sky-100/80 text-[#0284c7]'
-                            }`}>
-                            {isHybrid ? <Sparkles className="w-4.5 h-4.5" /> : isOnsite ? <Award className="w-4.5 h-4.5" /> : <CalendarDays className="w-4.5 h-4.5" />}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-sm font-bold text-slate-900 truncate">
-                              {m.titleTh}
-                            </div>
-                            <div className="text-xs text-slate-500 flex flex-wrap items-center gap-2 mt-0.5">
-                              <span className={`px-2 py-0.5 rounded-md font-semibold text-[11px] ${isHybrid
-                                ? 'bg-blue-100 text-[#0026b3]'
-                                : isOnsite
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-sky-100 text-sky-800'
-                                }`}>
-                                {isHybrid ? 'Hybrid' : isOnsite ? 'Onsite Workshop' : 'Online Webinar'}
-                              </span>
-                              <span>ลงทะเบียน {m.registered.toLocaleString()} ที่นั่ง {m.maxSeats ? `(${Math.round((m.registered / m.maxSeats) * 100)}%)` : ''}</span>
-                              <span className="hidden md:inline text-slate-300">•</span>
-                              <span className="hidden md:inline text-slate-400">{m.date}</span>
-                            </div>
-                          </div>
+            {/* Bar Chart Canvas Area */}
+            <div className="relative pt-8 pb-6 px-4 sm:px-6 bg-white border border-slate-200/90 rounded-2xl shadow-xs">
+              <div className="overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-200">
+                <div className="min-w-[760px] relative">
+                  {/* Horizontal Gridlines with Currency Values */}
+                  <div className="absolute inset-x-0 top-0 h-64 pointer-events-none flex flex-col justify-between opacity-50 z-0">
+                    {[1, 0.75, 0.5, 0.25, 0].map((ratio, idx) => {
+                      const val = Math.round(maxProgramRevenue * ratio);
+                      return (
+                        <div key={idx} className="border-b border-dashed border-slate-200 w-full flex justify-between items-center text-[10px] text-slate-400">
+                          <span>฿{val.toLocaleString()}</span>
+                          <span className="opacity-40">{Math.round(ratio * 100)}%</span>
                         </div>
-
-                        <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60">
-                          <div className="text-left sm:text-right">
-                            <div className="text-base sm:text-lg font-bold text-slate-900">
-                              ฿{m.revenue.toLocaleString()}
-                            </div>
-                            <div className="text-[11px] text-slate-500">{pct}% ของยอดรวม</div>
-                          </div>
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
-                            <TrendingUp className="w-3.5 h-3.5" />
-                            <span>+{(12 + idx * 2.5).toFixed(1)}%</span>
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Total Summary Row */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:px-4 bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-emerald-50/60 rounded-xl transition border border-blue-200/80 gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-[#0026b3] text-white flex items-center justify-center shrink-0 shadow-xs">
-                        <CheckCircle2 className="w-4.5 h-4.5 text-[#4ade80]" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-extrabold text-slate-900 truncate">
-                          รวมรายได้โครงการที่เลือก ({filteredMeetings.length} โครงการ)
-                        </div>
-                        <div className="text-xs text-slate-600 mt-0.5">
-                          ผู้ลงทะเบียนรวม {totalPaidCount.toLocaleString()} ที่นั่ง • ตรวจสอบสลิปตรงตามยอดทั้งหมด
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-blue-200/60">
-                      <div className="text-left sm:text-right">
-                        <div className="text-base sm:text-xl font-black text-[#0026b3]">฿{grandTotalRevenue.toLocaleString()}</div>
-                        <div className="text-[11px] text-emerald-700 font-bold">100.0% สมบูรณ์</div>
-                      </div>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#4ade80] text-slate-950 text-xs font-black shadow-xs">
-                        <Check className="w-3.5 h-3.5" />
-                        <span>สำเร็จ</span>
-                      </span>
-                    </div>
+                      );
+                    })}
                   </div>
-                </>
-              )}
+
+                  {/* Vertical Individual Bars Grid */}
+                  <div
+                    className="grid gap-3 sm:gap-4 relative z-10"
+                    style={{ gridTemplateColumns: `repeat(${Math.max(allCoursePrograms.length, 3)}, minmax(0, 1fr))` }}
+                  >
+                    {allCoursePrograms.map((p) => {
+                      const isSelected = selectedMeetingId === p.meetingId;
+                      const hasRevenue = p.approvedRevenue > 0;
+                      const hasPending = p.pendingRevenue > 0;
+
+                      const maxBarHeight = 150;
+                      const approvedHeight = maxProgramRevenue > 0 && p.approvedRevenue > 0
+                        ? Math.max(12, Math.round((p.approvedRevenue / maxProgramRevenue) * maxBarHeight))
+                        : 0;
+                      const pendingHeight = maxProgramRevenue > 0 && p.pendingRevenue > 0
+                        ? Math.max(10, Math.round((p.pendingRevenue / maxProgramRevenue) * maxBarHeight))
+                        : 0;
+
+                      const isMain = p.programType === 'main';
+
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => setSelectedMeetingId(isSelected && selectedMeetingId !== 'all' ? 'all' : p.meetingId)}
+                          className={`flex flex-col items-center group cursor-pointer transition-all duration-200 p-2 rounded-xl ${isSelected && selectedMeetingId !== 'all'
+                            ? 'bg-blue-50/60 ring-2 ring-[#0026b3] shadow-sm'
+                            : 'hover:bg-slate-50/80'
+                            }`}
+                        >
+                          {/* 1. Bar Pillar Area */}
+                          <div className="h-64 w-full flex flex-col justify-end items-center pb-1">
+                            {/* Value Tag Above Bar */}
+                            <div className="mb-2 text-center transition-transform group-hover:-translate-y-0.5 flex flex-col items-center gap-0.5">
+                              {hasRevenue ? (
+                                <div
+                                  className={`text-xs sm:text-sm font-black px-2 py-0.5 rounded-md shadow-2xs whitespace-nowrap border ${isMain
+                                    ? 'text-[#0026b3] bg-blue-50 border-blue-200'
+                                    : 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                                    }`}
+                                >
+                                  ฿{p.approvedRevenue.toLocaleString()}
+                                </div>
+                              ) : (
+                                <div className="text-[11px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200/80 whitespace-nowrap">
+                                  ฿0
+                                </div>
+                              )}
+
+                              {hasPending && (
+                                <div className="text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded mt-0.5 border border-amber-200 shadow-2xs whitespace-nowrap">
+                                  +฿{p.pendingRevenue.toLocaleString()} (รอตรวจ)
+                                </div>
+                              )}
+                            </div>
+
+                            {/* The Separate Bar Pillar */}
+                            <div className="w-full max-w-[64px] flex flex-col justify-end items-center relative">
+                              {hasRevenue || hasPending ? (
+                                <div className="w-full flex flex-col justify-end items-center rounded-t-lg overflow-hidden shadow-xs border border-slate-200/60 transition-all duration-300 group-hover:brightness-105">
+                                  {pendingHeight > 0 && (
+                                    <div
+                                      style={{ height: `${pendingHeight}px` }}
+                                      className="w-full bg-gradient-to-t from-amber-400 to-amber-300 border-b border-amber-500/30 transition-all duration-500"
+                                      title={`ยอดรอตรวจ: ฿${p.pendingRevenue.toLocaleString()}`}
+                                    />
+                                  )}
+                                  {approvedHeight > 0 && (
+                                    <div
+                                      style={{ height: `${approvedHeight}px` }}
+                                      className={`w-full transition-all duration-500 ${isMain
+                                        ? 'bg-gradient-to-t from-[#0026b3] via-[#1d4ed8] to-[#3b82f6]'
+                                        : 'bg-gradient-to-t from-emerald-600 via-emerald-500 to-teal-400'
+                                        }`}
+                                      title={`${p.programName}: ฿${p.approvedRevenue.toLocaleString()}`}
+                                    />
+                                  )}
+                                </div>
+                              ) : (
+                                <div
+                                  className="w-full h-2.5 bg-slate-200 rounded-t-sm border border-slate-300 transition-all group-hover:bg-slate-300"
+                                  title="ยังไม่มีข้อมูลรายได้ในหลักสูตรนี้"
+                                />
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Horizontal Axis Divider */}
+                          <div className="w-full border-t border-slate-200 my-1" />
+
+                          {/* 2. X-Axis Labels Below Bar */}
+                          <div className="pt-2 text-center space-y-1.5 w-full">
+                            <div className="flex items-center justify-center">
+                              <span
+                                className={`text-[10px] font-black px-2 py-0.5 rounded-md ${hasRevenue
+                                  ? isMain
+                                    ? 'bg-[#0026b3] text-white shadow-2xs'
+                                    : 'bg-emerald-600 text-white shadow-2xs'
+                                  : 'bg-slate-200 text-slate-700'
+                                  }`}
+                              >
+                                {isMain ? 'Main Program' : 'Workshop (WS)'}
+                              </span>
+                            </div>
+
+                            <div
+                              className={`text-xs font-extrabold line-clamp-2 leading-snug px-0.5 transition ${isSelected ? 'text-[#0026b3]' : 'text-slate-900 group-hover:text-[#0026b3]'
+                                }`}
+                              title={p.programName}
+                            >
+                              {p.programName}
+                            </div>
+
+                            <div className="text-[10px] font-bold text-slate-500 truncate" title={p.meetingName}>
+                              {p.meetingName.split('(')[0]} ({p.meetingId})
+                            </div>
+
+                            <div className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+                              {p.dateText}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* ── 2. COLUMN BAR CHART (Dual Clustered Bar Chart: Attendees Comparison) ── */}
+        {/* ── 2. BAR CHART: SIDE-BY-SIDE DUAL BARS BY ROUND ── */}
+        {activeChartTab === 'rounds' && (
+          <div className="space-y-6 animate-fade-in">
+            {/* Top Bar Summary & Legend */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-1">
+              <div className="flex items-center gap-3 sm:gap-5 flex-wrap">
+                <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800">
+                  <span className="w-3.5 h-3.5 rounded-xs bg-[#0026b3] shrink-0 shadow-xs" />
+                  <span>Main Program</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800">
+                  <span className="w-3.5 h-3.5 rounded-xs bg-emerald-500 shrink-0 shadow-xs" />
+                  <span>Workshop (WS)</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-500">
+                  <span className="w-3.5 h-3.5 rounded-xs bg-slate-200 border border-slate-300 shrink-0" />
+                  <span>ยังไม่มีข้อมูลรายได้ (฿0)</span>
+                </div>
+              </div>
+
+              <div className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
+                แยกแท่งคู่เคียงข้างกันตาม {courseBarChartData.length} รอบโครงการ
+              </div>
+            </div>
+
+            {/* Side-by-Side Bar Chart Canvas */}
+            <div className="relative pt-8 pb-6 px-4 sm:px-6 bg-white border border-slate-200/90 rounded-2xl shadow-xs">
+              <div className="overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-200">
+                <div className="min-w-[700px] relative">
+                  <div className="absolute inset-x-0 top-0 h-64 pointer-events-none flex flex-col justify-between opacity-50 z-0">
+                    {[1, 0.75, 0.5, 0.25, 0].map((ratio, idx) => {
+                      const val = Math.round(maxBarRevenue * ratio);
+                      return (
+                        <div key={idx} className="border-b border-dashed border-slate-200 w-full flex justify-between items-center text-[10px] text-slate-400">
+                          <span>฿{val.toLocaleString()}</span>
+                          <span className="opacity-40">{Math.round(ratio * 100)}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div
+                    className="grid gap-3 sm:gap-4 relative z-10"
+                    style={{ gridTemplateColumns: `repeat(${Math.max(courseBarChartData.length, 3)}, minmax(0, 1fr))` }}
+                  >
+                    {courseBarChartData.map((course) => {
+                      const isSelected = selectedMeetingId === course.id;
+                      const maxBarHeight = 150;
+                      const mainH = maxBarRevenue > 0 && course.approvedMainRevenue > 0
+                        ? Math.max(12, Math.round((course.approvedMainRevenue / maxBarRevenue) * maxBarHeight))
+                        : 0;
+                      const wsH = maxBarRevenue > 0 && course.approvedWorkshopRevenue > 0
+                        ? Math.max(12, Math.round((course.approvedWorkshopRevenue / maxBarRevenue) * maxBarHeight))
+                        : 0;
+
+                      return (
+                        <div
+                          key={course.id}
+                          onClick={() => setSelectedMeetingId(isSelected ? 'all' : course.id)}
+                          className={`flex flex-col items-center group cursor-pointer transition-all duration-200 p-2 rounded-xl ${isSelected
+                            ? 'bg-blue-50/60 ring-2 ring-[#0026b3] shadow-sm'
+                            : 'hover:bg-slate-50/80'
+                            }`}
+                        >
+                          <div className="h-64 w-full flex flex-col justify-end items-center pb-1">
+                            <div className="mb-2 text-center">
+                              {course.approvedRevenue > 0 ? (
+                                <div className="text-xs sm:text-sm font-black text-[#0026b3] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 shadow-2xs whitespace-nowrap">
+                                  ฿{course.approvedRevenue.toLocaleString()}
+                                </div>
+                              ) : (
+                                <div className="text-[11px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200/80 whitespace-nowrap">
+                                  ฿0
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-end justify-center gap-1.5 w-full max-w-[80px]">
+                              {/* Left Bar: Main Program */}
+                              <div className="flex-1 flex flex-col items-center">
+                                {mainH > 0 && (
+                                  <span className="text-[9px] font-black text-[#0026b3] mb-1">
+                                    ฿{(course.approvedMainRevenue / 1000).toFixed(1)}k
+                                  </span>
+                                )}
+                                {mainH > 0 ? (
+                                  <div
+                                    style={{ height: `${mainH}px` }}
+                                    className="w-full bg-gradient-to-t from-[#0026b3] via-[#1d4ed8] to-[#3b82f6] rounded-t-md shadow-xs"
+                                    title={`Main Program: ฿${course.approvedMainRevenue.toLocaleString()}`}
+                                  />
+                                ) : (
+                                  <div className="w-full h-2 bg-slate-200 rounded-t-sm" />
+                                )}
+                              </div>
+
+                              {/* Right Bar: Workshop */}
+                              <div className="flex-1 flex flex-col items-center">
+                                {wsH > 0 && (
+                                  <span className="text-[9px] font-black text-emerald-700 mb-1">
+                                    ฿{(course.approvedWorkshopRevenue / 1000).toFixed(1)}k
+                                  </span>
+                                )}
+                                {wsH > 0 ? (
+                                  <div
+                                    style={{ height: `${wsH}px` }}
+                                    className="w-full bg-gradient-to-t from-emerald-600 via-emerald-500 to-teal-400 rounded-t-md shadow-xs"
+                                    title={`Workshop: ฿${course.approvedWorkshopRevenue.toLocaleString()}`}
+                                  />
+                                ) : (
+                                  <div className="w-full h-2 bg-slate-200 rounded-t-sm" />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="w-full border-t border-slate-200 my-1" />
+
+                          <div className="pt-2 text-center space-y-1 w-full">
+                            <span
+                              className={`text-[11px] font-black px-2.5 py-0.5 rounded-md ${course.approvedRevenue > 0
+                                ? 'bg-[#0026b3] text-white shadow-2xs'
+                                : 'bg-slate-200 text-slate-700'
+                                }`}
+                            >
+                              {course.id}
+                            </span>
+                            <div className="text-xs font-extrabold text-slate-800 line-clamp-2 leading-snug">
+                              {course.titleTh}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+                              {course.date}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── 3. DUAL BAR CHART: ATTENDEES COMPARISON ── */}
         {activeChartTab === 'comparison' && (
           <div className="space-y-6 animate-fade-in">
-            {/* Legend & Summary Info */}
-            <div className="flex flex-wrap items-center justify-between gap-4 px-2">
+            <div className="flex flex-wrap items-center justify-between gap-4 px-1">
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800">
                   <span className="w-3.5 h-3.5 rounded-xs bg-[#0026b3] shrink-0 shadow-xs" />
@@ -1696,15 +1914,13 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
               </div>
 
               <div className="text-xs font-bold text-[#0026b3] bg-blue-50 px-3 py-1 rounded-lg border border-blue-100">
-                เปรียบเทียบ 6 รอบการประชุมและหลักสูตร
+                เปรียบเทียบ {filteredMeetings.length} รอบการประชุม
               </div>
             </div>
 
-            {/* Visual Dual Column Bar Chart */}
             <div className="relative pt-8 pb-4 px-4 sm:px-8 bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
               <div className="overflow-x-auto pb-2 scrollbar-none">
                 <div className="min-w-[540px] relative">
-                  {/* Y-Axis Reference Gridlines (Dotted) */}
                   <div className="space-y-8 absolute inset-x-0 top-0 bottom-20 pointer-events-none flex flex-col justify-between opacity-50">
                     <div className="border-b border-dashed border-slate-300 w-full flex justify-between text-[11px] text-slate-500">
                       <span>100% ความจุ</span>
@@ -1723,10 +1939,9 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                     </div>
                   </div>
 
-                  {/* Clustered Bar Pairs dynamically mapped from meetings */}
-                  <div className="grid gap-3 sm:gap-6 h-72 items-end pt-6 pb-2 relative z-10" style={{ gridTemplateColumns: `repeat(${Math.max(3, meetings.length)}, minmax(0, 1fr))` }}>
-                    {meetings.map((m) => {
-                      const maxVal = Math.max(...meetings.map((x) => Math.max(x.registered, x.attended, 100)), 100);
+                  <div className="grid gap-3 sm:gap-6 h-72 items-end pt-6 pb-2 relative z-10" style={{ gridTemplateColumns: `repeat(${Math.max(3, filteredMeetings.length)}, minmax(0, 1fr))` }}>
+                    {filteredMeetings.map((m) => {
+                      const maxVal = Math.max(...filteredMeetings.map((x) => Math.max(x.registered, x.attended, 100)), 100);
                       const h1 = `${Math.max(12, Math.min(100, Math.round((m.registered / maxVal) * 100)))}%`;
                       const h2 = `${Math.max(8, Math.min(100, Math.round((m.attended / maxVal) * 100)))}%`;
 
@@ -1736,7 +1951,6 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                           className="flex flex-col items-center h-full justify-end group cursor-pointer"
                           onClick={() => setSelectedMeetingId(m.id)}
                         >
-                          {/* Floating Info Tooltip */}
                           <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 mb-2 text-center pointer-events-none transform -translate-y-1 z-20">
                             <div className="bg-slate-900 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-lg whitespace-nowrap">
                               <div className="text-slate-200 font-extrabold">{m.titleTh}</div>
@@ -1745,15 +1959,12 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                             </div>
                           </div>
 
-                          {/* Dual Bar Container: Primary Blue & Accent Green */}
                           <div className="flex items-end justify-center w-full max-w-[80px] h-[210px] gap-0 sm:gap-0.5">
-                            {/* Left Bar: Primary Blue #0026b3 */}
                             <div
                               className="w-1/2 bg-[#0026b3] rounded-t-md hover:brightness-110 transition-all duration-500 shadow-2xs"
                               style={{ height: h1 }}
                               title={`ลงทะเบียน: ${m.registered} คน`}
                             />
-                            {/* Right Bar: Accent Green #4ade80 */}
                             <div
                               className="w-1/2 bg-[#4ade80] rounded-t-md hover:brightness-110 transition-all duration-500 shadow-2xs"
                               style={{ height: h2 }}
@@ -1761,7 +1972,6 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                             />
                           </div>
 
-                          {/* X-Axis Label */}
                           <div className="mt-3 text-center space-y-0.5 w-full">
                             <div className="text-xs sm:text-sm font-extrabold text-slate-800 line-clamp-1 group-hover:text-[#0026b3] transition">
                               {m.titleTh.split('(')[0]}
@@ -1780,15 +1990,13 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
           </div>
         )}
 
-        {/* ── 3. SVG DONUT / RING CHART (By Member / Ticket Category) ── */}
+        {/* ── 4. DONUT & BANK CHANNELS ── */}
         {activeChartTab === 'donut' && (
           <div className="space-y-6 animate-fade-in">
             {ticketTiers.length > 0 ? (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                {/* Donut SVG Illustration */}
                 <div className="lg:col-span-5 flex flex-col items-center justify-center p-6 bg-slate-50/70 border border-slate-200/80 rounded-2xl relative">
                   <svg className="w-56 h-56 transform -rotate-90 drop-shadow-xs" viewBox="0 0 180 180">
-                    {/* Background Circle */}
                     <circle
                       cx="90"
                       cy="90"
@@ -1798,42 +2006,43 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                       strokeWidth="24"
                     />
 
-                    {/* Dynamic Donut Segments */}
-                    {ticketTiers.map((tier) => {
-                      const tierPercent = totalTierRevenue > 0 ? (tier.total / totalTierRevenue) * 100 : 0;
-                      const strokeLength = (tierPercent / 100) * donutCircumference;
-                      const strokeOffset = -(accumulatedDonutPercent / 100) * donutCircumference;
-                      accumulatedDonutPercent += tierPercent;
+                    {(() => {
+                      let accumulatedDonutPercent = 0;
+                      return ticketTiers.map((tier) => {
+                        const tierPercent = totalTierRevenue > 0 ? (tier.total / totalTierRevenue) * 100 : 0;
+                        const strokeLength = (tierPercent / 100) * donutCircumference;
+                        const strokeOffset = -(accumulatedDonutPercent / 100) * donutCircumference;
+                        accumulatedDonutPercent += tierPercent;
 
-                      const isHovered = hoveredTier === tier.name;
+                        const isHovered = hoveredTier === tier.name;
 
-                      return (
-                        <circle
-                          key={tier.name}
-                          cx="90"
-                          cy="90"
-                          r={donutRadius}
-                          fill="transparent"
-                          stroke={tier.color}
-                          strokeWidth={isHovered ? 28 : 24}
-                          strokeDasharray={`${strokeLength} ${donutCircumference}`}
-                          strokeDashoffset={strokeOffset}
-                          strokeLinecap="round"
-                          className="transition-all duration-300 cursor-pointer"
-                          onMouseEnter={() => setHoveredTier(tier.name)}
-                          onMouseLeave={() => setHoveredTier(null)}
-                        />
-                      );
-                    })}
+                        return (
+                          <circle
+                            key={tier.name}
+                            cx="90"
+                            cy="90"
+                            r={donutRadius}
+                            fill="transparent"
+                            stroke={tier.color}
+                            strokeWidth={isHovered ? 28 : 24}
+                            strokeDasharray={`${strokeLength} ${donutCircumference}`}
+                            strokeDashoffset={strokeOffset}
+                            strokeLinecap="round"
+                            className="transition-all duration-300 cursor-pointer"
+                            onMouseEnter={() => setHoveredTier(tier.name)}
+                            onMouseLeave={() => setHoveredTier(null)}
+                          />
+                        );
+                      });
+                    })()}
                   </svg>
 
-                  {/* Central Inner Badge */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
                     <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                       {selectedMeetingId === 'all' ? 'รวมทุกรอบ' : 'ยอดรอบนี้'}
                     </span>
                     <span className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">
-                      ฿{(totalTierRevenue / 1000000).toFixed(2)}M
+                      ฿{totalTierRevenue >= 1000000 ? `${(totalTierRevenue / 1000000).toFixed(2)}M` : totalTierRevenue.toLocaleString()}
                     </span>
                     <span className="text-[11px] font-bold text-[#0026b3] bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200 mt-1">
                       {ticketTiers.reduce((s, t) => s + t.count, 0)} ที่นั่ง
@@ -1841,7 +2050,6 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
                   </div>
                 </div>
 
-                {/* Donut Legend & Proportions Table */}
                 <div className="lg:col-span-7 space-y-3">
                   <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                     จำแนกตามประเภทบัตรลงทะเบียน:
@@ -1897,6 +2105,343 @@ function RevenueReportPanel({ meetings, slips, attendees }: RevenueReportProps) 
         )}
       </div>
 
+      {/* ─── 5. DEEP-DIVE COURSE BREAKDOWN TABLE ─── */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-7 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3.5">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-blue-50 text-[#0026b3]">
+              <ClipboardList className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
+                ตารางสรุปรายได้แยกตามหลักสูตรจริงในฐานข้อมูล (Course Program Breakdown)
+              </h3>
+              <p className="text-xs text-slate-500">
+                แจกแจงรายได้จริง จำนวนที่นั่ง และสลิปที่อนุมัติแล้วของแต่ละหลักสูตร
+              </p>
+            </div>
+          </div>
+          <div className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 shrink-0 self-start sm:self-auto">
+            {allCoursePrograms.length} หลักสูตรย่อย
+          </div>
+        </div>
+
+        {/* Breakdown Table Grid */}
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <table className="w-full min-w-[640px] text-left text-xs sm:text-sm">
+            <thead>
+              <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                <th className="py-3 px-3.5 rounded-l-xl">หลักสูตร / โครงการ</th>
+                <th className="py-3 px-3">ประเภท</th>
+                <th className="py-3 px-3 text-center">สลิปอนุมัติ</th>
+                <th className="py-3 px-3 text-right">ยอดรอตรวจ</th>
+                <th className="py-3 px-3 text-right">รายได้อนุมัติ (บาท)</th>
+                <th className="py-3 px-3 text-center rounded-r-xl">สัดส่วนรายได้</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-medium">
+              {allCoursePrograms.map((p) => {
+                const isMain = p.programType === 'main';
+                const pct = grandTotalRevenue > 0 ? Number(((p.approvedRevenue / grandTotalRevenue) * 100).toFixed(1)) : 0;
+
+                return (
+                  <tr key={p.id} className="hover:bg-blue-50/30 transition">
+                    <td className="py-3.5 px-3.5">
+                      <div className="font-extrabold text-slate-900">{p.programName}</div>
+                      <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                        <span className="font-semibold text-slate-700">{p.meetingName}</span>
+                        <span>•</span>
+                        <span className="text-slate-400">{p.dateText}</span>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-3">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold ${isMain
+                          ? 'bg-blue-100 text-[#0026b3]'
+                          : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                      >
+                        {isMain ? 'Main Program' : 'Workshop'}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-3 text-center">
+                      <span className="font-extrabold text-slate-900">{p.approvedSlipCount}</span>
+                      <span className="text-xs text-slate-500"> รายการ</span>
+                    </td>
+                    <td className="py-3.5 px-3 text-right">
+                      {p.pendingRevenue > 0 ? (
+                        <span className="text-amber-700 font-bold text-xs bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                          +฿{p.pendingRevenue.toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-xs">-</span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-3 text-right font-black text-slate-900 text-sm sm:text-base">
+                      ฿{p.approvedRevenue.toLocaleString()}
+                    </td>
+                    <td className="py-3.5 px-3 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-16 bg-slate-100 rounded-full h-2 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${isMain ? 'bg-[#0026b3]' : 'bg-emerald-500'}`}
+                            style={{ width: `${Math.min(100, pct)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-bold text-slate-700 w-10 text-right">{pct}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 font-black border-t-2 border-[#0026b3]/30">
+                <td className="py-3.5 px-3.5 rounded-l-xl text-slate-900">
+                  รวมรายได้หลักสูตรทั้งหมด ({allCoursePrograms.length} หลักสูตร)
+                </td>
+                <td className="py-3.5 px-3 text-xs text-slate-600">ทุกประเภท</td>
+                <td className="py-3.5 px-3 text-center text-slate-900">{displayPaidCount} รายการ</td>
+                <td className="py-3.5 px-3 text-right text-amber-800 text-xs">
+                  {pendingAmount > 0 ? `+฿${pendingAmount.toLocaleString()}` : '-'}
+                </td>
+                <td className="py-3.5 px-3 text-right text-base sm:text-lg text-[#0026b3]">
+                  ฿{grandTotalRevenue.toLocaleString()}
+                </td>
+                <td className="py-3.5 px-3 text-center rounded-r-xl">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#4ade80] text-slate-950 text-xs font-black">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>100% สมบูรณ์</span>
+                  </span>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {/* ─── 6. SIDE-BY-SIDE FINANCIAL DISTRIBUTION (Bank Channels & Ticket Tiers) ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+        {/* Panel 1: Bank Payment Channels */}
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-purple-50 text-purple-700">
+                <Landmark className="w-4.5 h-4.5" />
+              </div>
+              <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                ช่องทางการชำระเงิน (Bank Channels Breakdown)
+              </h3>
+            </div>
+            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+              {bankBreakdown.length} ธนาคาร
+            </span>
+          </div>
+
+          {bankBreakdown.length > 0 ? (
+            <div className="space-y-3">
+              {bankBreakdown.map((item) => (
+                <div
+                  key={item.bank}
+                  className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-slate-50 transition flex items-center justify-between gap-3"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span
+                      className="w-3.5 h-3.5 rounded-full shrink-0"
+                      style={{ backgroundColor: item.styling.hex }}
+                    />
+                    <div className="min-w-0">
+                      <div className="text-xs sm:text-sm font-bold text-slate-900 truncate">{item.bank}</div>
+                      <div className="text-[11px] text-slate-500">{item.count} รายการสลิปที่โอนเข้า</div>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <div className="text-xs sm:text-sm font-black text-slate-900">
+                      ฿{item.amount.toLocaleString()}
+                    </div>
+                    <div className="text-[11px] font-bold text-[#0026b3]">{item.percent}% ของยอดรวม</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-8 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200 space-y-1">
+              <Landmark className="w-6 h-6 text-slate-300 mx-auto" />
+              <p className="text-xs font-bold text-slate-600">ยังไม่มีข้อมูลช่องทางธนาคาร</p>
+              <p className="text-[11px] text-slate-400">ระบบจะประมวลผลเมื่อมีสลิปที่ได้รับการอนุมัติ</p>
+            </div>
+          )}
+        </div>
+
+        {/* Panel 2: Ticket Tiers & Member Categories */}
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+                <Tag className="w-4.5 h-4.5" />
+              </div>
+              <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                สัดส่วนประเภทบัตรและสมาชิก (Ticket & Member Tiers)
+              </h3>
+            </div>
+            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+              {ticketTiers.length} ประเภทบัตร
+            </span>
+          </div>
+
+          {ticketTiers.length > 0 ? (
+            <div className="space-y-3">
+              {ticketTiers.map((tier) => {
+                const percent = totalTierRevenue > 0 ? Math.round((tier.total / totalTierRevenue) * 100) : 0;
+                return (
+                  <div
+                    key={tier.name}
+                    className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-slate-50 transition flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span
+                        className="w-3.5 h-3.5 rounded-full shrink-0"
+                        style={{ backgroundColor: tier.color }}
+                      />
+                      <div className="min-w-0">
+                        <div className="text-xs sm:text-sm font-bold text-slate-900 truncate">{tier.name}</div>
+                        <div className="text-[11px] text-slate-500">
+                          ฿{tier.price.toLocaleString()} / ที่นั่ง • {tier.count} ที่นั่ง
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <div className="text-xs sm:text-sm font-black text-slate-900">
+                        ฿{tier.total.toLocaleString()}
+                      </div>
+                      <div className="text-[11px] font-bold text-emerald-700">{percent}%</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-8 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200 space-y-1">
+              <Tag className="w-6 h-6 text-slate-300 mx-auto" />
+              <p className="text-xs font-bold text-slate-600">ยังไม่มีข้อมูลประเภทบัตร</p>
+              <p className="text-[11px] text-slate-400">ระบบจะแสดงสถิติเมื่อมีรายการลงทะเบียน</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ─── 7. RECENT REVENUE TRANSACTIONS LOG ─── */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 lg:p-7 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-blue-50 text-[#0026b3]">
+              <Receipt className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
+                รายการสลิปและธุรกรรมรายได้ล่าสุด (Recent Revenue Slips)
+              </h3>
+              <p className="text-xs text-slate-500">
+                ตรวจสอบความถูกต้องของรายการโอนเงินและสลิปที่ส่งเข้ามาในรอบที่เลือก
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Filter: All, Approved, Pending */}
+          <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold self-start sm:self-auto overflow-x-auto max-w-full">
+            <button
+              onClick={() => setTxFilter('all')}
+              className={`px-3 py-1 rounded-lg transition cursor-pointer whitespace-nowrap ${txFilter === 'all' ? 'bg-white text-[#0026b3] shadow-xs font-black' : 'text-slate-600'}`}
+            >
+              ทั้งหมด
+            </button>
+            <button
+              onClick={() => setTxFilter('approved')}
+              className={`px-3 py-1 rounded-lg transition cursor-pointer whitespace-nowrap ${txFilter === 'approved' ? 'bg-white text-emerald-700 shadow-xs font-black' : 'text-slate-600'}`}
+            >
+              อนุมัติแล้ว
+            </button>
+            <button
+              onClick={() => setTxFilter('pending')}
+              className={`px-3 py-1 rounded-lg transition cursor-pointer whitespace-nowrap ${txFilter === 'pending' ? 'bg-white text-amber-700 shadow-xs font-black' : 'text-slate-600'}`}
+            >
+              รอตรวจสอบ
+            </button>
+          </div>
+        </div>
+
+        {scopedRecentSlips.length > 0 ? (
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+            <table className="w-full min-w-[580px] text-left text-xs sm:text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                  <th className="py-3 px-3.5 rounded-l-xl">ผู้ชำระเงิน / สมาชิก</th>
+                  <th className="py-3 px-3">รอบการประชุม / หลักสูตร</th>
+                  <th className="py-3 px-3">ธนาคาร & วันที่โอน</th>
+                  <th className="py-3 px-3 text-right">ยอดเงิน</th>
+                  <th className="py-3 px-3 text-center rounded-r-xl">สถานะ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {scopedRecentSlips.map((s) => {
+                  const m = meetings.find((mtg) => mtg.id === s.meetingId);
+                  const isApproved = s.status === 'approved';
+                  const isPending = s.status === 'pending';
+
+                  return (
+                    <tr key={s.id} className="hover:bg-slate-50 transition">
+                      <td className="py-3.5 px-3.5">
+                        <div className="font-extrabold text-slate-900">{s.nameTh}</div>
+                        <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                          {s.memberCode && <span className="text-[#0026b3] font-bold">[{s.memberCode}]</span>}
+                          <span>{s.phone}</span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <div className="font-bold text-slate-800 line-clamp-1">{m ? m.titleTh : s.meetingId}</div>
+                        <div className="text-[11px] text-slate-500">{s.ticketType}</div>
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <div className="font-bold text-slate-700">{s.bank || 'ธนาคารพาณิชย์'}</div>
+                        <div className="text-[11px] text-slate-400">{s.transferDate} {s.transferTime ? `• ${s.transferTime}` : ''}</div>
+                      </td>
+                      <td className="py-3.5 px-3 text-right font-black text-slate-900 text-sm sm:text-base">
+                        ฿{s.amount.toLocaleString()}
+                      </td>
+                      <td className="py-3.5 px-3 text-center">
+                        {isApproved ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>อนุมัติแล้ว</span>
+                          </span>
+                        ) : isPending ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>รอตรวจสอบ</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold">
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>ปฏิเสธ</span>
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200 space-y-1">
+            <Receipt className="w-6 h-6 text-slate-300 mx-auto" />
+            <p className="text-xs font-bold text-slate-600">ไม่มีรายการสลิปในตัวกรองนี้</p>
+            <p className="text-[11px] text-slate-400">เลือกรอบการประชุมหรือล้างตัวกรองเพื่อดูรายการทั้งหมด</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -2653,8 +3198,8 @@ function AddMeetingPanel({
                         }
                       }}
                       className={`relative flex items-center justify-between p-3.5 rounded-xl transition border-2 text-left cursor-pointer ${isOnsite
-                          ? 'bg-emerald-50 text-emerald-900 border-emerald-400 ring-2 ring-emerald-200 shadow-xs'
-                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                        ? 'bg-emerald-50 text-emerald-900 border-emerald-400 ring-2 ring-emerald-200 shadow-xs'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
                         }`}
                     >
                       <div className="flex items-center gap-3">
@@ -2671,8 +3216,8 @@ function AddMeetingPanel({
                       </div>
                       <div
                         className={`w-5 h-5 rounded-md border flex items-center justify-center transition shrink-0 ${isOnsite
-                            ? 'bg-emerald-600 border-emerald-600 text-white'
-                            : 'border-slate-300 bg-white'
+                          ? 'bg-emerald-600 border-emerald-600 text-white'
+                          : 'border-slate-300 bg-white'
                           }`}
                       >
                         {isOnsite && <Check className="w-3.5 h-3.5 stroke-[3]" />}
@@ -2691,8 +3236,8 @@ function AddMeetingPanel({
                         }
                       }}
                       className={`relative flex items-center justify-between p-3.5 rounded-xl transition border-2 text-left cursor-pointer ${isOnline
-                          ? 'bg-blue-50 text-[#0026b3] border-[#0026b3]/50 ring-2 ring-blue-200 shadow-xs'
-                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                        ? 'bg-blue-50 text-[#0026b3] border-[#0026b3]/50 ring-2 ring-blue-200 shadow-xs'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
                         }`}
                     >
                       <div className="flex items-center gap-3">
@@ -2709,8 +3254,8 @@ function AddMeetingPanel({
                       </div>
                       <div
                         className={`w-5 h-5 rounded-md border flex items-center justify-center transition shrink-0 ${isOnline
-                            ? 'bg-[#0026b3] border-[#0026b3] text-white'
-                            : 'border-slate-300 bg-white'
+                          ? 'bg-[#0026b3] border-[#0026b3] text-white'
+                          : 'border-slate-300 bg-white'
                           }`}
                       >
                         {isOnline && <Check className="w-3.5 h-3.5 stroke-[3]" />}
@@ -2912,8 +3457,8 @@ function AddMeetingPanel({
                                   type="button"
                                   onClick={() => handleToggleActivityDay(activity.id, choice.id)}
                                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 border select-none ${isChoiceSelected
-                                      ? 'bg-[#0026b3] text-white border-[#0026b3] shadow-xs ring-1 ring-blue-300'
-                                      : 'bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-[#0026b3] border-slate-200 hover:border-blue-200'
+                                    ? 'bg-[#0026b3] text-white border-[#0026b3] shadow-xs ring-1 ring-blue-300'
+                                    : 'bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-[#0026b3] border-slate-200 hover:border-blue-200'
                                     }`}
                                 >
                                   <Calendar className="w-3 h-3" />
@@ -2963,8 +3508,8 @@ function AddMeetingPanel({
                                       type="button"
                                       onClick={() => handleToggleActivityDay(activity.id, choice.id)}
                                       className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 border select-none ${isChoiceSelected
-                                          ? 'bg-violet-600 text-white border-violet-600 shadow-xs ring-1 ring-violet-300'
-                                          : 'bg-slate-50 hover:bg-violet-50 text-slate-700 hover:text-violet-700 border-slate-200 hover:border-violet-200'
+                                        ? 'bg-violet-600 text-white border-violet-600 shadow-xs ring-1 ring-violet-300'
+                                        : 'bg-slate-50 hover:bg-violet-50 text-slate-700 hover:text-violet-700 border-slate-200 hover:border-violet-200'
                                         }`}
                                     >
                                       <Calendar className="w-3 h-3" />
@@ -3432,7 +3977,7 @@ function AddMeetingPanel({
             rows={3}
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="ระบุรายละเอียดวาระการประชุม วิทยากรรับเชิญ หรือหมายเหตุ..."
+            placeholder="ระบุรายละเอียดการประชุม วิทยากรรับเชิญ หรือหมายเหตุ..."
             className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition resize-none shadow-2xs"
           />
         </div>
@@ -3456,8 +4001,8 @@ function AddMeetingPanel({
               type="submit"
               disabled={isSubmitting}
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 font-bold text-sm px-8 py-3 rounded-xl shadow-md transition active:scale-95 cursor-pointer ${isSubmitting
-                  ? 'bg-slate-400 text-white shadow-slate-300/20 cursor-not-allowed'
-                  : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-[#0026b3]/20'
+                ? 'bg-slate-400 text-white shadow-slate-300/20 cursor-not-allowed'
+                : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-[#0026b3]/20'
                 }`}
             >
               <Check className="w-4 h-4 text-[#4ade80]" />
@@ -3885,7 +4430,7 @@ function VerifyAttendeesPanel({
 
   // Total pages and Paginated Slice (5 items per page default)
   const totalPages = Math.max(1, Math.ceil(filteredAttendees.length / pageSize));
-  
+
   // Reset current page when filters change or if current page exceeds total pages
   useEffect(() => {
     setCurrentPage(1);
@@ -4335,11 +4880,10 @@ function VerifyAttendeesPanel({
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition ${
-                currentPage === 1
-                  ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
-                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 cursor-pointer shadow-xs'
-              }`}
+              className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition ${currentPage === 1
+                ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 cursor-pointer shadow-xs'
+                }`}
             >
               <ChevronLeft className="w-4 h-4" />
               <span className="hidden sm:inline">ก่อนหน้า</span>
@@ -4357,11 +4901,10 @@ function VerifyAttendeesPanel({
                       {showEllipsis && <span className="px-1 text-slate-400 text-xs">...</span>}
                       <button
                         onClick={() => setCurrentPage(p)}
-                        className={`min-w-[32px] h-8 px-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                          currentPage === p
-                            ? 'bg-[#0026b3] text-white shadow-xs'
-                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                        }`}
+                        className={`min-w-[32px] h-8 px-2 rounded-xl text-xs font-bold transition cursor-pointer ${currentPage === p
+                          ? 'bg-[#0026b3] text-white shadow-xs'
+                          : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
                       >
                         {p}
                       </button>
@@ -4373,11 +4916,10 @@ function VerifyAttendeesPanel({
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition ${
-                currentPage === totalPages
-                  ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
-                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 cursor-pointer shadow-xs'
-              }`}
+              className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition ${currentPage === totalPages
+                ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 cursor-pointer shadow-xs'
+                }`}
             >
               <span className="hidden sm:inline">ถัดไป</span>
               <ChevronRight className="w-4 h-4" />
@@ -4866,6 +5408,7 @@ export default function AdminPage() {
           slipUrl: s.slipUrl,
           status: s.status,
           rejectionReason: s.notes,
+          selectedActivities: s.selectedActivities || [],
         }));
         setSlips(mapped);
       }
@@ -4909,30 +5452,40 @@ export default function AdminPage() {
 
   // ─── 5. Auto-populate Receipts from approved slips ───
   useEffect(() => {
-    const approvedSlips = slips.filter((s) => s.status === 'approved');
+    const approvedSlips = [...slips]
+      .filter((s) => s.status === 'approved')
+      .sort((a, b) => {
+        const timeA = new Date(a.transferDate || 0).getTime();
+        const timeB = new Date(b.transferDate || 0).getTime();
+        return timeA - timeB;
+      });
+
     if (approvedSlips.length > 0) {
-      const generatedReceipts: ReceiptData[] = approvedSlips.map((slip) => {
+      const generatedReceipts: ReceiptData[] = approvedSlips.map((slip, index) => {
         const m = meetings.find((mtg) => mtg.id === slip.meetingId);
+        const receiptNo = generateReceiptNo(slip.transferDate, index + 1);
         return {
           id: `REC-${slip.id}`,
-          receiptNo: `2569/${slip.id.slice(0, 8).toUpperCase()}`,
+          receiptNo,
           receiptDate: slip.transferDate || new Date().toLocaleDateString('th-TH'),
           purposeText: 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',
           payerType: 'individual',
           payerName: slip.nameTh,
-          payerAddressLine1: slip.workplace || 'กรุงเทพมหานคร',
-          payerAddressLine2: 'กรุงเทพมหานคร 10330',
+          payerAddressLine1: '',
+          payerAddressLine2: '',
           payerPhone: slip.phone,
           items: [
             {
               id: `item-${slip.id}`,
               itemNumber: 1,
-              title: `ค่าลงทะเบียน ${slip.ticketType}`,
+              title: 'ค่าลงทะเบียน',
               subDetails: [
-                m ? m.titleTh : 'การประชุมวิชาการประจำปี THAISRM Congress 2026',
-                m ? `จัดขึ้นวันที่ ${m.date}` : 'จัดขึ้นวันที่ 10-12 มีนาคม 2569',
-                m ? m.location : 'โรงแรมอีสติน แกรนด์ พญาไท กรุงเทพฯ',
-              ],
+                'การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569',
+                'ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์',
+                m ? `จัดขึ้นวันที่ ${m.date}` : 'จัดขึ้นวันที่ 20-21-22 ตุลาคม  2569',
+                m ? `${m.location}` : 'โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ',
+                slip.nameTh || '',
+              ].filter(Boolean),
               amount: slip.amount,
             },
           ],
@@ -4951,9 +5504,20 @@ export default function AdminPage() {
 
       setReceipts((prev) => {
         const customOnes = prev.filter((r) => !r.slipId);
+        // Normalize any old/custom receipts to follow the same YYYY/MM-NNN standard
+        const normalizedCustom = customOnes.map((r, i) => {
+          if (!r.receiptNo || r.receiptNo.includes('SLIP-') || r.receiptNo.includes('SAMPLE-')) {
+            return {
+              ...r,
+              receiptNo: generateReceiptNo(r.receiptDate || r.createdAt, generatedReceipts.length + i + 1),
+            };
+          }
+          return r;
+        });
+
         const uniqueKeys = new Set();
         const merged: ReceiptData[] = [];
-        [...customOnes, ...generatedReceipts].forEach((r) => {
+        [...normalizedCustom, ...generatedReceipts].forEach((r) => {
           const key = r.slipId || r.id;
           if (!uniqueKeys.has(key)) {
             uniqueKeys.add(key);
@@ -5186,24 +5750,26 @@ export default function AdminPage() {
 
     const newReceipt: ReceiptData = {
       id: `REC-${Date.now()}`,
-      receiptNo: `2569/03-${Math.floor(Math.random() * 900 + 100)}`,
+      receiptNo: generateReceiptNo(new Date(), receipts.length + 1),
       receiptDate: '10 มีนาคม 2569',
       purposeText: 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',
       payerType: 'individual',
       payerName: attendee.nameTh,
-      payerAddressLine1: attendee.workplace || 'กรุงเทพมหานคร',
-      payerAddressLine2: 'กรุงเทพมหานคร 10330',
+      payerAddressLine1: '',
+      payerAddressLine2: '',
       payerPhone: attendee.phone,
       items: [
         {
           id: `item-${Date.now()}`,
           itemNumber: 1,
-          title: `ค่าลงทะเบียน ${attendee.ticketType}`,
+          title: 'ค่าลงทะเบียน',
           subDetails: [
-            attendee.meetingTitle || 'การประชุมวิชาการประจำปี THAISRM Congress 2026',
-            m ? `จัดขึ้นวันที่ ${m.date}` : 'จัดขึ้นวันที่ 10-12 มีนาคม 2569',
-            m ? m.location : 'โรงแรมอีสติน แกรนด์ พญาไท กรุงเทพฯ',
-          ],
+            'การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569',
+            'ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์',
+            m ? `จัดขึ้นวันที่ ${m.date}` : 'จัดขึ้นวันที่ 20-21-22 ตุลาคม  2569',
+            m ? `${m.location}` : 'โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ',
+            attendee.nameTh || '',
+          ].filter(Boolean),
           amount: amount,
         },
       ],
@@ -5236,24 +5802,26 @@ export default function AdminPage() {
 
     const newReceipt: ReceiptData = {
       id: `REC-${Date.now()}`,
-      receiptNo: `2569/03-${Math.floor(Math.random() * 900 + 100)}`,
+      receiptNo: generateReceiptNo(slip.transferDate, receipts.length + 1),
       receiptDate: slip.transferDate || '10 มีนาคม 2569',
       purposeText: 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',
       payerType: 'individual',
       payerName: slip.nameTh,
-      payerAddressLine1: slip.workplace || 'กรุงเทพมหานคร',
-      payerAddressLine2: 'กรุงเทพมหานคร 10330',
+      payerAddressLine1: '',
+      payerAddressLine2: '',
       payerPhone: slip.phone,
       items: [
         {
           id: `item-${Date.now()}`,
           itemNumber: 1,
-          title: `ค่าลงทะเบียน ${slip.ticketType}`,
+          title: 'ค่าลงทะเบียน',
           subDetails: [
-            m ? m.titleTh : 'การประชุมวิชาการประจำปี THAISRM Congress 2026',
-            m ? `จัดขึ้นวันที่ ${m.date}` : 'จัดขึ้นวันที่ 10-12 มีนาคม 2569',
-            m ? m.location : 'โรงแรมอีสติน แกรนด์ พญาไท กรุงเทพฯ',
-          ],
+            'การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569',
+            'ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์',
+            m ? `จัดขึ้นวันที่ ${m.date}` : 'จัดขึ้นวันที่ 20-21-22 ตุลาคม  2569',
+            m ? `${m.location}` : 'โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ',
+            slip.nameTh || '',
+          ].filter(Boolean),
           amount: slip.amount,
         },
       ],

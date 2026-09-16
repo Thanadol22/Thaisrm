@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { ReceiptData } from '@/types/receipt';
 import { ReceiptModal } from '@/components/ReceiptModal';
 import { ReceiptFormModal } from '@/components/ReceiptFormModal';
+import { printReceipt } from '@/lib/printReceipt';
 import {
   Receipt,
   PlusCircle,
@@ -103,11 +104,7 @@ export function ReceiptManagementPanel({
   };
 
   const handleDirectPrint = (receipt: ReceiptData) => {
-    setPreviewReceipt(receipt);
-    setIsPreviewOpen(true);
-    setTimeout(() => {
-      window.print();
-    }, 300);
+    printReceipt(receipt);
   };
 
   const handleDuplicate = (receipt: ReceiptData) => {
@@ -124,11 +121,7 @@ export function ReceiptManagementPanel({
     onSaveReceipt(savedReceipt);
     setIsFormOpen(false);
     if (andPrint) {
-      setPreviewReceipt(savedReceipt);
-      setIsPreviewOpen(true);
-      setTimeout(() => {
-        window.print();
-      }, 400);
+      printReceipt(savedReceipt);
     }
   };
 

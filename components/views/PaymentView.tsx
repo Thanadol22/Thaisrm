@@ -355,7 +355,7 @@ export function PaymentView({
                 </div>
                 <div className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700">
                   <Check className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#0026b3] flex-shrink-0 mt-0.5 stroke-[2.5]" />
-                  <span>{(t.payment as any).regFeature2 || 'รับเอกสารประกอบการประชุม สูจิบัตรดิจิทัล และอาหารว่าง/กลางวัน'}</span>
+                  <span>{(t.payment as any).regFeature2 || 'รับเอกสารประกอบการประชุม และอาหารว่าง/กลางวัน'}</span>
                 </div>
                 <div className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700">
                   <Check className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#0026b3] flex-shrink-0 mt-0.5 stroke-[2.5]" />

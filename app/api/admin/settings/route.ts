@@ -66,6 +66,34 @@ export async function POST(req: NextRequest) {
     if (typeof body.association_address === 'string') payload.association_address = body.association_address;
     if (typeof body.association_contact === 'string') payload.association_contact = body.association_contact;
 
+    // Receipt Templates
+    if (typeof body.receipt_tpl1_name === 'string') payload.receipt_tpl1_name = body.receipt_tpl1_name;
+    if (typeof body.receipt_tpl1_title === 'string') payload.receipt_tpl1_title = body.receipt_tpl1_title;
+    if (typeof body.receipt_tpl1_purpose === 'string') payload.receipt_tpl1_purpose = body.receipt_tpl1_purpose;
+    if (body.receipt_tpl1_amount !== undefined) {
+      const amt = Number(body.receipt_tpl1_amount);
+      if (!isNaN(amt) && amt >= 0) payload.receipt_tpl1_amount = amt;
+    }
+    if (typeof body.receipt_tpl1_details === 'string') payload.receipt_tpl1_details = body.receipt_tpl1_details;
+
+    if (typeof body.receipt_tpl2_name === 'string') payload.receipt_tpl2_name = body.receipt_tpl2_name;
+    if (typeof body.receipt_tpl2_title === 'string') payload.receipt_tpl2_title = body.receipt_tpl2_title;
+    if (typeof body.receipt_tpl2_purpose === 'string') payload.receipt_tpl2_purpose = body.receipt_tpl2_purpose;
+    if (body.receipt_tpl2_amount !== undefined) {
+      const amt = Number(body.receipt_tpl2_amount);
+      if (!isNaN(amt) && amt >= 0) payload.receipt_tpl2_amount = amt;
+    }
+    if (typeof body.receipt_tpl2_details === 'string') payload.receipt_tpl2_details = body.receipt_tpl2_details;
+
+    if (typeof body.receipt_tpl3_name === 'string') payload.receipt_tpl3_name = body.receipt_tpl3_name;
+    if (typeof body.receipt_tpl3_title === 'string') payload.receipt_tpl3_title = body.receipt_tpl3_title;
+    if (typeof body.receipt_tpl3_purpose === 'string') payload.receipt_tpl3_purpose = body.receipt_tpl3_purpose;
+    if (body.receipt_tpl3_amount !== undefined) {
+      const amt = Number(body.receipt_tpl3_amount);
+      if (!isNaN(amt) && amt >= 0) payload.receipt_tpl3_amount = amt;
+    }
+    if (typeof body.receipt_tpl3_details === 'string') payload.receipt_tpl3_details = body.receipt_tpl3_details;
+
     const res = await updateSystemSettings(payload);
 
     if (!res.success) {

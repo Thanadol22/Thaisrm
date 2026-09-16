@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
           status: s.status as 'pending' | 'approved' | 'rejected',
           notes: s.rejection_reason || undefined,
           resubmitToken: s.resubmit_token,
+          selectedActivities: s.selected_activities || [],
           createdAt: s.created_at ? new Date(s.created_at).toISOString() : new Date().toISOString(),
         };
       });
@@ -143,6 +144,7 @@ export async function GET(request: NextRequest) {
           status: s.status as 'pending' | 'approved' | 'rejected',
           notes: s.rejection_reason || undefined,
           resubmitToken: s.resubmit_token,
+          selectedActivities: s.selected_activities || [],
           createdAt: s.created_at ? new Date(s.created_at).toISOString() : new Date().toISOString(),
         };
       });

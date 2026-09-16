@@ -31,6 +31,7 @@ import { GoogleIcon } from '@/components/GoogleIcon';
 import { ParticipantSearchModal } from '@/components/ParticipantSearchModal';
 import { ExpiredMemberModal } from '@/components/ExpiredMemberModal';
 import { SignupView } from '@/components/views/SignupView';
+import { PositionSelect } from '@/components/PositionSelect';
 import { useLanguage } from '@/context/LanguageContext';
 import { parseGoogleName } from '@/lib/utils';
 
@@ -59,44 +60,6 @@ interface LoginViewProps {
     family_name?: string | null;
   } | null;
 }
-
-const POSITION_OPTIONS = [
-  {
-    value: '1 RM',
-    labelTh: '1 RM (แพทย์เวชศาสตร์การเจริญพันธุ์)',
-    labelEn: '1 RM (Reproductive Medicine)'
-  },
-  {
-    value: '2 Fellow RM',
-    labelTh: '2 Fellow RM (แพทย์ประจำบ้านต่อยอด RM)',
-    labelEn: '2 Fellow RM (Fellow in RM)'
-  },
-  {
-    value: '3 Embryologist',
-    labelTh: '3 Embryologist (นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อน)',
-    labelEn: '3 Embryologist'
-  },
-  {
-    value: '4 Technologist for Andrology',
-    labelTh: '4 Technologist for Andrology (นักวิทยาศาสตร์ห้องปฏิบัติการน้ำอสุจิ)',
-    labelEn: '4 Technologist for Andrology'
-  },
-  {
-    value: '5 Molecular Geneticist',
-    labelTh: '5 Molecular Geneticist (นักพันธุศาสตร์ระดับโมเลกุล)',
-    labelEn: '5 Molecular Geneticist'
-  },
-  {
-    value: '6 Nurse',
-    labelTh: '6 Nurse (พยาบาลด้านเวชศาสตร์การเจริญพันธุ์)',
-    labelEn: '6 Nurse'
-  },
-  {
-    value: '0 อื่นๆ',
-    labelTh: '0 อื่นๆ (โปรดระบุ)...',
-    labelEn: '0 Other (Please specify)...'
-  },
-];
 
 function formatMeetingDateDisplay(meetingOrDate?: any, lang: 'th' | 'en' = 'th'): string {
   if (!meetingOrDate) return '';
@@ -285,7 +248,7 @@ export function LoginView({
     nameTh: '',
     nameEn: '',
     workplace: '',
-    position: '1 RM',
+    position: 'ไม่ระบุ',
     positionOther: '',
     specialCode: '',
     email: '',
@@ -319,7 +282,7 @@ export function LoginView({
       nameTh: '',
       nameEn: '',
       workplace: '',
-      position: '1 RM',
+      position: 'ไม่ระบุ',
       positionOther: '',
       specialCode: '',
       email: '',
@@ -375,40 +338,38 @@ export function LoginView({
       }));
 
     const programLabel = selectedActivityObjects.map(a => a.name).join(' + ');
-    const selectedPosObj = POSITION_OPTIONS.find(o => o.value === formData.position);
-    const finalPosition = formData.position === '0 อื่นๆ'
+    const finalPosition = (formData.position === 'อื่นๆ' || formData.position === '0 อื่นๆ')
       ? (formData.positionOther || (lang === 'th' ? 'อื่นๆ' : 'Other'))
-      : (selectedPosObj ? (lang === 'th' ? selectedPosObj.labelTh : selectedPosObj.labelEn) : formData.position);
+      : (formData.position || (lang === 'th' ? 'ไม่ระบุ' : 'Unspecified'));
 
     const rawMemberNo = formData.memberNo.trim();
 
     // ── Form Validation ──────────────────────────────────────────────────────────
-    // ตอนนี้บังคับกรอกเฉพาะเลขสมาชิก (Member No.) ก่อน
-    // เมื่อขึ้น Production สามารถเปิดใช้งาน IS_PRODUCTION_VALIDATION = true ได้ทันที
-    const IS_PRODUCTION_VALIDATION = false;
-
-    if (IS_PRODUCTION_VALIDATION) {
-      if (!formData.nameTh.trim()) {
-        alert(lang === 'th' ? 'กรุณากรอกชื่อ-นามสกุล (ภาษาไทย)' : 'Please enter your Full Name (Thai)');
-        return;
-      }
-      if (!formData.nameEn.trim()) {
-        alert(lang === 'th' ? 'กรุณากรอกชื่อ-นามสกุล (English)' : 'Please enter your Full Name (English)');
-        return;
-      }
-      if (!formData.email.trim()) {
-        alert(lang === 'th' ? 'กรุณากรอกอีเมล' : 'Please enter your Email');
-        return;
-      }
-      if (!formData.workplace.trim()) {
-        alert(lang === 'th' ? 'กรุณากรอกสถานที่ทำงาน/หน่วยงาน' : 'Please enter your Workplace / Hospital');
-        return;
-      }
+    // บังคับกรอก: ชื่อ-นามสกุล (ภาษาไทย), ชื่อ-นามสกุล (ภาษาอังกฤษ), อีเมล, และ หน่วยงาน
+    if (!formData.nameTh.trim()) {
+      alert(lang === 'th' ? 'กรุณากรอกชื่อ-นามสกุล (ภาษาไทย)' : 'Please enter your Full Name (Thai)');
+      return;
     }
 
-    // บังคับกรอกเลขสมาชิก (Member No.)
-    if (!rawMemberNo) {
-      alert(lang === 'th' ? 'กรุณากรอกเลขสมาชิก (Member No.)' : 'Please enter your Member No.');
+    if (!formData.nameEn.trim()) {
+      alert(lang === 'th' ? 'กรุณากรอกชื่อ-นามสกุล (ภาษาอังกฤษ)' : 'Please enter your Full Name (English)');
+      return;
+    }
+
+    const emailTrimmed = formData.email.trim();
+    if (!emailTrimmed) {
+      alert(lang === 'th' ? 'กรุณากรอกอีเมล' : 'Please enter your Email');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailTrimmed)) {
+      alert(lang === 'th' ? 'รูปแบบอีเมลไม่ถูกต้อง' : 'Please enter a valid email address');
+      return;
+    }
+
+    if (!formData.workplace.trim()) {
+      alert(lang === 'th' ? 'กรุณากรอกสถานที่ทำงาน/หน่วยงาน' : 'Please enter your Workplace / Organization');
       return;
     }
 
@@ -789,7 +750,7 @@ export function LoginView({
                       {/* 1. ชื่อ-นามสกุล(ไทย) */}
                       <div>
                         <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
-                          {lang === 'th' ? 'ชื่อ-นามสกุล (ภาษาไทย)' : 'Full Name (Thai)'}
+                          {lang === 'th' ? 'ชื่อ-นามสกุล (ภาษาไทย)' : 'Full Name (Thai)'} <span className="text-rose-500 font-bold">*</span>
                         </label>
                         <div className="relative">
                           <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -806,7 +767,7 @@ export function LoginView({
                       {/* 2. ชื่อ-นามสกุล(อังกฤษ) */}
                       <div>
                         <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
-                          {lang === 'th' ? 'ชื่อ-นามสกุล (ภาษาอังกฤษ)' : 'Full Name (English)'}
+                          {lang === 'th' ? 'ชื่อ-นามสกุล (ภาษาอังกฤษ)' : 'Full Name (English)'} <span className="text-rose-500 font-bold">*</span>
                         </label>
                         <div className="relative">
                           <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -823,7 +784,7 @@ export function LoginView({
                       {/* 3. อีเมล (Email) */}
                       <div>
                         <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
-                          {lang === 'th' ? 'อีเมล (Email)' : 'Email Address'}
+                          {lang === 'th' ? 'อีเมล (Email)' : 'Email Address'} <span className="text-rose-500 font-bold">*</span>
                         </label>
                         <div className="relative">
                           <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -840,7 +801,7 @@ export function LoginView({
                       {/* 4. หน่วยงาน */}
                       <div>
                         <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
-                          {lang === 'th' ? 'หน่วยงาน' : 'Organization / Workplace'}
+                          {lang === 'th' ? 'หน่วยงาน' : 'Organization / Workplace'} <span className="text-rose-500 font-bold">*</span>
                         </label>
                         <div className="relative">
                           <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -855,43 +816,19 @@ export function LoginView({
                       </div>
 
                       {/* 5. ตำแหน่ง */}
-                      <div>
-                        <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
-                          {lang === 'th' ? 'ตำแหน่ง' : 'Position'}
-                        </label>
-                        <div className="relative">
-                          <Award className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                          <select
-                            value={formData.position}
-                            onChange={(e) => handleInputChange('position', e.target.value)}
-                            className="w-full pl-9 sm:pl-10 pr-8 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition appearance-none cursor-pointer"
-                          >
-                            {POSITION_OPTIONS.map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {lang === 'th' ? opt.labelTh : opt.labelEn}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                        </div>
-
-                        {formData.position === '0 อื่นๆ' && (
-                          <div className="mt-2 animate-fade-in">
-                            <input
-                              type="text"
-                              value={formData.positionOther}
-                              onChange={(e) => handleInputChange('positionOther', e.target.value)}
-                              placeholder={lang === 'th' ? 'โปรดระบุตำแหน่งอื่นๆ...' : 'Please specify other position...'}
-                              className="w-full px-3 py-2 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition"
-                            />
-                          </div>
-                        )}
-                      </div>
+                      <PositionSelect
+                        value={formData.position}
+                        onChange={(val) => handleInputChange('position', val)}
+                        otherValue={formData.positionOther}
+                        onOtherChange={(val) => handleInputChange('positionOther', val)}
+                        showIcon={true}
+                        showLabel={true}
+                      />
 
                       {/* 6. เลขสมาชิก */}
                       <div>
                         <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
-                          {lang === 'th' ? 'เลขสมาชิก (Member No.)' : 'Member No.'} <span className="text-rose-500 font-bold">*</span>
+                          {lang === 'th' ? 'เลขสมาชิก (Member No.)' : 'Member No.'}
                         </label>
                         <div className="relative">
                           <Hash className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -899,7 +836,7 @@ export function LoginView({
                             type="text"
                             value={formData.memberNo}
                             onChange={(e) => handleInputChange('memberNo', e.target.value)}
-                            placeholder={lang === 'th' ? 'เช่น 0123 (จำเป็นต้องกรอก)' : 'e.g. 0123 (Required)'}
+                            placeholder={lang === 'th' ? 'เช่น 0123 (ถ้ามี)' : 'e.g. 0123 (Optional)'}
                             className="w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition"
                           />
                         </div>
