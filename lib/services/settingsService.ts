@@ -83,10 +83,22 @@ interface SettingRow {
   updated_at?: Date;
 }
 
+let settingsCache: { data: SystemSettings; timestamp: number } | null = null;
+const SETTINGS_CACHE_TTL_MS = 60000; // 60 seconds
+
+export function invalidateSettingsCache() {
+  settingsCache = null;
+}
+
 /**
- * Fetch all system settings merged with defaults
+ * Fetch all system settings merged with defaults (cached in-memory for 60s)
  */
-export async function getSystemSettings(): Promise<SystemSettings> {
+export async function getSystemSettings(forceFresh = false): Promise<SystemSettings> {
+  const now = Date.now();
+  if (!forceFresh && settingsCache && now - settingsCache.timestamp < SETTINGS_CACHE_TTL_MS) {
+    return settingsCache.data;
+  }
+
   const result: SystemSettings = { ...DEFAULT_SYSTEM_SETTINGS };
 
   try {
@@ -116,6 +128,7 @@ export async function getSystemSettings(): Promise<SystemSettings> {
     console.warn('Could not read from system_settings table, using defaults:', error);
   }
 
+  settingsCache = { data: result, timestamp: now };
   return result;
 }
 
@@ -142,7 +155,8 @@ export async function updateSystemSettings(
       );
     }
 
-    const updated = await getSystemSettings();
+    invalidateSettingsCache();
+    const updated = await getSystemSettings(true);
     return { success: true, settings: updated };
   } catch (error: any) {
     console.error('Error updating system settings:', error);

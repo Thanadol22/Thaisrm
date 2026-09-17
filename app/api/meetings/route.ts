@@ -35,7 +35,14 @@ export async function GET(req: NextRequest) {
     if (action === 'latest' || action === 'active') {
       const { getLatestActiveMeeting } = await import('@/lib/services/meetingService');
       const meeting = await getLatestActiveMeeting();
-      return NextResponse.json({ success: true, data: meeting });
+      return NextResponse.json(
+        { success: true, data: meeting },
+        {
+          headers: {
+            'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+          },
+        }
+      );
     }
 
     const search = searchParams.get('search') || undefined;

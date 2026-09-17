@@ -150,49 +150,62 @@ export async function generateQrCode(text: string): Promise<string> {
   }
 }
 
+let statsCache: { data: MemberStats; timestamp: number } | null = null;
+const STATS_CACHE_TTL_MS = 20000; // 20 seconds cache
+
+export function invalidateMemberStatsCache() {
+  statsCache = null;
+}
+
 /**
  * สถิติภาพรวมสมาชิกทั้งหมดจากฐานข้อมูล (Total, Regular, Lifelong, Active, Inactive)
+ * ปรับปรุงให้รัน Single SQL Aggregation Query เพียง 1 รอบ แทนการยิง 5 queries แยกกัน
  */
 export async function getMemberStats(): Promise<MemberStats> {
-  const [total, regularCount, lifelongCount, activeCount, inactiveCount] = await Promise.all([
-    prisma.member.count(),
-    prisma.member.count({
-      where: {
-        OR: [
-          { membership_type: { equals: 'Regular', mode: 'insensitive' } },
-          { membership_type: null },
-          { membership_type: '' },
-        ],
-      },
-    }),
-    prisma.member.count({
-      where: {
-        membership_type: { equals: 'Lifelong', mode: 'insensitive' },
-      },
-    }),
-    prisma.member.count({
-      where: {
-        OR: [
-          { membership_status: { equals: 'Active', mode: 'insensitive' } },
-          { membership_status: null },
-          { membership_status: '' },
-        ],
-      },
-    }),
-    prisma.member.count({
-      where: {
-        membership_status: { equals: 'Inactive', mode: 'insensitive' },
-      },
-    }),
-  ]);
+  const now = Date.now();
+  if (statsCache && now - statsCache.timestamp < STATS_CACHE_TTL_MS) {
+    return statsCache.data;
+  }
 
-  return {
-    total,
-    regular_count: regularCount,
-    lifelong_count: lifelongCount,
-    active_count: activeCount,
-    inactive_count: inactiveCount,
-  };
+  try {
+    const rows = await prisma.$queryRaw<Array<{
+      total: bigint | number;
+      regular_count: bigint | number;
+      lifelong_count: bigint | number;
+      active_count: bigint | number;
+      inactive_count: bigint | number;
+    }>>`
+      SELECT
+        COUNT(*)::integer AS total,
+        COUNT(CASE WHEN LOWER(COALESCE(membership_type, 'Regular')) = 'regular' OR membership_type IS NULL OR membership_type = '' THEN 1 END)::integer AS regular_count,
+        COUNT(CASE WHEN LOWER(membership_type) = 'lifelong' THEN 1 END)::integer AS lifelong_count,
+        COUNT(CASE WHEN LOWER(COALESCE(membership_status, 'Active')) = 'active' OR membership_status IS NULL OR membership_status = '' THEN 1 END)::integer AS active_count,
+        COUNT(CASE WHEN LOWER(membership_status) = 'inactive' THEN 1 END)::integer AS inactive_count
+      FROM members
+    `;
+
+    const row = rows?.[0];
+    const stats: MemberStats = {
+      total: Number(row?.total || 0),
+      regular_count: Number(row?.regular_count || 0),
+      lifelong_count: Number(row?.lifelong_count || 0),
+      active_count: Number(row?.active_count || 0),
+      inactive_count: Number(row?.inactive_count || 0),
+    };
+
+    statsCache = { data: stats, timestamp: now };
+    return stats;
+  } catch (err) {
+    console.warn('Optimized member stats query failed, falling back to count:', err);
+    const total = await prisma.member.count();
+    return {
+      total,
+      regular_count: 0,
+      lifelong_count: 0,
+      active_count: total,
+      inactive_count: 0,
+    };
+  }
 }
 
 /**
@@ -270,6 +283,7 @@ export async function createMember(rawInput: CreateMemberInput): Promise<Member>
     },
   });
 
+  invalidateMemberStatsCache();
   return toMemberDto(newMember);
 }
 
@@ -564,6 +578,7 @@ export async function updateMember(id: string | number | bigint, rawInput: Updat
     });
   });
 
+  invalidateMemberStatsCache();
   return toMemberDto(updated);
 }
 
@@ -591,6 +606,7 @@ export async function deleteMember(id: string | number | bigint): Promise<boolea
     await prisma.member.delete({
       where: { member_no },
     });
+    invalidateMemberStatsCache();
     return true;
   } catch (error) {
     console.error('Delete member error:', error);

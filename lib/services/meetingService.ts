@@ -50,6 +50,15 @@ export interface GetMeetingsParams {
   order?: 'asc' | 'desc';
 }
 
+/* ─── In-Memory Cache for Latest Active Meeting ───────────────────── */
+
+let latestMeetingCache: { data: any; timestamp: number } | null = null;
+const LATEST_MEETING_CACHE_TTL_MS = 30000; // 30 seconds cache
+
+export function invalidateLatestMeetingCache() {
+  latestMeetingCache = null;
+}
+
 /* ─── HELPER: Generate Next TSRM Meeting ID ───────────────────────── */
 
 export async function getNextMeetingId(): Promise<string> {
@@ -148,6 +157,7 @@ export async function createMeeting(input: CreateMeetingInput) {
     console.warn('Could not set start_date / end_date in DB:', rawErr);
   }
 
+  invalidateLatestMeetingCache();
   return meeting;
 }
 
@@ -316,7 +326,12 @@ export async function getMeetingById(meetingId: string) {
 
 /* ─── READ (Latest Active/Open Meeting) ────────────────────────────── */
 
-export async function getLatestActiveMeeting() {
+export async function getLatestActiveMeeting(forceFresh = false) {
+  const now = Date.now();
+  if (!forceFresh && latestMeetingCache && now - latestMeetingCache.timestamp < LATEST_MEETING_CACHE_TTL_MS) {
+    return latestMeetingCache.data;
+  }
+
   // Find latest meeting that is 'upcoming' or 'ongoing' ordered by meeting_date desc
   const meeting = await prisma.meetings.findFirst({
     where: {
@@ -330,6 +345,7 @@ export async function getLatestActiveMeeting() {
     },
   });
 
+  latestMeetingCache = { data: meeting, timestamp: now };
   return meeting;
 }
 
@@ -435,6 +451,7 @@ export async function updateMeeting(meetingId: string, input: UpdateMeetingInput
     }
   }
 
+  invalidateLatestMeetingCache();
   return meeting;
 }
 
@@ -450,6 +467,7 @@ export async function deleteMeeting(meetingId: string) {
     where: { meeting_id: meetingId },
   });
 
+  invalidateLatestMeetingCache();
   return meeting;
 }
 
