@@ -41,6 +41,7 @@ interface MeetingActivity {
   name: string;
   date?: string;
   selectedDays?: string[];
+  format?: 'onsite' | 'online' | 'both';
   maxSeats?: number;
   memberPrice?: number;
   nonMemberPrice?: number;
@@ -226,10 +227,14 @@ export function LoginView({
         next = [...prev, key];
       }
 
-      // Check if newly selected programs contain a workshop
-      const containsWorkshop = effectiveActivities.some(a => next.includes(a.id) && a.type === 'workshop');
-      if (containsWorkshop) {
+      // Check if newly selected programs contain format restrictions
+      const selectedActs = effectiveActivities.filter(a => next.includes(a.id));
+      const hasOnsiteOnly = selectedActs.some(a => (a.format || (a.type === 'workshop' ? 'onsite' : 'both')) === 'onsite');
+      const hasOnlineOnly = selectedActs.some(a => a.format === 'online');
+      if (hasOnsiteOnly) {
         setAttendanceType('onsite');
+      } else if (hasOnlineOnly) {
+        setAttendanceType('online');
       }
 
       return next;
@@ -333,9 +338,13 @@ export function LoginView({
         name: a.name,
         type: a.type,
         date: a.date,
+        format: a.format || (a.type === 'workshop' ? 'onsite' : 'both'),
         memberPrice: a.memberPrice,
         nonMemberPrice: a.nonMemberPrice,
       }));
+
+    const onsiteOnlyActs = selectedActivityObjects.filter(a => a.format === 'onsite');
+    const hasOnsiteOnlySelected = onsiteOnlyActs.length > 0;
 
     const programLabel = selectedActivityObjects.map(a => a.name).join(' + ');
     const finalPosition = (formData.position === 'อื่นๆ' || formData.position === '0 อื่นๆ')
@@ -422,8 +431,12 @@ export function LoginView({
 
     // Validation: Main program online attendance is strictly reserved for active members
     if (attendanceType === 'online') {
-      if (hasWorkshopSelected) {
-        alert(lang === 'th' ? 'หลักสูตรเวิร์กช็อป (Workshop) บังคับเข้าร่วมแบบ Onsite (ที่งาน) เท่านั้น' : 'Workshops require Onsite attendance only.');
+      if (hasOnsiteOnlySelected) {
+        alert(
+          lang === 'th'
+            ? `หลักสูตร "${onsiteOnlyActs.map(a => a.name).join(', ')}" กำหนดให้เข้าร่วมแบบ Onsite (ที่งาน) เท่านั้น`
+            : `Course "${onsiteOnlyActs.map(a => a.name).join(', ')}" requires Onsite attendance only.`
+        );
         return;
       }
 
@@ -893,6 +906,23 @@ export function LoginView({
                                     }`}>
                                     {act.type === 'main' ? (lang === 'th' ? 'หลักสูตรหลัก' : 'Main') : (lang === 'th' ? 'เวิร์กช็อป' : 'Workshop')}
                                   </span>
+
+                                  {/* Format Badge */}
+                                  {(() => {
+                                    const fmt = act.format || (act.type === 'workshop' ? 'onsite' : 'both');
+                                    return (
+                                      <span className={`text-[8px] sm:text-[9px] font-extrabold px-1.5 py-0.5 rounded shrink-0 border ${
+                                        fmt === 'online'
+                                          ? (isSelected ? 'bg-blue-100 text-[#0026b3] border-blue-300' : 'bg-blue-50 text-blue-700 border-blue-200')
+                                          : fmt === 'both'
+                                          ? (isSelected ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-purple-50 text-purple-700 border-purple-200')
+                                          : (isSelected ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                                      }`}>
+                                        {fmt === 'online' ? '💻 Online' : fmt === 'both' ? '🌐 Hybrid' : '🏢 Onsite'}
+                                      </span>
+                                    );
+                                  })()}
+
                                   {act.date && (
                                     <span className="text-[10px] sm:text-[11px] text-slate-500 flex items-center gap-1">
                                       <Calendar className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400 shrink-0" />
@@ -916,73 +946,95 @@ export function LoginView({
                     </div>
 
                     {/* Attendance Format: Onsite vs Online */}
-                    <div className="space-y-1 sm:space-y-1.5 pt-0.5 sm:pt-1">
-                      <label className="text-[11px] sm:text-xs font-bold text-slate-700 block">
-                        {lang === 'th' ? 'รูปแบบการเข้าร่วม (Attendance Format)' : 'Attendance Format'}
-                      </label>
+                    {(() => {
+                      const selectedActs = effectiveActivities.filter(a => selectedPrograms.includes(a.id));
+                      const onsiteOnlyActs = selectedActs.filter(a => (a.format || (a.type === 'workshop' ? 'onsite' : 'both')) === 'onsite');
+                      const onlineOnlyActs = selectedActs.filter(a => a.format === 'online');
+                      const hasOnsiteOnly = onsiteOnlyActs.length > 0;
+                      const hasOnlineOnly = onlineOnlyActs.length > 0;
 
-                      <div className="grid grid-cols-2 gap-1.5 sm:gap-3">
-                        {/* Onsite */}
-                        <button
-                          type="button"
-                          onClick={() => setAttendanceType('onsite')}
-                          className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl border text-[11px] sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 sm:gap-2 active:scale-95 ${attendanceType === 'onsite'
-                              ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30'
-                              : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-600 font-medium'
-                            }`}
-                        >
-                          <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                          <span className="truncate">{lang === 'th' ? 'Onsite (ที่งาน)' : 'Onsite'}</span>
-                        </button>
+                      return (
+                        <div className="space-y-1 sm:space-y-1.5 pt-0.5 sm:pt-1">
+                          <label className="text-[11px] sm:text-xs font-bold text-slate-700 block">
+                            {lang === 'th' ? 'รูปแบบการเข้าร่วม (Attendance Format)' : 'Attendance Format'}
+                          </label>
 
-                        {/* Online */}
-                        <button
-                          type="button"
-                          disabled={hasWorkshopSelected}
-                          onClick={() => {
-                            if (!hasWorkshopSelected) {
-                              setAttendanceType('online');
-                            }
-                          }}
-                          className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl border text-[11px] sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${hasWorkshopSelected
-                              ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                              : attendanceType === 'online'
-                                ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30 cursor-pointer active:scale-95'
-                                : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-600 font-medium cursor-pointer active:scale-95'
-                            }`}
-                          title={
-                            hasWorkshopSelected
-                              ? (lang === 'th' ? 'เวิร์กช็อปเปิดรับเฉพาะ Onsite เท่านั้น' : 'Workshops are Onsite only')
-                              : ''
-                          }
-                        >
-                          <Monitor className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                          <span className="truncate">{lang === 'th' ? 'Online (ออนไลน์)' : 'Online'}</span>
-                        </button>
-                      </div>
+                          <div className="grid grid-cols-2 gap-1.5 sm:gap-3">
+                            {/* Onsite */}
+                            <button
+                              type="button"
+                              disabled={hasOnlineOnly}
+                              onClick={() => {
+                                if (!hasOnlineOnly) setAttendanceType('onsite');
+                              }}
+                              className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl border text-[11px] sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${hasOnlineOnly
+                                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                                  : attendanceType === 'onsite'
+                                    ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30 cursor-pointer active:scale-95'
+                                    : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-600 font-medium cursor-pointer active:scale-95'
+                                }`}
+                              title={hasOnlineOnly ? (lang === 'th' ? 'มีหลักสูตรที่เปิดรับเฉพาะ Online เท่านั้น' : 'Includes Online-only courses') : ''}
+                            >
+                              <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                              <span className="truncate">{lang === 'th' ? 'Onsite (ที่งาน)' : 'Onsite'}</span>
+                            </button>
 
-                      {/* Workshop Onsite Notice */}
-                      {hasWorkshopSelected && (
-                        <div className="flex items-start gap-1.5 p-2 rounded-lg bg-amber-50/90 border border-amber-200/70 text-amber-800 text-[11px] leading-relaxed">
-                          <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                          <span>
-                            {lang === 'th'
-                              ? 'หลักสูตรเวิร์กช็อป บังคับเข้าร่วมที่งานเท่านั้น'
-                              : 'Workshop courses require Onsite attendance only.'}
-                          </span>
+                            {/* Online */}
+                            <button
+                              type="button"
+                              disabled={hasOnsiteOnly}
+                              onClick={() => {
+                                if (!hasOnsiteOnly) setAttendanceType('online');
+                              }}
+                              className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl border text-[11px] sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${hasOnsiteOnly
+                                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                                  : attendanceType === 'online'
+                                    ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30 cursor-pointer active:scale-95'
+                                    : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-600 font-medium cursor-pointer active:scale-95'
+                                }`}
+                              title={hasOnsiteOnly ? (lang === 'th' ? 'มีหลักสูตรที่เปิดรับเฉพาะ Onsite เท่านั้น' : 'Includes Onsite-only courses') : ''}
+                            >
+                              <Monitor className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                              <span className="truncate">{lang === 'th' ? 'Online (ออนไลน์)' : 'Online'}</span>
+                            </button>
+                          </div>
+
+                          {/* Onsite only notice */}
+                          {hasOnsiteOnly && (
+                            <div className="flex items-start gap-1.5 p-2 rounded-lg bg-amber-50/90 border border-amber-200/70 text-amber-800 text-[11px] leading-relaxed">
+                              <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                              <span>
+                                {lang === 'th'
+                                  ? `หลักสูตร "${onsiteOnlyActs.map(a => a.name).join(', ')}" บังคับเข้าร่วม ณ สถานที่จัดงานจริง (Onsite)`
+                                  : `Course "${onsiteOnlyActs.map(a => a.name).join(', ')}" requires Onsite attendance.`}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Online only notice */}
+                          {hasOnlineOnly && (
+                            <div className="flex items-start gap-1.5 p-2 rounded-lg bg-blue-50/90 border border-blue-200/70 text-blue-800 text-[11px] leading-relaxed">
+                              <AlertCircle className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                              <span>
+                                {lang === 'th'
+                                  ? `หลักสูตร "${onlineOnlyActs.map(a => a.name).join(', ')}" จัดการเรียนผ่านระบบ Online เท่านั้น`
+                                  : `Course "${onlineOnlyActs.map(a => a.name).join(', ')}" is Online only.`}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Format Change Fee Notice (1,000 THB) */}
+                          <div className="flex items-start gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-200/80 text-slate-600 text-[11px] leading-relaxed">
+                            <AlertCircle className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
+                            <span>
+                              {lang === 'th'
+                                ? `หมายเหตุ: หากต้องการเปลี่ยนรูปแบบการเข้าร่วมภายหลัง จะมีค่าธรรมเนียมการเปลี่ยนรูปแบบ ${((activeMeeting?.pricing_tiers?.changeFee?.onsiteMember || 1000)).toLocaleString()} บาท ตามที่ระบุไว้ในเงื่อนไขการประชุม`
+                                : `Note: If you request to change attendance format later, a ${((activeMeeting?.pricing_tiers?.changeFee?.onsiteMember || 1000)).toLocaleString()} THB fee will apply as specified in event policy.`}
+                            </span>
+                          </div>
                         </div>
-                      )}
-
-                      {/* Format Change Fee Notice (1,000 THB) */}
-                      <div className="flex items-start gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-200/80 text-slate-600 text-[11px] leading-relaxed">
-                        <AlertCircle className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
-                        <span>
-                          {lang === 'th'
-                            ? `หมายเหตุ: หากต้องการเปลี่ยนรูปแบบการเข้าร่วมภายหลัง จะมีค่าธรรมเนียมการเปลี่ยนรูปแบบ ${((activeMeeting?.pricing_tiers?.changeFee?.onsiteMember || 1000)).toLocaleString()} บาท ตามที่ระบุไว้ในเงื่อนไขการประชุม`
-                            : `Note: If you request to change attendance format later, a ${((activeMeeting?.pricing_tiers?.changeFee?.onsiteMember || 1000)).toLocaleString()} THB fee will apply as specified in event policy.`}
-                        </span>
-                      </div>
-                    </div>
+                      );
+                    })()}
 
                     {/* High-Impact Call to Action Button to Payment Page */}
                     <button

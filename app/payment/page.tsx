@@ -38,6 +38,7 @@ function PaymentContent() {
       id: string;
       name: string;
       type?: string;
+      format?: 'onsite' | 'online' | 'both';
       date?: string;
       memberPrice?: number;
       nonMemberPrice?: number;
@@ -47,6 +48,7 @@ function PaymentContent() {
       id: string;
       name: string;
       type?: string;
+      format?: 'onsite' | 'online' | 'both';
       date?: string;
       memberPrice?: number;
       nonMemberPrice?: number;
@@ -119,6 +121,7 @@ function PaymentContent() {
           id: string;
           name: string;
           type: string;
+          format?: string;
           date?: string;
           price: number;
           rateBadgeTh: string;
@@ -147,10 +150,10 @@ function PaymentContent() {
     const activitiesToCalculate = allActivities.filter(a => selectedIds.includes(a.id));
 
     // Enforce attendance rule:
-    // 1. If any workshop selected -> force 'onsite'
-    // 2. If Main program only -> only active member is allowed 'online'
-    const hasWorkshop = activitiesToCalculate.some(a => a.type === 'workshop');
-    const isOnlineEligible = !hasWorkshop && isMemberUser;
+    // 1. If any selected activity is strictly 'onsite' -> force 'onsite'
+    // 2. Online rate is only eligible if no onsite-only activity is selected and user is active member
+    const hasOnsiteOnly = activitiesToCalculate.some(a => (a.format || (a.type === 'workshop' ? 'onsite' : 'both')) === 'onsite');
+    const isOnlineEligible = !hasOnsiteOnly && isMemberUser;
     const attendType: 'onsite' | 'online' = (regData.attendanceType === 'online' && isOnlineEligible) ? 'online' : 'onsite';
 
     // Calculate each item
@@ -187,6 +190,7 @@ function PaymentContent() {
         id: act.id,
         name: act.name,
         type: act.type || 'main',
+        format: act.format,
         date: act.date,
         price,
         rateBadgeTh,

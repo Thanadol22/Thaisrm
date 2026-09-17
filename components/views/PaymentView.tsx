@@ -23,6 +23,7 @@ export interface ItemizedActivity {
   name: string;
   type: string;
   date?: string;
+  format?: string;
   price: number;
   rateBadgeTh?: string;
   rateBadgeEn?: string;
@@ -244,6 +245,17 @@ export function PaymentView({
                               }`}>
                                 {act.type === 'main' ? (lang === 'th' ? 'หลักสูตรหลัก' : 'Main') : (lang === 'th' ? 'เวิร์กช็อป' : 'Workshop')}
                               </span>
+                              {act.format && (
+                                <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded border ${
+                                  act.format === 'online'
+                                    ? 'bg-blue-50 text-[#0026b3] border-blue-200'
+                                    : act.format === 'both'
+                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                    : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                }`}>
+                                  {act.format === 'online' ? '💻 Online' : act.format === 'both' ? '🌐 Hybrid' : '🏢 Onsite'}
+                                </span>
+                              )}
                               <h4 className="font-bold text-xs sm:text-sm text-slate-900 truncate">
                                 {act.name}
                               </h4>

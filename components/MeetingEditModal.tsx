@@ -24,7 +24,8 @@ import {
   SlidersHorizontal,
   Info,
   CalendarDays,
-  Loader2
+  Loader2,
+  Monitor
 } from 'lucide-react';
 import { ThaiDateRangePicker } from '@/components/ThaiDateRangePicker';
 import { ThaiTimeRangePicker } from '@/components/ThaiTimeRangePicker';
@@ -56,6 +57,7 @@ export interface ActivityItem {
   name: string;
   date: string;
   selectedDays?: string[];
+  format?: 'onsite' | 'online' | 'both';
   maxSeats?: number;
   memberPrice?: number;
   nonMemberPrice?: number;
@@ -165,6 +167,7 @@ export function MeetingEditModal({
     name: '',
     date: '',
     selectedDays: [],
+    format: type === 'workshop' ? 'onsite' : 'both',
     maxSeats: type === 'workshop' ? 50 : 0,
     memberPrice: type === 'workshop' ? 0 : undefined,
     nonMemberPrice: type === 'workshop' ? 0 : undefined,
@@ -208,7 +211,10 @@ export function MeetingEditModal({
 
       // Parse activities if available
       if (meeting.activities && Array.isArray(meeting.activities) && meeting.activities.length > 0) {
-        setActivities(meeting.activities);
+        setActivities(meeting.activities.map((a: any) => ({
+          ...a,
+          format: a.format || (a.type === 'workshop' ? 'onsite' : 'both')
+        })));
       } else {
         setActivities([
           {
@@ -217,6 +223,7 @@ export function MeetingEditModal({
             name: meeting.titleTh || 'Main Scientific Program',
             date: meeting.date || '',
             selectedDays: [],
+            format: 'both',
             maxSeats: 0,
           },
         ]);
@@ -775,6 +782,54 @@ export function MeetingEditModal({
                             placeholder={isMain ? 'เช่น Main Scientific Program' : 'เช่น Embryologist Hands-on Workshop'}
                             className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3]"
                           />
+                        </div>
+
+                        {/* Format Selection: Onsite / Online / Both */}
+                        <div className="space-y-1.5 pt-1">
+                          <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                            <span>รูปแบบหลักสูตร (Online / Onsite) *</span>
+                            <span className="text-[11px] text-slate-400 font-normal">กำหนดช่องทางการเข้าร่วม</span>
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateActivity(activity.id, 'format', 'onsite')}
+                              className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                (activity.format || 'onsite') === 'onsite'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-400 shadow-2xs ring-1 ring-emerald-300 font-extrabold'
+                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-800'
+                              }`}
+                            >
+                              <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="truncate">Onsite เท่านั้น</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateActivity(activity.id, 'format', 'online')}
+                              className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                activity.format === 'online'
+                                  ? 'bg-blue-50 text-[#0026b3] border-[#0026b3] shadow-2xs ring-1 ring-blue-300 font-extrabold'
+                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-800'
+                              }`}
+                            >
+                              <Monitor className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
+                              <span className="truncate">Online เท่านั้น</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateActivity(activity.id, 'format', 'both')}
+                              className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                activity.format === 'both'
+                                  ? 'bg-indigo-50 text-indigo-800 border-indigo-400 shadow-2xs ring-1 ring-indigo-300 font-extrabold'
+                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-800'
+                              }`}
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                              <span className="truncate">ทั้งสองแบบ (Hybrid)</span>
+                            </button>
+                          </div>
                         </div>
 
                         {/* Date selection pills */}

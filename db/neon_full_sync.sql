@@ -1,6 +1,6 @@
 -- ==========================================================
 -- THAISRM FULL DATABASE MIGRATION & SYNC FOR NEON POSTGRESQL
--- Generated at: 2026-09-17T04:27:34.568Z
+-- Generated at: 2026-09-17T08:01:15.686Z
 -- ==========================================================
 
 -- 0. Ensure Schema & Columns exist on Neon
