@@ -217,7 +217,7 @@ export function ReceiptManagementPanel({
               className="px-4 py-2 text-xs font-bold text-white bg-[#0026b3] hover:bg-[#001f94] shadow-md shadow-[#0026b3]/25 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <PlusCircle className="w-4 h-4 text-[#4ade80]" />
-              <span>ออกใบเสร็จใหม่ (+ Issue)</span>
+              <span>ออกใบเสร็จใหม่</span>
             </button>
           </div>
         </div>
@@ -292,39 +292,39 @@ export function ReceiptManagementPanel({
               ) : (
                 filteredReceipts.map((r) => (
                   <tr key={r.id} className="hover:bg-blue-50/40 transition-colors">
-                    <td className="py-4 px-4 sm:px-6">
+                    <td className="py-4 px-4 sm:px-6 whitespace-nowrap min-w-[140px]">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-[#0026b3] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                        <span className="font-mono font-bold text-[#0026b3] bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-200 whitespace-nowrap inline-block">
                           {r.receiptNo}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1 text-[11px] text-slate-500 mt-1">
-                        <Calendar className="w-3 h-3 text-slate-400" />
+                      <div className="flex items-center gap-1 text-[11px] text-slate-500 mt-1 whitespace-nowrap">
+                        <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
                         <span>{r.receiptDate}</span>
                       </div>
                     </td>
 
-                    <td className="py-4 px-4 max-w-xs">
+                    <td className="py-4 px-4 min-w-[180px]">
                       <div className="flex items-center gap-1.5">
                         <span className="font-bold text-slate-800 line-clamp-1">{r.payerName}</span>
                         {r.payerType === 'company' ? (
-                          <span className="shrink-0 text-[10px] px-1.5 py-0.5 bg-blue-50 text-[#0026b3] rounded font-bold border border-blue-200">
+                          <span className="shrink-0 text-[10px] px-1.5 py-0.5 bg-blue-50 text-[#0026b3] rounded font-bold border border-blue-200 whitespace-nowrap">
                             นิติบุคคล
                           </span>
                         ) : (
-                          <span className="shrink-0 text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded font-medium">
+                          <span className="shrink-0 text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded font-medium whitespace-nowrap">
                             บุคคล
                           </span>
                         )}
                       </div>
                       {r.payerTaxId && (
-                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                        <p className="text-[11px] text-slate-400 font-mono mt-0.5 whitespace-nowrap">
                           Tax ID: {r.payerTaxId}
                         </p>
                       )}
                     </td>
 
-                    <td className="py-4 px-4 max-w-xs">
+                    <td className="py-4 px-4 min-w-[200px]">
                       <div className="space-y-0.5">
                         {r.items.map((it, idx) => (
                           <div key={idx} className="text-xs text-slate-700">
@@ -339,7 +339,7 @@ export function ReceiptManagementPanel({
                       </div>
                     </td>
 
-                    <td className="py-4 px-4 text-right whitespace-nowrap">
+                    <td className="py-4 px-4 text-right whitespace-nowrap min-w-[120px]">
                       <div className="font-bold font-mono text-slate-900 text-sm">
                         ฿{r.totalAmount.toLocaleString('th-TH')}
                       </div>
@@ -349,7 +349,7 @@ export function ReceiptManagementPanel({
                       </div>
                     </td>
 
-                    <td className="py-4 px-4">
+                    <td className="py-4 px-4 min-w-[150px] whitespace-nowrap">
                       <div className="text-xs text-slate-700">
                         {r.authorizedSignerName}
                       </div>
@@ -358,7 +358,7 @@ export function ReceiptManagementPanel({
                       </div>
                     </td>
 
-                    <td className="py-4 px-4 sm:px-6 text-center">
+                    <td className="py-4 px-4 sm:px-6 text-center whitespace-nowrap min-w-[150px]">
                       <div className="flex items-center justify-center gap-1">
                         <button
                           type="button"

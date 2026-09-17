@@ -14,6 +14,7 @@ export interface SystemSettings {
   association_name_en: string;
   association_address: string;
   association_contact: string;
+  association_tax_id: string;
 
   // Receipt Template 1: ค่าลงทะเบียน (Registration)
   receipt_tpl1_name: string;
@@ -51,6 +52,7 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   association_name_en: 'Thai Society for Reproductive Medicine',
   association_address: 'ชั้น 8 อาคารเฉลิมพระบารมี ๕๐ ปี เลขที่ 2 ซอยศูนย์วิจัย ถนนเพชรบุรีตัดใหม่ กรุงเทพฯ',
   association_contact: 'Website: https://thaisrm.com/ E-mail: tsrm.info@gmail.com',
+  association_tax_id: '0-9930-00367-70-7',
 
   // Template 1: ค่าลงทะเบียน
   receipt_tpl1_name: 'ค่าลงทะเบียนเข้าร่วมประชุม',

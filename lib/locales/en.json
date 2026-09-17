@@ -136,7 +136,7 @@
     "noSlipWarning": "Please upload a payment slip before confirming payment",
     "readyToConfirmNotice": "Slip attached successfully. Please click confirm payment to proceed.",
     "termsDisclaimer": "By making payment you agree to THAISRM terms and conditions.",
-    "copyToast": "Bank account number 020-8-16398-1 copied successfully!",
+    "copyToast": "Bank account number copied successfully!",
     "uploadSuccessToast": "Slip uploaded successfully! Ready for payment confirmation."
   },
   "slipModal": {

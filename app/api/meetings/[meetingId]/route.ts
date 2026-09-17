@@ -5,6 +5,7 @@ import {
   deleteMeeting,
   UpdateMeetingInput,
 } from '@/lib/services/meetingService';
+import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 
 /**
  * GET /api/meetings/[meetingId]
@@ -31,7 +32,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการดึงข้อมูลการประชุม',
+        error: 'เกิดข้อผิดพลาดในการดึงข้อมูลการประชุม',
       },
       { status: 500 }
     );
@@ -46,6 +47,10 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ meetingId: string }> }
 ) {
+  const session = getAdminSessionFromRequest(req);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const { meetingId } = await params;
     const body: UpdateMeetingInput = await req.json();
@@ -74,7 +79,7 @@ export async function PUT(
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการอัปเดตข้อมูลการประชุม',
+        error: 'เกิดข้อผิดพลาดในการอัปเดตข้อมูลการประชุม',
       },
       { status: 500 }
     );
@@ -86,9 +91,13 @@ export async function PUT(
  * ลบการประชุม (และ attendance records ที่เกี่ยวข้อง)
  */
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ meetingId: string }> }
 ) {
+  const session = getAdminSessionFromRequest(req);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const { meetingId } = await params;
 
@@ -114,7 +123,7 @@ export async function DELETE(
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลบการประชุม',
+        error: 'เกิดข้อผิดพลาดในการลบการประชุม',
       },
       { status: 500 }
     );

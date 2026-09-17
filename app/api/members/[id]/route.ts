@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getMemberById, updateMember, deleteMember } from '@/lib/services/memberService';
 import { validateUpdateMember } from '@/lib/validators/memberValidator';
 import { UpdateMemberInput, ApiResponse } from '@/types/member';
+import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -15,9 +16,13 @@ interface RouteContext {
  * ดึงข้อมูลสมาชิกรายบุคคลตาม ID
  */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   context: RouteContext
 ) {
+  const session = getAdminSessionFromRequest(req);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const { id } = await context.params;
 
@@ -48,7 +53,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการดึงข้อมูลสมาชิก',
+        error: 'เกิดข้อผิดพลาดในการดึงข้อมูลสมาชิก',
       },
       { status: 500 }
     );
@@ -63,6 +68,10 @@ export async function PUT(
   req: NextRequest,
   context: RouteContext
 ) {
+  const session = getAdminSessionFromRequest(req);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const { id } = await context.params;
 
@@ -108,7 +117,7 @@ export async function PUT(
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการแก้ไขข้อมูลสมาชิก',
+        error: 'เกิดข้อผิดพลาดในการแก้ไขข้อมูลสมาชิก',
       },
       { status: 500 }
     );
@@ -120,9 +129,13 @@ export async function PUT(
  * ลบข้อมูลสมาชิก
  */
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   context: RouteContext
 ) {
+  const session = getAdminSessionFromRequest(req);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const { id } = await context.params;
 
@@ -153,7 +166,7 @@ export async function DELETE(
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลบข้อมูลสมาชิก',
+        error: 'เกิดข้อผิดพลาดในการลบข้อมูลสมาชิก',
       },
       { status: 500 }
     );

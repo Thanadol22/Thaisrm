@@ -50,7 +50,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการตรวจสอบข้อมูลสมาชิก',
+        error: 'เกิดข้อผิดพลาดในการตรวจสอบข้อมูลสมาชิก',
       },
       { status: 500 }
     );

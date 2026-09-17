@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
     if (typeof body.association_name_en === 'string') payload.association_name_en = body.association_name_en;
     if (typeof body.association_address === 'string') payload.association_address = body.association_address;
     if (typeof body.association_contact === 'string') payload.association_contact = body.association_contact;
+    if (typeof body.association_tax_id === 'string') payload.association_tax_id = body.association_tax_id;
 
     // Receipt Templates
     if (typeof body.receipt_tpl1_name === 'string') payload.receipt_tpl1_name = body.receipt_tpl1_name;

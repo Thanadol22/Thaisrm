@@ -85,6 +85,8 @@ function LoginContent() {
     try {
       localStorage.removeItem('user_data');
       localStorage.removeItem('auth_token');
+      localStorage.removeItem('membership_registration');
+      localStorage.removeItem('thaisrm_user');
       document.cookie = 'thaisrm_user=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
       document.cookie = 'thaisrm_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
     } catch (e) {}

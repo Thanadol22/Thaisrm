@@ -105,6 +105,7 @@ export function ReceiptFormModal({
                 associationNameEn: json.data.association_name_en || DEFAULT_ASSOCIATION_INFO.nameEn,
                 associationAddress: json.data.association_address || DEFAULT_ASSOCIATION_INFO.address,
                 associationContact: json.data.association_contact || DEFAULT_ASSOCIATION_INFO.contact,
+                associationTaxId: json.data.association_tax_id || DEFAULT_ASSOCIATION_INFO.taxId,
                 authorizedSignerName: json.data.receipt_authorized_signer || prev.authorizedSignerName,
                 authorizedSignerRole: json.data.receipt_authorized_role || prev.authorizedSignerRole,
                 preparedByName: json.data.receipt_prepared_by || prev.preparedByName,
@@ -135,8 +136,8 @@ export function ReceiptFormModal({
   ) => {
     setSelectedTemplate(templateType);
     const cfg = activeSettings || settings;
-    const m = meetings[0];
-    const dateStr = m ? m.date : '20-21-22 ตุลาคม  2569';
+    const m = (formData.meetingId ? meetings.find((mtg) => mtg.id === formData.meetingId) : null) || meetings[0];
+    const dateStr = m ? m.date : '20-22 ตุลาคม 2569';
     const locationStr = m ? m.location : 'โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ';
     const pName = currentPayerName !== undefined ? currentPayerName : formData.payerName || '';
 
@@ -206,6 +207,7 @@ export function ReceiptFormModal({
       associationNameEn: cfg.association_name_en || DEFAULT_ASSOCIATION_INFO.nameEn,
       associationAddress: cfg.association_address || DEFAULT_ASSOCIATION_INFO.address,
       associationContact: cfg.association_contact || DEFAULT_ASSOCIATION_INFO.contact,
+      associationTaxId: cfg.association_tax_id || DEFAULT_ASSOCIATION_INFO.taxId,
       authorizedSignerName: cfg.receipt_authorized_signer || prev.authorizedSignerName,
       authorizedSignerRole: cfg.receipt_authorized_role || prev.authorizedSignerRole,
       preparedByName: cfg.receipt_prepared_by || prev.preparedByName,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -9,6 +10,10 @@ export const revalidate = 0;
  * ดึงรายชื่อผู้ลงทะเบียน/ผู้เข้าร่วมประชุมทั้งหมดจากฐานข้อมูลจริง
  */
 export async function GET(request: NextRequest) {
+  const session = getAdminSessionFromRequest(request);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const meetingId = searchParams.get('meetingId');
@@ -171,7 +176,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Error fetching admin attendees:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal Server Error' },
+      { success: false, error: 'เกิดข้อผิดพลาดในการดึงข้อมูลผู้เข้าร่วม' },
       { status: 500 }
     );
   }
@@ -182,6 +187,10 @@ export async function GET(request: NextRequest) {
  * บันทึกผู้เข้าร่วมประชุมแบบ Walk-in ลงฐานข้อมูลจริง
  */
 export async function POST(request: NextRequest) {
+  const session = getAdminSessionFromRequest(request);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const body = await request.json();
     const {
@@ -254,7 +263,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error creating walk-in attendee:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' },
+      { success: false, error: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' },
       { status: 500 }
     );
   }
@@ -265,6 +274,10 @@ export async function POST(request: NextRequest) {
  * อัปเดตสถานะการเช็คอิน (Toggle Check-in / Check-out)
  */
 export async function PATCH(request: NextRequest) {
+  const session = getAdminSessionFromRequest(request);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const body = await request.json();
     const { attendanceId, action } = body;
@@ -323,7 +336,7 @@ export async function PATCH(request: NextRequest) {
   } catch (error: any) {
     console.error('Error updating attendance checkin:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'เกิดข้อผิดพลาดในการอัปเดตสถานะเช็คอิน' },
+      { success: false, error: 'เกิดข้อผิดพลาดในการอัปเดตสถานะเช็คอิน' },
       { status: 500 }
     );
   }

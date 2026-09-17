@@ -28,7 +28,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   } catch (error: any) {
     console.error('Error handling blob upload:', error);
     return NextResponse.json(
-      { error: error?.message || 'Failed to generate upload token' },
+      { error: 'ไม่สามารถอัปโหลดไฟล์ได้ กรุณาลองใหม่อีกครั้ง' },
       { status: 400 }
     );
   }

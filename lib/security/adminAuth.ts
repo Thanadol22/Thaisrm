@@ -16,11 +16,11 @@ interface AdminSessionPayload {
  * Get the secret used for signing session cookies
  */
 function getSigningSecret(): string {
-  return (
-    process.env.AUTH_SECRET ||
-    process.env.NEXTAUTH_SECRET ||
-    'thaisrm-association-admin-fallback-secret-2026'
-  );
+  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error('AUTH_SECRET environment variable is not configured. Admin authentication is disabled.');
+  }
+  return secret;
 }
 
 /**
@@ -56,8 +56,14 @@ export function hashAdminPassword(password: string, salt: string = 'thaisrm_salt
  */
 export function verifyAdminCredentials(usernameInput: string, passwordInput: string): boolean {
   const configuredUsername = (process.env.ADMIN_USERNAME || 'admin').trim();
-  const configuredPassword = process.env.ADMIN_PASSWORD || 'tsrm2026!admin';
+  const configuredPassword = process.env.ADMIN_PASSWORD;
   const configuredPasswordHash = process.env.ADMIN_PASSWORD_HASH;
+
+  // Reject if neither password nor password hash is configured
+  if (!configuredPassword && !configuredPasswordHash) {
+    console.error('ADMIN_PASSWORD or ADMIN_PASSWORD_HASH environment variable is not configured.');
+    return false;
+  }
 
   const cleanUser = usernameInput.trim();
   const cleanPass = passwordInput.trim();
@@ -74,7 +80,7 @@ export function verifyAdminCredentials(usernameInput: string, passwordInput: str
   }
 
   // Fallback: direct timing-safe comparison with configured password
-  return timingSafeCompare(cleanPass, configuredPassword);
+  return timingSafeCompare(cleanPass, configuredPassword!);
 }
 
 /**

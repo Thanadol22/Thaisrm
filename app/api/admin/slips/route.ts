@@ -2,13 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import crypto from 'crypto';
 import { sendRegistrationApprovedEmail, sendSlipRejectionEmail } from '@/lib/email';
+import { getSystemSettings } from '@/lib/services/settingsService';
+import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 
 // GET: Fetch all payment slips for Admin Review
 export async function GET(request: NextRequest) {
+  const session = getAdminSessionFromRequest(request);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const meetingId = searchParams.get('meetingId');
     const status = searchParams.get('status');
+    const settings = await getSystemSettings();
+    const defaultBank = settings.bank_name || 'ธนาคารกสิกรไทย (KBANK)';
 
     let formattedSlips: any[] = [];
 
@@ -68,7 +76,7 @@ export async function GET(request: NextRequest) {
           ticketType: s.is_member ? 'Member Pass' : 'Non-Member Pass',
           ticketCode: s.ticket_code || '',
           amount: s.amount,
-          bank: s.bank || 'ธนาคารไทยพาณิชย์ (SCB)',
+          bank: s.bank || defaultBank,
           transferTime: s.transfer_time || '',
           transferDate: s.transfer_date || '',
           refNo: s.ref_no || s.slip_id,
@@ -136,7 +144,7 @@ export async function GET(request: NextRequest) {
           ticketType: s.is_member ? 'Member Pass' : 'Non-Member Pass',
           ticketCode: s.ticket_code || '',
           amount: Number(s.amount) || 0,
-          bank: s.bank || 'ธนาคารไทยพาณิชย์ (SCB)',
+          bank: s.bank || defaultBank,
           transferTime: s.transfer_time || '',
           transferDate: s.transfer_date || '',
           refNo: s.ref_no || s.slip_id,
@@ -157,7 +165,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Error fetching admin slips:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal Server Error' },
+      { success: false, error: 'เกิดข้อผิดพลาดในการดึงข้อมูลสลิป' },
       { status: 500 }
     );
   }
@@ -165,6 +173,10 @@ export async function GET(request: NextRequest) {
 
 // POST: Review slip (Approve / Reject / Reset)
 export async function POST(request: NextRequest) {
+  const session = getAdminSessionFromRequest(request);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const body = await request.json();
     const { slipId, action, notes, reviewer } = body;
@@ -372,7 +384,8 @@ export async function POST(request: NextRequest) {
       // Send rejection & resubmit email stub
       const recipientEmail = slip.members?.email || slip.guest_email || '';
       const recipientName = slip.members?.fullNameTh || slip.guest_name || 'ผู้ลงทะเบียน';
-      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+      const origin = request.headers.get('origin') || (request.headers.get('host') ? `https://${request.headers.get('host')}` : '');
+      const baseUrl = process.env.FRONTEND_URL || process.env.NEXTAUTH_URL || process.env.AUTH_URL || origin || 'http://localhost:3000';
       const resubmitUrl = `${baseUrl}/resubmit-slip/${resubmitToken}`;
 
       if (recipientEmail) {
@@ -380,7 +393,7 @@ export async function POST(request: NextRequest) {
           await sendSlipRejectionEmail({
             to: recipientEmail,
             recipientName,
-            meetingName: slip.meetings?.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
+            meetingName: slip.meetings?.meeting_name || 'การประชุมวิชาการ สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (TSRM)',
             rejectionReason,
             resubmitUrl,
           });
@@ -402,7 +415,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error reviewing slip:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal Server Error' },
+      { success: false, error: 'เกิดข้อผิดพลาดในการตรวจสอบสลิป' },
       { status: 500 }
     );
   }

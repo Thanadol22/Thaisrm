@@ -151,7 +151,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
         associationNameEn: settings.association_name_en || DEFAULT_ASSOCIATION_INFO.nameEn,
         associationAddress: settings.association_address || DEFAULT_ASSOCIATION_INFO.address,
         associationContact: settings.association_contact || DEFAULT_ASSOCIATION_INFO.contact,
-        associationTaxId: DEFAULT_ASSOCIATION_INFO.taxId,
+        associationTaxId: settings.association_tax_id || DEFAULT_ASSOCIATION_INFO.taxId,
         payerSignerRole: 'ผู้จ่ายเงิน',
         authorizedSignerName: settings.receipt_authorized_signer,
         authorizedSignerRole: settings.receipt_authorized_role,
@@ -190,7 +190,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
         associationNameEn: settings.association_name_en || DEFAULT_ASSOCIATION_INFO.nameEn,
         associationAddress: settings.association_address || DEFAULT_ASSOCIATION_INFO.address,
         associationContact: settings.association_contact || DEFAULT_ASSOCIATION_INFO.contact,
-        associationTaxId: DEFAULT_ASSOCIATION_INFO.taxId,
+        associationTaxId: settings.association_tax_id || DEFAULT_ASSOCIATION_INFO.taxId,
         payerSignerRole: 'ผู้จ่ายเงิน',
         authorizedSignerName: settings.receipt_authorized_signer,
         authorizedSignerRole: settings.receipt_authorized_role,
@@ -235,7 +235,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
         associationNameEn: settings.association_name_en || DEFAULT_ASSOCIATION_INFO.nameEn,
         associationAddress: settings.association_address || DEFAULT_ASSOCIATION_INFO.address,
         associationContact: settings.association_contact || DEFAULT_ASSOCIATION_INFO.contact,
-        associationTaxId: DEFAULT_ASSOCIATION_INFO.taxId,
+        associationTaxId: settings.association_tax_id || DEFAULT_ASSOCIATION_INFO.taxId,
         payerSignerRole: 'ผู้จ่ายเงิน',
         authorizedSignerName: settings.receipt_authorized_signer,
         authorizedSignerRole: settings.receipt_authorized_role,
@@ -515,6 +515,19 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
                 value={settings.association_contact}
                 onChange={(e) => handleChange('association_contact', e.target.value)}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:bg-white transition"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                เลขประจำตัวผู้เสียภาษีของสมาคม
+              </label>
+              <input
+                type="text"
+                value={settings.association_tax_id}
+                onChange={(e) => handleChange('association_tax_id', e.target.value)}
+                placeholder="เช่น 0-9930-00367-70-7"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:bg-white transition font-mono"
               />
             </div>
 

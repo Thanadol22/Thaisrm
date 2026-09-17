@@ -4,6 +4,7 @@ import {
   getMeetings,
   CreateMeetingInput,
 } from '@/lib/services/meetingService';
+import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการดึงข้อมูลการประชุม',
+        error: 'เกิดข้อผิดพลาดในการดึงข้อมูลการประชุม',
       },
       { status: 500 }
     );
@@ -78,6 +79,10 @@ export async function GET(req: NextRequest) {
  * Body: CreateMeetingInput
  */
 export async function POST(req: NextRequest) {
+  const session = getAdminSessionFromRequest(req);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const body: CreateMeetingInput = await req.json();
 
@@ -119,7 +124,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการสร้างการประชุม',
+        error: 'เกิดข้อผิดพลาดในการสร้างการประชุม',
       },
       { status: 500 }
     );

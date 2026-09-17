@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createMember, getMembers } from '@/lib/services/memberService';
 import { validateCreateMember } from '@/lib/validators/memberValidator';
 import { CreateMemberInput, ApiResponse } from '@/types/member';
+import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -18,6 +19,10 @@ export const revalidate = 0;
  *   - order: string ('asc' | 'desc')
  */
 export async function GET(req: NextRequest) {
+  const session = getAdminSessionFromRequest(req);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const { searchParams } = new URL(req.url);
 
@@ -58,7 +63,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการดึงข้อมูลสมาชิก',
+        error: 'เกิดข้อผิดพลาดในการดึงข้อมูลสมาชิก',
       },
       { status: 500 }
     );
@@ -101,7 +106,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการบันทึกข้อมูลสมาชิก',
+        error: 'เกิดข้อผิดพลาดในการบันทึกข้อมูลสมาชิก',
       },
       { status: 500 }
     );

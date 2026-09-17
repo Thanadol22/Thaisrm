@@ -239,7 +239,7 @@ export async function POST(
   } catch (error: any) {
     console.error('Error during meeting registration:', error?.stack || error);
     return NextResponse.json(
-      { success: false, error: error?.message || 'Internal Server Error' },
+      { success: false, error: 'เกิดข้อผิดพลาดในการลงทะเบียน กรุณาลองใหม่อีกครั้ง' },
       { status: 500 }
     );
   }

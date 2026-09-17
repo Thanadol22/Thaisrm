@@ -103,9 +103,9 @@ export function StaffScannerView() {
   // Check saved staff session on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const isAuthed = localStorage.getItem('thaisrm_staff_authed') === 'true' || sessionStorage.getItem('thaisrm_staff_authed') === 'true';
-      const storedMeeting = localStorage.getItem('thaisrm_staff_meeting');
-      const storedPin = localStorage.getItem('thaisrm_staff_pin') || '';
+      const isAuthed = sessionStorage.getItem('thaisrm_staff_authed') === 'true';
+      const storedMeeting = sessionStorage.getItem('thaisrm_staff_meeting');
+      const storedPin = sessionStorage.getItem('thaisrm_staff_pin') || '';
 
       if (isAuthed) {
         setIsAuthenticated(true);
@@ -199,11 +199,10 @@ export function StaffScannerView() {
       if (data.success) {
         playBeepSound('success');
         if (typeof window !== 'undefined') {
-          localStorage.setItem('thaisrm_staff_authed', 'true');
           sessionStorage.setItem('thaisrm_staff_authed', 'true');
-          localStorage.setItem('thaisrm_staff_pin', inputPin);
+          sessionStorage.setItem('thaisrm_staff_pin', inputPin);
           if (data.meeting) {
-            localStorage.setItem('thaisrm_staff_meeting', JSON.stringify(data.meeting));
+            sessionStorage.setItem('thaisrm_staff_meeting', JSON.stringify(data.meeting));
           }
         }
         setSavedPin(inputPin);
@@ -252,10 +251,9 @@ export function StaffScannerView() {
 
   const handleLockSystem = () => {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('thaisrm_staff_authed');
       sessionStorage.removeItem('thaisrm_staff_authed');
-      localStorage.removeItem('thaisrm_staff_meeting');
-      localStorage.removeItem('thaisrm_staff_pin');
+      sessionStorage.removeItem('thaisrm_staff_meeting');
+      sessionStorage.removeItem('thaisrm_staff_pin');
     }
     setIsAuthenticated(false);
     setActiveMeeting(null);

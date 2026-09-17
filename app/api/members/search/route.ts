@@ -360,7 +360,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการค้นหาข้อมูลสมาชิกจากฐานข้อมูล',
+        error: 'เกิดข้อผิดพลาดในการค้นหาข้อมูลสมาชิก',
       },
       { status: 500 }
     );

@@ -67,15 +67,6 @@ function PaymentContent() {
     registeredAt?: string;
   } | null>(null);
 
-  const [membershipData, setMembershipData] = useState<{
-    member_no?: string;
-    full_name_th?: string;
-    full_name_en?: string;
-    position?: string;
-    workplace?: string;
-    email?: string;
-  } | null>(null);
-
   const [systemSettings, setSystemSettings] = useState<{
     bank_name: string;
     bank_account_no: string;
@@ -115,15 +106,6 @@ function PaymentContent() {
         }
       } catch (err) {
         console.error('Failed to parse conference_registration from localStorage', err);
-      }
-    } else if (paymentType === 'membership') {
-      try {
-        const saved = localStorage.getItem('membership_registration');
-        if (saved) {
-          setMembershipData(JSON.parse(saved));
-        }
-      } catch (err) {
-        console.error('Failed to parse membership_registration from localStorage', err);
       }
     }
   }, [paymentType]);
@@ -180,15 +162,15 @@ function PaymentContent() {
       if (act.type === 'main') {
         if (attendType === 'online') {
           price = isMemberUser
-            ? (pricingTiers?.participant?.onlineMember ?? basePrice ?? 4000)
-            : (pricingTiers?.participant?.onsiteNonMember ?? (basePrice ? basePrice + 1000 : 5000));
+            ? (pricingTiers?.participant?.onlineMember ?? basePrice ?? 3500)
+            : (pricingTiers?.participant?.onlineNonMember ?? pricingTiers?.participant?.onsiteNonMember ?? (basePrice ? basePrice + 1000 : 4500));
           rateBadgeTh = isMemberUser ? 'Online (ราคาสมาชิก)' : 'Online (ราคาบุคคลทั่วไป)';
           rateBadgeEn = isMemberUser ? 'Online (Member Rate)' : 'Online (Non-Member Rate)';
         } else {
           // Onsite
           price = isMemberUser
-            ? (pricingTiers?.participant?.onsiteMember ?? basePrice ?? 4000)
-            : (pricingTiers?.participant?.onsiteNonMember ?? (basePrice ? basePrice + 1000 : 5000));
+            ? (pricingTiers?.participant?.onsiteMember ?? basePrice ?? 3500)
+            : (pricingTiers?.participant?.onsiteNonMember ?? (basePrice ? basePrice + 1000 : 4500));
           rateBadgeTh = isMemberUser ? 'Onsite (ราคาสมาชิก)' : 'Onsite (ราคาบุคคลทั่วไป)';
           rateBadgeEn = isMemberUser ? 'Onsite (Member Rate)' : 'Onsite (Non-Member Rate)';
         }
@@ -306,6 +288,10 @@ function PaymentContent() {
       }
     } else {
       // Membership payment
+      try {
+        localStorage.removeItem('membership_registration');
+        localStorage.removeItem('thaisrm_user');
+      } catch (e) {}
       setShowSuccessModal(true);
     }
   };
@@ -342,26 +328,10 @@ function PaymentContent() {
           paymentType={paymentType}
           customAmount={paymentType === 'registration' ? calculationResult.totalAmount : undefined}
           isMember={paymentType === 'registration' ? calculationResult.isMemberUser : true}
-          attendeeName={
-            paymentType === 'registration'
-              ? (regData?.nameTh || regData?.nameEn)
-              : (membershipData?.full_name_th || membershipData?.full_name_en)
-          }
-          attendeePosition={
-            paymentType === 'registration'
-              ? regData?.position
-              : membershipData?.position
-          }
-          attendeeWorkplace={
-            paymentType === 'registration'
-              ? regData?.workplace
-              : membershipData?.workplace
-          }
-          attendeeMemberNo={
-            paymentType === 'registration'
-              ? regData?.memberNo
-              : membershipData?.member_no
-          }
+          attendeeName={paymentType === 'registration' ? (regData?.nameTh || regData?.nameEn) : undefined}
+          attendeePosition={paymentType === 'registration' ? regData?.position : undefined}
+          attendeeWorkplace={paymentType === 'registration' ? regData?.workplace : undefined}
+          attendeeMemberNo={paymentType === 'registration' ? regData?.memberNo : undefined}
           isExpiredMember={regData?.isExpiredMember}
           attendanceType={calculationResult.attendType}
           itemizedActivities={calculationResult.items}
@@ -381,6 +351,7 @@ function PaymentContent() {
         onClose={() => setUploadModalOpen(false)}
         onSuccess={handleSlipUploadSuccess}
         bankAccount={bankAccountNumber}
+        bankName={systemSettings.bank_name}
         amountDueText={amountDueText}
       />
     </div>

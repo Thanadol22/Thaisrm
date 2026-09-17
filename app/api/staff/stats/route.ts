@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
   } catch (error: any) {
     console.error('Error fetching staff stats:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal Server Error' },
+      { success: false, error: 'เกิดข้อผิดพลาดในการดึงข้อมูลสถิติ' },
       { status: 500 }
     );
   }

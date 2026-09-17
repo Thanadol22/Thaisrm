@@ -477,9 +477,9 @@ export function LoginView({
       if (checkData.success && checkData.isRegistered) {
         alert(
           checkData.message ||
-            (lang === 'th'
-              ? 'ท่านได้ลงทะเบียนเข้าร่วมงานประชุมนี้ในระบบเรียบร้อยแล้ว ไม่สามารถลงทะเบียนซ้ำได้'
-              : 'You have already registered for this conference.')
+          (lang === 'th'
+            ? 'ท่านได้ลงทะเบียนเข้าร่วมงานประชุมนี้ในระบบเรียบร้อยแล้ว ไม่สามารถลงทะเบียนซ้ำได้'
+            : 'You have already registered for this conference.')
         );
         return;
       }
@@ -880,19 +880,17 @@ export function LoginView({
                               key={act.id}
                               type="button"
                               onClick={() => toggleProgram(act.id)}
-                              className={`p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2.5 active:scale-[0.99] relative overflow-hidden ${
-                                isSelected
+                              className={`p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2.5 active:scale-[0.99] relative overflow-hidden ${isSelected
                                   ? 'bg-blue-50/90 border-[#0026b3] text-slate-900 shadow-2xs ring-1.5 ring-[#0026b3]/30 font-bold'
                                   : 'bg-slate-50/80 border-slate-200 hover:border-slate-300 text-slate-700 font-medium'
-                              }`}
+                                }`}
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                  <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 ${
-                                    act.type === 'main'
+                                  <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 ${act.type === 'main'
                                       ? (isSelected ? 'bg-[#0026b3] text-white' : 'bg-slate-200 text-slate-700')
                                       : (isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700')
-                                  }`}>
+                                    }`}>
                                     {act.type === 'main' ? (lang === 'th' ? 'หลักสูตรหลัก' : 'Main') : (lang === 'th' ? 'เวิร์กช็อป' : 'Workshop')}
                                   </span>
                                   {act.date && (
@@ -907,9 +905,8 @@ export function LoginView({
                                 </h4>
                               </div>
 
-                              <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-                                isSelected ? 'bg-[#0026b3] text-white shadow-2xs' : 'border border-slate-300 bg-white'
-                              }`}>
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'bg-[#0026b3] text-white shadow-2xs' : 'border border-slate-300 bg-white'
+                                }`}>
                                 {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                               </div>
                             </button>
@@ -929,11 +926,10 @@ export function LoginView({
                         <button
                           type="button"
                           onClick={() => setAttendanceType('onsite')}
-                          className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl border text-[11px] sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 sm:gap-2 active:scale-95 ${
-                            attendanceType === 'onsite'
+                          className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl border text-[11px] sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 sm:gap-2 active:scale-95 ${attendanceType === 'onsite'
                               ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30'
                               : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-600 font-medium'
-                          }`}
+                            }`}
                         >
                           <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                           <span className="truncate">{lang === 'th' ? 'Onsite (ที่งาน)' : 'Onsite'}</span>
@@ -948,13 +944,12 @@ export function LoginView({
                               setAttendanceType('online');
                             }
                           }}
-                          className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl border text-[11px] sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${
-                            hasWorkshopSelected
+                          className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl border text-[11px] sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${hasWorkshopSelected
                               ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
                               : attendanceType === 'online'
                                 ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30 cursor-pointer active:scale-95'
                                 : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-600 font-medium cursor-pointer active:scale-95'
-                          }`}
+                            }`}
                           title={
                             hasWorkshopSelected
                               ? (lang === 'th' ? 'เวิร์กช็อปเปิดรับเฉพาะ Onsite เท่านั้น' : 'Workshops are Onsite only')
@@ -972,7 +967,7 @@ export function LoginView({
                           <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                           <span>
                             {lang === 'th'
-                              ? 'หลักสูตรเวิร์กช็อป (Workshop) บังคับเข้าร่วมแบบ Onsite (ที่งาน) เท่านั้น'
+                              ? 'หลักสูตรเวิร์กช็อป บังคับเข้าร่วมที่งานเท่านั้น'
                               : 'Workshop courses require Onsite attendance only.'}
                           </span>
                         </div>
@@ -993,11 +988,10 @@ export function LoginView({
                     <button
                       type="submit"
                       disabled={selectedPrograms.length === 0 || verifyingMember}
-                      className={`w-full font-black py-2.5 sm:py-3.5 px-4 sm:px-6 rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl transition-all flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-base border border-blue-400/20 relative overflow-hidden mt-2 sm:mt-3 ${
-                        selectedPrograms.length === 0 || verifyingMember
+                      className={`w-full font-black py-2.5 sm:py-3.5 px-4 sm:px-6 rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl transition-all flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-base border border-blue-400/20 relative overflow-hidden mt-2 sm:mt-3 ${selectedPrograms.length === 0 || verifyingMember
                           ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
                           : 'bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] hover:brightness-110 text-white shadow-blue-900/30 hover:shadow-blue-900/40 cursor-pointer active:scale-[0.99] group'
-                      }`}
+                        }`}
                     >
                       {/* Top glowing accent green line */}
                       <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#4ade80] to-transparent opacity-90" />

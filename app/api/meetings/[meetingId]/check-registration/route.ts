@@ -119,7 +119,7 @@ export async function GET(
   } catch (error: any) {
     console.error('Error checking registration status:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal Server Error' },
+      { success: false, error: 'เกิดข้อผิดพลาดในการตรวจสอบสถานะการลงทะเบียน' },
       { status: 500 }
     );
   }

@@ -74,6 +74,7 @@ import { AdminSlipsView } from '@/components/views/AdminSlipsView';
 import { AdminLoginView } from '@/components/views/AdminLoginView';
 import { AdminSettingsPanel } from '@/components/AdminSettingsPanel';
 import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
+import { SystemSettings, DEFAULT_SYSTEM_SETTINGS } from '@/lib/services/settingsService';
 
 /* ─── Data Types & Interfaces ─────────────────────────────────────────── */
 
@@ -5263,6 +5264,7 @@ export default function AdminPage() {
   const [attendees, setAttendees] = useState<AttendeeItem[]>(INITIAL_ATTENDEES);
   const [receipts, setReceipts] = useState<ReceiptData[]>(INITIAL_RECEIPTS);
   const [membersCount, setMembersCount] = useState<number>(0);
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>(DEFAULT_SYSTEM_SETTINGS);
 
   // ─── Admin Authentication State ───
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -5303,6 +5305,18 @@ export default function AdminPage() {
     setIsAuthenticated(false);
     setAdminUser(null);
   };
+
+  // Fetch System Settings on mount
+  useEffect(() => {
+    fetch('/api/admin/settings')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data) {
+          setSystemSettings(json.data);
+        }
+      })
+      .catch((err) => console.error('Failed to load system settings in admin page:', err));
+  }, []);
 
   // ─── 1. Fetch meetings from API on mount ───
   const fetchMeetings = useCallback(async () => {
@@ -5443,12 +5457,26 @@ export default function AdminPage() {
     }
   }, []);
 
+  // ─── 4.5 Fetch Receipts from DB ───
+  const fetchReceipts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/receipts');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+        setReceipts(json.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch receipts from DB:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchMeetings();
     fetchSlips();
     fetchAttendees();
     fetchMembersCount();
-  }, [fetchMeetings, fetchSlips, fetchAttendees, fetchMembersCount]);
+    fetchReceipts();
+  }, [fetchMeetings, fetchSlips, fetchAttendees, fetchMembersCount, fetchReceipts]);
 
   // ─── 5. Auto-populate Receipts from approved slips ───
   useEffect(() => {
@@ -5461,6 +5489,11 @@ export default function AdminPage() {
       });
 
     if (approvedSlips.length > 0) {
+      const detailLines = (systemSettings.receipt_tpl1_details || '')
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean);
+
       const generatedReceipts: ReceiptData[] = approvedSlips.map((slip, index) => {
         const m = meetings.find((mtg) => mtg.id === slip.meetingId);
         const receiptNo = generateReceiptNo(slip.transferDate, index + 1);
@@ -5468,7 +5501,7 @@ export default function AdminPage() {
           id: `REC-${slip.id}`,
           receiptNo,
           receiptDate: slip.transferDate || new Date().toLocaleDateString('th-TH'),
-          purposeText: 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',
+          purposeText: systemSettings.receipt_tpl1_purpose || 'ได้รับเงินค่าลงทะเบียน',
           payerType: 'individual',
           payerName: slip.nameTh,
           payerAddressLine1: '',
@@ -5478,12 +5511,11 @@ export default function AdminPage() {
             {
               id: `item-${slip.id}`,
               itemNumber: 1,
-              title: 'ค่าลงทะเบียน',
+              title: systemSettings.receipt_tpl1_title || 'ค่าลงทะเบียน',
               subDetails: [
-                'การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569',
-                'ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์',
-                m ? `จัดขึ้นวันที่ ${m.date}` : 'จัดขึ้นวันที่ 20-21-22 ตุลาคม  2569',
-                m ? `${m.location}` : 'โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ',
+                ...(detailLines.length > 0 ? detailLines : ['การประชุมวิชาการ']),
+                m?.date ? `จัดขึ้นวันที่ ${m.date}` : '',
+                m?.location ? `${m.location}` : '',
                 slip.nameTh || '',
               ].filter(Boolean),
               amount: slip.amount,
@@ -5491,10 +5523,15 @@ export default function AdminPage() {
           ],
           totalAmount: slip.amount,
           payerSignerRole: 'ผู้จ่ายเงิน',
-          authorizedSignerName: 'แพทย์หญิงพิมพกา ชวนะเวสน์',
-          authorizedSignerRole: '',
-          preparedByName: 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม',
-          preparedByRole: 'ผู้จัดทำ',
+          authorizedSignerName: systemSettings.receipt_authorized_signer || 'แพทย์หญิงพิมพกา ชวนะเวสน์',
+          authorizedSignerRole: systemSettings.receipt_authorized_role || 'เหรัญญิก / ผู้รับเงิน',
+          preparedByName: systemSettings.receipt_prepared_by || 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม',
+          preparedByRole: systemSettings.receipt_prepared_role || 'ผู้จัดทำ',
+          associationNameTh: systemSettings.association_name_th,
+          associationNameEn: systemSettings.association_name_en,
+          associationAddress: systemSettings.association_address,
+          associationContact: systemSettings.association_contact,
+          associationTaxId: systemSettings.association_tax_id,
           meetingId: slip.meetingId,
           slipId: slip.id,
           createdAt: new Date().toISOString().split('T')[0],
@@ -5521,13 +5558,13 @@ export default function AdminPage() {
           const key = r.slipId || r.id;
           if (!uniqueKeys.has(key)) {
             uniqueKeys.add(key);
-            merged.push(r);
           }
+          merged.push(r);
         });
         return merged;
       });
     }
-  }, [slips, meetings]);
+  }, [slips, meetings, systemSettings]);
 
   // Global Receipt Modal for quick print from attendees/slips
   const [globalReceipt, setGlobalReceipt] = useState<ReceiptData | null>(null);
@@ -5718,20 +5755,56 @@ export default function AdminPage() {
   };
 
   // Receipt Handlers
-  const handleSaveReceipt = (receipt: ReceiptData) => {
-    setReceipts((prev) => {
-      const idx = prev.findIndex((r) => r.id === receipt.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = receipt;
-        return next;
+  const handleSaveReceipt = async (receipt: ReceiptData) => {
+    try {
+      const res = await fetch('/api/admin/receipts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(receipt),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setReceipts((prev) => {
+          const idx = prev.findIndex((r) => r.id === json.data.id || r.id === receipt.id);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = json.data;
+            return next;
+          }
+          return [json.data, ...prev];
+        });
+        setGlobalToastMessage('บันทึกใบเสร็จรับเงินลงฐานข้อมูลเรียบร้อยแล้ว');
+        setTimeout(() => setGlobalToastMessage(null), 4000);
+      } else {
+        setGlobalToastMessage(json.error || 'ไม่สามารถบันทึกใบเสร็จรับเงินได้');
+        setTimeout(() => setGlobalToastMessage(null), 4000);
       }
-      return [receipt, ...prev];
-    });
+    } catch (err) {
+      console.error('Error saving receipt:', err);
+      setGlobalToastMessage('เกิดข้อผิดพลาดในการบันทึกใบเสร็จรับเงิน');
+      setTimeout(() => setGlobalToastMessage(null), 4000);
+    }
   };
 
-  const handleDeleteReceipt = (id: string) => {
-    setReceipts((prev) => prev.filter((r) => r.id !== id));
+  const handleDeleteReceipt = async (id: string) => {
+    try {
+      const res = await fetch(`/api/admin/receipts?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (json.success) {
+        setReceipts((prev) => prev.filter((r) => r.id !== id));
+        setGlobalToastMessage('ลบใบเสร็จรับเงินออกจากฐานข้อมูลเรียบร้อยแล้ว');
+        setTimeout(() => setGlobalToastMessage(null), 4000);
+      } else {
+        setGlobalToastMessage(json.error || 'ไม่สามารถลบใบเสร็จรับเงินได้');
+        setTimeout(() => setGlobalToastMessage(null), 4000);
+      }
+    } catch (err) {
+      console.error('Error deleting receipt:', err);
+      setGlobalToastMessage('เกิดข้อผิดพลาดในการลบใบเสร็จรับเงิน');
+      setTimeout(() => setGlobalToastMessage(null), 4000);
+    }
   };
 
   const handlePrintAttendeeReceipt = (attendee: AttendeeItem) => {
@@ -5749,10 +5822,10 @@ export default function AdminPage() {
     if (attendee.ticketType.includes('Day')) amount = 2000;
 
     const newReceipt: ReceiptData = {
-      id: `REC-${Date.now()}`,
+      id: `REC-ATT-${attendee.id}`,
       receiptNo: generateReceiptNo(new Date(), receipts.length + 1),
-      receiptDate: '10 มีนาคม 2569',
-      purposeText: 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',
+      receiptDate: new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }),
+      purposeText: systemSettings.receipt_tpl1_purpose || 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',
       payerType: 'individual',
       payerName: attendee.nameTh,
       payerAddressLine1: '',
@@ -5762,11 +5835,11 @@ export default function AdminPage() {
         {
           id: `item-${Date.now()}`,
           itemNumber: 1,
-          title: 'ค่าลงทะเบียน',
+          title: systemSettings.receipt_tpl1_title || 'ค่าลงทะเบียน',
           subDetails: [
             'การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569',
             'ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์',
-            m ? `จัดขึ้นวันที่ ${m.date}` : 'จัดขึ้นวันที่ 20-21-22 ตุลาคม  2569',
+            m ? `จัดขึ้นวันที่ ${m.date}` : 'จัดขึ้นวันที่ 20-22 ตุลาคม 2569',
             m ? `${m.location}` : 'โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ',
             attendee.nameTh || '',
           ].filter(Boolean),
@@ -5775,19 +5848,30 @@ export default function AdminPage() {
       ],
       totalAmount: amount,
       payerSignerRole: 'ผู้จ่ายเงิน',
-      authorizedSignerName: 'แพทย์หญิงพิมพกา ชวนะเวสน์',
-      authorizedSignerRole: '',
-      preparedByName: 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม',
-      preparedByRole: 'ผู้จัดทำ',
+      authorizedSignerName: systemSettings.receipt_authorized_signer || 'แพทย์หญิงพิมพกา ชวนะเวสน์',
+      authorizedSignerRole: systemSettings.receipt_authorized_role || 'เหรัญญิก / ผู้รับเงิน',
+      preparedByName: systemSettings.receipt_prepared_by || 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม',
+      preparedByRole: systemSettings.receipt_prepared_role || 'ผู้จัดทำ',
+      associationNameTh: systemSettings.association_name_th,
+      associationNameEn: systemSettings.association_name_en,
+      associationAddress: systemSettings.association_address,
+      associationContact: systemSettings.association_contact,
+      associationTaxId: systemSettings.association_tax_id,
       meetingId: attendee.meetingId,
       attendeeId: attendee.id,
       createdAt: new Date().toISOString().split('T')[0],
       status: 'issued',
     };
 
-    setReceipts((prev) => [newReceipt, ...prev]);
+    setReceipts((prev) => [newReceipt, ...prev.filter((r) => r.id !== newReceipt.id)]);
     setGlobalReceipt(newReceipt);
     setIsGlobalReceiptOpen(true);
+
+    fetch('/api/admin/receipts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newReceipt),
+    }).catch((e) => console.warn('Could not persist attendee receipt to DB:', e));
   };
 
   const handlePrintSlipReceipt = (slip: SlipItem) => {
@@ -5801,10 +5885,10 @@ export default function AdminPage() {
     const m = meetings.find((mtg) => mtg.id === slip.meetingId);
 
     const newReceipt: ReceiptData = {
-      id: `REC-${Date.now()}`,
+      id: `REC-${slip.id}`,
       receiptNo: generateReceiptNo(slip.transferDate, receipts.length + 1),
-      receiptDate: slip.transferDate || '10 มีนาคม 2569',
-      purposeText: 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',
+      receiptDate: slip.transferDate || new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }),
+      purposeText: systemSettings.receipt_tpl1_purpose || 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',
       payerType: 'individual',
       payerName: slip.nameTh,
       payerAddressLine1: '',
@@ -5814,11 +5898,11 @@ export default function AdminPage() {
         {
           id: `item-${Date.now()}`,
           itemNumber: 1,
-          title: 'ค่าลงทะเบียน',
+          title: systemSettings.receipt_tpl1_title || 'ค่าลงทะเบียน',
           subDetails: [
             'การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569',
             'ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์',
-            m ? `จัดขึ้นวันที่ ${m.date}` : 'จัดขึ้นวันที่ 20-21-22 ตุลาคม  2569',
+            m ? `จัดขึ้นวันที่ ${m.date}` : 'จัดขึ้นวันที่ 20-22 ตุลาคม 2569',
             m ? `${m.location}` : 'โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ',
             slip.nameTh || '',
           ].filter(Boolean),
@@ -5827,19 +5911,30 @@ export default function AdminPage() {
       ],
       totalAmount: slip.amount,
       payerSignerRole: 'ผู้จ่ายเงิน',
-      authorizedSignerName: 'แพทย์หญิงพิมพกา ชวนะเวสน์',
-      authorizedSignerRole: '',
-      preparedByName: 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม',
-      preparedByRole: 'ผู้จัดทำ',
+      authorizedSignerName: systemSettings.receipt_authorized_signer || 'แพทย์หญิงพิมพกา ชวนะเวสน์',
+      authorizedSignerRole: systemSettings.receipt_authorized_role || 'เหรัญญิก / ผู้รับเงิน',
+      preparedByName: systemSettings.receipt_prepared_by || 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม',
+      preparedByRole: systemSettings.receipt_prepared_role || 'ผู้จัดทำ',
+      associationNameTh: systemSettings.association_name_th,
+      associationNameEn: systemSettings.association_name_en,
+      associationAddress: systemSettings.association_address,
+      associationContact: systemSettings.association_contact,
+      associationTaxId: systemSettings.association_tax_id,
       meetingId: slip.meetingId,
       slipId: slip.id,
       createdAt: new Date().toISOString().split('T')[0],
       status: 'issued',
     };
 
-    setReceipts((prev) => [newReceipt, ...prev]);
+    setReceipts((prev) => [newReceipt, ...prev.filter((r) => r.id !== newReceipt.id)]);
     setGlobalReceipt(newReceipt);
     setIsGlobalReceiptOpen(true);
+
+    fetch('/api/admin/receipts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newReceipt),
+    }).catch((e) => console.warn('Could not persist slip receipt to DB:', e));
   };
 
   // Meeting Edit Modal State

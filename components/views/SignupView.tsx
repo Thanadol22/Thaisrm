@@ -179,6 +179,8 @@ export function SignupView({
       try {
         localStorage.removeItem('user_data');
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('membership_registration');
+        localStorage.removeItem('thaisrm_user');
         document.cookie = 'thaisrm_user=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
         document.cookie = 'thaisrm_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
         if (window.location.search) {
@@ -305,13 +307,13 @@ export function SignupView({
 
       const createdMember = resData.data;
 
-      // Store in localStorage for user session and subsequent payment step
+      // Clean up any legacy localStorage data
       try {
-        localStorage.setItem('membership_registration', JSON.stringify(createdMember));
-        localStorage.setItem('thaisrm_user', JSON.stringify(createdMember));
+        localStorage.removeItem('membership_registration');
+        localStorage.removeItem('thaisrm_user');
       } catch (e) {}
 
-      // Trigger callback
+      // Trigger callback with created member data from database
       if (onSubmitSignup) {
         onSubmitSignup(createdMember);
       }

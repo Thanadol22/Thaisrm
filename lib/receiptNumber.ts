@@ -6,8 +6,11 @@ export function generateReceiptNo(
   dateInput?: string | Date | null,
   seqNumber: number = 1
 ): string {
-  let year = 2569;
-  let month = '02';
+  const now = new Date();
+  const currentYear = now.getFullYear() > 2500 ? now.getFullYear() : now.getFullYear() + 543;
+  const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+  let year = currentYear;
+  let month = currentMonth;
 
   if (dateInput) {
     if (typeof dateInput === 'string') {
