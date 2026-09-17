@@ -13,13 +13,6 @@ import {
   CheckCircle2, 
   Trash2, 
   RotateCw,
-  User,
-  Building2,
-  MapPin,
-  Monitor,
-  Award,
-  Hash,
-  Tag,
   AlertTriangle
 } from 'lucide-react';
 import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
@@ -198,77 +191,7 @@ export function PaymentView({
       {/* Body Content */}
       <div className="px-4 sm:px-8 lg:px-12 py-5 sm:py-6 flex-1 flex flex-col justify-between space-y-4 max-w-3xl sm:max-w-4xl mx-auto w-full">
         
-        {/* Attendee Profile & Registration Info Box (For Conference Registration) */}
-        {isRegistration && attendeeName && (
-          <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#0026b3] flex items-center justify-center">
-                  <User className="w-4 h-4" />
-                </div>
-                <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                  {lang === 'th' ? 'ข้อมูลผู้ลงทะเบียน' : 'Attendee Information'}
-                </span>
-              </div>
 
-              {/* Attendance Format Badge (Onsite vs Online) */}
-              <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black shadow-2xs border ${
-                attendanceType === 'online'
-                  ? 'bg-purple-50 text-purple-700 border-purple-200'
-                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-              }`}>
-                {attendanceType === 'online' ? (
-                  <>
-                    <Monitor className="w-3.5 h-3.5 shrink-0" />
-                    <span>{lang === 'th' ? 'เข้าร่วมแบบ Online (ออนไลน์)' : 'Online Attendance'}</span>
-                  </>
-                ) : (
-                  <>
-                    <MapPin className="w-3.5 h-3.5 shrink-0" />
-                    <span>{lang === 'th' ? 'เข้าร่วมแบบ Onsite (ที่งาน)' : 'Onsite Attendance'}</span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-              <div className="flex items-center gap-2 text-slate-700">
-                <span className="font-bold text-slate-400 shrink-0">{lang === 'th' ? 'ชื่อ-นามสกุล:' : 'Name:'}</span>
-                <span className="font-extrabold text-slate-900 truncate">{attendeeName}</span>
-              </div>
-              {attendeePosition && (
-                <div className="flex items-center gap-2 text-slate-700">
-                  <span className="font-bold text-slate-400 shrink-0">{lang === 'th' ? 'ตำแหน่ง:' : 'Position:'}</span>
-                  <span className="font-bold text-slate-800 truncate">{attendeePosition}</span>
-                </div>
-              )}
-              {attendeeWorkplace && (
-                <div className="flex items-center gap-2 text-slate-700">
-                  <span className="font-bold text-slate-400 shrink-0">{lang === 'th' ? 'หน่วยงาน:' : 'Workplace:'}</span>
-                  <span className="font-medium text-slate-800 truncate">{attendeeWorkplace}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2 text-slate-700">
-                <span className="font-bold text-slate-400 shrink-0">{lang === 'th' ? 'สถานะสมาชิก:' : 'Status:'}</span>
-                {isExpiredMember ? (
-                  <span className="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                    <AlertTriangle className="w-3 h-3 text-amber-600" />
-                    <span>{lang === 'th' ? `สมาชิกหมดอายุ (${attendeeMemberNo}) • คิดอัตราบุคคลทั่วไป` : `Expired (${attendeeMemberNo}) • Standard Rate`}</span>
-                  </span>
-                ) : attendeeMemberNo ? (
-                  <span className="inline-flex items-center gap-1 font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
-                    <Hash className="w-3 h-3" />
-                    <span>{lang === 'th' ? `สมาชิก TSRM (${attendeeMemberNo})` : `TSRM Member (${attendeeMemberNo})`}</span>
-                  </span>
-                ) : (
-                  <span className="font-medium text-slate-600">
-                    {lang === 'th' ? 'บุคคลทั่วไป (Non-member)' : 'Non-member'}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Expired Member Notification Banner */}
         {isRegistration && isExpiredMember && (
