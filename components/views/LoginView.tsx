@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Shield,
@@ -25,6 +25,7 @@ import {
   AlertCircle,
   Loader2,
   Check,
+  ExternalLink,
 } from 'lucide-react';
 import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
 import { GoogleIcon } from '@/components/GoogleIcon';
@@ -158,6 +159,50 @@ export function LoginView({
   const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
   const [attendanceType, setAttendanceType] = useState<'onsite' | 'online'>('onsite');
 
+  // Track scroll position for hero parallax effect
+  const [scrollY, setScrollY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Intersection observer to trigger smooth staggered entrance animations for the registration form
+  const formRef = useRef<HTMLDivElement>(null);
+  const [isFormInView, setIsFormInView] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsFormInView(true);
+          }
+        });
+      },
+      { threshold: 0.05, rootMargin: '0px 0px -40px 0px' }
+    );
+
+    if (formRef.current) {
+      observer.observe(formRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  const scrollToRegistration = (tab?: 'conference' | 'membership') => {
+    if (tab) {
+      handleTabChange(tab);
+    }
+    const el = document.getElementById('registration-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   // Fetch Latest Active Meeting on mount
   useEffect(() => {
     let isMounted = true;
@@ -240,6 +285,36 @@ export function LoginView({
       return next;
     });
   };
+
+  // Dynamically extract all conference details from database (activeMeeting)
+  const meetingInfo = useMemo(() => {
+    const rawName = activeMeeting?.meeting_name || '34th TSRM 2026';
+    const rawId = activeMeeting?.meeting_id || 'TSRM34';
+    const loc = activeMeeting?.location || 'Grande Centre Point Lumphini, Bangkok';
+    const desc = activeMeeting?.description;
+
+    // Detect edition number like "34" from "TSRM 34" or "34th TSRM 2026"
+    const editionMatch = rawName.match(/(\d{1,2})(?:st|nd|rd|th)?/i) || rawId.match(/TSRM\s*(\d+)/i) || ['34', '34'];
+    const editionNum = editionMatch[1] || '34';
+
+    // Detect year like "2026" or "2569"
+    const yearMatch = rawName.match(/(20\d{2}|25\d{2})/);
+    const yearText = yearMatch ? yearMatch[1] : '2026';
+
+    const displayName = rawName || `${editionNum}th TSRM ${yearText}`;
+
+    return {
+      editionNum,
+      yearText,
+      displayName,
+      badgeTextTh: `การประชุมวิชาการประจำปี ครั้งที่ ${editionNum} • ${rawId || `TSRM ${yearText}`}`,
+      badgeTextEn: `The ${editionNum}th Annual Conference • ${rawId || `TSRM ${yearText}`}`,
+      location: loc,
+      descriptionTh: desc || 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย ขอเชิญร่วมงานประชุมวิชาการประจำปี 2569',
+      descriptionEn: desc || 'Thai Society for Reproductive Medicine 34th Annual Scientific Conference',
+      mapUrl: `https://maps.google.com/?q=${encodeURIComponent(loc)}`,
+    };
+  }, [activeMeeting]);
 
   useEffect(() => {
     if (defaultTab) {
@@ -547,68 +622,177 @@ export function LoginView({
 
   return (
     <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[640px]">
-      {/* Header Blue Card Section */}
-      <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-5 sm:px-8 lg:px-12 pt-6 sm:pt-8 pb-7 sm:pb-9 rounded-b-[28px] sm:rounded-b-[36px] shadow-xl relative overflow-hidden">
-        {/* Subtle Background Glow */}
-        <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute bottom-0 -left-12 w-40 h-40 bg-[#4ade80]/15 rounded-full blur-2xl pointer-events-none" />
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <div className="relative w-full min-h-[100dvh] bg-slate-950 text-white overflow-hidden flex flex-col justify-between">
+        {/* Parallax Background Image - Positioned at top to show the illuminated hotel rooftop */}
+        <div
+          className="absolute inset-0 w-full h-[140%] top-0 bg-cover bg-[center_70%] will-change-transform pointer-events-none transition-transform duration-100 ease-out brightness-[1.12] contrast-[1.06] saturate-[1.12]"
+          style={{
+            backgroundImage: `url('/location.jpg')`,
+            transform: `translate3d(0, ${Math.min(scrollY * 0.25, 140)}px, 0) scale(${1.02 + Math.min(scrollY * 0.0002, 0.05)})`,
+          }}
+        />
 
-        <div className="max-w-5xl xl:max-w-6xl mx-auto relative z-10">
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 group hover:opacity-95 transition">
-              <ThaiSrmLogo className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 group-hover:scale-105 transition-transform" />
+        {/* Top Vignette for Navbar Readability */}
+        <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-slate-950/80 via-slate-950/40 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-radial-[at_center_top] from-transparent via-slate-950/15 to-transparent pointer-events-none" />
+        <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 w-[600px] h-[160px] bg-[#4ade80]/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Top Floating Glassmorphism Navbar */}
+        <header className="relative z-20 w-full px-4 sm:px-8 lg:px-12 py-3.5 sm:py-4.5 border-b border-white/10 bg-slate-950/50 backdrop-blur-md">
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
+            {/* Brand Logo & Name */}
+            <div className="flex items-center gap-2.5 sm:gap-3 group">
+              <div className="relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-[#4ade80] rounded-full blur-xs opacity-60 group-hover:opacity-100 transition duration-300" />
+                <ThaiSrmLogo className="relative w-10 h-10 sm:w-12 sm:h-12 shrink-0 group-hover:scale-105 transition-transform" />
+              </div>
               <div className="min-w-0">
-                <span className="text-[10px] sm:text-xs font-bold tracking-wider sm:tracking-widest text-blue-200 uppercase block truncate">
+                <span className="text-[10px] sm:text-xs font-bold tracking-widest text-[#4ade80] uppercase block truncate">
                   {t.associationName}
                 </span>
-                <p className="text-xs sm:text-sm font-extrabold text-white">{t.brandName}</p>
+                <p className="text-xs sm:text-sm font-black text-white tracking-tight">
+                  {t.brandName}
+                </p>
               </div>
             </div>
 
-            {/* Top Right Actions: Search Member Icon + Language Switcher Pill */}
-            <div className="flex items-center gap-2 shrink-0">
-              {/* Member Search Button */}
+            {/* Top Right Action Tools */}
+            <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+              {/* Member Search Trigger */}
               <button
                 type="button"
                 onClick={() => setIsSearchOpen(true)}
-                className="flex items-center justify-center p-2 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md rounded-xl text-xs font-semibold transition border border-white/20 cursor-pointer active:scale-95 shadow-2xs group"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-white/10 hover:bg-white/20 text-white backdrop-blur-md rounded-xl text-xs font-bold transition border border-white/15 cursor-pointer active:scale-95 shadow-md group"
                 title={lang === 'th' ? 'ค้นหาข้อมูลสมาชิก' : 'Search Members'}
                 aria-label={lang === 'th' ? 'ค้นหาข้อมูลสมาชิก' : 'Search Members'}
               >
-                <Search className="w-4 h-4 text-blue-200 group-hover:text-white transition-colors" />
+                <Search className="w-4 h-4 text-[#4ade80] group-hover:scale-110 transition-transform" />
+                <span className="hidden sm:inline font-semibold">{lang === 'th' ? 'ค้นหาสมาชิก' : 'Search Member'}</span>
               </button>
 
-              {/* Language Switcher Pill */}
+              {/* Language Switcher */}
               <button
                 onClick={toggleLang}
-                className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shrink-0 shadow-2xs"
+                className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white backdrop-blur-md px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-black transition border border-white/15 cursor-pointer active:scale-95 shadow-md"
                 title="Switch Language / สลับภาษา"
               >
-                <Globe className="w-3.5 h-3.5 text-blue-200 shrink-0" />
-                <span className={lang === 'th' ? 'text-white font-black' : 'text-blue-200/60'}>TH</span>
-                <span className="text-white/40 font-normal">|</span>
-                <span className={lang === 'en' ? 'text-white font-black' : 'text-blue-200/60'}>EN</span>
+                <Globe className="w-3.5 h-3.5 text-blue-300 shrink-0" />
+                <span className={lang === 'th' ? 'text-[#4ade80] font-black' : 'text-slate-400'}>TH</span>
+                <span className="text-white/30 font-normal">|</span>
+                <span className={lang === 'en' ? 'text-[#4ade80] font-black' : 'text-slate-400'}>EN</span>
               </button>
             </div>
           </div>
+        </header>
 
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight mt-1">
-            {lang === 'th' ? 'ลงทะเบียนและสมัครสมาชิก TSRM' : 'TSRM Registration & Membership'}
+        {/* Center Hero Showcase (Fully Dynamic from Database - Centered in Fullscreen) */}
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center max-w-6xl mx-auto px-4 sm:px-8 lg:px-12 py-6 sm:py-8 w-full">
+
+          {/* Top Shimmering Badge - Dynamic from DB */}
+          <div className="inline-flex items-center gap-2 px-3.5 sm:px-4 py-1.5 rounded-full bg-slate-900/80 border border-[#4ade80]/50 backdrop-blur-md shadow-lg shadow-[#4ade80]/15 mb-3.5 sm:mb-4 animate-slide-down">
+            <Sparkles className="w-3.5 h-3.5 text-[#4ade80] animate-pulse" />
+            <span className="text-[11px] sm:text-xs font-black tracking-widest text-[#4ade80] uppercase">
+              {lang === 'th' ? meetingInfo.badgeTextTh : meetingInfo.badgeTextEn}
+            </span>
+          </div>
+
+          {/* Main Dynamic Title: e.g. 34th TSRM 2026 */}
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.12] max-w-4xl drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)]">
+            <span className="bg-gradient-to-r from-white via-blue-100 to-[#4ade80] bg-clip-text text-transparent">
+              {meetingInfo.displayName}
+            </span>
           </h1>
-          <p className="text-xs sm:text-sm lg:text-base text-blue-100/90 leading-relaxed mt-1 font-normal">
-            {lang === 'th'
-              ? 'เลือกลงทะเบียนเข้าร่วมงานประชุมวิชาการ หรือ สมัครสมาชิกสมาคมฯ'
-              : 'Register for Conference Summit or apply for TSRM membership'}
+
+          {/* Dynamic Description Subtitle */}
+          <p className="mt-2.5 sm:mt-3 text-xs sm:text-base lg:text-lg font-medium text-blue-100 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] max-w-2xl leading-relaxed">
+            {lang === 'th' ? meetingInfo.descriptionTh : meetingInfo.descriptionEn}
           </p>
+
+          {/* Luxury Venue Feature Card - Dynamic from DB */}
+          <div className="mt-5 sm:mt-6 w-full max-w-2xl bg-slate-900/75 hover:bg-slate-900/85 backdrop-blur-xl border border-white/20 hover:border-[#4ade80]/50 rounded-2xl sm:rounded-3xl p-4 sm:p-5 lg:p-6 shadow-2xl transition-all duration-300 group">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4">
+
+              {/* Left Column: Venue Icon & Information */}
+              <div className="flex items-center sm:items-start gap-3.5 text-left min-w-0 w-full sm:w-auto">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-[#0026b3] via-blue-700 to-[#001c8c] border border-blue-400/40 flex items-center justify-center shrink-0 shadow-lg text-[#4ade80] group-hover:scale-105 transition-transform">
+                  <Building2 className="w-6 h-6 sm:w-7 sm:h-7" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-extrabold uppercase tracking-wider text-[#4ade80]">
+                    <MapPin className="w-3.5 h-3.5 text-[#4ade80] shrink-0" />
+                    <span>{lang === 'th' ? 'สถานที่จัดงาน (Official Venue)' : 'Official Venue'}</span>
+                  </div>
+                  <h2 className="text-base sm:text-xl font-black text-white tracking-tight mt-0.5 group-hover:text-[#4ade80] transition-colors truncate">
+                    {meetingInfo.location}
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-300 font-medium truncate">
+                    {lang === 'th' ? 'โรงแรม แกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ' : 'Grande Centre Point Lumphini, Bangkok'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Right Column: Date & Google Maps Trigger */}
+              <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-white/10 shrink-0">
+                <div className="text-left sm:text-right">
+                  <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">
+                    {lang === 'th' ? 'กำหนดการจัดงาน' : 'Conference Date'}
+                  </span>
+                  <span className="text-xs sm:text-sm font-black text-blue-200">
+                    {activeMeeting ? formatMeetingDateDisplay(activeMeeting, lang) : (lang === 'th' ? 'เร็วๆ นี้' : 'Coming Soon')}
+                  </span>
+                </div>
+
+                <a
+                  href={meetingInfo.mapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/30 px-3 py-1.5 rounded-xl transition shadow-xs"
+                >
+                  <span>{lang === 'th' ? 'ดูแผนที่สถานที่' : 'Google Maps'}</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+          </div>
+
         </div>
+
+        {/* Floating Scroll-Down Micro Indicator */}
+        <div className="relative z-20 pb-5 sm:pb-7 flex flex-col items-center justify-center pointer-events-auto">
+          <button
+            type="button"
+            onClick={() => scrollToRegistration()}
+            className="inline-flex flex-col items-center gap-1.5 text-white/80 hover:text-white transition-all cursor-pointer group"
+            title={lang === 'th' ? 'เลื่อนลงเพื่อลงทะเบียน' : 'Scroll to register'}
+          >
+            <span className="text-[10px] sm:text-xs font-bold tracking-widest uppercase text-slate-300 group-hover:text-[#4ade80] transition-colors drop-shadow-sm">
+              {lang === 'th' ? 'เลื่อนลงเพื่อลงทะเบียน' : 'Scroll to Register'}
+            </span>
+            <div className="w-8 h-8 rounded-full bg-white/10 group-hover:bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center transition-transform group-hover:translate-y-1 shadow-md animate-bounce">
+              <ChevronDown className="w-4 h-4 text-[#4ade80]" />
+            </div>
+          </button>
+        </div>
+
+        {/* Seamless Soft Bottom Fade Overlay with reduced distance */}
+        <div className="absolute inset-x-0 -bottom-[1px] h-24 sm:h-32 lg:h-36 bg-gradient-to-t from-[#f6f8fc] from-15% via-[#f6f8fc]/60 to-transparent pointer-events-none z-10" />
       </div>
 
-      {/* Content Body */}
-      <div className="px-4 sm:px-8 lg:px-12 py-5 sm:py-8 flex-1 flex flex-col justify-between max-w-5xl xl:max-w-6xl mx-auto w-full">
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* 📋 REGISTRATION SECTION (Smooth Progressive Scroll Reveal)          */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <div
+        ref={formRef}
+        id="registration-section"
+        className={`relative z-20 scroll-mt-6 px-4 sm:px-8 lg:px-12 pt-4 sm:pt-8 pb-12 sm:pb-16 flex-1 flex flex-col justify-between max-w-5xl xl:max-w-6xl mx-auto w-full transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] transform ${isFormInView ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-16 scale-[0.98]'
+          }`}
+      >
         <div className="space-y-4 sm:space-y-6">
 
-          {/* Main Action Segmented Buttons (Call to Action Tabs) */}
-          <div className="relative grid grid-cols-2 p-1.5 bg-slate-200/80 rounded-2xl border border-slate-200/90 shadow-inner select-none max-w-xl mx-auto w-full">
+          {/* Main Action Segmented Buttons (Call to Action Tabs) - Staggered Bounce 1 */}
+          <div className={`relative grid grid-cols-2 p-1.5 bg-white/90 backdrop-blur-md rounded-2xl border border-slate-200 shadow-lg shadow-slate-900/5 select-none max-w-xl mx-auto w-full transition-all duration-700 delay-100 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform ${isFormInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+            }`}>
             {/* Sliding Active Indicator Pill */}
             <div
               aria-hidden="true"
@@ -649,9 +833,10 @@ export function LoginView({
             </button>
           </div>
 
-          {/* View 1: Conference Registration Form */}
+          {/* View 1: Conference Registration Form - Staggered Bounce 2 */}
           {activeTab === 'conference' ? (
-            <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-7 lg:p-8 border border-slate-200/90 shadow-sm space-y-3.5 sm:space-y-5 animate-fade-in">
+            <div className={`bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-7 lg:p-8 border border-slate-200/90 shadow-sm space-y-3.5 sm:space-y-5 transition-all duration-700 delay-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform ${isFormInView ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-[0.99]'
+              }`}>
               {loadingMeeting ? (
                 /* Loading Skeleton / State */
                 <div className="flex flex-col items-center justify-center py-10 sm:py-14 space-y-3">
@@ -759,7 +944,8 @@ export function LoginView({
 
                   {/* Registration Form with 7 Specified Fields */}
                   <form onSubmit={handleSubmitRegistration} className="space-y-3 sm:space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5">
+                    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5 transition-all duration-700 delay-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform ${isFormInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+                      }`}>
                       {/* 1. ชื่อ-นามสกุล(ไทย) */}
                       <div>
                         <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
@@ -874,7 +1060,8 @@ export function LoginView({
                     </div>
 
                     {/* Dynamic Multi-select Program Options (Optimized for Mobile) */}
-                    <div className="space-y-1.5 sm:space-y-2 pt-0.5">
+                    <div className={`space-y-1.5 sm:space-y-2 pt-0.5 transition-all duration-700 delay-400 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform ${isFormInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+                      }`}>
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] sm:text-xs font-bold text-slate-700 flex items-center gap-1.5">
                           <span>{lang === 'th' ? 'เลือกหลักสูตร / เวิร์กช็อป (เลือกได้หลายรายการ)' : 'Select Programs & Workshops (Multi-select)'}</span>
@@ -894,15 +1081,15 @@ export function LoginView({
                               type="button"
                               onClick={() => toggleProgram(act.id)}
                               className={`p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2.5 active:scale-[0.99] relative overflow-hidden ${isSelected
-                                  ? 'bg-blue-50/90 border-[#0026b3] text-slate-900 shadow-2xs ring-1.5 ring-[#0026b3]/30 font-bold'
-                                  : 'bg-slate-50/80 border-slate-200 hover:border-slate-300 text-slate-700 font-medium'
+                                ? 'bg-blue-50/90 border-[#0026b3] text-slate-900 shadow-2xs ring-1.5 ring-[#0026b3]/30 font-bold'
+                                : 'bg-slate-50/80 border-slate-200 hover:border-slate-300 text-slate-700 font-medium'
                                 }`}
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                                   <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 ${act.type === 'main'
-                                      ? (isSelected ? 'bg-[#0026b3] text-white' : 'bg-slate-200 text-slate-700')
-                                      : (isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700')
+                                    ? (isSelected ? 'bg-[#0026b3] text-white' : 'bg-slate-200 text-slate-700')
+                                    : (isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700')
                                     }`}>
                                     {act.type === 'main' ? (lang === 'th' ? 'หลักสูตรหลัก' : 'Main') : (lang === 'th' ? 'เวิร์กช็อป' : 'Workshop')}
                                   </span>
@@ -911,13 +1098,12 @@ export function LoginView({
                                   {(() => {
                                     const fmt = act.format || (act.type === 'workshop' ? 'onsite' : 'both');
                                     return (
-                                      <span className={`text-[8px] sm:text-[9px] font-extrabold px-1.5 py-0.5 rounded shrink-0 border ${
-                                        fmt === 'online'
-                                          ? (isSelected ? 'bg-blue-100 text-[#0026b3] border-blue-300' : 'bg-blue-50 text-blue-700 border-blue-200')
-                                          : fmt === 'both'
+                                      <span className={`text-[8px] sm:text-[9px] font-extrabold px-1.5 py-0.5 rounded shrink-0 border ${fmt === 'online'
+                                        ? (isSelected ? 'bg-blue-100 text-[#0026b3] border-blue-300' : 'bg-blue-50 text-blue-700 border-blue-200')
+                                        : fmt === 'both'
                                           ? (isSelected ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-purple-50 text-purple-700 border-purple-200')
                                           : (isSelected ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
-                                      }`}>
+                                        }`}>
                                         {fmt === 'online' ? '💻 Online' : fmt === 'both' ? '🌐 Hybrid' : '🏢 Onsite'}
                                       </span>
                                     );
@@ -954,7 +1140,8 @@ export function LoginView({
                       const hasOnlineOnly = onlineOnlyActs.length > 0;
 
                       return (
-                        <div className="space-y-1 sm:space-y-1.5 pt-0.5 sm:pt-1">
+                        <div className={`space-y-1 sm:space-y-1.5 pt-0.5 sm:pt-1 transition-all duration-700 delay-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform ${isFormInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+                          }`}>
                           <label className="text-[11px] sm:text-xs font-bold text-slate-700 block">
                             {lang === 'th' ? 'รูปแบบการเข้าร่วม (Attendance Format)' : 'Attendance Format'}
                           </label>
@@ -968,10 +1155,10 @@ export function LoginView({
                                 if (!hasOnlineOnly) setAttendanceType('onsite');
                               }}
                               className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl border text-[11px] sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${hasOnlineOnly
-                                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                                  : attendanceType === 'onsite'
-                                    ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30 cursor-pointer active:scale-95'
-                                    : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-600 font-medium cursor-pointer active:scale-95'
+                                ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                                : attendanceType === 'onsite'
+                                  ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30 cursor-pointer active:scale-95'
+                                  : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-600 font-medium cursor-pointer active:scale-95'
                                 }`}
                               title={hasOnlineOnly ? (lang === 'th' ? 'มีหลักสูตรที่เปิดรับเฉพาะ Online เท่านั้น' : 'Includes Online-only courses') : ''}
                             >
@@ -987,10 +1174,10 @@ export function LoginView({
                                 if (!hasOnsiteOnly) setAttendanceType('online');
                               }}
                               className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl border text-[11px] sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${hasOnsiteOnly
-                                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                                  : attendanceType === 'online'
-                                    ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30 cursor-pointer active:scale-95'
-                                    : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-600 font-medium cursor-pointer active:scale-95'
+                                ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                                : attendanceType === 'online'
+                                  ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30 cursor-pointer active:scale-95'
+                                  : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-600 font-medium cursor-pointer active:scale-95'
                                 }`}
                               title={hasOnsiteOnly ? (lang === 'th' ? 'มีหลักสูตรที่เปิดรับเฉพาะ Onsite เท่านั้น' : 'Includes Onsite-only courses') : ''}
                             >
@@ -1040,7 +1227,8 @@ export function LoginView({
                     <button
                       type="submit"
                       disabled={selectedPrograms.length === 0 || verifyingMember}
-                      className={`w-full font-black py-2.5 sm:py-3.5 px-4 sm:px-6 rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl transition-all flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-base border border-blue-400/20 relative overflow-hidden mt-2 sm:mt-3 ${selectedPrograms.length === 0 || verifyingMember
+                      className={`w-full font-black py-2.5 sm:py-3.5 px-4 sm:px-6 rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl transition-all duration-700 delay-600 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform ${isFormInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+                        } flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-base border border-blue-400/20 relative overflow-hidden mt-2 sm:mt-3 ${selectedPrograms.length === 0 || verifyingMember
                           ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
                           : 'bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] hover:brightness-110 text-white shadow-blue-900/30 hover:shadow-blue-900/40 cursor-pointer active:scale-[0.99] group'
                         }`}
