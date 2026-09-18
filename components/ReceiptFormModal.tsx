@@ -15,8 +15,11 @@ import {
   AlertCircle,
   Layers,
   Check,
-  DollarSign,
   Calendar,
+  ListOrdered,
+  DollarSign,
+  PenTool,
+  Sparkles,
 } from 'lucide-react';
 
 interface ReceiptFormModalProps {
@@ -41,8 +44,10 @@ export function ReceiptFormModal({
 }: ReceiptFormModalProps) {
   const [mounted, setMounted] = useState(false);
   const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SYSTEM_SETTINGS);
-  const [selectedTemplate, setSelectedTemplate] = useState<1 | 2 | 3>(1);
+  const [selectedTemplate, setSelectedTemplate] = useState<1 | 2 | 3 | 4>(3);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [subDetailsText, setSubDetailsText] = useState<string>('');
+  const [showCustomBahtText, setShowCustomBahtText] = useState(false);
 
   const [formData, setFormData] = useState<ReceiptData>(() => {
     return initialData || {
@@ -53,7 +58,7 @@ export function ReceiptFormModal({
         month: 'long',
         year: 'numeric',
       }),
-      purposeText: 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',
+      purposeText: 'ได้รับเงินสนับสนุน ประจำปี 2569',
       payerType: 'company',
       payerName: '',
       branchName: 'สำนักงานแห่งใหญ่',
@@ -65,17 +70,16 @@ export function ReceiptFormModal({
         {
           id: `item-${Date.now()}`,
           itemNumber: 1,
-          title: 'ค่าลงทะเบียน',
+          title: 'ค่าสนับสนุนการประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569',
           subDetails: [
-            'การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569',
             'ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์',
             'จัดขึ้นวันที่ 20-21-22 ตุลาคม  2569',
             'โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ',
           ],
-          amount: 3500,
+          amount: 50000,
         },
       ],
-      totalAmount: 3500,
+      totalAmount: 50000,
       payerSignerName: '',
       payerSignerRole: 'ผู้จ่ายเงิน',
       authorizedSignerName: 'แพทย์หญิงพิมพกา ชวนะเวสน์',
@@ -112,11 +116,11 @@ export function ReceiptFormModal({
                 preparedByName: json.data.receipt_prepared_by || prev.preparedByName,
                 preparedByRole: json.data.receipt_prepared_role || prev.preparedByRole,
               }));
-              applyTemplate(1, json.data, '');
+              applyTemplate(3, json.data, '');
             }
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [isOpen, initialData]);
 
@@ -124,14 +128,20 @@ export function ReceiptFormModal({
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
+      setSelectedTemplate(4); // Default to custom/free-edit mode for existing receipts
       setNameError(null);
+      const lines = initialData.items?.[0]?.subDetails || [];
+      setSubDetailsText(lines.join('\n'));
+      if (initialData.thaiBahtTextOverride) {
+        setShowCustomBahtText(true);
+      }
     }
   }, [initialData]);
 
   if (!isOpen || !mounted) return null;
 
   const applyTemplate = (
-    templateType: 1 | 2 | 3,
+    templateType: 1 | 2 | 3 | 4,
     activeSettings?: SystemSettings,
     currentPayerName?: string
   ) => {
@@ -141,6 +151,11 @@ export function ReceiptFormModal({
     const dateStr = m ? m.date : '20-22 ตุลาคม 2569';
     const locationStr = m ? m.location : 'โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ';
     const pName = currentPayerName !== undefined ? currentPayerName : formData.payerName || '';
+
+    if (templateType === 4) {
+      // 4. กำหนดเอง (Custom Mode): ไม่มีการดึงข้อมูลตายตัวจากฐานข้อมูลมาทับ แต่ให้แก้ไขทุกส่วนได้อิสระ
+      return;
+    }
 
     let title = '';
     let purposeText = '';
@@ -171,7 +186,7 @@ export function ReceiptFormModal({
         .filter(Boolean);
       subDetails = [
         ...baseLines,
-        pName || '...................',
+        pName || '',
       ].filter(Boolean);
     } else if (templateType === 3) {
       title = cfg.receipt_tpl3_title || 'ค่าสนับสนุนการประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569';
@@ -199,6 +214,8 @@ export function ReceiptFormModal({
       },
     ];
 
+    setSubDetailsText(subDetails.join('\n'));
+
     setFormData((prev) => ({
       ...prev,
       payerType: templateType === 3 ? 'company' : 'individual',
@@ -225,12 +242,13 @@ export function ReceiptFormModal({
   const handlePayerNameChange = (val: string) => {
     setFormData((prev) => {
       const nextItems = [...prev.items];
-      if (nextItems.length > 0 && nextItems[0].subDetails) {
+      if (selectedTemplate !== 4 && nextItems.length > 0 && nextItems[0].subDetails) {
         const subs = [...nextItems[0].subDetails];
         if (subs.length > 0) {
           subs[subs.length - 1] = val;
         }
         nextItems[0] = { ...nextItems[0], subDetails: subs };
+        setSubDetailsText(subs.join('\n'));
       }
       return {
         ...prev,
@@ -243,10 +261,56 @@ export function ReceiptFormModal({
     }
   };
 
+  const handleItemTitleChange = (val: string) => {
+    setFormData((prev) => {
+      const nextItems = [...prev.items];
+      if (nextItems.length === 0) {
+        nextItems.push({
+          id: `item-${Date.now()}`,
+          itemNumber: 1,
+          title: val,
+          subDetails: [],
+          amount: prev.totalAmount || 0,
+        });
+      } else {
+        nextItems[0] = { ...nextItems[0], title: val };
+      }
+      return { ...prev, items: nextItems };
+    });
+  };
+
+  const handleSubDetailsTextChange = (text: string) => {
+    setSubDetailsText(text);
+    const lines = text.split('\n');
+    setFormData((prev) => {
+      const nextItems = [...prev.items];
+      if (nextItems.length === 0) {
+        nextItems.push({
+          id: `item-${Date.now()}`,
+          itemNumber: 1,
+          title: 'ค่าลงทะเบียน',
+          subDetails: lines,
+          amount: prev.totalAmount || 0,
+        });
+      } else {
+        nextItems[0] = { ...nextItems[0], subDetails: lines };
+      }
+      return { ...prev, items: nextItems };
+    });
+  };
+
   const handleAmountChange = (val: number) => {
     const nextItems = [...formData.items];
     if (nextItems.length > 0) {
       nextItems[0] = { ...nextItems[0], amount: val };
+    } else {
+      nextItems.push({
+        id: `item-${Date.now()}`,
+        itemNumber: 1,
+        title: 'ค่าลงทะเบียน',
+        subDetails: [],
+        amount: val,
+      });
     }
     setFormData((prev) => ({
       ...prev,
@@ -271,7 +335,7 @@ export function ReceiptFormModal({
   return createPortal(
     <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center p-3 sm:p-6 animate-fade-in">
       <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
-        
+
         {/* Header */}
         <div className="px-6 py-4 bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -300,30 +364,37 @@ export function ReceiptFormModal({
         {/* Scrollable Form Body */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 text-slate-800">
 
-          {/* ─── 1. ตัวเลือกตามรูปแบบต่างๆ (เลือกแค่รูปแบบ) ────── */}
+          {/* ─── 1. ตัวเลือกตามรูปแบบต่างๆ (เลือกรูปแบบ) ────── */}
           <div className="bg-slate-50/80 p-4 sm:p-5 rounded-3xl border border-slate-200/90 shadow-2xs space-y-3">
-            <div className="flex items-center gap-2">
-              <Layers className="w-4.5 h-4.5 text-indigo-700" />
-              <span className="text-xs sm:text-sm font-bold text-slate-800">
-                เลือกรูปแบบใบเสร็จรับเงิน
-              </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4.5 h-4.5 text-indigo-700" />
+                <span className="text-xs sm:text-sm font-bold text-slate-800">
+                  เลือกรูปแบบใบเสร็จรับเงิน
+                </span>
+              </div>
+              {selectedTemplate === 4 && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 rounded-full">
+                  <Sparkles className="w-3 h-3" />
+                  โหมดกำหนดเอง (แก้ไขได้อิสระทุกส่วน)
+                </span>
+              )}
             </div>
 
-            {/* 3 Clean Template Selector Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {/* 4 Clean Template Selector Buttons */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {/* Template 1 */}
               <button
                 type="button"
                 onClick={() => applyTemplate(1)}
-                className={`py-3 px-4 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${
-                  selectedTemplate === 1
+                className={`py-3 px-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${selectedTemplate === 1
                     ? 'bg-[#4338ca] border-[#4338ca] text-white shadow-xs'
                     : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${
-                    selectedTemplate === 1 ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
-                  }`}>
+                  <span className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${selectedTemplate === 1 ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                    }`}>
                     1
                   </span>
                   <span className="text-xs font-bold truncate">
@@ -335,19 +406,18 @@ export function ReceiptFormModal({
                 )}
               </button>
 
+              {/* Template 2 */}
               <button
                 type="button"
                 onClick={() => applyTemplate(2)}
-                className={`py-3 px-4 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${
-                  selectedTemplate === 2
+                className={`py-3 px-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${selectedTemplate === 2
                     ? 'bg-[#4338ca] border-[#4338ca] text-white shadow-xs'
                     : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${
-                    selectedTemplate === 2 ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
-                  }`}>
+                  <span className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${selectedTemplate === 2 ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                    }`}>
                     2
                   </span>
                   <span className="text-xs font-bold truncate">
@@ -359,19 +429,18 @@ export function ReceiptFormModal({
                 )}
               </button>
 
+              {/* Template 3 */}
               <button
                 type="button"
                 onClick={() => applyTemplate(3)}
-                className={`py-3 px-4 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${
-                  selectedTemplate === 3
+                className={`py-3 px-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${selectedTemplate === 3
                     ? 'bg-[#4338ca] border-[#4338ca] text-white shadow-xs'
                     : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${
-                    selectedTemplate === 3 ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
-                  }`}>
+                  <span className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${selectedTemplate === 3 ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                    }`}>
                     3
                   </span>
                   <span className="text-xs font-bold truncate">
@@ -380,6 +449,31 @@ export function ReceiptFormModal({
                 </div>
                 {selectedTemplate === 3 && (
                   <Check className="w-4 h-4 text-white shrink-0 ml-1" />
+                )}
+              </button>
+
+              {/* Template 4: Custom / กำหนดเอง */}
+              <button
+                type="button"
+                onClick={() => applyTemplate(4)}
+                className={`py-3 px-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${selectedTemplate === 4
+                    ? 'bg-[#4338ca] border-[#4338ca] text-white shadow-xs ring-2 ring-indigo-300/40'
+                    : 'bg-white hover:bg-indigo-50/50 border-indigo-200/80 text-indigo-900'
+                  }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${selectedTemplate === 4 ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-800'
+                    }`}>
+                    4
+                  </span>
+                  <span className="text-xs font-bold truncate">
+                    กำหนดเอง
+                  </span>
+                </div>
+                {selectedTemplate === 4 ? (
+                  <Check className="w-4 h-4 text-white shrink-0 ml-1" />
+                ) : (
+                  <PenTool className="w-3.5 h-3.5 text-indigo-500 shrink-0 ml-1" />
                 )}
               </button>
             </div>
@@ -398,14 +492,15 @@ export function ReceiptFormModal({
               {/* Receipt No */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  เลขที่ใบเสร็จรับเงิน (Receipt No.)
+                  เลขที่ใบเสร็จรับเงิน (Receipt No.) <span className="text-rose-600 font-bold">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.receiptNo}
                   onChange={(e) => setFormData({ ...formData, receiptNo: e.target.value })}
-                  placeholder="เช่น 2569/02-108"
+                  placeholder="เช่น 2569/02-109"
                   className="w-full px-4 py-2.5 text-sm font-mono font-bold bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
+                  required
                 />
               </div>
 
@@ -448,7 +543,40 @@ export function ReceiptFormModal({
             </div>
           </div>
 
-          {/* ─── 3. ข้อมูลผู้ชำระเงิน / บริษัท / หน่วยงาน (ตามรูปเป๊ะๆ 100%) ─── */}
+          {/* ─── 3. ข้อความการรับเงิน / วัตถุประสงค์ (Purpose Text) ─── */}
+          <div className="bg-slate-50/80 p-4 sm:p-5 rounded-3xl border border-slate-200/90 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4.5 h-4.5 text-indigo-700" />
+                <span className="text-xs sm:text-sm font-bold text-slate-800">
+                  ข้อความการรับเงิน / วัตถุประสงค์
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-500">
+                แสดงต่อจาก &quot;สมาคมเวชศาสตร์การเจริญพันธุ์ไทย&quot;
+              </span>
+            </div>
+
+            <div>
+              <div className="flex items-center bg-white border border-slate-200 rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-indigo-100 focus-within:border-indigo-600 transition">
+                <span className="px-3.5 py-2.5 text-xs font-semibold text-slate-500 bg-slate-100/70 border-r border-slate-200 shrink-0 hidden sm:inline-block">
+                  สมาคมเวชศาสตร์การเจริญพันธุ์ไทย
+                </span>
+                <input
+                  type="text"
+                  value={formData.purposeText}
+                  onChange={(e) => setFormData({ ...formData, purposeText: e.target.value })}
+                  placeholder="เช่น ได้รับเงินค่าลงทะเบียน ประจำปี 2569 หรือ ได้รับเงินค่าสมัครสมาชิก..."
+                  className="w-full px-4 py-2.5 text-sm bg-transparent focus:outline-none"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1 pl-1">
+                ตัวอย่างแสดงผล: <span className="text-slate-800 font-medium">สมาคมเวชศาสตร์การเจริญพันธุ์ไทย {formData.purposeText || 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569'}</span>
+              </p>
+            </div>
+          </div>
+
+          {/* ─── 4. ข้อมูลผู้ชำระเงิน / บริษัท / หน่วยงาน ─── */}
           <div className="bg-slate-50/80 p-5 sm:p-6 rounded-3xl border border-slate-200/90 space-y-4 shadow-xs">
             {/* Header with Icon & Right Toggle Pill */}
             <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
@@ -457,7 +585,7 @@ export function ReceiptFormModal({
                   <Building2 className="w-4.5 h-4.5" />
                 </div>
                 <h3 className="text-sm sm:text-base font-bold text-slate-800">
-                  ข้อมูลผู้ชำระเงิน / บริษัท / หน่วยงาน
+                  ข้อมูลผู้ชำระเงิน / บริษัท / หน่วยงาน (จาก)
                 </h3>
               </div>
 
@@ -466,28 +594,26 @@ export function ReceiptFormModal({
                 <button
                   type="button"
                   onClick={() => {
-                    setFormData({ ...formData, payerType: 'company', branchName: formData.branchName || 'สำนักงานแห่งใหญ่' });
+                    setFormData({ ...formData, payerType: 'individual', branchName: '' });
                   }}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    formData.payerType === 'company'
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${formData.payerType === 'individual'
                       ? 'bg-[#4338ca] text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                    }`}
                 >
-                  นิติบุคคล / บริษัท
+                  บุคคลธรรมดา
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    setFormData({ ...formData, payerType: 'individual', branchName: '' });
+                    setFormData({ ...formData, payerType: 'company', branchName: formData.branchName || 'สำนักงานแห่งใหญ่' });
                   }}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    formData.payerType === 'individual'
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${formData.payerType === 'company'
                       ? 'bg-[#4338ca] text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                    }`}
                 >
-                  บุคคลธรรมดา
+                  นิติบุคคล / บริษัท
                 </button>
               </div>
             </div>
@@ -502,7 +628,7 @@ export function ReceiptFormModal({
 
             {/* Row 1: Name & Branch */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="sm:col-span-2">
+              <div className={formData.payerType === 'company' ? 'sm:col-span-2' : 'sm:col-span-3'}>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   ชื่อผู้ชำระเงิน / ชื่อบริษัท / หน่วยงาน <span className="text-rose-600 font-bold">*</span>
                 </label>
@@ -511,108 +637,210 @@ export function ReceiptFormModal({
                   type="text"
                   value={formData.payerName}
                   onChange={(e) => handlePayerNameChange(e.target.value)}
-                  placeholder={formData.payerType === 'company' ? 'เช่น บริษัท ออร์กานอน (ประเทศไทย) จำกัด' : 'เช่น นพ. วรวัฒน์ เกียรติอนันต์'}
-                  className={`w-full px-4 py-2.5 text-sm bg-white border rounded-2xl focus:outline-none focus:ring-2 transition ${
-                    nameError
+                  placeholder={formData.payerType === 'company' ? 'เช่น บริษัท ออร์กานอน (ประเทศไทย) จำกัด' : 'เช่น พิชญ์พงษ์ จุฑิ่น'}
+                  className={`w-full px-4 py-2.5 text-sm bg-white border rounded-2xl focus:outline-none focus:ring-2 transition ${nameError
                       ? 'border-rose-500 ring-2 ring-rose-200 focus:border-rose-600'
                       : 'border-slate-200 focus:border-indigo-600 focus:ring-indigo-100'
-                  }`}
+                    }`}
                   required
                 />
               </div>
 
+              {formData.payerType === 'company' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    สาขา
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.branchName || ''}
+                    onChange={(e) => setFormData({ ...formData, branchName: e.target.value })}
+                    placeholder="สำนักงานแห่งใหญ่"
+                    className="w-full px-4 py-2.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* If Company: Show Address, Phone, Tax ID */}
+            {formData.payerType === 'company' && (
+              <div className="space-y-4 pt-2 border-t border-slate-200/80 animate-fade-in">
+                {/* Row 2: Address Line 1 */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    ที่อยู่บรรทัดที่ 1 (เลขที่ อาคาร ชั้น ห้อง ซอย ถนน แขวง เขต)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.payerAddressLine1}
+                    onChange={(e) => setFormData({ ...formData, payerAddressLine1: e.target.value })}
+                    placeholder="เช่น เลขที่ 88 อาคารเดอะปาร์ค ชั้นที่ 7 ฝั่งอีสต์วิง ห้องเลขที่ 07-101 ถนนรัชดาภิเษก แขวงคลองเตย เขตคลองเตย"
+                    className="w-full px-4 py-2.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
+                  />
+                </div>
+
+                {/* Row 3: City/Postal, Phone, Tax ID */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      จังหวัด / รหัสไปรษณีย์
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.payerAddressLine2}
+                      onChange={(e) => setFormData({ ...formData, payerAddressLine2: e.target.value })}
+                      placeholder="เช่น กรุงเทพมหานคร 10110"
+                      className="w-full px-4 py-2.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      เบอร์โทรศัพท์
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.payerPhone || ''}
+                      onChange={(e) => setFormData({ ...formData, payerPhone: e.target.value })}
+                      placeholder="เช่น +662-257-2500"
+                      className="w-full px-4 py-2.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      เลขประจำตัวผู้เสียภาษี
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.payerTaxId || ''}
+                      onChange={(e) => setFormData({ ...formData, payerTaxId: e.target.value })}
+                      placeholder="เช่น 0105563092355"
+                      className="w-full px-4 py-2.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ─── 5. ข้อมูลรายการและรายละเอียดในตารางใบเสร็จ ─── */}
+          <div className="bg-slate-50/80 p-5 sm:p-6 rounded-3xl border border-slate-200/90 space-y-4 shadow-xs">
+            <div className="flex items-center gap-2.5 pb-1">
+              <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                <ListOrdered className="w-4.5 h-4.5" />
+              </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  สาขา
-                </label>
-                <input
-                  type="text"
-                  value={formData.branchName || ''}
-                  onChange={(e) => setFormData({ ...formData, branchName: e.target.value })}
-                  placeholder="สำนักงานแห่งใหญ่"
-                  className="w-full px-4 py-2.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
-                />
+                <h3 className="text-sm sm:text-base font-bold text-slate-800">
+                  ข้อมูลรายการและรายละเอียดในใบเสร็จ
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  แก้ไขชื่อรายการหลัก และข้อความรายละเอียดแต่ละบรรทัดได้ตามต้องการ
+                </p>
               </div>
             </div>
 
-            {/* Row 2: Address Line 1 */}
+            {/* Item Title */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                ที่อยู่บรรทัดที่ 1 (เลขที่ อาคาร ชั้น ห้อง ซอย ถนน แขวง เขต)
+                ชื่อรายการหลัก (Item Title) <span className="text-rose-600 font-bold">*</span>
               </label>
               <input
                 type="text"
-                value={formData.payerAddressLine1}
-                onChange={(e) => setFormData({ ...formData, payerAddressLine1: e.target.value })}
-                placeholder="เช่น เลขที่ 88 อาคารเดอะปาร์ค ชั้นที่ 7 ฝั่งอีสต์วิง ห้องเลขที่ 07-101 ถนนรัชดาภิเษก แขวงคลองเตย เขตคลองเตย"
-                className="w-full px-4 py-2.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
+                value={formData.items?.[0]?.title || ''}
+                onChange={(e) => handleItemTitleChange(e.target.value)}
+                placeholder="เช่น ค่าลงทะเบียน, ค่าสมัครสมาชิก, ค่าสนับสนุนการประชุมวิชาการ..."
+                className="w-full px-4 py-2.5 text-sm font-semibold bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
+                required
               />
             </div>
 
-            {/* Row 3: City/Postal, Phone, Tax ID */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  จังหวัด / รหัสไปรษณีย์
-                </label>
-                <input
-                  type="text"
-                  value={formData.payerAddressLine2}
-                  onChange={(e) => setFormData({ ...formData, payerAddressLine2: e.target.value })}
-                  placeholder="เช่น กรุงเทพมหานคร 10110"
-                  className="w-full px-4 py-2.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  เบอร์โทรศัพท์
-                </label>
-                <input
-                  type="text"
-                  value={formData.payerPhone || ''}
-                  onChange={(e) => setFormData({ ...formData, payerPhone: e.target.value })}
-                  placeholder="เช่น +662-257-2500"
-                  className="w-full px-4 py-2.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  เลขประจำตัวผู้เสียภาษี
-                </label>
-                <input
-                  type="text"
-                  value={formData.payerTaxId || ''}
-                  onChange={(e) => setFormData({ ...formData, payerTaxId: e.target.value })}
-                  placeholder="เช่น 0105563092355"
-                  className="w-full px-4 py-2.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition font-mono"
-                />
-              </div>
-            </div>
-
-            {/* Row 4: Amount Field */}
+            {/* Item Sub-Details (Multiline textarea) */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                จำนวนเงิน (บาท) <span className="text-rose-600 font-bold">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.totalAmount || ''}
-                  onChange={(e) => handleAmountChange(parseFloat(e.target.value) || 0)}
-                  placeholder="เช่น 3500"
-                  className="w-full px-4 py-2.5 text-sm font-black font-mono text-slate-900 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
-                  required
-                />
-                <span className="absolute right-4 top-2.5 text-xs font-bold text-slate-400">
-                  THB (บาท)
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  รายละเอียดบรรทัดย่อย (แสดงใต้ชื่อรายการในตาราง)
+                </label>
+                <span className="text-[11px] text-indigo-600">
+                  (แยกบรรทัดละ 1 ข้อความ)
                 </span>
               </div>
-              <p className="text-[11px] text-indigo-700 font-medium mt-1">
-                ({thaiBahtText(formData.totalAmount || 0)})
+              <textarea
+                rows={5}
+                value={subDetailsText}
+                onChange={(e) => handleSubDetailsTextChange(e.target.value)}
+                placeholder={`การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569\nด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์\nจัดขึ้นวันที่ 20 ตุลาคม 2569\nโรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ\nพิชญ์พงษ์ จุฑิ่น`}
+                className="w-full px-4 py-3 text-sm font-sans bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition leading-relaxed"
+              />
+              <p className="text-[11px] text-slate-500 mt-1 pl-1">
+                💡 ข้อความแต่ละบรรทัดจะแสดงเรียงต่อกันเป็นแถวข้อมูลใต้ชื่อรายการในตารางใบเสร็จ
               </p>
+            </div>
+          </div>
+
+          {/* ─── 6. จำนวนเงินและยอดรวม ─── */}
+          <div className="bg-slate-50/80 p-5 sm:p-6 rounded-3xl border border-slate-200/90 space-y-4 shadow-xs">
+            <div className="flex items-center gap-2.5 pb-1">
+              <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                <DollarSign className="w-4.5 h-4.5" />
+              </div>
+              <h3 className="text-sm sm:text-base font-bold text-slate-800">
+                จำนวนเงินและยอดรวม (บาท)
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Total Amount Input */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  จำนวนเงิน (บาท) <span className="text-rose-600 font-bold">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={formData.totalAmount || ''}
+                    onChange={(e) => handleAmountChange(parseFloat(e.target.value) || 0)}
+                    placeholder="เช่น 4000"
+                    className="w-full px-4 py-2.5 text-base font-black font-mono text-slate-900 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
+                    required
+                  />
+                  <span className="absolute right-4 top-3 text-xs font-bold text-slate-400">
+                    THB (บาท)
+                  </span>
+                </div>
+              </div>
+
+              {/* Thai Baht Text Display & Override */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700">
+                    จำนวนเงินตัวอักษร (ตัวอักษร)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomBahtText(!showCustomBahtText)}
+                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                  >
+                    {showCustomBahtText ? 'ใช้ค่าอัตโนมัติ' : 'แก้ไขตัวอักษรเอง'}
+                  </button>
+                </div>
+
+                {showCustomBahtText ? (
+                  <input
+                    type="text"
+                    value={formData.thaiBahtTextOverride || thaiBahtText(formData.totalAmount || 0)}
+                    onChange={(e) => setFormData({ ...formData, thaiBahtTextOverride: e.target.value })}
+                    placeholder="เช่น สี่พันบาทถ้วน"
+                    className="w-full px-4 py-2.5 text-sm font-medium bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
+                  />
+                ) : (
+                  <div className="px-4 py-2.5 text-sm font-bold text-indigo-800 bg-indigo-50/60 border border-indigo-100 rounded-2xl">
+                    ({thaiBahtText(formData.totalAmount || 0)})
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

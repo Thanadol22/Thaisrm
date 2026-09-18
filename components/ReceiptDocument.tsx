@@ -33,12 +33,12 @@ function cleanPhone(phone?: string): string {
 
 export function ReceiptDocument({ data, className = '', isPrintOnly = false }: ReceiptDocumentProps) {
   const isIndividual = isIndividualOrRegistration(data);
-  const formattedTotal = data.totalAmount.toLocaleString('th-TH', {
+  const formattedTotal = (data.totalAmount || 0).toLocaleString('th-TH', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
 
-  const bahtText = data.thaiBahtTextOverride || thaiBahtText(data.totalAmount);
+  const bahtText = data.thaiBahtTextOverride || thaiBahtText(data.totalAmount || 0);
 
   return (
     <div
@@ -175,7 +175,7 @@ export function ReceiptDocument({ data, className = '', isPrintOnly = false }: R
           <div className="w-48 p-3 text-right text-[15px] pr-4">
             {data.items.map((item, index) => (
               <div key={item.id || index} className="font-normal">
-                {item.amount.toLocaleString('th-TH', {
+                {(item.amount || 0).toLocaleString('th-TH', {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 2,
                 })}
