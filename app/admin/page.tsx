@@ -178,9 +178,11 @@ interface AttendeeItem {
   meetingId: string;
   meetingTitle: string;
   registeredDate: string;
-  paymentStatus: 'paid' | 'pending' | 'unpaid';
+  paymentStatus: 'paid' | 'pending' | 'rejected' | 'unpaid';
   checkInStatus: 'checked_in' | 'not_checked_in';
   checkInTime?: string;
+  slipId?: string | null;
+  rejectionReason?: string | null;
 }
 
 const INITIAL_ATTENDEES: AttendeeItem[] = [];
@@ -4389,12 +4391,14 @@ function VerifyAttendeesPanel({
   onToggleCheckIn,
   onAddAttendee,
   onPrintReceipt,
+  onUpdatePaymentStatus,
 }: {
   attendees: AttendeeItem[];
   meetings: MeetingItem[];
   onToggleCheckIn: (id: string) => void;
   onAddAttendee?: (newAttendee: AttendeeItem) => void;
   onPrintReceipt?: (attendee: AttendeeItem) => void;
+  onUpdatePaymentStatus?: (attendeeId: string, paymentStatus: 'paid' | 'pending' | 'rejected', rejectionReason?: string) => Promise<void>;
 }) {
   // Find current ongoing meeting (or first upcoming, or fallback to first meeting)
   const currentOngoingMeeting = useMemo(() => {
@@ -4411,8 +4415,14 @@ function VerifyAttendeesPanel({
 
   const [search, setSearch] = useState('');
   const [filterCheckIn, setFilterCheckIn] = useState<'all' | 'checked_in' | 'not_checked_in'>('all');
-  const [filterPayment, setFilterPayment] = useState<'all' | 'paid' | 'pending'>('all');
+  const [filterPayment, setFilterPayment] = useState<'all' | 'paid' | 'pending' | 'rejected'>('all');
   const [selectedAttendee, setSelectedAttendee] = useState<AttendeeItem | null>(null);
+
+  // Status Edit Modal State
+  const [editingStatusAttendee, setEditingStatusAttendee] = useState<AttendeeItem | null>(null);
+  const [editStatusValue, setEditStatusValue] = useState<'paid' | 'pending' | 'rejected'>('paid');
+  const [editRejectionReason, setEditRejectionReason] = useState<string>('');
+  const [isSavingStatus, setIsSavingStatus] = useState<boolean>(false);
 
   // Pagination state (default: 5 items per page to reduce heavy DOM loads)
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -4479,6 +4489,18 @@ function VerifyAttendeesPanel({
     });
   };
 
+  const handleSaveStatusChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStatusAttendee || !onUpdatePaymentStatus) return;
+    setIsSavingStatus(true);
+    try {
+      await onUpdatePaymentStatus(editingStatusAttendee.id, editStatusValue, editRejectionReason);
+      setEditingStatusAttendee(null);
+    } finally {
+      setIsSavingStatus(false);
+    }
+  };
+
   // Filter attendees by selected round first
   const roundAttendees = useMemo(() => {
     if (activeMeetingId === 'all') return attendees;
@@ -4493,7 +4515,11 @@ function VerifyAttendeesPanel({
   const filteredAttendees = useMemo(() => {
     return roundAttendees.filter((a) => {
       const matchStatus = filterCheckIn === 'all' || a.checkInStatus === filterCheckIn;
-      const matchPayment = filterPayment === 'all' || a.paymentStatus === filterPayment;
+      const matchPayment =
+        filterPayment === 'all' ||
+        (filterPayment === 'pending'
+          ? a.paymentStatus === 'pending' || a.paymentStatus === 'unpaid'
+          : a.paymentStatus === filterPayment);
       const q = search.toLowerCase().trim();
       const matchSearch =
         !q ||
@@ -4527,6 +4553,8 @@ function VerifyAttendeesPanel({
   const checkedInInRound = roundAttendees.filter((a) => a.checkInStatus === 'checked_in').length;
   const notCheckedInInRound = totalInRound - checkedInInRound;
   const paidInRound = roundAttendees.filter((a) => a.paymentStatus === 'paid').length;
+  const pendingInRound = roundAttendees.filter((a) => a.paymentStatus === 'pending' || a.paymentStatus === 'unpaid').length;
+  const rejectedInRound = roundAttendees.filter((a) => a.paymentStatus === 'rejected').length;
   const rateInRound = totalInRound > 0 ? Math.round((checkedInInRound / totalInRound) * 100) : 0;
 
   // Export CSV handler
@@ -4544,7 +4572,7 @@ function VerifyAttendeesPanel({
       `"${a.ticketType}"`,
       a.ticketCode,
       `"${a.meetingTitle}"`,
-      a.paymentStatus === 'paid' ? 'ชำระแล้ว' : 'รอชำระ',
+      a.paymentStatus === 'paid' ? 'ชำระแล้ว' : a.paymentStatus === 'rejected' ? 'สลิปถูกปฏิเสธ' : 'รอชำระ',
       a.checkInStatus === 'checked_in' ? 'เช็คอินแล้ว' : 'ยังไม่เข้าร่วม',
       a.checkInTime || '-',
     ]);
@@ -4815,8 +4843,9 @@ function VerifyAttendeesPanel({
             className="bg-white border border-slate-300 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none shadow-xs cursor-pointer focus:border-[#0026b3]"
           >
             <option value="all">การชำระเงิน: ทั้งหมด</option>
-            <option value="paid">ชำระแล้ว ({roundAttendees.filter((a) => a.paymentStatus === 'paid').length})</option>
-            <option value="pending">รอชำระ ({roundAttendees.filter((a) => a.paymentStatus === 'pending').length})</option>
+            <option value="paid">ชำระแล้ว ({paidInRound})</option>
+            <option value="pending">รอชำระ ({pendingInRound})</option>
+            <option value="rejected">สลิปถูกปฏิเสธ ({rejectedInRound})</option>
           </select>
         </div>
       </div>
@@ -4871,14 +4900,36 @@ function VerifyAttendeesPanel({
                       <div className="text-xs text-[#0026b3] font-mono font-medium">{a.ticketCode}</div>
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap ${a.paymentStatus === 'paid'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap ${
+                            a.paymentStatus === 'paid'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : a.paymentStatus === 'rejected'
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
                           }`}
-                      >
-                        {a.paymentStatus === 'paid' ? 'ชำระแล้ว' : 'รอชำระ'}
-                      </span>
+                        >
+                          {a.paymentStatus === 'paid' ? (
+                            <>
+                              <CheckCircle2 className="w-3 h-3" /> ชำระแล้ว
+                            </>
+                          ) : a.paymentStatus === 'rejected' ? (
+                            <>
+                              <XCircle className="w-3 h-3" /> สลิปถูกปฏิเสธ
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-3 h-3" /> รอชำระ
+                            </>
+                          )}
+                        </span>
+                      </div>
+                      {a.paymentStatus === 'rejected' && a.rejectionReason && (
+                        <div className="text-[11px] text-rose-500 mt-0.5 truncate max-w-[170px]" title={a.rejectionReason}>
+                          {a.rejectionReason}
+                        </div>
+                      )}
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap">
                       {a.checkInStatus === 'checked_in' ? (
@@ -4907,16 +4958,33 @@ function VerifyAttendeesPanel({
                         )}
                         <button
                           onClick={() => onToggleCheckIn(a.id)}
-                          className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${a.checkInStatus === 'checked_in'
-                            ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
-                            : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-xs'
-                            }`}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+                            a.checkInStatus === 'checked_in'
+                              ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                              : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-xs'
+                          }`}
                         >
                           {a.checkInStatus === 'checked_in' ? 'ยกเลิก' : 'เช็คอิน'}
                         </button>
+                        {onUpdatePaymentStatus && (
+                          <button
+                            onClick={() => {
+                              setEditingStatusAttendee(a);
+                              setEditStatusValue(
+                                a.paymentStatus === 'paid' ? 'paid' : a.paymentStatus === 'rejected' ? 'rejected' : 'pending'
+                              );
+                              setEditRejectionReason(a.rejectionReason || '');
+                            }}
+                            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-[#0026b3] border border-slate-200 transition cursor-pointer"
+                            title="แก้ไขสถานะการชำระเงิน"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
                         <button
                           onClick={() => setSelectedAttendee(a)}
                           className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 transition cursor-pointer"
+                          title="ดูรายละเอียด"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -4960,10 +5028,11 @@ function VerifyAttendeesPanel({
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition ${currentPage === 1
-                ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
-                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 cursor-pointer shadow-xs'
-                }`}
+              className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition ${
+                currentPage === 1
+                  ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 cursor-pointer shadow-xs'
+              }`}
             >
               <ChevronLeft className="w-4 h-4" />
               <span className="hidden sm:inline">ก่อนหน้า</span>
@@ -4981,10 +5050,11 @@ function VerifyAttendeesPanel({
                       {showEllipsis && <span className="px-1 text-slate-400 text-xs">...</span>}
                       <button
                         onClick={() => setCurrentPage(p)}
-                        className={`min-w-[32px] h-8 px-2 rounded-xl text-xs font-bold transition cursor-pointer ${currentPage === p
-                          ? 'bg-[#0026b3] text-white shadow-xs'
-                          : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                          }`}
+                        className={`min-w-[32px] h-8 px-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                          currentPage === p
+                            ? 'bg-[#0026b3] text-white shadow-xs'
+                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
                       >
                         {p}
                       </button>
@@ -4996,16 +5066,163 @@ function VerifyAttendeesPanel({
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition ${currentPage === totalPages
-                ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
-                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 cursor-pointer shadow-xs'
-                }`}
+              className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition ${
+                currentPage === totalPages
+                  ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 cursor-pointer shadow-xs'
+              }`}
             >
               <span className="hidden sm:inline">ถัดไป</span>
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>
+      )}
+
+      {/* ─── Edit Payment Status Modal ────────────────────────────────────── */}
+      {editingStatusAttendee && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Pencil className="w-5 h-5 text-[#0026b3]" />
+                <h3 className="text-base sm:text-lg font-extrabold text-slate-900">แก้ไขสถานะการชำระเงิน</h3>
+              </div>
+              <button
+                onClick={() => setEditingStatusAttendee(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-1 text-xs">
+              <div className="font-bold text-sm text-slate-900">{editingStatusAttendee.nameTh}</div>
+              <div className="text-slate-500">
+                รหัสสมาชิก: <span className="font-bold text-[#0026b3]">{editingStatusAttendee.code}</span> | รหัสตั๋ว:{' '}
+                <span className="font-mono">{editingStatusAttendee.ticketCode}</span>
+              </div>
+              <div className="text-slate-500 truncate">รอบ: {editingStatusAttendee.meetingTitle}</div>
+            </div>
+
+            <form onSubmit={handleSaveStatusChange} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700">เลือกสถานะใหม่:</label>
+
+                <div className="space-y-2">
+                  <label
+                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                      editStatusValue === 'paid'
+                        ? 'bg-emerald-50/70 border-emerald-500 text-emerald-900 ring-1 ring-emerald-500'
+                        : 'bg-white border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="payment_status_radio"
+                      value="paid"
+                      checked={editStatusValue === 'paid'}
+                      onChange={() => setEditStatusValue('paid')}
+                      className="text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div className="flex-1">
+                      <div className="font-bold text-xs flex items-center gap-1.5 text-emerald-700">
+                        <CheckCircle2 className="w-4 h-4" /> ชำระแล้ว (Paid / Approved)
+                      </div>
+                      <div className="text-[11px] text-slate-500">อนุมัติสิทธิ์การเข้าร่วมงานและสามารถออกใบเสร็จได้</div>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                      editStatusValue === 'pending'
+                        ? 'bg-amber-50/70 border-amber-500 text-amber-900 ring-1 ring-amber-500'
+                        : 'bg-white border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="payment_status_radio"
+                      value="pending"
+                      checked={editStatusValue === 'pending'}
+                      onChange={() => setEditStatusValue('pending')}
+                      className="text-amber-600 focus:ring-amber-500"
+                    />
+                    <div className="flex-1">
+                      <div className="font-bold text-xs flex items-center gap-1.5 text-amber-700">
+                        <Clock className="w-4 h-4" /> รอชำระ (Pending Payment)
+                      </div>
+                      <div className="text-[11px] text-slate-500">อยู่ระหว่างรอแนบสลิปหรือรอเจ้าหน้าที่ตรวจสอบ</div>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                      editStatusValue === 'rejected'
+                        ? 'bg-rose-50/70 border-rose-500 text-rose-900 ring-1 ring-rose-500'
+                        : 'bg-white border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="payment_status_radio"
+                      value="rejected"
+                      checked={editStatusValue === 'rejected'}
+                      onChange={() => setEditStatusValue('rejected')}
+                      className="text-rose-600 focus:ring-rose-500"
+                    />
+                    <div className="flex-1">
+                      <div className="font-bold text-xs flex items-center gap-1.5 text-rose-700">
+                        <XCircle className="w-4 h-4" /> สลิปถูกปฏิเสธ (Rejected)
+                      </div>
+                      <div className="text-[11px] text-slate-500">หลักฐานไม่ถูกต้อง หรือยอดเงินไม่ตรง แจ้งให้แนบใหม่</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {editStatusValue === 'rejected' && (
+                <div className="space-y-1.5 animate-fade-in">
+                  <label className="text-xs font-bold text-slate-700">ระบุเหตุผลในการปฏิเสธ (ไม่บังคับ):</label>
+                  <textarea
+                    value={editRejectionReason}
+                    onChange={(e) => setEditRejectionReason(e.target.value)}
+                    placeholder="เช่น ยอดเงินไม่ถูกต้อง, สลิปไม่ชัดเจน, วันที่โอนไม่ตรง..."
+                    className="w-full text-xs p-2.5 border border-slate-300 rounded-xl focus:outline-none focus:border-[#0026b3] resize-none h-20"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingStatusAttendee(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingStatus}
+                  className="px-4 py-2 rounded-xl bg-[#0026b3] hover:bg-[#001f94] text-white font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingStatus ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>กำลังบันทึก...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>บันทึกสถานะ</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* ─── Attendee Details Modal ──────────────────────────────────────── */}
@@ -5070,12 +5287,47 @@ function VerifyAttendeesPanel({
                   <span className="text-slate-500">รหัสตั๋ว:</span>
                   <span className="font-mono font-bold text-[#0026b3]">{selectedAttendee.ticketCode}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-slate-500">สถานะการชำระเงิน:</span>
-                  <span className={`font-bold ${selectedAttendee.paymentStatus === 'paid' ? 'text-emerald-700' : 'text-amber-700'}`}>
-                    {selectedAttendee.paymentStatus === 'paid' ? 'ชำระแล้ว' : 'รอชำระ'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`font-bold text-xs px-2.5 py-0.5 rounded-full ${
+                        selectedAttendee.paymentStatus === 'paid'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : selectedAttendee.paymentStatus === 'rejected'
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}
+                    >
+                      {selectedAttendee.paymentStatus === 'paid'
+                        ? '✓ ชำระแล้ว'
+                        : selectedAttendee.paymentStatus === 'rejected'
+                        ? '✕ สลิปถูกปฏิเสธ'
+                        : '⏳ รอชำระ'}
+                    </span>
+                    {onUpdatePaymentStatus && (
+                      <button
+                        onClick={() => {
+                          const target = selectedAttendee;
+                          setSelectedAttendee(null);
+                          setEditingStatusAttendee(target);
+                          setEditStatusValue(
+                            target.paymentStatus === 'paid' ? 'paid' : target.paymentStatus === 'rejected' ? 'rejected' : 'pending'
+                          );
+                          setEditRejectionReason(target.rejectionReason || '');
+                        }}
+                        className="text-xs text-[#0026b3] hover:underline font-bold"
+                      >
+                        แก้ไขสถานะ
+                      </button>
+                    )}
+                  </div>
                 </div>
+                {selectedAttendee.paymentStatus === 'rejected' && selectedAttendee.rejectionReason && (
+                  <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-800">
+                    <span className="font-bold">สาเหตุที่ปฏิเสธ:</span> {selectedAttendee.rejectionReason}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -5097,10 +5349,11 @@ function VerifyAttendeesPanel({
                   onToggleCheckIn(selectedAttendee.id);
                   setSelectedAttendee(null);
                 }}
-                className={`px-4 py-2.5 rounded-xl font-bold text-sm cursor-pointer shadow-xs transition ${selectedAttendee.checkInStatus === 'checked_in'
-                  ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                  : 'bg-[#0026b3] hover:bg-[#001f94] text-white'
-                  }`}
+                className={`px-4 py-2.5 rounded-xl font-bold text-sm cursor-pointer shadow-xs transition ${
+                  selectedAttendee.checkInStatus === 'checked_in'
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    : 'bg-[#0026b3] hover:bg-[#001f94] text-white'
+                }`}
               >
                 {selectedAttendee.checkInStatus === 'checked_in' ? 'ยกเลิกการเช็คอิน' : 'เช็คอินผู้เข้าร่วมทันที'}
               </button>
@@ -5557,6 +5810,18 @@ export default function AdminPage() {
     fetchReceipts();
   }, [fetchMeetings, fetchSlips, fetchAttendees, fetchMembersCount, fetchReceipts]);
 
+  // Sync data when switching tabs (e.g. between slip verification and attendee checkin)
+  useEffect(() => {
+    if (activeTab === 'verify-attendees' || activeTab === 'dashboard') {
+      fetchAttendees();
+      fetchMeetings();
+    } else if (activeTab === 'verify-slip') {
+      fetchSlips();
+    } else if (activeTab === 'receipts') {
+      fetchReceipts();
+    }
+  }, [activeTab, fetchAttendees, fetchMeetings, fetchSlips, fetchReceipts]);
+
   // Global Receipt Modal for quick print from attendees/slips
   const [globalReceipt, setGlobalReceipt] = useState<ReceiptData | null>(null);
   const [isGlobalReceiptOpen, setIsGlobalReceiptOpen] = useState(false);
@@ -5707,6 +5972,53 @@ export default function AdminPage() {
       }
     } catch (err) {
       console.error('Failed to save walk-in attendee to DB:', err);
+    }
+  };
+
+  const handleUpdatePaymentStatus = async (
+    attendeeId: string,
+    newPaymentStatus: 'paid' | 'pending' | 'rejected',
+    reason?: string
+  ) => {
+    // Optimistic UI update
+    setAttendees((prev) =>
+      prev.map((a) =>
+        a.id === attendeeId
+          ? {
+              ...a,
+              paymentStatus: newPaymentStatus,
+              rejectionReason: newPaymentStatus === 'rejected' ? (reason || 'สลิปถูกปฏิเสธโดยเจ้าหน้าที่') : undefined,
+            }
+          : a
+      )
+    );
+
+    try {
+      const res = await fetch('/api/admin/attendees', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attendanceId: attendeeId,
+          action: 'update_payment_status',
+          paymentStatus: newPaymentStatus,
+          rejectionReason: reason,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        fetchAttendees();
+        fetchSlips();
+        fetchMeetings();
+        setGlobalToastMessage(json.data?.message || 'ปรับปรุงสถานะการชำระเงินเรียบร้อยแล้ว');
+        setTimeout(() => setGlobalToastMessage(null), 4000);
+      } else {
+        setGlobalToastMessage(json.error || 'เกิดข้อผิดพลาดในการปรับปรุงสถานะ');
+        setTimeout(() => setGlobalToastMessage(null), 4000);
+        fetchAttendees();
+      }
+    } catch (err) {
+      console.error('Failed to update payment status:', err);
+      fetchAttendees();
     }
   };
 
@@ -6063,6 +6375,7 @@ export default function AdminPage() {
             onToggleCheckIn={handleToggleCheckIn}
             onPrintReceipt={handlePrintAttendeeReceipt}
             onAddAttendee={handleAddAttendee}
+            onUpdatePaymentStatus={handleUpdatePaymentStatus}
           />
         );
       case 'settings':

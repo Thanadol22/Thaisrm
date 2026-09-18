@@ -61,6 +61,9 @@ export async function GET(request: NextRequest) {
     if ((prisma as any).payment_slips) {
       slips = await (prisma as any).payment_slips.findMany({
         where: meetingId && meetingId !== 'all' ? { meeting_id: meetingId } : {},
+        orderBy: {
+          created_at: 'desc',
+        },
         select: {
           slip_id: true,
           meeting_id: true,
@@ -70,21 +73,28 @@ export async function GET(request: NextRequest) {
           ticket_code: true,
           amount: true,
           status: true,
+          rejection_reason: true,
           transfer_date: true,
           is_member: true,
         },
       });
     }
 
-    // Create a fast lookup map for slips
+    // Create a fast lookup map for slips (first occurrence is newest due to created_at: desc)
     const slipMapByMember = new Map<string, any>();
     const slipMapByEmail = new Map<string, any>();
     const slipMapByPhone = new Map<string, any>();
 
     slips.forEach((s: any) => {
-      if (s.member_no) slipMapByMember.set(`${s.meeting_id}_${s.member_no}`, s);
-      if (s.guest_email) slipMapByEmail.set(`${s.meeting_id}_${s.guest_email.toLowerCase()}`, s);
-      if (s.guest_phone) slipMapByPhone.set(`${s.meeting_id}_${s.guest_phone}`, s);
+      if (s.member_no && !slipMapByMember.has(`${s.meeting_id}_${s.member_no}`)) {
+        slipMapByMember.set(`${s.meeting_id}_${s.member_no}`, s);
+      }
+      if (s.guest_email && !slipMapByEmail.has(`${s.meeting_id}_${s.guest_email.toLowerCase()}`)) {
+        slipMapByEmail.set(`${s.meeting_id}_${s.guest_email.toLowerCase()}`, s);
+      }
+      if (s.guest_phone && !slipMapByPhone.has(`${s.meeting_id}_${s.guest_phone}`)) {
+        slipMapByPhone.set(`${s.meeting_id}_${s.guest_phone}`, s);
+      }
     });
 
     // 3. Format attendee items
@@ -113,12 +123,17 @@ export async function GET(request: NextRequest) {
       const code = isMember ? mem?.member_no || '' : `G-${att.attendance_id.toString().padStart(4, '0')}`;
 
       // Ticket and Payment details
-      let paymentStatus: 'paid' | 'pending' | 'unpaid' = 'unpaid';
+      let paymentStatus: 'paid' | 'pending' | 'rejected' | 'unpaid' = 'unpaid';
       if (matchingSlip) {
         if (matchingSlip.status === 'approved') paymentStatus = 'paid';
         else if (matchingSlip.status === 'pending') paymentStatus = 'pending';
+        else if (matchingSlip.status === 'rejected') paymentStatus = 'rejected';
       } else if (att.attendance_status === 'Registered' || att.attendance_status === 'Attended') {
         paymentStatus = 'paid';
+      } else if (att.attendance_status === 'Rejected') {
+        paymentStatus = 'rejected';
+      } else if (att.attendance_status === 'Pending_Payment') {
+        paymentStatus = 'pending';
       }
 
       const ticketCode = matchingSlip?.ticket_code || `TSRM-${att.meeting_id}-${code || att.attendance_id}`;
@@ -143,6 +158,8 @@ export async function GET(request: NextRequest) {
         memberType: isMember ? (mem?.membership_type === 'Lifelong' ? 'สมาชิกตลอดชีพ' : 'สมาชิกสามัญ') : 'บุคคลทั่วไป',
         ticketType,
         ticketCode,
+        slipId: matchingSlip?.slip_id || null,
+        rejectionReason: matchingSlip?.rejection_reason || null,
         meetingId: att.meeting_id,
         meetingTitle: att.meetings?.meeting_name || att.meeting_id,
         registeredDate: matchingSlip?.transfer_date || (att.meetings?.meeting_date ? new Date(att.meetings.meeting_date).toLocaleDateString('th-TH') : '10 มี.ค. 2569'),
@@ -271,7 +288,7 @@ export async function POST(request: NextRequest) {
 
 /**
  * PATCH /api/admin/attendees
- * อัปเดตสถานะการเช็คอิน (Toggle Check-in / Check-out)
+ * อัปเดตสถานะการเช็คอิน (Toggle Check-in / Check-out) หรือ ปรับปรุงสถานะการชำระเงิน (paid / pending / rejected)
  */
 export async function PATCH(request: NextRequest) {
   const session = getAdminSessionFromRequest(request);
@@ -280,7 +297,7 @@ export async function PATCH(request: NextRequest) {
   }
   try {
     const body = await request.json();
-    const { attendanceId, action } = body;
+    const { attendanceId, action, paymentStatus, rejectionReason } = body;
 
     if (!attendanceId) {
       return NextResponse.json(
@@ -293,6 +310,9 @@ export async function PATCH(request: NextRequest) {
 
     const existing = await (prisma as any).meeting_attendances.findUnique({
       where: { attendance_id: attId },
+      include: {
+        members: true,
+      },
     });
 
     if (!existing) {
@@ -302,6 +322,67 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    // Handle Payment Status Update Action
+    if (paymentStatus || action === 'update_payment_status') {
+      const targetPaymentStatus = paymentStatus as 'paid' | 'pending' | 'rejected';
+      
+      let nextAttendanceStatus = existing.attendance_status;
+      if (targetPaymentStatus === 'paid') {
+        nextAttendanceStatus = existing.checkin_time ? 'Attended' : 'Registered';
+      } else if (targetPaymentStatus === 'rejected') {
+        nextAttendanceStatus = 'Rejected';
+      } else if (targetPaymentStatus === 'pending') {
+        nextAttendanceStatus = 'Pending_Payment';
+      }
+
+      await (prisma as any).meeting_attendances.update({
+        where: { attendance_id: attId },
+        data: {
+          attendance_status: nextAttendanceStatus,
+        },
+      });
+
+      // Update or find corresponding payment slip
+      const slipWhereOr: any[] = [];
+      if (existing.member_no) slipWhereOr.push({ member_no: existing.member_no });
+      if (existing.attendee_email) slipWhereOr.push({ guest_email: existing.attendee_email });
+      if (existing.attendee_phone) slipWhereOr.push({ guest_phone: existing.attendee_phone });
+
+      if (slipWhereOr.length > 0 && (prisma as any).payment_slips) {
+        const slip = await (prisma as any).payment_slips.findFirst({
+          where: {
+            meeting_id: existing.meeting_id,
+            OR: slipWhereOr,
+          },
+          orderBy: { created_at: 'desc' },
+        });
+
+        if (slip) {
+          const slipStatus = targetPaymentStatus === 'paid' ? 'approved' : targetPaymentStatus;
+          await (prisma as any).payment_slips.update({
+            where: { slip_id: slip.slip_id },
+            data: {
+              status: slipStatus,
+              rejection_reason: targetPaymentStatus === 'rejected' ? (rejectionReason || 'ผู้ดูแลระบบปฏิเสธการชำระเงิน') : null,
+              reviewed_by: session.username || 'Admin',
+              reviewed_at: new Date(),
+            },
+          });
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: existing.attendance_id.toString(),
+          paymentStatus: targetPaymentStatus,
+          attendanceStatus: nextAttendanceStatus,
+          message: `อัปเดตสถานะการชำระเงินเป็น "${targetPaymentStatus === 'paid' ? 'ชำระแล้ว' : targetPaymentStatus === 'rejected' ? 'สลิปถูกปฏิเสธ' : 'รอชำระ'}" สำเร็จ`,
+        },
+      });
+    }
+
+    // Handle Check-in / Check-out Action
     let isCheckIn = false;
     if (action === 'checkin') {
       isCheckIn = true;
@@ -316,7 +397,7 @@ export async function PATCH(request: NextRequest) {
       where: { attendance_id: attId },
       data: {
         checkin_time: isCheckIn ? new Date() : null,
-        attendance_status: isCheckIn ? 'Attended' : 'Registered',
+        attendance_status: isCheckIn ? 'Attended' : (existing.attendance_status === 'Rejected' ? 'Rejected' : 'Registered'),
       },
     });
 
@@ -334,9 +415,9 @@ export async function PATCH(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('Error updating attendance checkin:', error);
+    console.error('Error updating attendance:', error);
     return NextResponse.json(
-      { success: false, error: 'เกิดข้อผิดพลาดในการอัปเดตสถานะเช็คอิน' },
+      { success: false, error: 'เกิดข้อผิดพลาดในการอัปเดตข้อมูล' },
       { status: 500 }
     );
   }

@@ -77,31 +77,31 @@ export function AdminLoginView({ onLoginSuccess }: AdminLoginViewProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950 flex flex-col justify-center items-center p-4 sm:p-6 relative overflow-hidden font-sans selection:bg-[#4ade80] selection:text-slate-950">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950 flex flex-col justify-center items-center p-3 xs:p-4 sm:p-6 relative overflow-hidden font-sans selection:bg-[#4ade80] selection:text-slate-950">
       {/* Background Decorative Lighting */}
       <div className="absolute top-1/4 -left-48 w-96 h-96 bg-[#0026b3]/30 rounded-full blur-3xl pointer-events-none animate-pulse" />
       <div className="absolute bottom-1/4 -right-48 w-96 h-96 bg-[#4ade80]/15 rounded-full blur-3xl pointer-events-none" />
 
       {/* Main Container Card */}
-      <div className="w-full max-w-md bg-white/[0.04] backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/60 relative z-10">
+      <div className="w-full max-w-md bg-white/[0.04] backdrop-blur-xl border border-white/10 rounded-2xl sm:rounded-3xl p-4.5 xs:p-6 sm:p-8 shadow-2xl shadow-black/60 relative z-10">
         {/* Header Branding */}
-        <div className="flex flex-col items-center text-center mb-8">
-          <div className="relative mb-4 group">
+        <div className="flex flex-col items-center text-center mb-6 sm:mb-8">
+          <div className="relative mb-3.5 sm:mb-4 group">
             <div className="absolute -inset-2 bg-gradient-to-r from-[#0026b3] to-[#4ade80] rounded-2xl blur-md opacity-70 group-hover:opacity-100 transition duration-500" />
-            <div className="relative w-16 h-16 rounded-2xl bg-slate-900 border border-white/20 p-2.5 flex items-center justify-center shadow-lg">
+            <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-slate-900 border border-white/20 p-2 sm:p-2.5 flex items-center justify-center shadow-lg">
               <TsrmLogo className="w-full h-full object-contain" />
             </div>
-            <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#4ade80] border-2 border-slate-900 flex items-center justify-center">
-              <ShieldCheck className="w-3 h-3 text-slate-950" />
+            <span className="absolute -bottom-1 -right-1 w-4.5 h-4.5 sm:w-5 sm:h-5 rounded-full bg-[#4ade80] border-2 border-slate-900 flex items-center justify-center">
+              <ShieldCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-950" />
             </span>
           </div>
 
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-[#4ade80] text-xs font-black tracking-wider uppercase mb-2">
+          <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-[#4ade80] text-[10.5px] sm:text-xs font-black tracking-wider uppercase mb-1.5 sm:mb-2">
             <Sparkles className="w-3 h-3" />
             <span>TSRM Admin Portal</span>
           </span>
 
-          <h1 className="text-2xl font-black text-white tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
             เข้าสู่ระบบผู้ดูแล
           </h1>
           <p className="text-slate-400 text-xs sm:text-sm mt-1">

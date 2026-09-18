@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
         guest_workplace: true,
         is_member: true,
         amount: true,
+        status: true,
       },
     });
 
@@ -225,6 +226,42 @@ export async function POST(req: NextRequest) {
       ? `${mem?.membership_type === 'Lifelong' ? 'สมาชิกตลอดชีพ' : 'สมาชิกสามัญ'} Pass`
       : 'บุคคลทั่วไป (Non-Member Pass)';
     const displayCode = matchingSlip?.ticket_code || (isMember ? `TSRM-MEM-${mem?.member_no}` : `TSRM-TKT-${matchedAttendance.attendance_id}`);
+
+    // Case 1.5: REJECTED SLIP / ATTENDANCE
+    if (matchingSlip?.status === 'rejected' || matchedAttendance.attendance_status === 'Rejected') {
+      const [totalCount, checkedInCount] = await Promise.all([
+        prisma.meeting_attendances.count({
+          where: { meeting_id: targetMeetingId },
+        }),
+        prisma.meeting_attendances.count({
+          where: {
+            meeting_id: targetMeetingId,
+            OR: [
+              { checkin_time: { not: null } },
+              { attendance_status: 'Attended' },
+            ],
+          },
+        }),
+      ]);
+
+      return NextResponse.json({
+        success: true,
+        status: 'invalid',
+        message: 'หลักฐานการชำระเงิน/สลิปของรายการนี้ถูกปฏิเสธ กรุณาติดต่อจุดลงทะเบียนเพื่อตรวจสอบ',
+        record: {
+          id: displayCode,
+          name: displayName,
+          ticketType: displayTicketType,
+          email: displayEmail,
+          checkInTime: 'สลิปไม่ผ่านการอนุมัติ',
+          status: 'invalid',
+        },
+        stats: {
+          total: totalCount,
+          checkedIn: checkedInCount,
+        },
+      });
+    }
 
     // Case 2: ALREADY CHECKED IN (Duplicate Scan)
     // Rule: ห้ามแก้ไขข้อมูลในฐานข้อมูลเด็ดขาด! คงสถานะและเวลาสำเร็จเดิมไว้ แล้วส่งผล duplicate กลับไป
