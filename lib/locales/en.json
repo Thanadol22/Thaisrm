@@ -1,6 +1,6 @@
 {
   "associationName": "สมาคมเวชศาสตร์การเจริญพันธุ์ไทย",
-  "brandName": "THAISRM",
+  "brandName": "TSRM",
   "subtitle": "Meeting Summit 2026",
   "nav": {
     "signIn": "Sign In",
@@ -103,9 +103,9 @@
     "subtitle": "Complete payment and upload payment slip to verify TSRM membership.",
     "registrationTitle": "Conference Registration Payment",
     "registrationSubtitle": "Complete payment and upload payment slip to verify your TSRM 2026 conference registration.",
-    "passName": "THAISRM Premium Pass",
+    "passName": "TSRM Premium Pass",
     "passBadge": "LIFELONG MEMBER",
-    "regPassName": "THAISRM Congress Pass",
+    "regPassName": "TSRM Congress Pass",
     "regPassBadge": "CONFERENCE REGISTRATION",
     "feature1": "Member-exclusive rate for TSRM Annual Congress",
     "feature2": "Direct communication & consultation with clinical care team",
@@ -135,7 +135,7 @@
     "removeSlipButton": "Remove",
     "noSlipWarning": "Please upload a payment slip before confirming payment",
     "readyToConfirmNotice": "Slip attached successfully. Please click confirm payment to proceed.",
-    "termsDisclaimer": "By making payment you agree to THAISRM terms and conditions.",
+    "termsDisclaimer": "By making payment you agree to TSRM terms and conditions.",
     "copyToast": "Bank account number copied successfully!",
     "uploadSuccessToast": "Slip uploaded successfully! Ready for payment confirmation."
   },
@@ -192,7 +192,7 @@
   },
   "footer": {
     "orgNameTh": "สมาคมเวชศาสตร์การเจริญพันธุ์ไทย",
-    "orgNameEn": "Thai Society for Reproductive Medicine (THAISRM)",
+    "orgNameEn": "Thai Society for Reproductive Medicine (TSRM)",
     "orgDescription": "มุ่งมั่นส่งเสริม พัฒนา และยกระดับมาตรฐานวิชาการ การวิจัย และการบริการทางการแพทย์ด้านเวชศาสตร์การเจริญพันธุ์สู่ระดับสากล",
     "quickLinksTitle": "หัวข้อสำคัญ",
     "linkPr": "ประชาสัมพันธ์ & หน่วยกิต CME",
@@ -202,9 +202,9 @@
     "contactTitle": "กองเลขาธิการสมาคม",
     "address": "อาคารเฉลิมพระบารมี ๕๐ ปี ซอยศูนย์วิจัย ถนนเพชรบุรีตัดใหม่ แขวงบางกะปิ เขตห้วยขวาง กรุงเทพฯ 10310",
     "phone": "โทรศัพท์: +66 (0) 2-716-6556",
-    "email": "อีเมล: secretariat@thaisrm.or.th",
+    "email": "อีเมล: secretariat@tsrm.or.th",
     "hours": "เวลาทำการ: จันทร์ - ศุกร์ 08:30 - 17:00 น.",
-    "copyright": "สงวนลิขสิทธิ์ © 2026 สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (THAISRM)",
+    "copyright": "สงวนลิขสิทธิ์ © 2026 สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (TSRM)",
     "privacy": "นโยบายความเป็นส่วนตัว",
     "terms": "ข้อกำหนดและเงื่อนไข",
     "pdpa": "การคุ้มครองข้อมูลส่วนบุคคล (PDPA)"

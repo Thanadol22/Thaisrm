@@ -125,7 +125,7 @@ export function MemberDetailModal({
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/60 backdrop-blur-sm animate-fade-in print:p-0 print:bg-white">
       <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh] my-auto print:max-h-none print:shadow-none print:border-none">
         
-        {/* Header (ThaiSRM Gradient) */}
+        {/* Header (TSRM Gradient) */}
         <div className="relative px-6 py-5 bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 text-[#4ade80]">

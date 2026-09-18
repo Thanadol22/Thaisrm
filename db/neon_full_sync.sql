@@ -1,6 +1,6 @@
 -- ==========================================================
--- THAISRM FULL DATABASE MIGRATION & SYNC FOR NEON POSTGRESQL
--- Generated at: 2026-09-18T02:24:18.126Z
+-- TSRM FULL DATABASE MIGRATION & SYNC FOR NEON POSTGRESQL
+-- Generated at: 2026-09-18T04:51:44.633Z
 -- ==========================================================
 
 -- 0. Ensure Schema & Columns exist on Neon
@@ -51932,14 +51932,34 @@ ON CONFLICT (key) DO UPDATE SET
   description = EXCLUDED.description,
   updated_at = EXCLUDED.updated_at;
 
--- 6. Table: payment_slips (1 rows)
-INSERT INTO payment_slips (id, slip_id, meeting_id, member_no, guest_name, guest_email, guest_phone, guest_workplace, is_member, ticket_code, amount, bank, transfer_date, transfer_time, ref_no, slip_url, status, rejection_reason, resubmit_token, selected_activities, reviewed_by, reviewed_at, created_at, updated_at) VALUES (5, 'SLIP-1789458095472-B39577', 'TSRM34', NULL, 'บัญชีทดสอบ ระบบ', 'test0000@thaisrm.com', NULL, 'โรงพยาบาลทดสอบ (Test Hospital)', FALSE, 'TSRM-2026-9447', 8500, 'Kasikorn (KBANK)', NULL, NULL, NULL, '/uploads/slips/1789458092568_THAISRM-Pass-TSRM-2026-8891.png', 'approved', NULL, NULL, '[{"id":"act-1789437193113-8043r","date":"วันที่ 21, 22 ต.ค. 2569","name":"Main Program  21-22 Oct 2026","type":"main","price":5000},{"id":"act-1789437197387-10ddf","date":"วันที่ 20 ต.ค. 2569","name":"ART Nurse","type":"workshop","price":3500}]'::jsonb, 'Admin', '2026-09-15T08:14:30.130Z', '2026-09-15T07:41:35.475Z', '2026-09-15T08:14:30.130Z')
+-- 6. Table: payment_slips (2 rows)
+INSERT INTO payment_slips (id, slip_id, meeting_id, member_no, guest_name, guest_email, guest_phone, guest_workplace, is_member, ticket_code, amount, bank, transfer_date, transfer_time, ref_no, slip_url, status, rejection_reason, resubmit_token, selected_activities, reviewed_by, reviewed_at, created_at, updated_at) VALUES (8, 'SLIP-MU68P76Z', 'TSRM34', '0336', NULL, NULL, NULL, NULL, TRUE, 'TSRM-2026-8092', 4000, 'Kasikorn (KBANK)', NULL, NULL, NULL, 'https://4ejwkwchwl3y5mfv.public.blob.vercel-storage.com/slips/1789692458410_115_______online.jpeg', 'approved', NULL, NULL, '[{"id":"act-1789437193113-8043r","date":"วันที่ 21, 22 ต.ค. 2569","name":"Main Program  21-22 Oct 2026","type":"main","price":4000}]'::jsonb, 'Admin', '2026-09-18T01:20:00.452Z', '2026-09-18T00:48:09.900Z', '2026-09-18T01:20:00.453Z')
 ON CONFLICT (slip_id) DO UPDATE SET
   status = EXCLUDED.status,
   amount = EXCLUDED.amount,
   rejection_reason = EXCLUDED.rejection_reason,
   reviewed_by = EXCLUDED.reviewed_by,
   reviewed_at = EXCLUDED.reviewed_at,
+  updated_at = EXCLUDED.updated_at;
+INSERT INTO payment_slips (id, slip_id, meeting_id, member_no, guest_name, guest_email, guest_phone, guest_workplace, is_member, ticket_code, amount, bank, transfer_date, transfer_time, ref_no, slip_url, status, rejection_reason, resubmit_token, selected_activities, reviewed_by, reviewed_at, created_at, updated_at) VALUES (9, 'SLIP-MU6BGSA8', 'TSRM34', '1217', NULL, NULL, NULL, NULL, TRUE, 'TSRM-2026-2426', 4000, 'Kasikorn (KBANK)', NULL, NULL, NULL, 'https://4ejwkwchwl3y5mfv.public.blob.vercel-storage.com/slips/1789697121187_115_______online.jpeg', 'approved', NULL, NULL, '[{"id":"act-1789437193113-8043r","date":"วันที่ 21, 22 ต.ค. 2569","name":"Main Program  21-22 Oct 2026","type":"main","price":4000}]'::jsonb, 'Admin', '2026-09-18T02:54:48.841Z', '2026-09-18T02:05:36.177Z', '2026-09-18T02:54:48.842Z')
+ON CONFLICT (slip_id) DO UPDATE SET
+  status = EXCLUDED.status,
+  amount = EXCLUDED.amount,
+  rejection_reason = EXCLUDED.rejection_reason,
+  reviewed_by = EXCLUDED.reviewed_by,
+  reviewed_at = EXCLUDED.reviewed_at,
+  updated_at = EXCLUDED.updated_at;
+
+-- 7. Table: receipts (2 rows)
+INSERT INTO receipts (id, receipt_no, receipt_date, purpose_text, payer_type, payer_name, branch_name, payer_address_line1, payer_address_line2, payer_phone, payer_tax_id, items, total_amount, thai_baht_text_override, payer_signer_name, payer_signer_role, payer_signed_date, authorized_signer_name, authorized_signer_role, authorized_signed_date, prepared_by_name, prepared_by_role, prepared_by_signed_date, association_name_th, association_name_en, association_address, association_contact, association_tax_id, meeting_id, attendee_id, slip_id, status, created_at, updated_at)
+VALUES ('1', '2569/02-108', '18 กันยายน 2569', 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569', 'individual', 'ปราณี นำชัยศรีค้า', NULL, '', '', NULL, NULL, '[{"id":"item-1","title":"ค่าลงทะเบียน","amount":4000,"itemNumber":1,"subDetails":["การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569","ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์","จัดขึ้นวันที่ 20 ตุลาคม 2569","โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ","ปราณี นำชัยศรีค้า"]}]'::jsonb, 4000, NULL, NULL, 'ผู้จ่ายเงิน', NULL, 'แพทย์หญิงพิมพกา ชวนะเวสน์', 'เหรัญญิก / ผู้รับเงิน', NULL, 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม', 'ผู้จัดทำ', NULL, 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย', 'Thai Society for Reproductive Medicine', 'ชั้น 8 อาคารเฉลิมพระบารมี ๕๐ ปี เลขที่ 2 ซอยศูนย์วิจัย ถนนเพชรบุรีตัดใหม่ กรุงเทพฯ', 'Website: https://thaisrm.com/ E-mail: tsrm.info@gmail.com', '0-9930-00367-70-7', 'TSRM34', NULL, 'SLIP-MU68P76Z', 'issued', '2026-09-18T04:08:51.638Z', '2026-09-18T04:47:16.625Z')
+ON CONFLICT (receipt_no) DO UPDATE SET
+  status = EXCLUDED.status,
+  updated_at = EXCLUDED.updated_at;
+INSERT INTO receipts (id, receipt_no, receipt_date, purpose_text, payer_type, payer_name, branch_name, payer_address_line1, payer_address_line2, payer_phone, payer_tax_id, items, total_amount, thai_baht_text_override, payer_signer_name, payer_signer_role, payer_signed_date, authorized_signer_name, authorized_signer_role, authorized_signed_date, prepared_by_name, prepared_by_role, prepared_by_signed_date, association_name_th, association_name_en, association_address, association_contact, association_tax_id, meeting_id, attendee_id, slip_id, status, created_at, updated_at)
+VALUES ('2', '2569/02-109', '18 กันยายน 2569', 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569', 'individual', 'พิชญ์พงษ์ จุทิ่น', NULL, '', '', NULL, NULL, '[{"id":"item-2","title":"ค่าลงทะเบียน","amount":4000,"itemNumber":1,"subDetails":["การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569","ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์","จัดขึ้นวันที่ 20 ตุลาคม 2569","โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ","พิชญ์พงษ์ จุทิ่น"]}]'::jsonb, 4000, NULL, NULL, 'ผู้จ่ายเงิน', NULL, 'แพทย์หญิงพิมพกา ชวนะเวสน์', 'เหรัญญิก / ผู้รับเงิน', NULL, 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม', 'ผู้จัดทำ', NULL, 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย', 'Thai Society for Reproductive Medicine', 'ชั้น 8 อาคารเฉลิมพระบารมี ๕๐ ปี เลขที่ 2 ซอยศูนย์วิจัย ถนนเพชรบุรีตัดใหม่ กรุงเทพฯ', 'Website: https://thaisrm.com/ E-mail: tsrm.info@gmail.com', '0-9930-00367-70-7', 'TSRM34', NULL, 'SLIP-MU6BGSA8', 'issued', '2026-09-18T04:08:51.640Z', '2026-09-18T04:47:16.628Z')
+ON CONFLICT (receipt_no) DO UPDATE SET
+  status = EXCLUDED.status,
   updated_at = EXCLUDED.updated_at;
 
 -- 8. Update Sequences

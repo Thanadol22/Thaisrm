@@ -21,19 +21,31 @@ async function main() {
     return n.includes('ทดสอบ') || n.includes('test') || e.includes('test');
   };
 
-  let seq = DEFAULT_RECEIPT_START_SEQ; // 115
+  let seq = DEFAULT_RECEIPT_START_SEQ; // 108
   let idSeq = 1;
 
+  // Step 1: Temporarily set receipt_no to temporary unique string to avoid unique conflict
   for (const r of receipts) {
     if (isTestAccount(r.payer_name)) {
       console.log(`🗑️ Deleting test receipt: ${r.receipt_no} - ${r.payer_name}`);
       await (prisma as any).receipts.delete({ where: { id: r.id } });
       continue;
     }
+    await (prisma as any).receipts.update({
+      where: { id: r.id },
+      data: { receipt_no: `TEMP-${r.id}-${Date.now()}` }
+    });
+  }
 
+  // Step 2: Fetch valid remaining receipts and assign new sequential ID and receipt_no
+  const validReceipts = await (prisma as any).receipts.findMany({
+    orderBy: { created_at: 'asc' }
+  });
+
+  for (const r of validReceipts) {
     const newReceiptNo = generateReceiptNo(r.receipt_date || r.created_at, seq);
     const newId = String(idSeq);
-    console.log(`✨ Renumbering [${r.payer_name}]: ID ${r.id} -> ${newId} | No: ${r.receipt_no} -> ${newReceiptNo}`);
+    console.log(`✨ Renumbering [${r.payer_name}]: ID ${r.id} -> ${newId} | No -> ${newReceiptNo}`);
 
     if (r.id !== newId) {
       await (prisma as any).receipts.delete({ where: { id: r.id } });
@@ -54,7 +66,7 @@ async function main() {
     idSeq++;
   }
 
-  console.log('✅ Done updating all receipts to running ID (1, 2, ...) and Receipt No (2569/02-115, ...).');
+  console.log(`✅ Done updating all receipts to running ID (1, 2, ...) and Receipt No starting from 2569/02-${DEFAULT_RECEIPT_START_SEQ}.`);
 }
 
 main()

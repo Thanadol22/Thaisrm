@@ -36,7 +36,7 @@ export function ReceiptDocument({ data, className = '', isPrintOnly = false }: R
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/tsrm-logoPNG.png"
-            alt="THAISRM Logo"
+            alt="TSRM Logo"
             className="w-22 h-22 object-contain"
             onError={(e) => {
               e.currentTarget.src = '/logoPNG.png';

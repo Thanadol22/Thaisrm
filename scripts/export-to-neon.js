@@ -37,7 +37,7 @@ async function exportData() {
   `);
 
   let sql = `-- ==========================================================\n`;
-  sql += `-- THAISRM FULL DATABASE MIGRATION & SYNC FOR NEON POSTGRESQL\n`;
+  sql += `-- TSRM FULL DATABASE MIGRATION & SYNC FOR NEON POSTGRESQL\n`;
   sql += `-- Generated at: ${new Date().toISOString()}\n`;
   sql += `-- ==========================================================\n\n`;
 

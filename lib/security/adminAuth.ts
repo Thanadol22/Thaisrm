@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 
-export const ADMIN_COOKIE_NAME = 'thaisrm_admin_session';
+export const ADMIN_COOKIE_NAME = 'tsrm_admin_session';
 export const ADMIN_SESSION_MAX_AGE = 8 * 60 * 60; // 8 hours in seconds
 
 interface AdminSessionPayload {
@@ -44,7 +44,7 @@ export function timingSafeCompare(a: string, b: string): boolean {
 /**
  * Hash a password using SHA-256 with a salt
  */
-export function hashAdminPassword(password: string, salt: string = 'thaisrm_salt_2026'): string {
+export function hashAdminPassword(password: string, salt: string = 'tsrm_salt_2026'): string {
   return crypto
     .createHmac('sha256', salt)
     .update(password)
@@ -148,7 +148,7 @@ export function verifyAdminSessionToken(token: string): AdminSessionPayload | nu
  * Check admin authentication from NextRequest headers/cookies
  */
 export function getAdminSessionFromRequest(req: NextRequest): AdminSessionPayload | null {
-  const token = req.cookies.get(ADMIN_COOKIE_NAME)?.value;
+  const token = req.cookies.get(ADMIN_COOKIE_NAME)?.value || req.cookies.get('thaisrm_admin_session')?.value;
   if (!token) return null;
   return verifyAdminSessionToken(token);
 }

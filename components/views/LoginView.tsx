@@ -551,7 +551,7 @@ export function LoginView({
       position: finalPosition,
       positionCode: formData.position,
       specialCode: formData.specialCode.trim(),
-      email: formData.email.trim() || memberDataFound?.email || 'attendee@thaisrm.org',
+      email: formData.email.trim() || memberDataFound?.email || 'attendee@tsrm.org',
       registeredAt: new Date().toISOString(),
     };
 

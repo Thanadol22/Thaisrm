@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ReceiptData, ReceiptItemLine, DEFAULT_ASSOCIATION_INFO } from '@/types/receipt';
 import { thaiBahtText } from '@/lib/thaiBahtText';
-import { generateReceiptNo } from '@/lib/receiptNumber';
+import { generateReceiptNo, DEFAULT_RECEIPT_START_SEQ } from '@/lib/receiptNumber';
 import { SystemSettings, DEFAULT_SYSTEM_SETTINGS } from '@/lib/services/settingsService';
 import {
   X,
@@ -47,7 +47,7 @@ export function ReceiptFormModal({
   const [formData, setFormData] = useState<ReceiptData>(() => {
     return initialData || {
       id: '1',
-      receiptNo: generateReceiptNo(new Date(), 115),
+      receiptNo: generateReceiptNo(new Date(), DEFAULT_RECEIPT_START_SEQ),
       receiptDate: new Date().toLocaleDateString('th-TH', {
         day: 'numeric',
         month: 'long',
@@ -398,7 +398,7 @@ export function ReceiptFormModal({
                   type="text"
                   value={formData.receiptNo}
                   onChange={(e) => setFormData({ ...formData, receiptNo: e.target.value })}
-                  placeholder="เช่น 2569/02-115"
+                  placeholder="เช่น 2569/02-108"
                   className="w-full px-4 py-2.5 text-sm font-mono font-bold bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
                 />
               </div>

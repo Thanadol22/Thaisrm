@@ -219,7 +219,7 @@ export async function POST(request: NextRequest) {
       data: {
         meeting_id: meetingId,
         attendee_name: nameTh,
-        attendee_email: email || `${phone}@walkin.thaisrm.org`,
+        attendee_email: email || `${phone}@walkin.tsrm.org`,
         attendee_phone: phone,
         workplace: workplace || 'โรงพยาบาล/คลินิก',
         attendance_status: checkInNow ? 'Attended' : 'Registered',
@@ -235,7 +235,7 @@ export async function POST(request: NextRequest) {
         data: {
           meeting_id: meetingId,
           guest_name: nameTh,
-          guest_email: email || `${phone}@walkin.thaisrm.org`,
+          guest_email: email || `${phone}@walkin.tsrm.org`,
           guest_phone: phone,
           guest_workplace: workplace || 'โรงพยาบาล/คลินิก',
           is_member: false,

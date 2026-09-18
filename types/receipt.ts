@@ -60,7 +60,7 @@ export const DEFAULT_ASSOCIATION_INFO = {
   nameTh: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
   nameEn: 'THAI SOCIETY FOR REPRODUCTIVE MEDICINE',
   address: 'ชั้น 8 อาคารเฉลิมพระบารมี ๕๐ ปี เลขที่ 2 ซอยศูนย์วิจัย ถนนเพชรบุรีตัดใหม่ กรุงเทพฯ',
-  contact: 'Website: https://thaisrm.com/ E-mail: tsrm.info@gmail.com',
+  contact: 'Website: https://tsrm.com/ E-mail: tsrm.info@gmail.com',
   taxId: '0-9930-00367-70-7',
 };
 

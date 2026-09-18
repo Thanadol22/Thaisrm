@@ -16,7 +16,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Language>('th');
 
   useEffect(() => {
-    const saved = localStorage.getItem('thaisrm_lang') as Language;
+    const saved = (localStorage.getItem('tsrm_lang') || localStorage.getItem('thaisrm_lang')) as Language;
     if (saved === 'th' || saved === 'en') {
       setLangState(saved);
       document.documentElement.lang = saved;
@@ -26,7 +26,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const setLang = (newLang: Language) => {
     setLangState(newLang);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('thaisrm_lang', newLang);
+      localStorage.setItem('tsrm_lang', newLang);
       document.documentElement.lang = newLang;
     }
   };

@@ -51,7 +51,7 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   association_name_th: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
   association_name_en: 'Thai Society for Reproductive Medicine',
   association_address: 'ชั้น 8 อาคารเฉลิมพระบารมี ๕๐ ปี เลขที่ 2 ซอยศูนย์วิจัย ถนนเพชรบุรีตัดใหม่ กรุงเทพฯ',
-  association_contact: 'Website: https://thaisrm.com/ E-mail: tsrm.info@gmail.com',
+  association_contact: 'Website: https://tsrm.com/ E-mail: tsrm.info@gmail.com',
   association_tax_id: '0-9930-00367-70-7',
 
   // Template 1: ค่าลงทะเบียน

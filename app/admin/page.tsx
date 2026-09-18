@@ -65,7 +65,7 @@ import {
 import { ThaiDateRangePicker } from '@/components/ThaiDateRangePicker';
 import { ThaiTimeRangePicker } from '@/components/ThaiTimeRangePicker';
 import { ReceiptData } from '@/types/receipt';
-import { generateReceiptNo } from '@/lib/receiptNumber';
+import { generateReceiptNo, DEFAULT_RECEIPT_START_SEQ } from '@/lib/receiptNumber';
 import { ReceiptManagementPanel } from '@/components/ReceiptManagementPanel';
 import { ReceiptModal } from '@/components/ReceiptModal';
 import { MemberManagementPanel } from '@/components/MemberManagementPanel';
@@ -302,7 +302,7 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onE
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
-      {/* Top Banner (ThaiSRM Brand Primary & Accent Green) */}
+      {/* Top Banner (TSRM Brand Primary & Accent Green) */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white p-5 sm:p-8 shadow-xl">
         {/* Subtle Background Glow Spheres */}
         <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-400/20 rounded-full blur-2xl pointer-events-none" />
@@ -3125,7 +3125,7 @@ function AddMeetingPanel({
                 required
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="เช่น 34th TSRM 2026 หรือ THAISRM Annual Congress"
+                placeholder="เช่น 34th TSRM 2026 หรือ TSRM Annual Congress"
                 className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition shadow-2xs"
               />
             </div>
@@ -4429,7 +4429,7 @@ function VerifyAttendeesPanel({
     workplace: '',
     meetingId: meetings[0]?.id || '',
     memberType: 'แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)',
-    ticketType: 'THAISRM Congress Full Pass',
+    ticketType: 'TSRM Congress Full Pass',
     paymentStatus: 'paid' as 'paid' | 'pending',
     checkInNow: true,
   });
@@ -4448,14 +4448,14 @@ function VerifyAttendeesPanel({
       nameTh: walkInData.nameTh,
       nameEn: walkInData.nameEn || walkInData.nameTh,
       id4Digits: walkInData.id4Digits || walkInData.phone.slice(-4),
-      email: walkInData.email || 'attendee@thaisrm.org',
+      email: walkInData.email || 'attendee@tsrm.org',
       phone: walkInData.phone,
       workplace: walkInData.workplace || 'โรงพยาบาล/คลินิก',
       memberType: walkInData.memberType,
       ticketType: walkInData.ticketType,
       ticketCode: `TSRM-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       meetingId: meeting?.id || '',
-      meetingTitle: meeting?.titleTh || 'การประชุมวิชาการประจำปี THAISRM Congress 2026',
+      meetingTitle: meeting?.titleTh || 'การประชุมวิชาการประจำปี TSRM Congress 2026',
       registeredDate: '10 ก.ย. 2569',
       paymentStatus: walkInData.paymentStatus,
       checkInStatus: walkInData.checkInNow ? 'checked_in' : 'not_checked_in',
@@ -4473,7 +4473,7 @@ function VerifyAttendeesPanel({
       workplace: '',
       meetingId: meetings[0]?.id || '',
       memberType: 'แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)',
-      ticketType: 'THAISRM Congress Full Pass',
+      ticketType: 'TSRM Congress Full Pass',
       paymentStatus: 'paid',
       checkInNow: true,
     });
@@ -5266,7 +5266,7 @@ function VerifyAttendeesPanel({
                     onChange={(e) => setWalkInData({ ...walkInData, ticketType: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 font-medium focus:bg-white focus:outline-none focus:border-[#0026b3]"
                   >
-                    <option value="THAISRM Congress Full Pass">THAISRM Congress Full Pass (3,500 บาท)</option>
+                    <option value="TSRM Congress Full Pass">TSRM Congress Full Pass (3,500 บาท)</option>
                     <option value="Special Workshop: Hands-on Embryo">Special Workshop (5,000 บาท)</option>
                     <option value="Single Day Pass: Day 1">Single Day Pass: Day 1 (2,000 บาท)</option>
                     <option value="Single Day Pass: Day 2">Single Day Pass: Day 2 (2,000 บาท)</option>
@@ -5825,7 +5825,7 @@ export default function AdminPage() {
     if (attendee.ticketType.includes('Workshop')) amount = 5000;
     if (attendee.ticketType.includes('Day')) amount = 2000;
 
-    let maxSeq = 114;
+    let maxSeq = DEFAULT_RECEIPT_START_SEQ - 1;
     let maxId = 0;
     receipts.forEach((r) => {
       const match = r.receiptNo?.match(/-(\d+)$/);
@@ -5922,7 +5922,7 @@ export default function AdminPage() {
 
     const m = meetings.find((mtg) => mtg.id === slip.meetingId);
 
-    let maxSeq = 114;
+    let maxSeq = DEFAULT_RECEIPT_START_SEQ - 1;
     let maxId = 0;
     receipts.forEach((r) => {
       const match = r.receiptNo?.match(/-(\d+)$/);

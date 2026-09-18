@@ -263,7 +263,7 @@ function PaymentContent() {
             isMember: isMember,
             memberNo: isMember ? regData?.memberNo : undefined,
             guestName: !isMember ? (regData?.nameTh || regData?.nameEn || 'Guest Attendee') : undefined,
-            guestEmail: !isMember ? (regData?.email || 'guest@thaisrm.org') : undefined,
+            guestEmail: !isMember ? (regData?.email || 'guest@tsrm.org') : undefined,
             guestPhone: undefined,
             guestWorkplace: !isMember ? (regData?.workplace || null) : undefined,
             amount: calculationResult.totalAmount,
@@ -294,6 +294,7 @@ function PaymentContent() {
       // Membership payment
       try {
         localStorage.removeItem('membership_registration');
+        localStorage.removeItem('tsrm_user');
         localStorage.removeItem('thaisrm_user');
       } catch (e) {}
       setShowSuccessModal(true);

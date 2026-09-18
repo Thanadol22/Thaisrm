@@ -397,6 +397,51 @@ async function main() {
     console.log('   ✅ Payment Slips sync completed.');
   }
 
+  // STEP 7.5: Receipts Sync
+  console.log('   Syncing Receipts...');
+  await neonPrisma.receipts.deleteMany();
+  for (const r of localReceipts) {
+    await neonPrisma.receipts.create({
+      data: {
+        id: r.id,
+        receipt_no: r.receipt_no,
+        receipt_date: r.receipt_date,
+        purpose_text: r.purpose_text,
+        payer_type: r.payer_type,
+        payer_name: r.payer_name,
+        branch_name: r.branch_name,
+        payer_address_line1: r.payer_address_line1,
+        payer_address_line2: r.payer_address_line2,
+        payer_phone: r.payer_phone,
+        payer_tax_id: r.payer_tax_id,
+        items: r.items,
+        total_amount: r.total_amount,
+        thai_baht_text_override: r.thai_baht_text_override,
+        payer_signer_name: r.payer_signer_name,
+        payer_signer_role: r.payer_signer_role,
+        payer_signed_date: r.payer_signed_date,
+        authorized_signer_name: r.authorized_signer_name,
+        authorized_signer_role: r.authorized_signer_role,
+        authorized_signed_date: r.authorized_signed_date,
+        prepared_by_name: r.prepared_by_name,
+        prepared_by_role: r.prepared_by_role,
+        prepared_by_signed_date: r.prepared_by_signed_date,
+        association_name_th: r.association_name_th,
+        association_name_en: r.association_name_en,
+        association_address: r.association_address,
+        association_contact: r.association_contact,
+        association_tax_id: r.association_tax_id,
+        meeting_id: r.meeting_id,
+        attendee_id: r.attendee_id,
+        slip_id: r.slip_id,
+        status: r.status,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+      },
+    });
+  }
+  console.log('   ✅ Receipts sync completed.');
+
   // STEP 8: Reset Sequences on Neon
   const seqQueries = [
     `SELECT setval('member_no_seq', GREATEST(COALESCE((SELECT MAX(NULLIF(regexp_replace(member_no, '\\D', '', 'g'), '')::bigint) FROM members), 0) + 1, 1281), false)`,
@@ -416,12 +461,13 @@ async function main() {
 
   // STEP 9: Summary
   console.log('\n🔍 5. ตรวจสอบจำนวนข้อมูลบน Neon Cloud DB...');
-  const [neonMembers, neonEducations, neonMeetings, neonAttendances, neonSettings] = await Promise.all([
+  const [neonMembers, neonEducations, neonMeetings, neonAttendances, neonSettings, neonReceipts] = await Promise.all([
     neonPrisma.member.count(),
     neonPrisma.member_educations.count(),
     neonPrisma.meetings.count(),
     neonPrisma.meeting_attendances.count(),
     neonPrisma.system_settings.count(),
+    neonPrisma.receipts.count(),
   ]);
 
   console.log(`
@@ -433,6 +479,7 @@ async function main() {
   - การประชุม (Meetings):         ${neonMeetings} รายการ (Local: ${localMeetings.length})
   - ผู้เข้าร่วม (Attendances):     ${neonAttendances} รายการ (Local: ${localAttendances.length})
   - การตั้งค่าระบบ (Settings):     ${neonSettings} รายการ (Local: ${localSettings.length})
+  - ใบเสร็จรับเงิน (Receipts):     ${neonReceipts} รายการ (Local: ${localReceipts.length})
 ======================================================
 `);
 }

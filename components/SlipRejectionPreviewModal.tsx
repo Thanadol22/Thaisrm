@@ -30,7 +30,7 @@ export function SlipRejectionPreviewModal({
   onClose,
   rejectionReason,
   associationNameTh = 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
-  associationContact = 'Website: https://thaisrm.com/ E-mail: tsrm.info@gmail.com',
+  associationContact = 'Website: https://tsrm.com/ E-mail: tsrm.info@gmail.com',
 }: SlipRejectionPreviewModalProps) {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'email' | 'resubmit' | 'admin_dialog'>('email');
@@ -127,7 +127,7 @@ export function SlipRejectionPreviewModal({
               <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
                 <div className="bg-slate-100/80 px-4 py-3 border-b border-slate-200 flex flex-col gap-1 text-[11px] text-slate-600 font-mono">
                   <div className="flex items-center justify-between">
-                    <span><strong>จาก:</strong> {associationNameTh} &lt;noreply@thaisrm.com&gt;</span>
+                    <span><strong>จาก:</strong> {associationNameTh} &lt;noreply@tsrm.com&gt;</span>
                     <span className="text-slate-400">วันนี้ 14:30 น.</span>
                   </div>
                   <div><strong>ถึง:</strong> somchai.chai@hospital.ac.th (นพ. สมชาย ใจดี)</div>
@@ -213,7 +213,7 @@ export function SlipRejectionPreviewModal({
                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
                   </div>
                   <div className="flex-1 bg-white px-3 py-1 rounded-md border border-slate-200 text-[11px] font-mono text-slate-600 truncate">
-                    https://thaisrm.com/resubmit-slip/token_a7b9x2...
+                    https://tsrm.com/resubmit-slip/token_a7b9x2...
                   </div>
                 </div>
 

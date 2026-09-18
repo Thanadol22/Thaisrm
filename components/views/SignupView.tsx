@@ -180,7 +180,10 @@ export function SignupView({
         localStorage.removeItem('user_data');
         localStorage.removeItem('auth_token');
         localStorage.removeItem('membership_registration');
+        localStorage.removeItem('tsrm_user');
         localStorage.removeItem('thaisrm_user');
+        document.cookie = 'tsrm_user=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+        document.cookie = 'tsrm_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
         document.cookie = 'thaisrm_user=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
         document.cookie = 'thaisrm_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
         if (window.location.search) {
@@ -310,6 +313,7 @@ export function SignupView({
       // Clean up any legacy localStorage data
       try {
         localStorage.removeItem('membership_registration');
+        localStorage.removeItem('tsrm_user');
         localStorage.removeItem('thaisrm_user');
       } catch (e) {}
 

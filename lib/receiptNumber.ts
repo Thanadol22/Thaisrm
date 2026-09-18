@@ -1,8 +1,8 @@
-export const DEFAULT_RECEIPT_START_SEQ = 115;
+export const DEFAULT_RECEIPT_START_SEQ = 108;
 
 /**
  * Helper to generate or format receipt numbers according to the standard pattern:
- * YYYY/02-NNN (e.g. 2569/02-115, 2569/02-116)
+ * YYYY/02-NNN (e.g. 2569/02-108, 2569/02-109)
  */
 export function generateReceiptNo(
   dateInput?: string | Date | null,

@@ -25,7 +25,7 @@ const sarabun = Sarabun({
 });
 
 export const metadata: Metadata = {
-  title: "THAISRM | Meeting System",
+  title: "TSRM | Meeting System",
   description: "Event platform for association management, registration, and attendee experience.",
   icons: {
     icon: [

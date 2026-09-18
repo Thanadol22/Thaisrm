@@ -99,7 +99,7 @@ export function PaymentView({
     : (isRegistration ? (isMember ? '3,500' : '4,500') : '1,000');
 
   const displayProgramName = meetingName || (isRegistration
-    ? ((t.payment as any).regPassName || (lang === 'th' ? 'THAISRM Congress Pass' : 'THAISRM Congress Pass'))
+    ? ((t.payment as any).regPassName || (lang === 'th' ? 'TSRM Congress Pass' : 'TSRM Congress Pass'))
     : t.payment.passName);
 
   const displayBadge = isRegistration
