@@ -5846,7 +5846,8 @@ export default function AdminPage() {
       payerName: attendee.nameTh,
       payerAddressLine1: '',
       payerAddressLine2: '',
-      payerPhone: attendee.phone,
+      payerPhone: '',
+      payerTaxId: '',
       items: [
         {
           id: `item-${Date.now()}`,
@@ -5943,7 +5944,8 @@ export default function AdminPage() {
       payerName: slip.nameTh,
       payerAddressLine1: '',
       payerAddressLine2: '',
-      payerPhone: slip.phone,
+      payerPhone: '',
+      payerTaxId: '',
       items: [
         {
           id: `item-${Date.now()}`,

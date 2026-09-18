@@ -128,10 +128,10 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
         purposeText: settings.receipt_tpl1_purpose || 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',
         payerType: 'individual',
         payerName: 'นพ. ภูมิภัทร เวชประสิทธิ์ (ตัวอย่างผู้ลงทะเบียน)',
-        payerAddressLine1: 'โรงพยาบาลศิริราช 2 ถนนวังหลัง แขวงศิริราช เขตบางกอกน้อย',
-        payerAddressLine2: 'กรุงเทพมหานคร 10700',
-        payerPhone: '081-234-5678',
-        payerTaxId: '1100400123456',
+        payerAddressLine1: '',
+        payerAddressLine2: '',
+        payerPhone: '',
+        payerTaxId: '',
         items: [
           {
             id: 'item-preview-1',
@@ -172,10 +172,10 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
         purposeText: settings.receipt_tpl2_purpose || 'ได้รับเงินค่าสมัครสมาชิกสมาคมฯ ประจำปี 2569',
         payerType: 'individual',
         payerName: 'พญ. ณัฐวดี ธีรคุณานนท์ (ตัวอย่างสมาชิก)',
-        payerAddressLine1: '99/4 อาคารแพทย์ศาสตร์สัมพันธ์ ซอยศูนย์วิจัย ถ.เพชรบุรีตัดใหม่',
-        payerAddressLine2: 'กรุงเทพมหานคร 10310',
-        payerPhone: '089-876-5432',
-        payerTaxId: '3100200543210',
+        payerAddressLine1: '',
+        payerAddressLine2: '',
+        payerPhone: '',
+        payerTaxId: '',
         items: [
           {
             id: 'item-preview-2',

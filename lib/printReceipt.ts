@@ -1,10 +1,32 @@
 import { ReceiptData, DEFAULT_ASSOCIATION_INFO } from '@/types/receipt';
 import { thaiBahtText } from '@/lib/thaiBahtText';
 
+function isIndividualOrRegistration(data: ReceiptData): boolean {
+  if (data.payerType === 'individual') return true;
+  const purpose = (data.purposeText || '').toLowerCase();
+  if (purpose.includes('ลงทะเบียน') || purpose.includes('สมัคร') || purpose.includes('สมาชิก')) {
+    return true;
+  }
+  const hasRegItem = (data.items || []).some((it) => {
+    const t = (it.title || '').toLowerCase();
+    return t.includes('ลงทะเบียน') || t.includes('สมัคร') || t.includes('สมาชิก');
+  });
+  if (hasRegItem && data.payerType !== 'company') {
+    return true;
+  }
+  return false;
+}
+
+function cleanPhone(phone?: string): string {
+  if (!phone) return '';
+  return phone.replace(/^tel:\s*/i, '').trim();
+}
+
 /**
  * Generates the clean HTML string for a receipt document A4 page.
  */
 export function generateReceiptHtml(data: ReceiptData): string {
+  const isIndividual = isIndividualOrRegistration(data);
   const formattedTotal = (data.totalAmount || 0).toLocaleString('th-TH', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
@@ -269,14 +291,18 @@ export function generateReceiptHtml(data: ReceiptData): string {
       <div style="margin-top: 2px;">
         <span style="margin-right: 12px;">จาก</span>
         <span style="font-weight: 700;">${escapeHtml(data.payerName)}</span>
-        ${data.branchName ? `<span style="margin-left: 12px; font-weight: 400;">${escapeHtml(data.branchName)}</span>` : ''}
+        ${!isIndividual && data.branchName ? `<span style="margin-left: 12px; font-weight: 400;">${escapeHtml(data.branchName)}</span>` : ''}
       </div>
-      ${data.payerAddressLine1 ? `<div style="margin-top: 2px;">${escapeHtml(data.payerAddressLine1)}</div>` : ''}
       ${
-        data.payerAddressLine2 || data.payerPhone || data.payerTaxId
+        !isIndividual && data.payerAddressLine1
+          ? `<div style="margin-top: 2px;">${escapeHtml(data.payerAddressLine1)}</div>`
+          : ''
+      }
+      ${
+        !isIndividual && (data.payerAddressLine2 || data.payerPhone || data.payerTaxId)
           ? `<div style="margin-top: 2px;">
               ${data.payerAddressLine2 ? `${escapeHtml(data.payerAddressLine2)} ` : ''}
-              ${data.payerPhone ? `Tel: ${escapeHtml(data.payerPhone)} ` : ''}
+              ${data.payerPhone ? `${escapeHtml(cleanPhone(data.payerPhone))} ` : ''}
               ${data.payerTaxId ? `เลขประจำตัวผู้เสียภาษี ${escapeHtml(data.payerTaxId)}` : ''}
             </div>`
           : ''

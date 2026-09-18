@@ -10,7 +10,29 @@ interface ReceiptDocumentProps {
   isPrintOnly?: boolean;
 }
 
+function isIndividualOrRegistration(data: ReceiptData): boolean {
+  if (data.payerType === 'individual') return true;
+  const purpose = (data.purposeText || '').toLowerCase();
+  if (purpose.includes('ลงทะเบียน') || purpose.includes('สมัคร') || purpose.includes('สมาชิก')) {
+    return true;
+  }
+  const hasRegItem = (data.items || []).some((it) => {
+    const t = (it.title || '').toLowerCase();
+    return t.includes('ลงทะเบียน') || t.includes('สมัคร') || t.includes('สมาชิก');
+  });
+  if (hasRegItem && data.payerType !== 'company') {
+    return true;
+  }
+  return false;
+}
+
+function cleanPhone(phone?: string): string {
+  if (!phone) return '';
+  return phone.replace(/^tel:\s*/i, '').trim();
+}
+
 export function ReceiptDocument({ data, className = '', isPrintOnly = false }: ReceiptDocumentProps) {
+  const isIndividual = isIndividualOrRegistration(data);
   const formattedTotal = data.totalAmount.toLocaleString('th-TH', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
@@ -92,17 +114,17 @@ export function ReceiptDocument({ data, className = '', isPrintOnly = false }: R
           <span className="font-bold text-slate-950">
             {data.payerName}
           </span>
-          {data.branchName ? <span className="ml-3 font-normal">{data.branchName}</span> : null}
+          {!isIndividual && data.branchName ? <span className="ml-3 font-normal">{data.branchName}</span> : null}
         </p>
-        {data.payerAddressLine1 && (
+        {!isIndividual && data.payerAddressLine1 && (
           <p className="font-normal">
             {data.payerAddressLine1}
           </p>
         )}
-        {(data.payerAddressLine2 || data.payerPhone || data.payerTaxId) ? (
+        {!isIndividual && (data.payerAddressLine2 || data.payerPhone || data.payerTaxId) ? (
           <p className="font-normal">
             {data.payerAddressLine2 ? `${data.payerAddressLine2} ` : ''}
-            {data.payerPhone ? `Tel: ${data.payerPhone} ` : ''}
+            {data.payerPhone ? `${cleanPhone(data.payerPhone)} ` : ''}
             {data.payerTaxId ? `เลขประจำตัวผู้เสียภาษี ${data.payerTaxId}` : ''}
           </p>
         ) : null}

@@ -201,6 +201,12 @@ export function ReceiptFormModal({
 
     setFormData((prev) => ({
       ...prev,
+      payerType: templateType === 3 ? 'company' : 'individual',
+      branchName: templateType === 3 ? (prev.branchName || 'สำนักงานแห่งใหญ่') : '',
+      payerAddressLine1: templateType === 3 ? prev.payerAddressLine1 : '',
+      payerAddressLine2: templateType === 3 ? prev.payerAddressLine2 : '',
+      payerPhone: templateType === 3 ? prev.payerPhone : '',
+      payerTaxId: templateType === 3 ? prev.payerTaxId : '',
       purposeText,
       items: nextItems,
       totalAmount: amount,
