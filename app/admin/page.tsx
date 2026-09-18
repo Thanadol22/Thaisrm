@@ -5559,13 +5559,32 @@ export default function AdminPage() {
 
   // ─── 5. Auto-populate Receipts from approved slips ───
   useEffect(() => {
+    const isTestAccount = (name?: string, email?: string, memberNo?: string | null, workplace?: string) => {
+      const n = (name || '').toLowerCase();
+      const e = (email || '').toLowerCase();
+      const m = (memberNo || '').trim();
+      const w = (workplace || '').toLowerCase();
+      return (
+        m === '0000' ||
+        n.includes('ทดสอบ') ||
+        n.includes('test account') ||
+        e.includes('test0000') ||
+        e.includes('test@') ||
+        w.includes('ทดสอบ') ||
+        w.includes('test hospital')
+      );
+    };
+
     const approvedSlips = [...slips]
       .filter((s) => s.status === 'approved')
+      .filter((s) => !isTestAccount(s.nameTh || s.nameEn, s.email, s.memberCode, s.workplace))
       .sort((a, b) => {
         const timeA = new Date(a.transferDate || 0).getTime();
         const timeB = new Date(b.transferDate || 0).getTime();
         return timeA - timeB;
       });
+
+    const START_RECEIPT_SEQ = 115;
 
     if (approvedSlips.length > 0) {
       const detailLines = (systemSettings.receipt_tpl1_details || '')
@@ -5575,11 +5594,11 @@ export default function AdminPage() {
 
       const generatedReceipts: ReceiptData[] = approvedSlips.map((slip, index) => {
         const m = meetings.find((mtg) => mtg.id === slip.meetingId);
-        const receiptNo = generateReceiptNo(slip.transferDate, index + 1);
+        const receiptNo = generateReceiptNo(slip.transferDate, START_RECEIPT_SEQ + index);
         return {
           id: `REC-${slip.id}`,
           receiptNo,
-          receiptDate: slip.transferDate || new Date().toLocaleDateString('th-TH'),
+          receiptDate: slip.transferDate || new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }),
           purposeText: systemSettings.receipt_tpl1_purpose || 'ได้รับเงินค่าลงทะเบียน',
           payerType: 'individual',
           payerName: slip.nameTh,
@@ -5619,13 +5638,14 @@ export default function AdminPage() {
       });
 
       setReceipts((prev) => {
-        const customOnes = prev.filter((r) => !r.slipId);
+        const nonTestExisting = prev.filter((r) => !isTestAccount(r.payerName));
+        const customOnes = nonTestExisting.filter((r) => !r.slipId);
         // Normalize any old/custom receipts to follow the same YYYY/MM-NNN standard
         const normalizedCustom = customOnes.map((r, i) => {
-          if (!r.receiptNo || r.receiptNo.includes('SLIP-') || r.receiptNo.includes('SAMPLE-')) {
+          if (!r.receiptNo || r.receiptNo.includes('SLIP-') || r.receiptNo.includes('SAMPLE-') || r.receiptNo.endsWith('-001')) {
             return {
               ...r,
-              receiptNo: generateReceiptNo(r.receiptDate || r.createdAt, generatedReceipts.length + i + 1),
+              receiptNo: generateReceiptNo(r.receiptDate || r.createdAt, START_RECEIPT_SEQ + generatedReceipts.length + i),
             };
           }
           return r;
@@ -5633,12 +5653,12 @@ export default function AdminPage() {
 
         const uniqueKeys = new Set();
         const merged: ReceiptData[] = [];
-        [...normalizedCustom, ...generatedReceipts].forEach((r) => {
+        [...generatedReceipts, ...normalizedCustom].forEach((r) => {
           const key = r.slipId || r.id;
           if (!uniqueKeys.has(key)) {
             uniqueKeys.add(key);
+            merged.push(r);
           }
-          merged.push(r);
         });
         return merged;
       });
@@ -5887,6 +5907,26 @@ export default function AdminPage() {
   };
 
   const handlePrintAttendeeReceipt = (attendee: AttendeeItem) => {
+    const isTestAccount = (name?: string, email?: string, memberNo?: string | null, workplace?: string) => {
+      const n = (name || '').toLowerCase();
+      const e = (email || '').toLowerCase();
+      const m = (memberNo || '').trim();
+      const w = (workplace || '').toLowerCase();
+      return (
+        m === '0000' ||
+        n.includes('ทดสอบ') ||
+        n.includes('test account') ||
+        e.includes('test0000') ||
+        e.includes('test@') ||
+        w.includes('ทดสอบ') ||
+        w.includes('test hospital')
+      );
+    };
+
+    if (isTestAccount(attendee.nameTh, attendee.email, attendee.code, attendee.workplace)) {
+      return;
+    }
+
     const existing = receipts.find((r) => r.attendeeId === attendee.id);
     if (existing) {
       setGlobalReceipt(existing);
@@ -5897,12 +5937,22 @@ export default function AdminPage() {
     const m = meetings.find((mtg) => mtg.id === attendee.meetingId || mtg.titleTh === attendee.meetingTitle);
 
     let amount = 3500;
+    if (attendee.ticketType.includes('Non-Member')) amount = 4500;
     if (attendee.ticketType.includes('Workshop')) amount = 5000;
     if (attendee.ticketType.includes('Day')) amount = 2000;
 
+    let maxSeq = 114;
+    receipts.forEach((r) => {
+      const match = r.receiptNo?.match(/-(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxSeq) maxSeq = num;
+      }
+    });
+
     const newReceipt: ReceiptData = {
       id: `REC-ATT-${attendee.id}`,
-      receiptNo: generateReceiptNo(new Date(), receipts.length + 1),
+      receiptNo: generateReceiptNo(new Date(), maxSeq + 1),
       receiptDate: new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }),
       purposeText: systemSettings.receipt_tpl1_purpose || 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',
       payerType: 'individual',
@@ -5954,6 +6004,26 @@ export default function AdminPage() {
   };
 
   const handlePrintSlipReceipt = (slip: SlipItem) => {
+    const isTestAccount = (name?: string, email?: string, memberNo?: string | null, workplace?: string) => {
+      const n = (name || '').toLowerCase();
+      const e = (email || '').toLowerCase();
+      const m = (memberNo || '').trim();
+      const w = (workplace || '').toLowerCase();
+      return (
+        m === '0000' ||
+        n.includes('ทดสอบ') ||
+        n.includes('test account') ||
+        e.includes('test0000') ||
+        e.includes('test@') ||
+        w.includes('ทดสอบ') ||
+        w.includes('test hospital')
+      );
+    };
+
+    if (isTestAccount(slip.nameTh, slip.email, slip.memberCode, slip.workplace)) {
+      return;
+    }
+
     const existing = receipts.find((r) => r.slipId === slip.id);
     if (existing) {
       setGlobalReceipt(existing);
@@ -5963,9 +6033,18 @@ export default function AdminPage() {
 
     const m = meetings.find((mtg) => mtg.id === slip.meetingId);
 
+    let maxSeq = 114;
+    receipts.forEach((r) => {
+      const match = r.receiptNo?.match(/-(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxSeq) maxSeq = num;
+      }
+    });
+
     const newReceipt: ReceiptData = {
       id: `REC-${slip.id}`,
-      receiptNo: generateReceiptNo(slip.transferDate, receipts.length + 1),
+      receiptNo: generateReceiptNo(slip.transferDate, maxSeq + 1),
       receiptDate: slip.transferDate || new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }),
       purposeText: systemSettings.receipt_tpl1_purpose || 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',
       payerType: 'individual',

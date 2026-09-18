@@ -18,8 +18,20 @@ import {
   UserCheck,
   UserX,
   ExternalLink,
+  BookOpen,
+  Layers,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+
+export interface SlipActivityItem {
+  id?: string;
+  name: string;
+  date?: string;
+  type?: string;
+  price?: number;
+  rateBadgeTh?: string;
+  rateBadgeEn?: string;
+}
 
 export interface SlipRecord {
   id: string;
@@ -44,7 +56,22 @@ export interface SlipRecord {
   status: 'pending' | 'approved' | 'rejected';
   notes?: string;
   resubmitToken?: string | null;
+  selectedActivities?: SlipActivityItem[] | string;
   createdAt?: string;
+}
+
+export function parseSlipActivities(raw?: SlipActivityItem[] | string): SlipActivityItem[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }
 
 export function AdminSlipsView() {
@@ -170,6 +197,9 @@ export function AdminSlipsView() {
   const filteredSlips = React.useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     return slips.filter((s) => {
+      const acts = parseSlipActivities(s.selectedActivities);
+      const matchesActivities = acts.some((a) => a.name && a.name.toLowerCase().includes(q));
+
       const matchesSearch =
         !q ||
         (s.nameTh && s.nameTh.toLowerCase().includes(q)) ||
@@ -177,7 +207,8 @@ export function AdminSlipsView() {
         (s.ticketCode && s.ticketCode.toLowerCase().includes(q)) ||
         (s.refNo && s.refNo.toLowerCase().includes(q)) ||
         (s.workplace && s.workplace.toLowerCase().includes(q)) ||
-        (s.memberNo && s.memberNo.toLowerCase().includes(q));
+        (s.memberNo && s.memberNo.toLowerCase().includes(q)) ||
+        matchesActivities;
 
       const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
       return matchesSearch && matchesStatus;
@@ -464,6 +495,32 @@ export function AdminSlipsView() {
                     )}
                   </div>
 
+                  {/* Registered Courses / Activities Badges */}
+                  {(() => {
+                    const acts = parseSlipActivities(slip.selectedActivities);
+                    if (acts.length > 0) {
+                      return (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          {acts.map((act, i) => (
+                            <span
+                              key={act.id || i}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-indigo-50 text-indigo-900 border border-indigo-200 shadow-2xs"
+                            >
+                              <BookOpen className="w-3 h-3 text-indigo-600 shrink-0" />
+                              <span>{act.name}</span>
+                              {act.price !== undefined && (
+                                <span className="text-[10px] font-extrabold text-indigo-700 bg-white px-1.5 py-0.5 rounded-md border border-indigo-100 font-mono">
+                                  ฿{Number(act.price).toLocaleString()}
+                                </span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
                   <p className="text-[11px] text-slate-400 font-normal">
                     {lang === 'th' ? 'วันที่โอน' : 'Transfer'}: {slip.transferDate || '-'} {slip.transferTime || ''} |
                     Ref: {slip.refNo}
@@ -638,6 +695,65 @@ export function AdminSlipsView() {
                     </span>
                   </div>
                 </div>
+
+                {/* Registered Courses & Activities Section */}
+                {(() => {
+                  const acts = parseSlipActivities(selectedSlip.selectedActivities);
+                  return (
+                    <div className="bg-slate-50/90 rounded-2xl p-4 sm:p-5 space-y-2.5 border border-slate-200 text-sm">
+                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/80">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                            <BookOpen className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="font-extrabold text-xs sm:text-sm text-slate-800 block leading-tight">
+                              {lang === 'th' ? 'หลักสูตร / กิจกรรมที่ลงทะเบียน' : 'Registered Courses & Activities'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              {lang === 'th' ? 'รายการแพ็กเกจและกิจกรรมที่เลือก' : 'Selected packages & workshop items'}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                          {acts.length} {lang === 'th' ? 'รายการ' : 'items'}
+                        </span>
+                      </div>
+
+                      {acts.length > 0 ? (
+                        <div className="space-y-1.5 pt-1">
+                          {acts.map((act, i) => (
+                            <div
+                              key={act.id || i}
+                              className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200/80 text-xs shadow-2xs hover:border-indigo-200 transition"
+                            >
+                              <div className="space-y-0.5 min-w-0 pr-3">
+                                <div className="flex items-center gap-1.5">
+                                  {act.type && (
+                                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                      {act.type}
+                                    </span>
+                                  )}
+                                  <p className="font-bold text-slate-900 truncate text-xs">{act.name}</p>
+                                </div>
+                                {act.date && <p className="text-[10px] text-slate-500 font-medium">{act.date}</p>}
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span className="font-black text-indigo-700 font-mono text-xs sm:text-sm">
+                                  ฿{Number(act.price || 0).toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-500 py-1 italic">
+                          {lang === 'th' ? 'ไม่มีรายละเอียดกิจกรรมย่อย (ลงทะเบียนแพ็กเกจรวม)' : 'Standard pass registration'}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Status & Rejection Notes */}
                 {selectedSlip.notes && (

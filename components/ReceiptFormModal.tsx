@@ -15,7 +15,8 @@ import {
   AlertCircle,
   Layers,
   Check,
-  DollarSign
+  DollarSign,
+  Calendar,
 } from 'lucide-react';
 
 interface ReceiptFormModalProps {
@@ -46,7 +47,7 @@ export function ReceiptFormModal({
   const [formData, setFormData] = useState<ReceiptData>(() => {
     return initialData || {
       id: `REC-${Date.now()}`,
-      receiptNo: generateReceiptNo(new Date(), 1),
+      receiptNo: generateReceiptNo(new Date(), 115),
       receiptDate: new Date().toLocaleDateString('th-TH', {
         day: 'numeric',
         month: 'long',
@@ -378,7 +379,70 @@ export function ReceiptFormModal({
             </div>
           </div>
 
-          {/* ─── 2. ข้อมูลผู้ชำระเงิน / บริษัท / หน่วยงาน (ตามรูปเป๊ะๆ 100%) ─── */}
+          {/* ─── 2. ข้อมูลเอกสารใบเสร็จ (เลขที่ และ วันที่ในใบเสร็จ) ─── */}
+          <div className="bg-slate-50/80 p-4 sm:p-5 rounded-3xl border border-slate-200/90 shadow-2xs space-y-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4.5 h-4.5 text-indigo-700" />
+              <span className="text-xs sm:text-sm font-bold text-slate-800">
+                ข้อมูลเลขที่และวันที่ในใบเสร็จ
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Receipt No */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  เลขที่ใบเสร็จรับเงิน (Receipt No.)
+                </label>
+                <input
+                  type="text"
+                  value={formData.receiptNo}
+                  onChange={(e) => setFormData({ ...formData, receiptNo: e.target.value })}
+                  placeholder="เช่น 2569/02-115"
+                  className="w-full px-4 py-2.5 text-sm font-mono font-bold bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
+                />
+              </div>
+
+              {/* Receipt Date */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  วันที่ออกใบเสร็จ (Receipt Date) <span className="text-rose-600 font-bold">*</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={formData.receiptDate}
+                    onChange={(e) => setFormData({ ...formData, receiptDate: e.target.value })}
+                    placeholder="เช่น 18 กันยายน 2569"
+                    className="flex-1 px-4 py-2.5 text-sm font-medium bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
+                    required
+                  />
+                  <div className="relative shrink-0">
+                    <input
+                      type="date"
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          const d = new Date(e.target.value);
+                          if (!isNaN(d.getTime())) {
+                            const thaiDateStr = d.toLocaleDateString('th-TH', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                            });
+                            setFormData({ ...formData, receiptDate: thaiDateStr });
+                          }
+                        }
+                      }}
+                      className="w-10 h-10.5 px-2 bg-white border border-slate-200 rounded-2xl text-slate-600 cursor-pointer hover:border-indigo-500 transition opacity-80 hover:opacity-100"
+                      title="เลือกจากปฏิทิน"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ─── 3. ข้อมูลผู้ชำระเงิน / บริษัท / หน่วยงาน (ตามรูปเป๊ะๆ 100%) ─── */}
           <div className="bg-slate-50/80 p-5 sm:p-6 rounded-3xl border border-slate-200/90 space-y-4 shadow-xs">
             {/* Header with Icon & Right Toggle Pill */}
             <div className="flex flex-wrap items-center justify-between gap-3 pb-1">

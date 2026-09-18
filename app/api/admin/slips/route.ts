@@ -53,6 +53,20 @@ export async function GET(request: NextRequest) {
         },
       });
 
+      const parseActivities = (act: any) => {
+        if (!act) return [];
+        if (Array.isArray(act)) return act;
+        if (typeof act === 'string') {
+          try {
+            const parsed = JSON.parse(act);
+            if (Array.isArray(parsed)) return parsed;
+          } catch {
+            return [];
+          }
+        }
+        return [];
+      };
+
       formattedSlips = slips.map((s: any) => {
         const isMember = s.is_member && s.members;
         const nameTh = isMember ? s.members?.fullNameTh || 'สมาชิก' : s.guest_name || 'ผู้สมัครทั่วไป';
@@ -84,7 +98,7 @@ export async function GET(request: NextRequest) {
           status: s.status as 'pending' | 'approved' | 'rejected',
           notes: s.rejection_reason || undefined,
           resubmitToken: s.resubmit_token,
-          selectedActivities: s.selected_activities || [],
+          selectedActivities: parseActivities(s.selected_activities),
           createdAt: s.created_at ? new Date(s.created_at).toISOString() : new Date().toISOString(),
         };
       });
@@ -121,6 +135,20 @@ export async function GET(request: NextRequest) {
 
       const slips: any[] = await prisma.$queryRawUnsafe(query, ...params);
 
+      const parseActivities = (act: any) => {
+        if (!act) return [];
+        if (Array.isArray(act)) return act;
+        if (typeof act === 'string') {
+          try {
+            const parsed = JSON.parse(act);
+            if (Array.isArray(parsed)) return parsed;
+          } catch {
+            return [];
+          }
+        }
+        return [];
+      };
+
       formattedSlips = slips.map((s: any) => {
         const isMember = s.is_member && s.member_full_name_th;
         const nameTh = isMember ? s.member_full_name_th : s.guest_name || 'ผู้สมัครทั่วไป';
@@ -152,7 +180,7 @@ export async function GET(request: NextRequest) {
           status: s.status as 'pending' | 'approved' | 'rejected',
           notes: s.rejection_reason || undefined,
           resubmitToken: s.resubmit_token,
-          selectedActivities: s.selected_activities || [],
+          selectedActivities: parseActivities(s.selected_activities),
           createdAt: s.created_at ? new Date(s.created_at).toISOString() : new Date().toISOString(),
         };
       });
