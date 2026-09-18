@@ -16,6 +16,7 @@ async function main() {
   };
 
   let seq = 115;
+  let idSeq = 1;
   for (const r of receipts) {
     if (isTestAccount(r.payer_name)) {
       console.log(`Skipping / deleting test receipt: ${r.receipt_no} - ${r.payer_name}`);
@@ -24,12 +25,26 @@ async function main() {
     }
 
     const newReceiptNo = generateReceiptNo(r.receipt_date || r.created_at, seq);
-    console.log(`Updating ${r.id} (${r.payer_name}): ${r.receipt_no} -> ${newReceiptNo}`);
-    await (prisma as any).receipts.update({
-      where: { id: r.id },
-      data: { receipt_no: newReceiptNo }
-    });
+    const newId = String(idSeq);
+    console.log(`Updating ${r.id} (${r.payer_name}): ID -> ${newId}, No -> ${newReceiptNo}`);
+    
+    if (r.id !== newId) {
+      await (prisma as any).receipts.delete({ where: { id: r.id } });
+      await (prisma as any).receipts.create({
+        data: {
+          ...r,
+          id: newId,
+          receipt_no: newReceiptNo,
+        }
+      });
+    } else {
+      await (prisma as any).receipts.update({
+        where: { id: r.id },
+        data: { receipt_no: newReceiptNo }
+      });
+    }
     seq++;
+    idSeq++;
   }
 
   console.log('Done updating receipts.');

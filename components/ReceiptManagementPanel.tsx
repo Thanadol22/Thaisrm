@@ -90,17 +90,21 @@ export function ReceiptManagementPanel({
 
   const handleOpenCreate = () => {
     let maxSeq = DEFAULT_RECEIPT_START_SEQ - 1;
+    let maxId = 0;
     receipts.forEach((r) => {
       const m = r.receiptNo?.match(/-(\d+)$/);
       if (m) {
         const num = parseInt(m[1], 10);
         if (num > maxSeq) maxSeq = num;
       }
+      const numId = parseInt(r.id, 10);
+      if (!isNaN(numId) && numId > maxId) maxId = numId;
     });
     const nextReceiptNo = generateReceiptNo(new Date(), maxSeq + 1);
+    const nextId = String(maxId + 1);
 
     setEditReceipt({
-      id: `REC-${Date.now()}`,
+      id: nextId,
       receiptNo: nextReceiptNo,
       receiptDate: new Date().toLocaleDateString('th-TH', {
         day: 'numeric',
@@ -158,9 +162,14 @@ export function ReceiptManagementPanel({
   };
 
   const handleDuplicate = (receipt: ReceiptData) => {
+    let maxId = 0;
+    receipts.forEach((r) => {
+      const numId = parseInt(r.id, 10);
+      if (!isNaN(numId) && numId > maxId) maxId = numId;
+    });
     const duplicated: ReceiptData = {
       ...receipt,
-      id: `REC-${Date.now()}`,
+      id: String(maxId + 1),
       receiptNo: `${receipt.receiptNo}-COPY`,
       createdAt: new Date().toISOString().split('T')[0],
     };

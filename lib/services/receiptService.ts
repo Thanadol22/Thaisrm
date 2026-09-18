@@ -120,12 +120,33 @@ export async function getReceiptById(id: string): Promise<ReceiptData | null> {
   }
 }
 
+export async function getNextReceiptId(): Promise<string> {
+  try {
+    const rows = await prisma.$queryRawUnsafe<any[]>(`SELECT id FROM receipts`);
+    let maxId = 0;
+    if (Array.isArray(rows)) {
+      for (const r of rows) {
+        const num = parseInt(r.id, 10);
+        if (!isNaN(num) && num > maxId) {
+          maxId = num;
+        }
+      }
+    }
+    return String(maxId + 1);
+  } catch {
+    return '1';
+  }
+}
+
 /**
  * Save or update a receipt in the database
  */
 export async function saveReceipt(receipt: ReceiptData): Promise<{ success: boolean; data?: ReceiptData; error?: string }> {
   try {
-    const id = receipt.id || `REC-${Date.now()}`;
+    let id = receipt.id;
+    if (!id || id.startsWith('REC-')) {
+      id = await getNextReceiptId();
+    }
     const itemsJson = JSON.stringify(receipt.items || []);
     const totalAmount = Number(receipt.totalAmount) || 0;
 

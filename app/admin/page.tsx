@@ -5596,7 +5596,7 @@ export default function AdminPage() {
         const m = meetings.find((mtg) => mtg.id === slip.meetingId);
         const receiptNo = generateReceiptNo(slip.transferDate, START_RECEIPT_SEQ + index);
         return {
-          id: `REC-${slip.id}`,
+          id: String(index + 1),
           receiptNo,
           receiptDate: slip.transferDate || new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }),
           purposeText: systemSettings.receipt_tpl1_purpose || 'ได้รับเงินค่าลงทะเบียน',
@@ -5942,16 +5942,19 @@ export default function AdminPage() {
     if (attendee.ticketType.includes('Day')) amount = 2000;
 
     let maxSeq = 114;
+    let maxId = 0;
     receipts.forEach((r) => {
       const match = r.receiptNo?.match(/-(\d+)$/);
       if (match) {
         const num = parseInt(match[1], 10);
         if (num > maxSeq) maxSeq = num;
       }
+      const numId = parseInt(r.id, 10);
+      if (!isNaN(numId) && numId > maxId) maxId = numId;
     });
 
     const newReceipt: ReceiptData = {
-      id: `REC-ATT-${attendee.id}`,
+      id: String(maxId + 1),
       receiptNo: generateReceiptNo(new Date(), maxSeq + 1),
       receiptDate: new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }),
       purposeText: systemSettings.receipt_tpl1_purpose || 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',
@@ -6034,16 +6037,19 @@ export default function AdminPage() {
     const m = meetings.find((mtg) => mtg.id === slip.meetingId);
 
     let maxSeq = 114;
+    let maxId = 0;
     receipts.forEach((r) => {
       const match = r.receiptNo?.match(/-(\d+)$/);
       if (match) {
         const num = parseInt(match[1], 10);
         if (num > maxSeq) maxSeq = num;
       }
+      const numId = parseInt(r.id, 10);
+      if (!isNaN(numId) && numId > maxId) maxId = numId;
     });
 
     const newReceipt: ReceiptData = {
-      id: `REC-${slip.id}`,
+      id: String(maxId + 1),
       receiptNo: generateReceiptNo(slip.transferDate, maxSeq + 1),
       receiptDate: slip.transferDate || new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }),
       purposeText: systemSettings.receipt_tpl1_purpose || 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
-import { getAllReceipts, saveReceipt, deleteReceipt } from '@/lib/services/receiptService';
+import { getAllReceipts, saveReceipt, deleteReceipt, getNextReceiptId } from '@/lib/services/receiptService';
 import { ReceiptData } from '@/types/receipt';
 
 export const dynamic = 'force-dynamic';
@@ -48,8 +48,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let receiptId = body.id;
+    if (!receiptId || receiptId.startsWith('REC-')) {
+      receiptId = await getNextReceiptId();
+    }
+
     const receiptData: ReceiptData = {
-      id: body.id || `REC-${Date.now()}`,
+      id: receiptId,
       receiptNo: body.receiptNo,
       receiptDate: body.receiptDate || new Date().toLocaleDateString('th-TH'),
       purposeText: body.purposeText || '',

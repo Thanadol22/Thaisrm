@@ -46,7 +46,7 @@ export function ReceiptFormModal({
 
   const [formData, setFormData] = useState<ReceiptData>(() => {
     return initialData || {
-      id: `REC-${Date.now()}`,
+      id: '1',
       receiptNo: generateReceiptNo(new Date(), 115),
       receiptDate: new Date().toLocaleDateString('th-TH', {
         day: 'numeric',
