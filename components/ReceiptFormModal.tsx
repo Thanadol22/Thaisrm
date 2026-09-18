@@ -27,6 +27,7 @@ interface ReceiptFormModalProps {
   onClose: () => void;
   onSave: (receipt: ReceiptData, andPrint?: boolean) => void;
   initialData?: ReceiptData | null;
+  receipts?: ReceiptData[];
   meetings?: Array<{
     id: string;
     titleTh: string;
@@ -40,6 +41,7 @@ export function ReceiptFormModal({
   onClose,
   onSave,
   initialData,
+  receipts = [],
   meetings = [],
 }: ReceiptFormModalProps) {
   const [mounted, setMounted] = useState(false);
@@ -104,8 +106,19 @@ export function ReceiptFormModal({
           if (json.success && json.data) {
             setSettings(json.data);
             if (!initialData) {
+              let maxSeq = DEFAULT_RECEIPT_START_SEQ - 1;
+              (receipts || []).forEach((r) => {
+                const match = r.receiptNo?.match(/-(\d+)/);
+                if (match) {
+                  const num = parseInt(match[1], 10);
+                  if (!isNaN(num) && num > maxSeq) maxSeq = num;
+                }
+              });
+              const nextSeqNo = generateReceiptNo(new Date(), maxSeq + 1);
+
               setFormData((prev) => ({
                 ...prev,
+                receiptNo: nextSeqNo,
                 associationNameTh: json.data.association_name_th || DEFAULT_ASSOCIATION_INFO.nameTh,
                 associationNameEn: json.data.association_name_en || DEFAULT_ASSOCIATION_INFO.nameEn,
                 associationAddress: json.data.association_address || DEFAULT_ASSOCIATION_INFO.address,
@@ -122,21 +135,39 @@ export function ReceiptFormModal({
         })
         .catch(() => { });
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, receipts]);
 
   // Keep state updated if initialData changes
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
-      setSelectedTemplate(4); // Default to custom/free-edit mode for existing receipts
+      if (initialData.payerName && initialData.payerName.trim().length > 0) {
+        setSelectedTemplate(4); // Editing existing saved receipt
+      } else {
+        setSelectedTemplate(3); // Creating new receipt
+      }
       setNameError(null);
       const lines = initialData.items?.[0]?.subDetails || [];
       setSubDetailsText(lines.join('\n'));
       if (initialData.thaiBahtTextOverride) {
         setShowCustomBahtText(true);
       }
+    } else if (isOpen) {
+      let maxSeq = DEFAULT_RECEIPT_START_SEQ - 1;
+      (receipts || []).forEach((r) => {
+        const match = r.receiptNo?.match(/-(\d+)/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxSeq) maxSeq = num;
+        }
+      });
+      const nextSeqNo = generateReceiptNo(new Date(), maxSeq + 1);
+      setFormData((prev) => ({
+        ...prev,
+        receiptNo: nextSeqNo,
+      }));
     }
-  }, [initialData]);
+  }, [initialData, isOpen, receipts]);
 
   if (!isOpen || !mounted) return null;
 
