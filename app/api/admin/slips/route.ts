@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import crypto from 'crypto';
-import { sendRegistrationApprovedEmail, sendSlipRejectionEmail } from '@/lib/email';
+import { sendRegistrationApprovedEmail, sendSlipRejectionEmail, sendMembershipApprovedEmail } from '@/lib/email';
+import { createMember } from '@/lib/services/memberService';
 import { getSystemSettings } from '@/lib/services/settingsService';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 
@@ -21,6 +22,39 @@ export async function GET(request: NextRequest) {
     let formattedSlips: any[] = [];
 
     const slipsModel = (prisma as any).payment_slips || (prisma as any).paymentSlip;
+
+    const parseActivitiesData = (act: any) => {
+      if (!act) return { activities: [], isMembership: false, memberPayload: null };
+      let parsed = act;
+      if (typeof act === 'string') {
+        try {
+          parsed = JSON.parse(act);
+        } catch {
+          return { activities: [], isMembership: false, memberPayload: null };
+        }
+      }
+
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.type === 'membership_registration') {
+        return {
+          activities: [{
+            id: 'membership_registration',
+            name: 'ค่าบำรุงสมาชิกรายปี (Membership Fee)',
+            type: 'membership_registration',
+            price: parsed.amount || 1000,
+            rateBadgeTh: 'สมัครสมาชิกใหม่',
+            rateBadgeEn: 'New Member',
+          }],
+          isMembership: true,
+          memberPayload: parsed.memberPayload || null,
+        };
+      }
+
+      if (Array.isArray(parsed)) {
+        return { activities: parsed, isMembership: false, memberPayload: null };
+      }
+
+      return { activities: [], isMembership: false, memberPayload: null };
+    };
 
     if (slipsModel) {
       const whereClause: any = {};
@@ -53,41 +87,46 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      const parseActivities = (act: any) => {
-        if (!act) return [];
-        if (Array.isArray(act)) return act;
-        if (typeof act === 'string') {
-          try {
-            const parsed = JSON.parse(act);
-            if (Array.isArray(parsed)) return parsed;
-          } catch {
-            return [];
-          }
-        }
-        return [];
-      };
-
       formattedSlips = slips.map((s: any) => {
+        const parsedAct = parseActivitiesData(s.selected_activities);
         const isMember = s.is_member && s.members;
-        const nameTh = isMember ? s.members?.fullNameTh || 'สมาชิก' : s.guest_name || 'ผู้สมัครทั่วไป';
-        const nameEn = isMember ? s.members?.fullNameEn || '' : '';
-        const email = isMember ? s.members?.email || '' : s.guest_email || '';
-        const phone = isMember ? s.members?.mobile || '' : s.guest_phone || '';
-        const workplace = isMember ? s.members?.workplace || '' : s.guest_workplace || '';
+        const nameTh = isMember
+          ? s.members?.fullNameTh || 'สมาชิก'
+          : s.guest_name || parsedAct.memberPayload?.full_name_th || 'ผู้สมัครทั่วไป';
+        const nameEn = isMember
+          ? s.members?.fullNameEn || ''
+          : parsedAct.memberPayload?.full_name_en || '';
+        const email = isMember
+          ? s.members?.email || ''
+          : s.guest_email || parsedAct.memberPayload?.email || '';
+        const phone = isMember
+          ? s.members?.mobile || ''
+          : s.guest_phone || parsedAct.memberPayload?.mobile || '';
+        const workplace = isMember
+          ? s.members?.workplace || ''
+          : s.guest_workplace || parsedAct.memberPayload?.workplace || '';
+
+        const ticketType = parsedAct.isMembership
+          ? 'Membership Registration'
+          : s.is_member
+          ? 'Member Pass'
+          : 'Non-Member Pass';
 
         return {
           id: s.slip_id,
           dbId: s.id.toString(),
           meetingId: s.meeting_id,
-          meetingName: s.meetings?.meeting_name || '',
+          meetingName: parsedAct.isMembership ? 'สมัครสมาชิกสมาคม (Membership Registration)' : (s.meetings?.meeting_name || ''),
           memberNo: s.member_no,
           isMember: s.is_member,
+          isMembershipRegistration: parsedAct.isMembership,
+          memberPayload: parsedAct.memberPayload,
           nameTh,
           nameEn,
           email,
           phone,
           workplace,
-          ticketType: s.is_member ? 'Member Pass' : 'Non-Member Pass',
+          ticketType,
           ticketCode: s.ticket_code || '',
           amount: s.amount,
           bank: s.bank || defaultBank,
@@ -98,7 +137,7 @@ export async function GET(request: NextRequest) {
           status: s.status as 'pending' | 'approved' | 'rejected',
           notes: s.rejection_reason || undefined,
           resubmitToken: s.resubmit_token,
-          selectedActivities: parseActivities(s.selected_activities),
+          selectedActivities: parsedAct.activities,
           createdAt: s.created_at ? new Date(s.created_at).toISOString() : new Date().toISOString(),
         };
       });
@@ -135,41 +174,46 @@ export async function GET(request: NextRequest) {
 
       const slips: any[] = await prisma.$queryRawUnsafe(query, ...params);
 
-      const parseActivities = (act: any) => {
-        if (!act) return [];
-        if (Array.isArray(act)) return act;
-        if (typeof act === 'string') {
-          try {
-            const parsed = JSON.parse(act);
-            if (Array.isArray(parsed)) return parsed;
-          } catch {
-            return [];
-          }
-        }
-        return [];
-      };
-
       formattedSlips = slips.map((s: any) => {
+        const parsedAct = parseActivitiesData(s.selected_activities);
         const isMember = s.is_member && s.member_full_name_th;
-        const nameTh = isMember ? s.member_full_name_th : s.guest_name || 'ผู้สมัครทั่วไป';
-        const nameEn = isMember ? s.member_full_name_en || '' : '';
-        const email = isMember ? s.member_email || '' : s.guest_email || '';
-        const phone = isMember ? s.member_mobile || '' : s.guest_phone || '';
-        const workplace = isMember ? s.member_workplace || '' : s.guest_workplace || '';
+        const nameTh = isMember
+          ? s.member_full_name_th
+          : s.guest_name || parsedAct.memberPayload?.full_name_th || 'ผู้สมัครทั่วไป';
+        const nameEn = isMember
+          ? s.member_full_name_en || ''
+          : parsedAct.memberPayload?.full_name_en || '';
+        const email = isMember
+          ? s.member_email || ''
+          : s.guest_email || parsedAct.memberPayload?.email || '';
+        const phone = isMember
+          ? s.member_mobile || ''
+          : s.guest_phone || parsedAct.memberPayload?.mobile || '';
+        const workplace = isMember
+          ? s.member_workplace || ''
+          : s.guest_workplace || parsedAct.memberPayload?.workplace || '';
+
+        const ticketType = parsedAct.isMembership
+          ? 'Membership Registration'
+          : s.is_member
+          ? 'Member Pass'
+          : 'Non-Member Pass';
 
         return {
           id: s.slip_id,
           dbId: s.id?.toString(),
           meetingId: s.meeting_id,
-          meetingName: s.meeting_name || '',
+          meetingName: parsedAct.isMembership ? 'สมัครสมาชิกสมาคม (Membership Registration)' : (s.meeting_name || ''),
           memberNo: s.member_no,
           isMember: s.is_member,
+          isMembershipRegistration: parsedAct.isMembership,
+          memberPayload: parsedAct.memberPayload,
           nameTh,
           nameEn,
           email,
           phone,
           workplace,
-          ticketType: s.is_member ? 'Member Pass' : 'Non-Member Pass',
+          ticketType,
           ticketCode: s.ticket_code || '',
           amount: Number(s.amount) || 0,
           bank: s.bank || defaultBank,
@@ -180,7 +224,7 @@ export async function GET(request: NextRequest) {
           status: s.status as 'pending' | 'approved' | 'rejected',
           notes: s.rejection_reason || undefined,
           resubmitToken: s.resubmit_token,
-          selectedActivities: parseActivities(s.selected_activities),
+          selectedActivities: parsedAct.activities,
           createdAt: s.created_at ? new Date(s.created_at).toISOString() : new Date().toISOString(),
         };
       });
@@ -263,13 +307,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if this slip is a membership registration request
+    let isMembershipRegistration = false;
+    let memberPayload: any = null;
+    if (slip.selected_activities) {
+      let actObj = slip.selected_activities;
+      if (typeof actObj === 'string') {
+        try { actObj = JSON.parse(actObj); } catch {}
+      }
+      if (actObj && typeof actObj === 'object' && actObj.type === 'membership_registration') {
+        isMembershipRegistration = true;
+        memberPayload = actObj.memberPayload;
+      }
+    }
+
     if (action === 'approve') {
-      // 1. Update slip status to approved
+      let assignedMemberNo = slip.member_no;
+
+      // 1. If this is a membership registration slip and member_no is not yet created, create Member now!
+      if (isMembershipRegistration && memberPayload && !assignedMemberNo) {
+        try {
+          const newMember = await createMember(memberPayload);
+          assignedMemberNo = newMember.member_no;
+        } catch (createErr: any) {
+          console.error('Failed to create member on slip approval:', createErr);
+          return NextResponse.json(
+            { success: false, error: `ไม่สามารถสร้างข้อมูลสมาชิกได้: ${createErr.message || 'ข้อมูลไม่ถูกต้อง'}` },
+            { status: 400 }
+          );
+        }
+      }
+
+      // 2. Update slip status to approved and attach member_no
       if ((prisma as any).payment_slips) {
         await (prisma as any).payment_slips.update({
           where: { slip_id: slipId },
           data: {
             status: 'approved',
+            member_no: assignedMemberNo || null,
+            is_member: !!assignedMemberNo,
             rejection_reason: null,
             resubmit_token: null,
             reviewed_by: reviewer || 'Admin',
@@ -279,40 +355,58 @@ export async function POST(request: NextRequest) {
       } else {
         await prisma.$executeRaw`
           UPDATE payment_slips
-          SET status = 'approved', rejection_reason = NULL, resubmit_token = NULL,
-              reviewed_by = ${reviewer || 'Admin'}, reviewed_at = NOW(), updated_at = NOW()
+          SET status = 'approved',
+              member_no = ${assignedMemberNo || null},
+              is_member = ${!!assignedMemberNo},
+              rejection_reason = NULL,
+              resubmit_token = NULL,
+              reviewed_by = ${reviewer || 'Admin'},
+              reviewed_at = NOW(),
+              updated_at = NOW()
           WHERE slip_id = ${slipId}
         `;
       }
 
-      // 2. Update meeting_attendances
-      if (slip.member_no) {
-        await prisma.$executeRaw`
-          UPDATE meeting_attendances
-          SET attendance_status = 'Registered'
-          WHERE meeting_id = ${slip.meeting_id} AND member_no = ${slip.member_no}
-        `;
-      } else if (slip.guest_email) {
-        await prisma.$executeRaw`
-          UPDATE meeting_attendances
-          SET attendance_status = 'Non-Member'
-          WHERE meeting_id = ${slip.meeting_id} AND attendee_email = ${slip.guest_email}
-        `;
+      // 3. If conference meeting attendance exists, update meeting_attendances
+      if (!isMembershipRegistration) {
+        if (assignedMemberNo) {
+          await prisma.$executeRaw`
+            UPDATE meeting_attendances
+            SET attendance_status = 'Registered'
+            WHERE meeting_id = ${slip.meeting_id} AND member_no = ${assignedMemberNo}
+          `;
+        } else if (slip.guest_email) {
+          await prisma.$executeRaw`
+            UPDATE meeting_attendances
+            SET attendance_status = 'Non-Member'
+            WHERE meeting_id = ${slip.meeting_id} AND attendee_email = ${slip.guest_email}
+          `;
+        }
       }
 
-      // 3. Send approval confirmation email stub
-      const recipientEmail = slip.members?.email || slip.guest_email || '';
-      const recipientName = slip.members?.fullNameTh || slip.guest_name || 'ผู้เข้าร่วมประชุม';
+      // 4. Send approval confirmation email
+      const recipientEmail = slip.members?.email || slip.guest_email || memberPayload?.email || '';
+      const recipientName = slip.members?.fullNameTh || slip.guest_name || memberPayload?.full_name_th || 'ผู้สมัครสมาชิก';
+
       if (recipientEmail) {
         try {
-          await sendRegistrationApprovedEmail({
-            to: recipientEmail,
-            recipientName,
-            meetingName: slip.meetings?.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
-            ticketCode: slip.ticket_code || '',
-            amountPaid: slip.amount,
-            isMember: slip.is_member,
-          });
+          if (isMembershipRegistration && assignedMemberNo) {
+            await sendMembershipApprovedEmail({
+              to: recipientEmail,
+              recipientName,
+              memberNo: assignedMemberNo,
+              amountPaid: slip.amount,
+            });
+          } else {
+            await sendRegistrationApprovedEmail({
+              to: recipientEmail,
+              recipientName,
+              meetingName: slip.meetings?.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
+              ticketCode: slip.ticket_code || '',
+              amountPaid: slip.amount,
+              isMember: slip.is_member,
+            });
+          }
         } catch (mailErr) {
           console.error('Failed to send approval email:', mailErr);
         }
@@ -322,7 +416,10 @@ export async function POST(request: NextRequest) {
         success: true,
         data: {
           status: 'approved',
-          message: 'Slip approved and attendee confirmed successfully.',
+          memberNo: assignedMemberNo,
+          message: isMembershipRegistration
+            ? `อนุมัติสลิปและบันทึกข้อมูลสมาชิกสำเร็จ (รหัสสมาชิก: ${assignedMemberNo})`
+            : 'Slip approved and attendee confirmed successfully.',
         },
       });
     } else if (action === 'reset') {
@@ -347,19 +444,21 @@ export async function POST(request: NextRequest) {
         `;
       }
 
-      // Revert attendance status to pending
-      if (slip.member_no) {
-        await prisma.$executeRaw`
-          UPDATE meeting_attendances
-          SET attendance_status = 'Pending_Payment'
-          WHERE meeting_id = ${slip.meeting_id} AND member_no = ${slip.member_no}
-        `;
-      } else if (slip.guest_email) {
-        await prisma.$executeRaw`
-          UPDATE meeting_attendances
-          SET attendance_status = 'Non-Member-Pending'
-          WHERE meeting_id = ${slip.meeting_id} AND attendee_email = ${slip.guest_email}
-        `;
+      // Revert attendance status to pending if conference registration
+      if (!isMembershipRegistration) {
+        if (slip.member_no) {
+          await prisma.$executeRaw`
+            UPDATE meeting_attendances
+            SET attendance_status = 'Pending_Payment'
+            WHERE meeting_id = ${slip.meeting_id} AND member_no = ${slip.member_no}
+          `;
+        } else if (slip.guest_email) {
+          await prisma.$executeRaw`
+            UPDATE meeting_attendances
+            SET attendance_status = 'Non-Member-Pending'
+            WHERE meeting_id = ${slip.meeting_id} AND attendee_email = ${slip.guest_email}
+          `;
+        }
       }
 
       return NextResponse.json({
@@ -394,24 +493,26 @@ export async function POST(request: NextRequest) {
         `;
       }
 
-      // Update attendance status to Rejected
-      if (slip.member_no) {
-        await prisma.$executeRaw`
-          UPDATE meeting_attendances
-          SET attendance_status = 'Rejected'
-          WHERE meeting_id = ${slip.meeting_id} AND member_no = ${slip.member_no}
-        `;
-      } else if (slip.guest_email) {
-        await prisma.$executeRaw`
-          UPDATE meeting_attendances
-          SET attendance_status = 'Rejected'
-          WHERE meeting_id = ${slip.meeting_id} AND attendee_email = ${slip.guest_email}
-        `;
+      // Update attendance status to Rejected if conference registration
+      if (!isMembershipRegistration) {
+        if (slip.member_no) {
+          await prisma.$executeRaw`
+            UPDATE meeting_attendances
+            SET attendance_status = 'Rejected'
+            WHERE meeting_id = ${slip.meeting_id} AND member_no = ${slip.member_no}
+          `;
+        } else if (slip.guest_email) {
+          await prisma.$executeRaw`
+            UPDATE meeting_attendances
+            SET attendance_status = 'Rejected'
+            WHERE meeting_id = ${slip.meeting_id} AND attendee_email = ${slip.guest_email}
+          `;
+        }
       }
 
       // Send rejection & resubmit email stub
-      const recipientEmail = slip.members?.email || slip.guest_email || '';
-      const recipientName = slip.members?.fullNameTh || slip.guest_name || 'ผู้ลงทะเบียน';
+      const recipientEmail = slip.members?.email || slip.guest_email || memberPayload?.email || '';
+      const recipientName = slip.members?.fullNameTh || slip.guest_name || memberPayload?.full_name_th || 'ผู้สมัคร';
       const origin = request.headers.get('origin') || (request.headers.get('host') ? `https://${request.headers.get('host')}` : '');
       const baseUrl = process.env.FRONTEND_URL || process.env.NEXTAUTH_URL || process.env.AUTH_URL || origin || 'http://localhost:3000';
       const resubmitUrl = `${baseUrl}/resubmit-slip/${resubmitToken}`;
@@ -421,7 +522,9 @@ export async function POST(request: NextRequest) {
           await sendSlipRejectionEmail({
             to: recipientEmail,
             recipientName,
-            meetingName: slip.meetings?.meeting_name || 'การประชุมวิชาการ สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (TSRM)',
+            meetingName: isMembershipRegistration
+              ? 'การสมัครสมาชิก สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (TSRM)'
+              : (slip.meetings?.meeting_name || 'การประชุมวิชาการ สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (TSRM)'),
             rejectionReason,
             resubmitUrl,
           });
@@ -448,3 +551,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

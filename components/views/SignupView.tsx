@@ -296,30 +296,20 @@ export function SignupView({
           })),
       };
 
-      // 3. Directly POST to /api/members (No summary view shown)
-      const res = await fetch('/api/members', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const resData = await res.json();
-      if (!res.ok || !resData.success) {
-        throw new Error(resData.error || (lang === 'th' ? 'เกิดข้อผิดพลาดในการบันทึกข้อมูลสมาชิก' : 'Failed to register member'));
+      // 3. Save pending registration data to localStorage (Wait for slip approval before inserting to members DB)
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('membership_registration', JSON.stringify(payload));
+          localStorage.removeItem('tsrm_user');
+          localStorage.removeItem('thaisrm_user');
+        } catch (e) {
+          console.error('Failed to save to localStorage:', e);
+        }
       }
 
-      const createdMember = resData.data;
-
-      // Clean up any legacy localStorage data
-      try {
-        localStorage.removeItem('membership_registration');
-        localStorage.removeItem('tsrm_user');
-        localStorage.removeItem('thaisrm_user');
-      } catch (e) {}
-
-      // Trigger callback with created member data from database
+      // 4. Trigger callback to navigate to payment step
       if (onSubmitSignup) {
-        onSubmitSignup(createdMember);
+        onSubmitSignup(payload);
       }
     } catch (err: any) {
       console.error('Signup submit error:', err);

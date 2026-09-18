@@ -62,3 +62,31 @@ export async function sendSlipRejectionEmail(params: SendSlipRejectionEmailParam
     messageId: `stub-reject-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
   };
 }
+
+export interface SendMembershipApprovedEmailParams {
+  to: string;
+  recipientName: string;
+  memberNo: string;
+  amountPaid: number;
+}
+
+/**
+ * Send email when membership registration payment slip is approved and member account is created
+ */
+export async function sendMembershipApprovedEmail(params: SendMembershipApprovedEmailParams): Promise<{ success: boolean; messageId?: string }> {
+  console.log('📧 [EMAIL SERVICE - STUB] Sending Membership Approval Email:', {
+    to: params.to,
+    recipient: params.recipientName,
+    memberNo: params.memberNo,
+    amount: params.amountPaid,
+    timestamp: new Date().toISOString()
+  });
+
+  // Future SMTP / Provider API Call placeholder
+  return {
+    success: true,
+    messageId: `stub-mem-approved-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+  };
+}
+
+

@@ -98,6 +98,8 @@ function PaymentContent() {
       .catch((err) => console.warn('Could not load dynamic settings in payment page:', err));
   }, []);
 
+  const [membershipRegData, setMembershipRegData] = useState<any>(null);
+
   React.useEffect(() => {
     if (paymentType === 'registration') {
       try {
@@ -108,6 +110,16 @@ function PaymentContent() {
         }
       } catch (err) {
         console.error('Failed to parse conference_registration from localStorage', err);
+      }
+    } else {
+      try {
+        const saved = localStorage.getItem('membership_registration');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setMembershipRegData(parsed);
+        }
+      } catch (err) {
+        console.error('Failed to parse membership_registration from localStorage', err);
       }
     }
   }, [paymentType]);
@@ -206,7 +218,7 @@ function PaymentContent() {
       isMemberUser,
       attendType,
     };
-  }, [paymentType, regData]);
+  }, [paymentType, regData, systemSettings]);
 
   const bankAccountNumber = systemSettings.bank_account_no;
 
@@ -291,13 +303,45 @@ function PaymentContent() {
         setSubmitting(false);
       }
     } else {
-      // Membership payment
+      // Membership payment with Slip Upload (Wait for Admin Approval before DB insert)
+      if (!membershipRegData) {
+        triggerNotification(lang === 'th' ? 'ไม่พบข้อมูลการสมัครสมาชิก กรุณากรอกใบสมัครใหม่อีกครั้ง' : 'Registration data not found. Please fill out the form again.');
+        router.push('/signup');
+        return;
+      }
+
+      setSubmitting(true);
       try {
-        localStorage.removeItem('membership_registration');
-        localStorage.removeItem('tsrm_user');
-        localStorage.removeItem('thaisrm_user');
-      } catch (e) {}
-      setShowSuccessModal(true);
+        const res = await fetch('/api/members/register-slip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            memberPayload: membershipRegData,
+            amount: systemSettings.annual_membership_fee,
+            bank: systemSettings.bank_name,
+            slipUrl: uploadedSlipData.fileUrl,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || (lang === 'th' ? 'ไม่สามารถส่งใบสมัครและหลักฐานได้ กรุณาลองใหม่อีกครั้ง' : 'Failed to submit application and slip.'));
+        }
+
+        // Clean up draft localStorage
+        try {
+          localStorage.removeItem('membership_registration');
+          localStorage.removeItem('tsrm_user');
+          localStorage.removeItem('thaisrm_user');
+        } catch (e) {}
+
+        setShowSuccessModal(true);
+      } catch (err: any) {
+        console.error('Membership slip submission error:', err);
+        triggerNotification(err.message || (lang === 'th' ? 'เกิดข้อผิดพลาดในการส่งใบสมัครและหลักฐาน' : 'Submission failed. Please try again.'));
+      } finally {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -316,7 +360,8 @@ function PaymentContent() {
 
   const successModalTitle = paymentType === 'registration'
     ? (t.successModal as any).paymentSuccessTitle || (lang === 'th' ? 'ลงทะเบียนเข้าร่วมงานประชุมสำเร็จ' : 'Conference Registration Submitted')
-    : (t.successModal as any).membershipSuccessTitle || t.successModal.loginTitle || t.successModal.title;
+    : (lang === 'th' ? 'ส่งใบสมัครและหลักฐานการชำระเงินเรียบร้อยแล้ว' : 'Membership Application & Slip Submitted');
+
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col items-center justify-start selection:bg-[#4ade80] selection:text-slate-900 font-sans">
@@ -333,9 +378,9 @@ function PaymentContent() {
           paymentType={paymentType}
           customAmount={paymentType === 'registration' ? calculationResult.totalAmount : undefined}
           isMember={paymentType === 'registration' ? calculationResult.isMemberUser : true}
-          attendeeName={paymentType === 'registration' ? (regData?.nameTh || regData?.nameEn) : undefined}
-          attendeePosition={paymentType === 'registration' ? regData?.position : undefined}
-          attendeeWorkplace={paymentType === 'registration' ? regData?.workplace : undefined}
+          attendeeName={paymentType === 'registration' ? (regData?.nameTh || regData?.nameEn) : (membershipRegData?.full_name_th || membershipRegData?.full_name_en)}
+          attendeePosition={paymentType === 'registration' ? regData?.position : (membershipRegData?.position || membershipRegData?.job_category)}
+          attendeeWorkplace={paymentType === 'registration' ? regData?.workplace : membershipRegData?.workplace}
           attendeeMemberNo={paymentType === 'registration' ? regData?.memberNo : undefined}
           isExpiredMember={regData?.isExpiredMember}
           attendanceType={calculationResult.attendType}

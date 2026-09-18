@@ -20,6 +20,7 @@ import {
   ExternalLink,
   BookOpen,
   Layers,
+  Sparkles,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -40,6 +41,8 @@ export interface SlipRecord {
   meetingName?: string;
   memberNo?: string | null;
   isMember: boolean;
+  isMembershipRegistration?: boolean;
+  memberPayload?: any;
   nameTh: string;
   nameEn: string;
   email: string;
@@ -119,7 +122,7 @@ export function AdminSlipsView() {
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   const handleApprove = async (id: string, e?: React.MouseEvent) => {
@@ -133,13 +136,38 @@ export function AdminSlipsView() {
       });
       const json = await res.json();
       if (json.success) {
+        const approvedMemberNo = json.data?.memberNo;
         setSlips((prev) =>
-          prev.map((s) => (s.id === id ? { ...s, status: 'approved', notes: undefined } : s))
+          prev.map((s) =>
+            s.id === id
+              ? {
+                  ...s,
+                  status: 'approved',
+                  notes: undefined,
+                  memberNo: approvedMemberNo || s.memberNo,
+                  isMember: Boolean(approvedMemberNo || s.isMember),
+                }
+              : s
+          )
         );
         if (selectedSlip && selectedSlip.id === id) {
-          setSelectedSlip((prev) => (prev ? { ...prev, status: 'approved', notes: undefined } : null));
+          setSelectedSlip((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: 'approved',
+                  notes: undefined,
+                  memberNo: approvedMemberNo || prev.memberNo,
+                  isMember: Boolean(approvedMemberNo || prev.isMember),
+                }
+              : null
+          );
         }
-        showToast(lang === 'th' ? 'อนุมัติหลักฐานสลิปเรียบร้อยแล้ว' : 'Slip approved successfully');
+        showToast(
+          approvedMemberNo
+            ? (lang === 'th' ? `อนุมัติสลิปและสร้างบัญชีสมาชิกเรียบร้อยแล้ว (รหัส: ${approvedMemberNo})` : `Slip approved and member created (No: ${approvedMemberNo})`)
+            : (lang === 'th' ? 'อนุมัติหลักฐานสลิปเรียบร้อยแล้ว' : 'Slip approved successfully')
+        );
       } else {
         showToast(json.error || 'เกิดข้อผิดพลาดในการอนุมัติ');
       }
@@ -443,8 +471,25 @@ export function AdminSlipsView() {
                       {lang === 'th' ? slip.nameTh : slip.nameEn || slip.nameTh}
                     </h3>
 
-                    {/* Member vs Non-Member Badge */}
-                    {slip.isMember ? (
+                    {/* Member vs Non-Member vs New Membership Badge */}
+                    {slip.isMembershipRegistration ? (
+                      slip.isMember ? (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-black bg-blue-50 text-[#0026b3] px-2 py-0.5 rounded-md border border-blue-200 flex items-center gap-1">
+                            <UserCheck className="w-3 h-3" />
+                            <span>Member #{slip.memberNo}</span>
+                          </span>
+                          <span className="text-[10px] font-black bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md border border-purple-200">
+                            {lang === 'th' ? 'สมัครสมาชิกใหม่' : 'New Member'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] font-black bg-purple-50 text-purple-800 px-2.5 py-0.5 rounded-md border border-purple-300 flex items-center gap-1 shadow-2xs">
+                          <Sparkles className="w-3 h-3 text-purple-600" />
+                          <span>{lang === 'th' ? 'คำขอสมัครสมาชิกใหม่' : 'New Member Application'}</span>
+                        </span>
+                      )
+                    ) : slip.isMember ? (
                       <span className="text-[10px] font-black bg-blue-50 text-[#0026b3] px-2 py-0.5 rounded-md border border-blue-200 flex items-center gap-1">
                         <UserCheck className="w-3 h-3" />
                         <span>Member #{slip.memberNo}</span>
@@ -504,12 +549,20 @@ export function AdminSlipsView() {
                           {acts.map((act, i) => (
                             <span
                               key={act.id || i}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-indigo-50 text-indigo-900 border border-indigo-200 shadow-2xs"
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold shadow-2xs ${
+                                act.type === 'membership_registration'
+                                  ? 'bg-purple-50 text-purple-900 border border-purple-200'
+                                  : 'bg-indigo-50 text-indigo-900 border border-indigo-200'
+                              }`}
                             >
-                              <BookOpen className="w-3 h-3 text-indigo-600 shrink-0" />
+                              <BookOpen className={`w-3 h-3 shrink-0 ${act.type === 'membership_registration' ? 'text-purple-600' : 'text-indigo-600'}`} />
                               <span>{act.name}</span>
                               {act.price !== undefined && (
-                                <span className="text-[10px] font-extrabold text-indigo-700 bg-white px-1.5 py-0.5 rounded-md border border-indigo-100 font-mono">
+                                <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border font-mono ${
+                                  act.type === 'membership_registration'
+                                    ? 'text-purple-700 bg-white border-purple-100'
+                                    : 'text-indigo-700 bg-white border-indigo-100'
+                                }`}>
                                   ฿{Number(act.price).toLocaleString()}
                                 </span>
                               )}
@@ -595,7 +648,9 @@ export function AdminSlipsView() {
                   </div>
                   <div>
                     <h3 className="font-extrabold text-slate-900 text-sm sm:text-base leading-tight">
-                      {lang === 'th' ? 'รายละเอียดสลิปโอนเงิน' : 'Slip Details'}
+                      {selectedSlip.isMembershipRegistration
+                        ? (lang === 'th' ? 'คำขอสมัครสมาชิกสมาคม & สลิปโอนเงิน' : 'Membership Application & Slip')
+                        : (lang === 'th' ? 'รายละเอียดสลิปโอนเงิน' : 'Slip Details')}
                     </h3>
                     <p className="text-xs text-slate-500 font-mono">Ref: {selectedSlip.refNo}</p>
                   </div>
@@ -648,6 +703,75 @@ export function AdminSlipsView() {
                   </div>
                 )}
 
+                {/* Membership Applicant Detailed Profile (If Membership Application) */}
+                {selectedSlip.isMembershipRegistration && selectedSlip.memberPayload ? (
+                  <div className="bg-purple-50/70 border border-purple-200 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center gap-2 text-purple-900 font-extrabold text-xs sm:text-sm border-b border-purple-200/80 pb-2">
+                      <Sparkles className="w-4 h-4 text-purple-600" />
+                      <span>ข้อมูลผู้สมัครสมาชิกใหม่ (Applicant Details)</span>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      {selectedSlip.memberPayload.photo_path ? (
+                        <img
+                          src={selectedSlip.memberPayload.photo_path}
+                          alt="Applicant Photo"
+                          className="w-16 h-20 rounded-xl object-cover border border-purple-300 shrink-0 bg-white shadow-xs"
+                        />
+                      ) : (
+                        <div className="w-16 h-20 rounded-xl bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-400 shrink-0">
+                          <UserCheck className="w-6 h-6" />
+                        </div>
+                      )}
+
+                      <div className="space-y-1 text-xs text-slate-700 min-w-0 flex-1">
+                        <p className="font-extrabold text-slate-900 text-sm">{selectedSlip.memberPayload.full_name_th}</p>
+                        {selectedSlip.memberPayload.full_name_en && (
+                          <p className="font-semibold text-slate-600">{selectedSlip.memberPayload.full_name_en}</p>
+                        )}
+                        <p className="text-slate-600">
+                          <span className="font-bold">ตำแหน่ง/วิชาชีพ:</span> {selectedSlip.memberPayload.position || selectedSlip.memberPayload.job_category || '-'}
+                        </p>
+                        {selectedSlip.memberPayload.scientist_reg_no && (
+                          <p className="text-slate-600">
+                            <span className="font-bold">เลขที่ใบอนุญาต:</span> {selectedSlip.memberPayload.scientist_reg_no}
+                          </p>
+                        )}
+                        {selectedSlip.memberPayload.workplace && (
+                          <p className="text-slate-600 truncate">
+                            <span className="font-bold">สถานที่ทำงาน:</span> {selectedSlip.memberPayload.workplace}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Educations */}
+                    {Array.isArray(selectedSlip.memberPayload.educations) && selectedSlip.memberPayload.educations.length > 0 && (
+                      <div className="pt-2 border-t border-purple-200/80 space-y-1.5">
+                        <span className="text-[11px] font-bold text-purple-900 block">ประวัติการศึกษา:</span>
+                        <div className="space-y-1">
+                          {selectedSlip.memberPayload.educations.map((edu: any, idx: number) => (
+                            <div key={idx} className="bg-white/80 border border-purple-100 rounded-lg p-2 text-[11px] text-slate-700 flex justify-between gap-2">
+                              <div>
+                                <span className="font-bold">{edu.degree || '-'}</span> - {edu.institution || '-'}
+                              </div>
+                              {edu.graduation_year && (
+                                <span className="text-slate-500 shrink-0 font-mono">({edu.graduation_year})</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedSlip.status === 'pending' && (
+                      <p className="text-[11px] text-purple-700 bg-purple-100/70 p-2.5 rounded-xl font-medium leading-relaxed">
+                        ✨ เมื่อกด <strong>&ldquo;อนุมัติ&rdquo;</strong> ระบบจะทำการบันทึกข้อมูลสมาชิกนี้ลงฐานข้อมูล members พร้อมออกเลขที่สมาชิกอัตโนมัติ และส่งอีเมลแจ้งผล
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+
                 {/* Participant & Ticket Info */}
                 <div className="bg-slate-50/90 rounded-2xl p-4 sm:p-5 space-y-3 border border-slate-200 text-sm">
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
@@ -664,15 +788,19 @@ export function AdminSlipsView() {
                     </span>
                     <span
                       className={`font-black text-xs sm:text-sm text-right ${
-                        selectedSlip.isMember ? 'text-[#0026b3]' : 'text-amber-800'
+                        selectedSlip.isMember ? 'text-[#0026b3]' : selectedSlip.isMembershipRegistration ? 'text-purple-700' : 'text-amber-800'
                       }`}
                     >
-                      {selectedSlip.isMember ? `สมาชิกสมาคม (#${selectedSlip.memberNo})` : (lang === 'th' ? 'บุคคลทั่วไป' : 'Non-Member')}
+                      {selectedSlip.isMember
+                        ? `สมาชิกสมาคม (#${selectedSlip.memberNo})`
+                        : selectedSlip.isMembershipRegistration
+                        ? (lang === 'th' ? 'คำขอสมัครสมาชิกใหม่ (รออนุมัติ)' : 'New Member Applicant (Pending)')
+                        : (lang === 'th' ? 'บุคคลทั่วไป' : 'Non-Member')}
                     </span>
                   </div>
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
                     <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
-                      {lang === 'th' ? 'รหัสตั๋ว' : 'Ticket ID'}
+                      {lang === 'th' ? 'รหัสตั๋ว / คำขอ' : 'Ticket / Request ID'}
                     </span>
                     <span className="font-black font-mono text-sm sm:text-base text-slate-900 tracking-wide text-right">
                       {selectedSlip.ticketCode}
@@ -766,6 +894,7 @@ export function AdminSlipsView() {
                   </div>
                 )}
               </div>
+
 
               {/* Modal Footer Actions */}
               <div className="p-3.5 sm:p-5 border-t border-slate-200 bg-slate-50/80 rounded-b-3xl flex items-center justify-between gap-2 sm:gap-3">
