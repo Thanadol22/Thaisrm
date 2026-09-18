@@ -417,8 +417,8 @@ export function MemberFormModal({
                   <input
                     type="text"
                     value={fullNameTh}
-                    onChange={(e) => setFullNameTh(e.target.value)}
-                    placeholder="เช่น นพ.สมชาย ใจดี หรือ นางสาวสุภาพร วิจิตร"
+                    onChange={(e) => setFullNameTh(e.target.value.replace(/[^\u0E00-\u0E7F\s\.\-]/g, ''))}
+                    placeholder="ชื่อ-นามสกุล (ไม่ต้องมีคำนำหน้า)"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent"
                     required
                   />
@@ -432,8 +432,8 @@ export function MemberFormModal({
                   <input
                     type="text"
                     value={fullNameEn}
-                    onChange={(e) => setFullNameEn(e.target.value)}
-                    placeholder="เช่น Dr. Somchai Jaidee"
+                    onChange={(e) => setFullNameEn(e.target.value.replace(/[^a-zA-Z\s\.\-']/g, ''))}
+                    placeholder="Full Name (Without prefix)"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent"
                   />
                 </div>
@@ -448,7 +448,7 @@ export function MemberFormModal({
                     type="text"
                     maxLength={4}
                     value={idLast4}
-                    onChange={(e) => setIdLast4(e.target.value.replace(/\D/g, ''))}
+                    onChange={(e) => setIdLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
                     placeholder="เช่น 1234"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent"
                   />
@@ -462,8 +462,9 @@ export function MemberFormModal({
                   </label>
                   <input
                     type="tel"
+                    maxLength={10}
                     value={mobile}
-                    onChange={(e) => setMobile(e.target.value)}
+                    onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
                     placeholder="เช่น 0812345678"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent"
                   />
@@ -494,7 +495,7 @@ export function MemberFormModal({
                     type="text"
                     value={lineId}
                     onChange={(e) => setLineId(e.target.value)}
-                    placeholder="เช่น somchai_line"
+                    placeholder="line_id"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent"
                   />
                 </div>

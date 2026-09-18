@@ -200,12 +200,26 @@ export function SignupView({
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    let sanitizedValue = value;
+    if (field === 'nameTh') {
+      sanitizedValue = value.replace(/[^\u0E00-\u0E7F\s\.\-]/g, '');
+    } else if (field === 'nameEn') {
+      sanitizedValue = value.replace(/[^a-zA-Z\s\.\-']/g, '');
+    } else if (field === 'id4Digits') {
+      sanitizedValue = value.replace(/\D/g, '').slice(0, 4);
+    } else if (field === 'mobile') {
+      sanitizedValue = value.replace(/\D/g, '').slice(0, 10);
+    }
+    setFormData(prev => ({ ...prev, [field]: sanitizedValue }));
   };
 
   const handleEducationChange = (id: string, field: keyof EducationRow, value: string) => {
+    let sanitizedValue = value;
+    if (field === 'year') {
+      sanitizedValue = value.replace(/\D/g, '').slice(0, 4);
+    }
     setEducationList(prev =>
-      prev.map(item => (item.id === id ? { ...item, [field]: value } : item))
+      prev.map(item => (item.id === id ? { ...item, [field]: sanitizedValue } : item))
     );
   };
 

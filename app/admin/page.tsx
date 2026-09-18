@@ -5418,8 +5418,8 @@ function VerifyAttendeesPanel({
                     type="text"
                     required
                     value={walkInData.nameTh}
-                    onChange={(e) => setWalkInData({ ...walkInData, nameTh: e.target.value })}
-                    placeholder="เช่น นพ.สมศักดิ์ สุขใจ"
+                    onChange={(e) => setWalkInData({ ...walkInData, nameTh: e.target.value.replace(/[^\u0E00-\u0E7F\s\.\-]/g, '') })}
+                    placeholder="ชื่อ-นามสกุล (ไม่ต้องมีคำนำหน้า)"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:bg-white focus:outline-none focus:border-[#0026b3]"
                   />
                 </div>
@@ -5430,8 +5430,8 @@ function VerifyAttendeesPanel({
                   <input
                     type="text"
                     value={walkInData.nameEn}
-                    onChange={(e) => setWalkInData({ ...walkInData, nameEn: e.target.value })}
-                    placeholder="e.g. Dr. Somsak Sookjai"
+                    onChange={(e) => setWalkInData({ ...walkInData, nameEn: e.target.value.replace(/[^a-zA-Z\s\.\-']/g, '') })}
+                    placeholder="Full Name (Without prefix)"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:bg-white focus:outline-none focus:border-[#0026b3]"
                   />
                 </div>
@@ -5445,8 +5445,9 @@ function VerifyAttendeesPanel({
                   <input
                     type="tel"
                     required
+                    maxLength={10}
                     value={walkInData.phone}
-                    onChange={(e) => setWalkInData({ ...walkInData, phone: e.target.value })}
+                    onChange={(e) => setWalkInData({ ...walkInData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                     placeholder="081-234-5678"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:bg-white focus:outline-none focus:border-[#0026b3]"
                   />
@@ -5459,7 +5460,7 @@ function VerifyAttendeesPanel({
                     type="text"
                     maxLength={4}
                     value={walkInData.id4Digits}
-                    onChange={(e) => setWalkInData({ ...walkInData, id4Digits: e.target.value })}
+                    onChange={(e) => setWalkInData({ ...walkInData, id4Digits: e.target.value.replace(/\D/g, '').slice(0, 4) })}
                     placeholder="1234"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:bg-white focus:outline-none focus:border-[#0026b3]"
                   />

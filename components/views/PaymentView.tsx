@@ -131,12 +131,12 @@ export function PaymentView({
         <div className="absolute bottom-0 -left-12 w-40 h-40 bg-[#4ade80]/15 rounded-full blur-2xl pointer-events-none" />
 
         <div className="max-w-3xl sm:max-w-4xl mx-auto relative z-10">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center justify-between gap-1.5 sm:gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 shrink-0">
               {/* Back Button */}
               <button
                 onClick={handleBack}
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-white/15 hover:bg-white/25 backdrop-blur-md text-white flex items-center justify-center transition border border-white/15 cursor-pointer active:scale-95 shrink-0"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white/15 hover:bg-white/25 backdrop-blur-md text-white flex items-center justify-center transition border border-white/15 cursor-pointer active:scale-95 shrink-0"
                 title="ย้อนกลับไปหน้าก่อนหน้า / Go Back"
                 aria-label="ย้อนกลับไปหน้าก่อนหน้า"
               >
@@ -146,15 +146,15 @@ export function PaymentView({
               {/* Brand Logo & Name */}
               <div 
                 onClick={() => router.push('/login')}
-                className="flex items-center gap-2.5 min-w-0 cursor-pointer group hover:opacity-90 transition"
+                className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 cursor-pointer group hover:opacity-90 transition"
                 title="กลับสู่หน้าหลัก / Back to Home"
               >
-                <TsrmLogo className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 group-hover:scale-105 transition-transform" />
+                <TsrmLogo className="w-8 h-8 sm:w-11 sm:h-11 shrink-0 group-hover:scale-105 transition-transform" />
                 <div className="min-w-0">
-                  <span className="text-[9px] sm:text-[10px] font-bold text-blue-200 uppercase block leading-tight truncate">
+                  <span className="text-[10px] xs:text-xs sm:text-[13px] md:text-sm font-bold text-blue-200 block whitespace-nowrap leading-tight">
                     {t.associationName}
                   </span>
-                  <span className="font-extrabold text-white text-xs sm:text-sm tracking-wide block leading-tight">
+                  <span className="font-extrabold text-white text-xs xs:text-sm sm:text-base tracking-wide block whitespace-nowrap leading-tight">
                     {t.brandName}
                   </span>
                 </div>
@@ -164,10 +164,10 @@ export function PaymentView({
             {/* Language Switcher Pill */}
             <button
               onClick={toggleLang}
-              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shrink-0 shadow-2xs"
+              className="flex items-center gap-0.5 xs:gap-1 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-1.5 xs:px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shrink-0 shadow-2xs"
               title="Switch Language / สลับภาษา"
             >
-              <Globe className="w-3.5 h-3.5 text-blue-200 shrink-0" />
+              <Globe className="w-3 h-3 xs:w-3.5 xs:h-3.5 text-blue-200 shrink-0" />
               <span className={lang === 'th' ? 'text-white font-black' : 'text-blue-200/60'}>TH</span>
               <span className="text-white/40 font-normal">|</span>
               <span className={lang === 'en' ? 'text-white font-black' : 'text-blue-200/60'}>EN</span>

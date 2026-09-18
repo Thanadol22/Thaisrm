@@ -130,7 +130,7 @@ export function SlipRejectionPreviewModal({
                     <span><strong>จาก:</strong> {associationNameTh} &lt;noreply@tsrm.com&gt;</span>
                     <span className="text-slate-400">วันนี้ 14:30 น.</span>
                   </div>
-                  <div><strong>ถึง:</strong> somchai.chai@hospital.ac.th (นพ. สมชาย ใจดี)</div>
+                  <div><strong>ถึง:</strong> member@example.com (ชื่อผู้รับการแจ้งเตือน)</div>
                   <div><strong>หัวข้อ:</strong> <span className="text-rose-600 font-bold">⚠️ แจ้งแก้ไขการแนบหลักฐานการชำระเงิน - {associationNameTh}</span></div>
                 </div>
 
@@ -159,7 +159,7 @@ export function SlipRejectionPreviewModal({
 
                   {/* Greeting */}
                   <div className="text-xs text-slate-700 space-y-2">
-                    <p className="font-bold text-slate-900">เรียน นพ. สมชาย ใจดี,</p>
+                    <p className="font-bold text-slate-900">เรียน ท่านสมาชิก / ผู้ลงทะเบียน,</p>
                     <p className="leading-relaxed">
                       ตามที่ท่านได้ลงทะเบียนเข้าร่วม <strong>การประชุมวิชาการประจำปี 2569</strong> ทางเจ้าหน้าที่ฝ่ายตรวจสอบการเงินได้ตรวจหลักฐานการชำระเงินของท่านแล้ว และไม่สามารถอนุมัติได้เนื่องจากสาเหตุดังต่อไปนี้:
                     </p>
@@ -276,7 +276,7 @@ export function SlipRejectionPreviewModal({
                       ปฏิเสธสลิปและส่งคำขอให้อัปโหลดใหม่
                     </h4>
                     <p className="text-xs text-slate-500">
-                      สลิป #SLIP-69001 (นพ. สมชาย ใจดี)
+                      สลิป #SLIP-69001 (ตัวอย่างการแจ้งเตือน)
                     </p>
                   </div>
                 </div>

@@ -20,11 +20,9 @@ export interface ReceiptData {
 
   // Purpose prefix
   purposeText: string; // e.g. "ได้รับเงินสนับสนุน ประจำปี 2569" or "ได้รับเงินค่าลงทะเบียน ประจำปี 2569"
-  
-  // Payer details
-  payerType: 'company' | 'individual' | 'organization';
-  payerName: string; // e.g. "บริษัท ออร์กานอน (ประเทศไทย) จำกัด" or "นพ. วรวัฒน์ เกียรติอนันต์"
-  branchName?: string; // e.g. "สำนักงานแห่งใหญ่"
+  payerType: 'individual' | 'company';
+  payerName: string; // e.g. "ชื่อบริษัท / หน่วยงาน" or "ชื่อ-นามสกุล"
+  branchName?: string; // e.g. "สำนักงานใหญ่"
   payerAddressLine1: string; // e.g. "เลขที่ 88 อาคารเดอะปาร์ค ชั้นที่ 7 ฝั่งอีสต์วิง ห้องเลขที่ 07-101 ถนนรัชดาภิเษก แขวงคลองเตย เขตคลองเตย"
   payerAddressLine2: string; // e.g. "กรุงเทพมหานคร 10110"
   payerPhone?: string; // e.g. "+662-257-2500"

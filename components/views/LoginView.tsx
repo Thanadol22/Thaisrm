@@ -159,50 +159,6 @@ export function LoginView({
   const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
   const [attendanceType, setAttendanceType] = useState<'onsite' | 'online'>('onsite');
 
-  // Track scroll position for hero parallax effect
-  const [scrollY, setScrollY] = useState(0);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrollY(window.scrollY);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // Intersection observer to trigger smooth staggered entrance animations for the registration form
-  const formRef = useRef<HTMLDivElement>(null);
-  const [isFormInView, setIsFormInView] = useState(false);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setIsFormInView(true);
-          }
-        });
-      },
-      { threshold: 0.05, rootMargin: '0px 0px -40px 0px' }
-    );
-
-    if (formRef.current) {
-      observer.observe(formRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
-
-  const scrollToRegistration = (tab?: 'conference' | 'membership') => {
-    if (tab) {
-      handleTabChange(tab);
-    }
-    const el = document.getElementById('registration-section');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
   // Fetch Latest Active Meeting on mount
   useEffect(() => {
     let isMounted = true;
@@ -286,36 +242,6 @@ export function LoginView({
     });
   };
 
-  // Dynamically extract all conference details from database (activeMeeting)
-  const meetingInfo = useMemo(() => {
-    const rawName = activeMeeting?.meeting_name || '34th TSRM 2026';
-    const rawId = activeMeeting?.meeting_id || 'TSRM34';
-    const loc = activeMeeting?.location || 'Grande Centre Point Lumphini, Bangkok';
-    const desc = activeMeeting?.description;
-
-    // Detect edition number like "34" from "TSRM 34" or "34th TSRM 2026"
-    const editionMatch = rawName.match(/(\d{1,2})(?:st|nd|rd|th)?/i) || rawId.match(/TSRM\s*(\d+)/i) || ['34', '34'];
-    const editionNum = editionMatch[1] || '34';
-
-    // Detect year like "2026" or "2569"
-    const yearMatch = rawName.match(/(20\d{2}|25\d{2})/);
-    const yearText = yearMatch ? yearMatch[1] : '2026';
-
-    const displayName = rawName || `${editionNum}th TSRM ${yearText}`;
-
-    return {
-      editionNum,
-      yearText,
-      displayName,
-      badgeTextTh: `การประชุมวิชาการประจำปี ครั้งที่ ${editionNum} • ${rawId || `TSRM ${yearText}`}`,
-      badgeTextEn: `The ${editionNum}th Annual Conference • ${rawId || `TSRM ${yearText}`}`,
-      location: loc,
-      descriptionTh: desc || 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย ขอเชิญร่วมงานประชุมวิชาการประจำปี 2569',
-      descriptionEn: desc || 'Thai Society for Reproductive Medicine 34th Annual Scientific Conference',
-      mapUrl: `https://maps.google.com/?q=${encodeURIComponent(loc)}`,
-    };
-  }, [activeMeeting]);
-
   useEffect(() => {
     if (defaultTab) {
       setActiveTab(defaultTab);
@@ -383,7 +309,15 @@ export function LoginView({
   };
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    let sanitizedValue = value;
+    if (field === 'nameTh') {
+      sanitizedValue = value.replace(/[^\u0E00-\u0E7F\s\.\-]/g, '');
+    } else if (field === 'nameEn') {
+      sanitizedValue = value.replace(/[^a-zA-Z\s\.\-']/g, '');
+    } else if (field === 'memberNo') {
+      sanitizedValue = value.replace(/\D/g, '').slice(0, 4);
+    }
+    setFormData(prev => ({ ...prev, [field]: sanitizedValue }));
   };
 
   // Expired Member Modal state
@@ -622,181 +556,73 @@ export function LoginView({
 
   return (
     <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[640px]">
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="relative w-full min-h-[100dvh] bg-slate-950 text-white overflow-hidden flex flex-col justify-between">
-        {/* Parallax Background Image - Positioned at top to show the illuminated hotel rooftop */}
-        <div
-          className="absolute inset-0 w-full h-[140%] top-0 bg-cover bg-[center_70%] will-change-transform pointer-events-none transition-transform duration-100 ease-out brightness-[1.12] contrast-[1.06] saturate-[1.12]"
-          style={{
-            backgroundImage: `url('/location.jpg')`,
-            transform: `translate3d(0, ${Math.min(scrollY * 0.25, 140)}px, 0) scale(${1.02 + Math.min(scrollY * 0.0002, 0.05)})`,
-          }}
-        />
+      {/* Header Blue Card Section */}
+      <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-3.5 xs:px-4 sm:px-8 lg:px-12 pt-4 sm:pt-8 pb-6 sm:pb-9 rounded-b-[24px] sm:rounded-b-[36px] shadow-xl relative overflow-hidden">
+        {/* Subtle Background Glow */}
+        <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute bottom-0 -left-12 w-40 h-40 bg-[#4ade80]/15 rounded-full blur-2xl pointer-events-none" />
 
-        {/* Top Vignette for Navbar Readability */}
-        <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-slate-950/80 via-slate-950/40 to-transparent pointer-events-none" />
-        <div className="absolute inset-0 bg-radial-[at_center_top] from-transparent via-slate-950/15 to-transparent pointer-events-none" />
-        <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 w-[600px] h-[160px] bg-[#4ade80]/10 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Top Floating Glassmorphism Navbar */}
-        <header className="relative z-20 w-full px-3 xs:px-4 sm:px-8 lg:px-12 py-3 sm:py-4 border-b border-white/10 bg-slate-950/60 backdrop-blur-md">
-          <div className="max-w-6xl mx-auto flex items-center justify-between gap-2 sm:gap-3">
-            {/* Brand Logo & Name */}
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0 group">
-              <div className="relative shrink-0">
-                <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-[#4ade80] rounded-full blur-xs opacity-60 group-hover:opacity-100 transition duration-300" />
-                <TsrmLogo className="relative w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 shrink-0 group-hover:scale-105 transition-transform" />
-              </div>
+        <div className="max-w-5xl xl:max-w-6xl mx-auto relative z-10">
+          <div className="flex items-center justify-between gap-1.5 sm:gap-3 mb-2">
+            <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 shrink-0 group hover:opacity-95 transition">
+              <TsrmLogo className="w-8 h-8 sm:w-11 sm:h-11 shrink-0 group-hover:scale-105 transition-transform" />
               <div className="min-w-0">
-                <span className="text-[9px] xs:text-[10px] sm:text-xs font-bold tracking-widest text-[#4ade80] uppercase block truncate">
+                <span className="text-[10px] xs:text-xs sm:text-[13px] md:text-sm font-bold text-blue-200 block whitespace-nowrap leading-tight">
                   {t.associationName}
                 </span>
-                <p className="text-[11px] xs:text-xs sm:text-sm font-black text-white tracking-tight truncate">
-                  {t.brandName}
-                </p>
+                <p className="text-xs xs:text-sm sm:text-base font-extrabold text-white leading-tight">{t.brandName}</p>
               </div>
             </div>
 
-            {/* Top Right Action Tools */}
-            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-              {/* Member Search Trigger */}
+            {/* Top Right Actions: Search Member + Language Switcher */}
+            <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 shrink-0">
+              {/* Member Search Button */}
               <button
                 type="button"
                 onClick={() => setIsSearchOpen(true)}
-                className="flex items-center gap-1.5 px-2 xs:px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-white/10 hover:bg-white/20 text-white backdrop-blur-md rounded-xl text-[11px] sm:text-xs font-bold transition border border-white/15 cursor-pointer active:scale-95 shadow-md group"
+                className="flex items-center gap-1 xs:gap-1.5 px-2 xs:px-2.5 sm:px-3.5 py-1 sm:py-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md rounded-xl text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-bold transition border border-white/20 cursor-pointer active:scale-95 shadow-2xs group shrink-0"
                 title={lang === 'th' ? 'ค้นหาข้อมูลสมาชิก' : 'Search Members'}
                 aria-label={lang === 'th' ? 'ค้นหาข้อมูลสมาชิก' : 'Search Members'}
               >
-                <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#4ade80] group-hover:scale-110 transition-transform" />
-                <span className="hidden sm:inline font-semibold">{lang === 'th' ? 'ค้นหาสมาชิก' : 'Search Member'}</span>
+                <Search className="w-3 h-3 xs:w-3.5 xs:h-3.5 text-[#4ade80] group-hover:scale-110 transition-transform shrink-0" />
+                <span className="font-semibold whitespace-nowrap">{lang === 'th' ? 'ค้นหาข้อมูลสมาชิก' : 'Search Members'}</span>
               </button>
 
-              {/* Language Switcher */}
+              {/* Language Switcher Pill */}
               <button
                 onClick={toggleLang}
-                className="flex items-center gap-1 xs:gap-1.5 bg-white/10 hover:bg-white/20 text-white backdrop-blur-md px-2 xs:px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition border border-white/15 cursor-pointer active:scale-95 shadow-md"
+                className="flex items-center gap-0.5 xs:gap-1 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-1.5 xs:px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shrink-0 shadow-2xs"
                 title="Switch Language / สลับภาษา"
               >
-                <Globe className="w-3.5 h-3.5 text-blue-300 shrink-0" />
-                <span className={lang === 'th' ? 'text-[#4ade80] font-black' : 'text-slate-400'}>TH</span>
-                <span className="text-white/30 font-normal">|</span>
-                <span className={lang === 'en' ? 'text-[#4ade80] font-black' : 'text-slate-400'}>EN</span>
+                <Globe className="w-3 h-3 xs:w-3.5 xs:h-3.5 text-blue-200 shrink-0" />
+                <span className={lang === 'th' ? 'text-white font-black' : 'text-blue-200/60'}>TH</span>
+                <span className="text-white/40 font-normal">|</span>
+                <span className={lang === 'en' ? 'text-white font-black' : 'text-blue-200/60'}>EN</span>
               </button>
             </div>
           </div>
-        </header>
 
-        {/* Center Hero Showcase (Fully Dynamic from Database - Centered in Fullscreen) */}
-        <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center max-w-6xl mx-auto px-3 xs:px-4 sm:px-8 lg:px-12 py-5 sm:py-8 w-full">
-
-          {/* Top Shimmering Badge - Dynamic from DB */}
-          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full bg-slate-900/85 border border-[#4ade80]/50 backdrop-blur-md shadow-lg shadow-[#4ade80]/15 mb-3 sm:mb-4 animate-slide-down max-w-[95vw]">
-            <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#4ade80] animate-pulse shrink-0" />
-            <span className="text-[10px] xs:text-[11px] sm:text-xs font-black tracking-widest text-[#4ade80] uppercase truncate">
-              {lang === 'th' ? meetingInfo.badgeTextTh : meetingInfo.badgeTextEn}
-            </span>
-          </div>
-
-          {/* Main Dynamic Title: e.g. 34th TSRM 2026 */}
-          <h1 className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.18] sm:leading-[1.12] max-w-4xl drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)] px-1">
-            <span className="bg-gradient-to-r from-white via-blue-100 to-[#4ade80] bg-clip-text text-transparent">
-              {meetingInfo.displayName}
-            </span>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight mt-1">
+            {lang === 'th' ? 'ลงทะเบียนและสมัครสมาชิก TSRM' : 'TSRM Registration & Membership'}
           </h1>
-
-          {/* Dynamic Description Subtitle */}
-          <p className="mt-2 sm:mt-3 text-xs sm:text-base lg:text-lg font-medium text-blue-100 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] max-w-2xl leading-relaxed px-2">
-            {lang === 'th' ? meetingInfo.descriptionTh : meetingInfo.descriptionEn}
+          <p className="text-xs sm:text-sm lg:text-base text-blue-100/90 leading-relaxed mt-1 font-normal">
+            {lang === 'th'
+              ? 'เลือกลงทะเบียนเข้าร่วมงานประชุมวิชาการ หรือ สมัครสมาชิกสมาคมฯ'
+              : 'Register for Conference Summit or apply for TSRM membership'}
           </p>
-
-          {/* Luxury Venue Feature Card - Dynamic from DB */}
-          <div className="mt-4 sm:mt-6 w-full max-w-2xl bg-slate-900/80 hover:bg-slate-900/90 backdrop-blur-xl border border-white/20 hover:border-[#4ade80]/50 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 lg:p-6 shadow-2xl transition-all duration-300 group text-left">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
-
-              {/* Left Column: Venue Icon & Information */}
-              <div className="flex items-center sm:items-start gap-3 text-left min-w-0 flex-1">
-                <div className="w-10 h-10 xs:w-12 xs:h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#0026b3] via-blue-700 to-[#001c8c] border border-blue-400/40 flex items-center justify-center shrink-0 shadow-lg text-[#4ade80] group-hover:scale-105 transition-transform">
-                  <Building2 className="w-5 h-5 xs:w-6 xs:h-6 sm:w-7 sm:h-7" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-[9px] xs:text-[10px] sm:text-xs font-extrabold uppercase tracking-wider text-[#4ade80]">
-                    <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#4ade80] shrink-0" />
-                    <span>{lang === 'th' ? 'สถานที่จัดงาน (Official Venue)' : 'Official Venue'}</span>
-                  </div>
-                  <h2 className="text-sm xs:text-base sm:text-xl font-black text-white tracking-tight mt-0.5 group-hover:text-[#4ade80] transition-colors truncate">
-                    {meetingInfo.location}
-                  </h2>
-                  <p className="text-[11px] sm:text-sm text-slate-300 font-medium truncate">
-                    {lang === 'th' ? 'โรงแรม แกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ' : 'Grande Centre Point Lumphini, Bangkok'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Right Column: Date & Google Maps Trigger */}
-              <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-white/10 shrink-0">
-                <div className="text-left sm:text-right">
-                  <span className="text-[9px] xs:text-[10px] text-slate-400 font-bold block uppercase tracking-wider">
-                    {lang === 'th' ? 'กำหนดการจัดงาน' : 'Conference Date'}
-                  </span>
-                  <span className="text-[11px] xs:text-xs sm:text-sm font-black text-blue-200 whitespace-nowrap">
-                    {activeMeeting ? formatMeetingDateDisplay(activeMeeting, lang) : (lang === 'th' ? 'เร็วๆ นี้' : 'Coming Soon')}
-                  </span>
-                </div>
-
-                <a
-                  href={meetingInfo.mapUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-[10px] xs:text-[11px] sm:text-xs font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-950/70 hover:bg-emerald-900/90 border border-emerald-500/30 px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl transition shadow-xs shrink-0"
-                >
-                  <span>{lang === 'th' ? 'ดูแผนที่' : 'Google Maps'}</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
-            </div>
-          </div>
-
         </div>
-
-        {/* Floating Scroll-Down Micro Indicator */}
-        <div className="relative z-20 pb-4 sm:pb-6 flex flex-col items-center justify-center pointer-events-auto">
-          <button
-            type="button"
-            onClick={() => scrollToRegistration()}
-            className="inline-flex flex-col items-center gap-1 text-white/80 hover:text-white transition-all cursor-pointer group"
-            title={lang === 'th' ? 'เลื่อนลงเพื่อลงทะเบียน' : 'Scroll to register'}
-          >
-            <span className="text-[9px] xs:text-[10px] sm:text-xs font-bold tracking-widest uppercase text-slate-300 group-hover:text-[#4ade80] transition-colors drop-shadow-sm">
-              {lang === 'th' ? 'เลื่อนลงเพื่อลงทะเบียน' : 'Scroll to Register'}
-            </span>
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/10 group-hover:bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center transition-transform group-hover:translate-y-1 shadow-md animate-bounce">
-              <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#4ade80]" />
-            </div>
-          </button>
-        </div>
-
-        {/* Seamless Soft Bottom Fade Overlay with reduced distance */}
-        <div className="absolute inset-x-0 -bottom-[1px] h-20 sm:h-32 lg:h-36 bg-gradient-to-t from-[#f6f8fc] from-15% via-[#f6f8fc]/60 to-transparent pointer-events-none z-10" />
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* 📋 REGISTRATION SECTION (Smooth Progressive Scroll Reveal)          */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div
-        ref={formRef}
-        id="registration-section"
-        className={`relative z-20 scroll-mt-6 px-3 xs:px-4 sm:px-8 lg:px-12 pt-3 sm:pt-8 pb-10 sm:pb-16 flex-1 flex flex-col justify-between max-w-5xl xl:max-w-6xl mx-auto w-full transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] transform ${isFormInView ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-16 scale-[0.98]'
-          }`}
-      >
-        <div className="space-y-3.5 sm:space-y-6">
+      {/* Content Body */}
+      <div className="px-4 sm:px-8 lg:px-12 py-5 sm:py-8 flex-1 flex flex-col justify-between max-w-5xl xl:max-w-6xl mx-auto w-full">
+        <div className="space-y-4 sm:space-y-6">
 
-          {/* Main Action Segmented Buttons (Call to Action Tabs) - Staggered Bounce 1 */}
-          <div className={`relative grid grid-cols-2 p-1 sm:p-1.5 bg-white/90 backdrop-blur-md rounded-2xl border border-slate-200 shadow-lg shadow-slate-900/5 select-none max-w-xl mx-auto w-full transition-all duration-700 delay-100 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform ${isFormInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
-            }`}>
+          {/* Main Action Segmented Buttons (Call to Action Tabs) */}
+          <div className="relative grid grid-cols-2 p-1.5 bg-slate-200/80 rounded-2xl border border-slate-200/90 shadow-inner select-none max-w-xl mx-auto w-full">
             {/* Sliding Active Indicator Pill */}
             <div
               aria-hidden="true"
-              className={`absolute top-1 sm:top-1.5 bottom-1 sm:bottom-1.5 left-1 sm:left-1.5 w-[calc(50%-4px)] sm:w-[calc(50%-6px)] rounded-xl bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] shadow-md shadow-blue-950/25 ring-2 ring-[#4ade80]/50 transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none will-change-transform ${activeTab === 'membership' ? 'translate-x-full' : 'translate-x-0'
+              className={`absolute top-1.5 bottom-1.5 left-1.5 w-[calc(50%-6px)] rounded-xl bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] shadow-md shadow-blue-950/25 ring-2 ring-[#4ade80]/50 transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none will-change-transform ${activeTab === 'membership' ? 'translate-x-full' : 'translate-x-0'
                 }`}
             />
 
@@ -804,39 +630,38 @@ export function LoginView({
             <button
               type="button"
               onClick={() => handleTabChange('conference')}
-              className={`relative z-10 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-1.5 sm:px-2 rounded-xl font-black text-[11px] xs:text-xs sm:text-sm transition-colors duration-200 cursor-pointer active:scale-98 ${activeTab === 'conference'
+              className={`relative z-10 flex items-center justify-center gap-2 py-3 px-2 rounded-xl font-black text-xs sm:text-sm transition-colors duration-200 cursor-pointer active:scale-98 ${activeTab === 'conference'
                 ? 'text-white'
                 : 'text-slate-600 hover:text-slate-900'
                 }`}
             >
               <Ticket
-                className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 transition-colors duration-200 ${activeTab === 'conference' ? 'text-[#4ade80]' : 'text-slate-400'
+                className={`w-4 h-4 shrink-0 transition-colors duration-200 ${activeTab === 'conference' ? 'text-[#4ade80]' : 'text-slate-400'
                   }`}
               />
-              <span className="truncate">{lang === 'th' ? 'ลงทะเบียนประชุม' : 'Register Conference'}</span>
+              <span className="truncate">{lang === 'th' ? 'ลงทะเบียนเข้าร่วมงานประชุม' : 'Register Conference'}</span>
             </button>
 
             {/* Tab 2: สมัครสมาชิก TSRM (Right) */}
             <button
               type="button"
               onClick={() => handleTabChange('membership')}
-              className={`relative z-10 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-1.5 sm:px-2 rounded-xl font-black text-[11px] xs:text-xs sm:text-sm transition-colors duration-200 cursor-pointer active:scale-98 ${activeTab === 'membership'
+              className={`relative z-10 flex items-center justify-center gap-2 py-3 px-2 rounded-xl font-black text-xs sm:text-sm transition-colors duration-200 cursor-pointer active:scale-98 ${activeTab === 'membership'
                 ? 'text-white'
                 : 'text-slate-600 hover:text-slate-900'
                 }`}
             >
               <UserPlus
-                className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 transition-colors duration-200 ${activeTab === 'membership' ? 'text-[#4ade80]' : 'text-slate-400'
+                className={`w-4 h-4 shrink-0 transition-colors duration-200 ${activeTab === 'membership' ? 'text-[#4ade80]' : 'text-slate-400'
                   }`}
               />
               <span className="truncate">{lang === 'th' ? 'สมัครสมาชิก TSRM' : 'TSRM Membership'}</span>
             </button>
           </div>
 
-          {/* View 1: Conference Registration Form - Staggered Bounce 2 */}
+          {/* View 1: Conference Registration Form */}
           {activeTab === 'conference' ? (
-            <div className={`bg-white rounded-2xl sm:rounded-3xl p-3.5 xs:p-4.5 sm:p-7 lg:p-8 border border-slate-200/90 shadow-sm space-y-3 sm:space-y-5 transition-all duration-700 delay-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform ${isFormInView ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-[0.99]'
-              }`}>
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-7 lg:p-8 border border-slate-200/90 shadow-sm space-y-4 sm:space-y-5 animate-fade-in">
               {loadingMeeting ? (
                 /* Loading Skeleton / State */
                 <div className="flex flex-col items-center justify-center py-10 sm:py-14 space-y-3">
@@ -876,30 +701,30 @@ export function LoginView({
                 /* Active Meeting Found: Dynamic Registration Form */
                 <>
                   {/* Latest Meeting Banner */}
-                  <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-blue-50/90 border border-blue-100/90 rounded-xl sm:rounded-2xl p-2.5 xs:p-3 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 shadow-2xs">
+                  <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-blue-50/90 border border-blue-100/90 rounded-xl sm:rounded-2xl p-3 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 shadow-2xs">
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                        <span className="bg-[#0026b3] text-white text-[8.5px] xs:text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
+                        <span className="bg-[#0026b3] text-white text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
                           {lang === 'th' ? 'การประชุมล่าสุด' : 'LATEST CONFERENCE'}
                         </span>
-                        <span className="bg-emerald-100 text-emerald-700 text-[8.5px] xs:text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <span className="bg-emerald-100 text-emerald-700 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                           {lang === 'th' ? 'เปิดรับลงทะเบียน' : 'Open for Registration'}
                         </span>
                       </div>
-                      <h2 className="text-xs xs:text-sm sm:text-base lg:text-lg font-black text-slate-900 tracking-tight truncate" title={activeMeeting.meeting_name}>
+                      <h2 className="text-sm sm:text-base lg:text-lg font-black text-slate-900 tracking-tight truncate" title={activeMeeting.meeting_name}>
                         {activeMeeting.meeting_name}
                       </h2>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] xs:text-[11px] sm:text-xs text-slate-600">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
                         {(activeMeeting.start_date || activeMeeting.meeting_date) && (
                           <span className="flex items-center gap-1 font-medium">
-                            <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#0026b3] shrink-0" />
+                            <Calendar className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
                             <span>{formatMeetingDateDisplay(activeMeeting, lang)}</span>
                           </span>
                         )}
                         {activeMeeting.location && (
                           <span className="flex items-center gap-1 font-medium truncate max-w-xs sm:max-w-sm" title={activeMeeting.location}>
-                            <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#0026b3] shrink-0" />
+                            <MapPin className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
                             <span className="truncate">{activeMeeting.location}</span>
                           </span>
                         )}
@@ -908,29 +733,35 @@ export function LoginView({
                   </div>
 
                   {/* Google Autofill Button with Accent Pill */}
-                  <div className="space-y-1 max-w-md mx-auto w-full">
+                  <div className="space-y-1.5 max-w-md mx-auto w-full">
                     <button
                       type="button"
                       onClick={handleGoogleAutofill}
                       className="w-full bg-slate-50 hover:bg-slate-100 text-slate-800 font-bold py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition flex items-center justify-between gap-2 cursor-pointer active:scale-[0.99] group"
                     >
                       <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-                        <GoogleIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0" />
-                        <span className="text-[11px] xs:text-xs sm:text-sm font-extrabold truncate">
-                          {lang === 'th' ? 'กรอกข้อมูลอัตโนมัติด้วย Google' : 'Autofill with Google'}
-                        </span>
+                        <GoogleIcon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                        <div className="text-left min-w-0">
+                          <p className="text-[11px] xs:text-xs sm:text-sm font-black text-slate-800 tracking-tight truncate">
+                            {lang === 'th' ? 'กรอกข้อมูลอัตโนมัติด้วย Google' : 'Autofill with Google'}
+                          </p>
+                          <span className="text-[9px] xs:text-[10px] text-slate-500 font-medium block truncate">
+                            {lang === 'th' ? 'ดึงชื่อและอีเมลจากบัญชีของคุณอัตโนมัติ' : 'Automatically fill name and email'}
+                          </span>
+                        </div>
                       </div>
-                      <span className="inline-flex items-center gap-1 text-[8.5px] xs:text-[9px] sm:text-[10px] font-extrabold text-emerald-800 bg-[#4ade80]/25 border border-[#4ade80]/40 px-2 sm:px-2.5 py-0.5 rounded-full shrink-0">
-                        <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-emerald-700" />
-                        <span>{lang === 'th' ? 'รวดเร็ว' : 'Fast'}</span>
-                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-[9px] xs:text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 sm:px-2 py-0.5 rounded-md">
+                          {lang === 'th' ? 'แนะนำ' : 'Recommended'}
+                        </span>
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                      </div>
                     </button>
-
                     {autofillSuccess && (
-                      <p className="text-[10px] sm:text-[11px] text-emerald-600 font-bold flex items-center gap-1 justify-center animate-fade-in pt-0.5">
-                        <Sparkles className="w-3 h-3" />
-                        {lang === 'th' ? 'กรอกข้อมูลจากบัญชี Google เรียบร้อยแล้ว' : 'Autofilled from Google successfully'}
-                      </p>
+                      <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 rounded-xl py-1.5 animate-fade-in">
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>{lang === 'th' ? 'กรอกข้อมูลจาก Google สำเร็จ!' : 'Autofilled from Google successfully!'}</span>
+                      </div>
                     )}
                   </div>
 
@@ -944,8 +775,7 @@ export function LoginView({
 
                   {/* Registration Form with 7 Specified Fields */}
                   <form onSubmit={handleSubmitRegistration} className="space-y-3 sm:space-y-4">
-                    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5 transition-all duration-700 delay-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform ${isFormInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
-                      }`}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5">
                       {/* 1. ชื่อ-นามสกุล(ไทย) */}
                       <div>
                         <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
@@ -957,7 +787,7 @@ export function LoginView({
                             type="text"
                             value={formData.nameTh}
                             onChange={(e) => handleInputChange('nameTh', e.target.value)}
-                            placeholder={lang === 'th' ? 'เช่น วรวัฒน์ เกียรติอนันต์ (ไม่ต้องใส่คำนำหน้า)' : 'e.g. Worawat Kiat-anan (Without prefix)'}
+                            placeholder={lang === 'th' ? 'ชื่อ-นามสกุล (ไม่ต้องมีคำนำหน้า)' : 'Full Name (Without prefix)'}
                             className="w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition"
                           />
                         </div>
@@ -974,7 +804,7 @@ export function LoginView({
                             type="text"
                             value={formData.nameEn}
                             onChange={(e) => handleInputChange('nameEn', e.target.value)}
-                            placeholder="e.g. Worawat Kiat-anan (Without prefix)"
+                            placeholder="Full Name (Without prefix)"
                             className="w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition"
                           />
                         </div>
@@ -1008,70 +838,83 @@ export function LoginView({
                             type="text"
                             value={formData.workplace}
                             onChange={(e) => handleInputChange('workplace', e.target.value)}
-                            placeholder={lang === 'th' ? 'ชื่อโรงพยาบาล / สถาบัน / บริษัท' : 'e.g. Hospital / University / Clinic'}
+                            placeholder={lang === 'th' ? 'เช่น โรงพยาบาล / คลินิก / บริษัท' : 'e.g. Hospital / Clinic / Company'}
                             className="w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition"
                           />
                         </div>
                       </div>
 
-                      {/* 5. ตำแหน่ง */}
-                      <PositionSelect
-                        value={formData.position}
-                        onChange={(val) => handleInputChange('position', val)}
-                        otherValue={formData.positionOther}
-                        onOtherChange={(val) => handleInputChange('positionOther', val)}
-                        showIcon={true}
-                        showLabel={true}
-                      />
-
-                      {/* 6. เลขสมาชิก */}
+                      {/* 5. ตำแหน่ง (Select + Other input) */}
                       <div>
-                        <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
-                          {lang === 'th' ? 'เลขสมาชิก (Member No.)' : 'Member No.'}
-                        </label>
+                        <PositionSelect
+                          value={formData.position}
+                          onChange={(val) => handleInputChange('position', val)}
+                          otherValue={formData.positionOther}
+                          onOtherChange={(val) => handleInputChange('positionOther', val)}
+                          required
+                          label={lang === 'th' ? 'ตำแหน่ง' : 'Position'}
+                        />
+                      </div>
+
+                      {/* 6. รหัสสมาชิก (Member ID) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] sm:text-xs font-bold text-slate-700">
+                            {lang === 'th' ? 'รหัสสมาชิก TSRM' : 'TSRM Member No.'}
+                          </label>
+                          <span className="text-[9.5px] xs:text-[10px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded">
+                            {lang === 'th' ? 'รับสิทธิ์ราคาพิเศษ' : 'For Special Rate'}
+                          </span>
+                        </div>
                         <div className="relative">
                           <Hash className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                           <input
                             type="text"
                             value={formData.memberNo}
                             onChange={(e) => handleInputChange('memberNo', e.target.value)}
-                            placeholder={lang === 'th' ? 'เช่น 0123 (ถ้ามี)' : 'e.g. 0123 (Optional)'}
+                            placeholder={lang === 'th' ? 'เช่น 0001 (เว้นว่างได้ถ้าไม่ใช่สมาชิก)' : 'e.g. 0001 (Leave blank if non-member)'}
                             className="w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition"
                           />
                         </div>
                       </div>
 
-                      {/* 7. โค๊ดพิเศษ */}
+                      {/* 7. รหัสพิเศษ (Special Code) */}
                       <div className="sm:col-span-2">
-                        <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
-                          {lang === 'th' ? 'โค๊ดพิเศษ' : 'Special Code'}
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] sm:text-xs font-bold text-slate-700">
+                            {lang === 'th' ? 'รหัสพิเศษ (ถ้ามี)' : 'Special Code (Optional)'}
+                          </label>
+                          <span className="text-[9.5px] xs:text-[10px] text-slate-500 font-medium">
+                            {lang === 'th' ? 'สำหรับผู้ได้รับสิทธิ์พิเศษหรือส่วนลด' : 'For sponsor / discount codes'}
+                          </span>
+                        </div>
                         <div className="relative">
                           <Tag className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                           <input
                             type="text"
                             value={formData.specialCode}
                             onChange={(e) => handleInputChange('specialCode', e.target.value)}
-                            placeholder={lang === 'th' ? 'กรอกรหัสส่วนลดหรือโค้ดพิเศษ (ถ้ามี)' : 'Enter promo or special code (if any)'}
+                            placeholder={lang === 'th' ? 'กรอกรหัสโปรโมชั่น / Sponsor Code' : 'Enter Special / Promo Code'}
                             className="w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition uppercase tracking-wider"
                           />
                         </div>
                       </div>
                     </div>
 
-                    {/* Dynamic Multi-select Program Options (Optimized for Mobile) */}
-                    <div className={`space-y-1.5 sm:space-y-2 pt-0.5 transition-all duration-700 delay-400 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform ${isFormInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
-                      }`}>
+                    {/* Program Selection Cards (Activities dynamically from DB) */}
+                    <div className="space-y-1.5 sm:space-y-2 pt-1 sm:pt-2">
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] sm:text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                          <span>{lang === 'th' ? 'เลือกหลักสูตร / เวิร์กช็อป (เลือกได้หลายรายการ)' : 'Select Programs & Workshops (Multi-select)'}</span>
+                          <Award className="w-3.5 h-3.5 text-[#0026b3]" />
+                          <span>{lang === 'th' ? 'เลือกหลักสูตรที่ต้องการเข้าร่วม' : 'Select Program / Courses'}</span>
+                          <span className="text-rose-500 font-bold">*</span>
                         </label>
-                        <span className="text-[9px] sm:text-[10px] text-[#0026b3] font-extrabold bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/60">
-                          {selectedPrograms.length} {lang === 'th' ? 'รายการที่เลือก' : 'selected'}
+                        <span className="text-[10px] xs:text-[11px] font-semibold text-slate-500">
+                          {lang === 'th' ? `เลือกแล้ว ${selectedPrograms.length} รายการ` : `${selectedPrograms.length} selected`}
                         </span>
                       </div>
 
-                      <div className={`grid gap-1.5 sm:gap-2.5 ${effectiveActivities.length > 2 ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
+                      <div className="grid grid-cols-1 gap-2">
                         {effectiveActivities.map((act) => {
                           const isSelected = selectedPrograms.includes(act.id);
 
@@ -1080,14 +923,14 @@ export function LoginView({
                               key={act.id}
                               type="button"
                               onClick={() => toggleProgram(act.id)}
-                              className={`p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2.5 active:scale-[0.99] relative overflow-hidden ${isSelected
+                              className={`p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 active:scale-[0.99] relative overflow-hidden ${isSelected
                                 ? 'bg-blue-50/90 border-[#0026b3] text-slate-900 shadow-2xs ring-1.5 ring-[#0026b3]/30 font-bold'
                                 : 'bg-slate-50/80 border-slate-200 hover:border-slate-300 text-slate-700 font-medium'
                                 }`}
                             >
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1 sm:gap-1.5 mb-1 flex-wrap">
-                                  <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 ${act.type === 'main'
+                                <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                  <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded shrink-0 ${act.type === 'main'
                                     ? (isSelected ? 'bg-[#0026b3] text-white' : 'bg-slate-200 text-slate-700')
                                     : (isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700')
                                     }`}>
@@ -1098,7 +941,7 @@ export function LoginView({
                                   {(() => {
                                     const fmt = act.format || (act.type === 'workshop' ? 'onsite' : 'both');
                                     return (
-                                      <span className={`text-[8px] sm:text-[9px] font-extrabold px-1.5 py-0.5 rounded shrink-0 border ${fmt === 'online'
+                                      <span className={`text-[9px] sm:text-[10px] font-extrabold px-2 py-0.5 rounded shrink-0 border ${fmt === 'online'
                                         ? (isSelected ? 'bg-blue-100 text-[#0026b3] border-blue-300' : 'bg-blue-50 text-blue-700 border-blue-200')
                                         : fmt === 'both'
                                           ? (isSelected ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-purple-50 text-purple-700 border-purple-200')
@@ -1110,8 +953,8 @@ export function LoginView({
                                   })()}
 
                                   {act.date && (
-                                    <span className="text-[9.5px] xs:text-[10px] sm:text-[11px] text-slate-500 flex items-center gap-1">
-                                      <Calendar className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400 shrink-0" />
+                                    <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                                      <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
                                       <span className="truncate">{act.date}</span>
                                     </span>
                                   )}
@@ -1140,8 +983,7 @@ export function LoginView({
                       const hasOnlineOnly = onlineOnlyActs.length > 0;
 
                       return (
-                        <div className={`space-y-1 sm:space-y-1.5 pt-0.5 sm:pt-1 transition-all duration-700 delay-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform ${isFormInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
-                          }`}>
+                        <div className="space-y-1 sm:space-y-1.5 pt-0.5 sm:pt-1">
                           <label className="text-[11px] sm:text-xs font-bold text-slate-700 block">
                             {lang === 'th' ? 'รูปแบบการเข้าร่วม (Attendance Format)' : 'Attendance Format'}
                           </label>
@@ -1154,7 +996,7 @@ export function LoginView({
                               onClick={() => {
                                 if (!hasOnlineOnly) setAttendanceType('onsite');
                               }}
-                              className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl border text-[11px] sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${hasOnlineOnly
+                              className={`py-2.5 px-3 sm:px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${hasOnlineOnly
                                 ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
                                 : attendanceType === 'onsite'
                                   ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30 cursor-pointer active:scale-95'
@@ -1162,7 +1004,7 @@ export function LoginView({
                                 }`}
                               title={hasOnlineOnly ? (lang === 'th' ? 'มีหลักสูตรที่เปิดรับเฉพาะ Online เท่านั้น' : 'Includes Online-only courses') : ''}
                             >
-                              <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                              <MapPin className="w-4 h-4 shrink-0" />
                               <span className="truncate">{lang === 'th' ? 'Onsite (ที่งาน)' : 'Onsite'}</span>
                             </button>
 
@@ -1173,7 +1015,7 @@ export function LoginView({
                               onClick={() => {
                                 if (!hasOnsiteOnly) setAttendanceType('online');
                               }}
-                              className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl border text-[11px] sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${hasOnsiteOnly
+                              className={`py-2.5 px-3 sm:px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${hasOnsiteOnly
                                 ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
                                 : attendanceType === 'online'
                                   ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30 cursor-pointer active:scale-95'
@@ -1181,7 +1023,7 @@ export function LoginView({
                                 }`}
                               title={hasOnsiteOnly ? (lang === 'th' ? 'มีหลักสูตรที่เปิดรับเฉพาะ Onsite เท่านั้น' : 'Includes Onsite-only courses') : ''}
                             >
-                              <Monitor className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                              <Monitor className="w-4 h-4 shrink-0" />
                               <span className="truncate">{lang === 'th' ? 'Online (ออนไลน์)' : 'Online'}</span>
                             </button>
                           </div>
@@ -1227,10 +1069,9 @@ export function LoginView({
                     <button
                       type="submit"
                       disabled={selectedPrograms.length === 0 || verifyingMember}
-                      className={`w-full font-black py-2.5 sm:py-3.5 px-4 sm:px-6 rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl transition-all duration-700 delay-600 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform ${isFormInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
-                        } flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-base border border-blue-400/20 relative overflow-hidden mt-2 sm:mt-3 ${selectedPrograms.length === 0 || verifyingMember
-                          ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
-                          : 'bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] hover:brightness-110 text-white shadow-blue-900/30 hover:shadow-blue-900/40 cursor-pointer active:scale-[0.99] group'
+                      className={`w-full font-black py-2.5 sm:py-3.5 px-4 sm:px-6 rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl transition-all flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-base border border-blue-400/20 relative overflow-hidden mt-2 sm:mt-3 ${selectedPrograms.length === 0 || verifyingMember
+                        ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+                        : 'bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] hover:brightness-110 text-white shadow-blue-900/30 hover:shadow-blue-900/40 cursor-pointer active:scale-[0.99] group'
                         }`}
                     >
                       {/* Top glowing accent green line */}

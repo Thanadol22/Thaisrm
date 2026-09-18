@@ -184,13 +184,13 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
       <div className="max-w-xl mx-auto w-full space-y-5">
         {/* Header */}
         <div className="bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white p-5 sm:p-6 rounded-3xl shadow-xl relative overflow-hidden">
-          <div className="flex items-center gap-3">
-            <TsrmLogo className="w-9 h-9" />
-            <div>
-              <span className="text-[10px] font-bold text-blue-200 uppercase block leading-tight">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <TsrmLogo className="w-8 h-8 sm:w-11 sm:h-11 shrink-0" />
+            <div className="min-w-0">
+              <span className="text-[10px] xs:text-xs sm:text-[13px] md:text-sm font-bold text-blue-200 block whitespace-nowrap leading-tight">
                 สมาคมเวชศาสตร์การเจริญพันธุ์ไทย
               </span>
-              <span className="font-extrabold text-white text-sm tracking-wide block">
+              <span className="font-extrabold text-white text-xs xs:text-sm sm:text-base tracking-wide block leading-tight">
                 แนบสลิปการโอนเงินใหม่ (Resubmit Slip)
               </span>
             </div>

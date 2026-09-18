@@ -472,8 +472,8 @@ export function ParticipantSearchModal({ isOpen, onClose }: ParticipantSearchMod
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder={
                 lang === 'th'
-                  ? 'พิมพ์ชื่อ-นามสกุล เช่น กรกนก, สมชาย'
-                  : 'Type full name e.g. Kornkanok, Somchai'
+                  ? 'พิมพ์ชื่อ หรือ นามสกุล'
+                  : 'Type first name or last name'
               }
               className="w-full pl-10 pr-10 py-2.5 sm:py-3 bg-white text-slate-900 rounded-xl sm:rounded-2xl border-0 shadow-inner text-base sm:text-sm font-medium placeholder:text-slate-400 focus:ring-2 focus:ring-[#4ade80] focus:outline-none transition"
             />

@@ -668,7 +668,7 @@ export function ReceiptFormModal({
                   type="text"
                   value={formData.payerName}
                   onChange={(e) => handlePayerNameChange(e.target.value)}
-                  placeholder={formData.payerType === 'company' ? 'เช่น บริษัท ออร์กานอน (ประเทศไทย) จำกัด' : 'เช่น พิชญ์พงษ์ จุฑิ่น'}
+                  placeholder={formData.payerType === 'company' ? 'ชื่อบริษัท / หน่วยงาน' : 'ชื่อ-นามสกุล (ไม่ต้องมีคำนำหน้า)'}
                   className={`w-full px-4 py-2.5 text-sm bg-white border rounded-2xl focus:outline-none focus:ring-2 transition ${nameError
                       ? 'border-rose-500 ring-2 ring-rose-200 focus:border-rose-600'
                       : 'border-slate-200 focus:border-indigo-600 focus:ring-indigo-100'
@@ -686,7 +686,7 @@ export function ReceiptFormModal({
                     type="text"
                     value={formData.branchName || ''}
                     onChange={(e) => setFormData({ ...formData, branchName: e.target.value })}
-                    placeholder="สำนักงานแห่งใหญ่"
+                    placeholder="สำนักงานใหญ่"
                     className="w-full px-4 py-2.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
                   />
                 </div>
@@ -705,7 +705,7 @@ export function ReceiptFormModal({
                     type="text"
                     value={formData.payerAddressLine1}
                     onChange={(e) => setFormData({ ...formData, payerAddressLine1: e.target.value })}
-                    placeholder="เช่น เลขที่ 88 อาคารเดอะปาร์ค ชั้นที่ 7 ฝั่งอีสต์วิง ห้องเลขที่ 07-101 ถนนรัชดาภิเษก แขวงคลองเตย เขตคลองเตย"
+                    placeholder="เลขที่ อาคาร ชั้น ซอย ถนน แขวง เขต"
                     className="w-full px-4 py-2.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
                   />
                 </div>
@@ -720,7 +720,7 @@ export function ReceiptFormModal({
                       type="text"
                       value={formData.payerAddressLine2}
                       onChange={(e) => setFormData({ ...formData, payerAddressLine2: e.target.value })}
-                      placeholder="เช่น กรุงเทพมหานคร 10110"
+                      placeholder="จังหวัด รหัสไปรษณีย์"
                       className="w-full px-4 py-2.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
                     />
                   </div>
@@ -733,7 +733,7 @@ export function ReceiptFormModal({
                       type="text"
                       value={formData.payerPhone || ''}
                       onChange={(e) => setFormData({ ...formData, payerPhone: e.target.value })}
-                      placeholder="เช่น +662-257-2500"
+                      placeholder="เบอร์โทรศัพท์ติดต่อ"
                       className="w-full px-4 py-2.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
                     />
                   </div>
@@ -744,9 +744,10 @@ export function ReceiptFormModal({
                     </label>
                     <input
                       type="text"
+                      maxLength={13}
                       value={formData.payerTaxId || ''}
-                      onChange={(e) => setFormData({ ...formData, payerTaxId: e.target.value })}
-                      placeholder="เช่น 0105563092355"
+                      onChange={(e) => setFormData({ ...formData, payerTaxId: e.target.value.replace(/\D/g, '').slice(0, 13) })}
+                      placeholder="เลขประจำตัวผู้เสียภาษี 13 หลัก"
                       className="w-full px-4 py-2.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition font-mono"
                     />
                   </div>
@@ -800,7 +801,7 @@ export function ReceiptFormModal({
                 rows={5}
                 value={subDetailsText}
                 onChange={(e) => handleSubDetailsTextChange(e.target.value)}
-                placeholder={`การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569\nด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์\nจัดขึ้นวันที่ 20 ตุลาคม 2569\nโรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ\nพิชญ์พงษ์ จุฑิ่น`}
+                placeholder={`การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569\nด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์\nจัดขึ้นวันที่ 20 ตุลาคม 2569\nสถานที่จัดงาน...\nชื่อ-นามสกุล`}
                 className="w-full px-4 py-3 text-sm font-sans bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition leading-relaxed"
               />
               <p className="text-[11px] text-slate-500 mt-1 pl-1">

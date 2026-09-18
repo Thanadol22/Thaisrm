@@ -421,18 +421,18 @@ export function StaffScannerView() {
           <div className="absolute bottom-0 -left-12 w-44 h-44 bg-[#0026b3]/40 rounded-full blur-2xl pointer-events-none" />
 
           <div className="relative z-10 space-y-3">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-1.5 sm:gap-3">
               <div
                 onClick={handleBackToLogin}
-                className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-90 transition"
+                className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 cursor-pointer group hover:opacity-90 transition"
                 title="กลับสู่หน้าเข้าสู่ระบบ / Back to Login"
               >
-                <TsrmLogo className="w-8 h-8 sm:w-10 sm:h-10 ring-2 ring-[#4ade80]/40 shadow-sm shrink-0 group-hover:scale-105 transition-transform" />
+                <TsrmLogo className="w-8 h-8 sm:w-11 sm:h-11 ring-2 ring-[#4ade80]/40 shadow-sm shrink-0 group-hover:scale-105 transition-transform" />
                 <div className="min-w-0">
-                  <span className="text-[10px] sm:text-xs font-bold text-blue-200 block leading-tight truncate">
+                  <span className="text-[10px] xs:text-xs sm:text-[13px] md:text-sm font-bold text-blue-200 block whitespace-nowrap leading-tight">
                     {t.associationName}
                   </span>
-                  <span className="text-xs sm:text-sm font-extrabold text-white block leading-tight tracking-wide truncate">
+                  <span className="text-xs xs:text-sm sm:text-base font-extrabold text-white block whitespace-nowrap leading-tight tracking-wide">
                     {t.brandName}
                   </span>
                 </div>
@@ -441,9 +441,10 @@ export function StaffScannerView() {
               {/* Language Switcher Pill */}
               <button
                 onClick={toggleLang}
-                className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shrink-0 shadow-2xs"
+                className="flex items-center gap-0.5 xs:gap-1 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-1.5 xs:px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shrink-0 shadow-2xs"
+                title="Switch Language / สลับภาษา"
               >
-                <Globe className="w-3 h-3 text-blue-200 shrink-0" />
+                <Globe className="w-3 h-3 xs:w-3.5 xs:h-3.5 text-blue-200 shrink-0" />
                 <span className={lang === 'th' ? 'text-white font-black' : 'text-blue-200/60'}>TH</span>
                 <span className="text-white/40 font-normal">|</span>
                 <span className={lang === 'en' ? 'text-white font-black' : 'text-blue-200/60'}>EN</span>
@@ -566,31 +567,31 @@ export function StaffScannerView() {
         <div className="absolute bottom-0 -left-12 w-44 h-44 bg-[#0026b3]/40 rounded-full blur-2xl pointer-events-none" />
 
         <div className="relative z-10 space-y-2.5">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-1.5 sm:gap-3">
             <div
               onClick={handleBackToLogin}
-              className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-90 transition"
+              className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 cursor-pointer group hover:opacity-90 transition"
               title="กลับสู่หน้าเข้าสู่ระบบ / Back to Login"
             >
-              <TsrmLogo className="w-8 h-8 sm:w-10 sm:h-10 ring-2 ring-[#4ade80]/40 shadow-sm shrink-0 group-hover:scale-105 transition-transform" />
+              <TsrmLogo className="w-8 h-8 sm:w-11 sm:h-11 ring-2 ring-[#4ade80]/40 shadow-sm shrink-0 group-hover:scale-105 transition-transform" />
               <div className="min-w-0">
-                <span className="text-[10px] sm:text-xs font-bold text-blue-200 block leading-tight truncate">
+                <span className="text-[10px] xs:text-xs sm:text-[13px] md:text-sm font-bold text-blue-200 block whitespace-nowrap leading-tight">
                   {t.associationName}
                 </span>
-                <span className="text-xs sm:text-sm font-extrabold text-white block leading-tight tracking-wide truncate">
+                <span className="text-xs xs:text-sm sm:text-base font-extrabold text-white block whitespace-nowrap leading-tight tracking-wide">
                   {t.brandName}
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 shrink-0">
               {/* Language Switcher Pill */}
               <button
                 onClick={toggleLang}
-                className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shrink-0 shadow-2xs"
+                className="flex items-center gap-0.5 xs:gap-1 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-1.5 xs:px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shrink-0 shadow-2xs"
                 title="Switch Language / สลับภาษา"
               >
-                <Globe className="w-3 h-3 text-blue-200 shrink-0" />
+                <Globe className="w-3 h-3 xs:w-3.5 xs:h-3.5 text-blue-200 shrink-0" />
                 <span className={lang === 'th' ? 'text-white font-black' : 'text-blue-200/60'}>TH</span>
                 <span className="text-white/40 font-normal">|</span>
                 <span className={lang === 'en' ? 'text-white font-black' : 'text-blue-200/60'}>EN</span>
@@ -599,10 +600,10 @@ export function StaffScannerView() {
               {/* Lock / Exit Staff Mode Button */}
               <button
                 onClick={handleLockSystem}
-                className="flex items-center gap-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold transition cursor-pointer active:scale-95 shrink-0"
+                className="flex items-center gap-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 px-2 xs:px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-extrabold transition cursor-pointer active:scale-95 shrink-0"
                 title="ออกจากระบบเจ้าหน้าที่ / Lock Staff View"
               >
-                <Lock className="w-3 h-3 text-rose-300 shrink-0" />
+                <Lock className="w-3 h-3 xs:w-3.5 xs:h-3.5 text-rose-300 shrink-0" />
                 <span>{t.staff.passcodeLock}</span>
               </button>
             </div>
