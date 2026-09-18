@@ -5541,7 +5541,7 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/admin/receipts');
       const json = await res.json();
-      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+      if (json.success && Array.isArray(json.data)) {
         setReceipts(json.data);
       }
     } catch (err) {
@@ -5556,114 +5556,6 @@ export default function AdminPage() {
     fetchMembersCount();
     fetchReceipts();
   }, [fetchMeetings, fetchSlips, fetchAttendees, fetchMembersCount, fetchReceipts]);
-
-  // ─── 5. Auto-populate Receipts from approved slips ───
-  useEffect(() => {
-    const isTestAccount = (name?: string, email?: string, memberNo?: string | null, workplace?: string) => {
-      const n = (name || '').toLowerCase();
-      const e = (email || '').toLowerCase();
-      const m = (memberNo || '').trim();
-      const w = (workplace || '').toLowerCase();
-      return (
-        m === '0000' ||
-        n.includes('ทดสอบ') ||
-        n.includes('test account') ||
-        e.includes('test0000') ||
-        e.includes('test@') ||
-        w.includes('ทดสอบ') ||
-        w.includes('test hospital')
-      );
-    };
-
-    const approvedSlips = [...slips]
-      .filter((s) => s.status === 'approved')
-      .filter((s) => !isTestAccount(s.nameTh || s.nameEn, s.email, s.memberCode, s.workplace))
-      .sort((a, b) => {
-        const timeA = new Date(a.transferDate || 0).getTime();
-        const timeB = new Date(b.transferDate || 0).getTime();
-        return timeA - timeB;
-      });
-
-    const START_RECEIPT_SEQ = 115;
-
-    if (approvedSlips.length > 0) {
-      const detailLines = (systemSettings.receipt_tpl1_details || '')
-        .split('\n')
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      const generatedReceipts: ReceiptData[] = approvedSlips.map((slip, index) => {
-        const m = meetings.find((mtg) => mtg.id === slip.meetingId);
-        const receiptNo = generateReceiptNo(slip.transferDate, START_RECEIPT_SEQ + index);
-        return {
-          id: String(index + 1),
-          receiptNo,
-          receiptDate: slip.transferDate || new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }),
-          purposeText: systemSettings.receipt_tpl1_purpose || 'ได้รับเงินค่าลงทะเบียน',
-          payerType: 'individual',
-          payerName: slip.nameTh,
-          payerAddressLine1: '',
-          payerAddressLine2: '',
-          payerPhone: slip.phone,
-          items: [
-            {
-              id: `item-${slip.id}`,
-              itemNumber: 1,
-              title: systemSettings.receipt_tpl1_title || 'ค่าลงทะเบียน',
-              subDetails: [
-                ...(detailLines.length > 0 ? detailLines : ['การประชุมวิชาการ']),
-                m?.date ? `จัดขึ้นวันที่ ${m.date}` : '',
-                m?.location ? `${m.location}` : '',
-                slip.nameTh || '',
-              ].filter(Boolean),
-              amount: slip.amount,
-            },
-          ],
-          totalAmount: slip.amount,
-          payerSignerRole: 'ผู้จ่ายเงิน',
-          authorizedSignerName: systemSettings.receipt_authorized_signer || 'แพทย์หญิงพิมพกา ชวนะเวสน์',
-          authorizedSignerRole: systemSettings.receipt_authorized_role || 'เหรัญญิก / ผู้รับเงิน',
-          preparedByName: systemSettings.receipt_prepared_by || 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม',
-          preparedByRole: systemSettings.receipt_prepared_role || 'ผู้จัดทำ',
-          associationNameTh: systemSettings.association_name_th,
-          associationNameEn: systemSettings.association_name_en,
-          associationAddress: systemSettings.association_address,
-          associationContact: systemSettings.association_contact,
-          associationTaxId: systemSettings.association_tax_id,
-          meetingId: slip.meetingId,
-          slipId: slip.id,
-          createdAt: new Date().toISOString().split('T')[0],
-          status: 'issued',
-        };
-      });
-
-      setReceipts((prev) => {
-        const nonTestExisting = prev.filter((r) => !isTestAccount(r.payerName));
-        const customOnes = nonTestExisting.filter((r) => !r.slipId);
-        // Normalize any old/custom receipts to follow the same YYYY/MM-NNN standard
-        const normalizedCustom = customOnes.map((r, i) => {
-          if (!r.receiptNo || r.receiptNo.includes('SLIP-') || r.receiptNo.includes('SAMPLE-') || r.receiptNo.endsWith('-001')) {
-            return {
-              ...r,
-              receiptNo: generateReceiptNo(r.receiptDate || r.createdAt, START_RECEIPT_SEQ + generatedReceipts.length + i),
-            };
-          }
-          return r;
-        });
-
-        const uniqueKeys = new Set();
-        const merged: ReceiptData[] = [];
-        [...generatedReceipts, ...normalizedCustom].forEach((r) => {
-          const key = r.slipId || r.id;
-          if (!uniqueKeys.has(key)) {
-            uniqueKeys.add(key);
-            merged.push(r);
-          }
-        });
-        return merged;
-      });
-    }
-  }, [slips, meetings, systemSettings]);
 
   // Global Receipt Modal for quick print from attendees/slips
   const [globalReceipt, setGlobalReceipt] = useState<ReceiptData | null>(null);
@@ -5863,15 +5755,7 @@ export default function AdminPage() {
       });
       const json = await res.json();
       if (json.success && json.data) {
-        setReceipts((prev) => {
-          const idx = prev.findIndex((r) => r.id === json.data.id || r.id === receipt.id);
-          if (idx >= 0) {
-            const next = [...prev];
-            next[idx] = json.data;
-            return next;
-          }
-          return [json.data, ...prev];
-        });
+        await fetchReceipts();
         setGlobalToastMessage('บันทึกใบเสร็จรับเงินลงฐานข้อมูลเรียบร้อยแล้ว');
         setTimeout(() => setGlobalToastMessage(null), 4000);
       } else {
@@ -5892,7 +5776,7 @@ export default function AdminPage() {
       });
       const json = await res.json();
       if (json.success) {
-        setReceipts((prev) => prev.filter((r) => r.id !== id));
+        await fetchReceipts();
         setGlobalToastMessage('ลบใบเสร็จรับเงินออกจากฐานข้อมูลเรียบร้อยแล้ว');
         setTimeout(() => setGlobalToastMessage(null), 4000);
       } else {
@@ -6003,7 +5887,9 @@ export default function AdminPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newReceipt),
-    }).catch((e) => console.warn('Could not persist attendee receipt to DB:', e));
+    })
+      .then(() => fetchReceipts())
+      .catch((e) => console.warn('Could not persist attendee receipt to DB:', e));
   };
 
   const handlePrintSlipReceipt = (slip: SlipItem) => {
@@ -6098,7 +5984,9 @@ export default function AdminPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newReceipt),
-    }).catch((e) => console.warn('Could not persist slip receipt to DB:', e));
+    })
+      .then(() => fetchReceipts())
+      .catch((e) => console.warn('Could not persist slip receipt to DB:', e));
   };
 
   // Meeting Edit Modal State

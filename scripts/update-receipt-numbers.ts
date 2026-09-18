@@ -1,13 +1,19 @@
-import prisma from '../lib/prisma';
-import { generateReceiptNo } from '../lib/receiptNumber';
+import { PrismaClient } from '@prisma/client';
+import { generateReceiptNo, DEFAULT_RECEIPT_START_SEQ } from '../lib/receiptNumber';
+
+const targetUrl = process.argv[2] || process.env.DATABASE_URL;
+
+const prisma = targetUrl && targetUrl !== process.env.DATABASE_URL
+  ? new PrismaClient({ datasources: { db: { url: targetUrl } } })
+  : new PrismaClient();
 
 async function main() {
-  console.log('Checking existing receipts in DB...');
+  console.log('🔄 Checking existing receipts in DB...');
   const receipts = await (prisma as any).receipts.findMany({
     orderBy: { created_at: 'asc' }
   });
 
-  console.log(`Found ${receipts.length} receipts.`);
+  console.log(`📋 Found ${receipts.length} receipts in database.`);
 
   const isTestAccount = (name?: string, email?: string) => {
     const n = (name || '').toLowerCase();
@@ -15,19 +21,20 @@ async function main() {
     return n.includes('ทดสอบ') || n.includes('test') || e.includes('test');
   };
 
-  let seq = 115;
+  let seq = DEFAULT_RECEIPT_START_SEQ; // 115
   let idSeq = 1;
+
   for (const r of receipts) {
     if (isTestAccount(r.payer_name)) {
-      console.log(`Skipping / deleting test receipt: ${r.receipt_no} - ${r.payer_name}`);
+      console.log(`🗑️ Deleting test receipt: ${r.receipt_no} - ${r.payer_name}`);
       await (prisma as any).receipts.delete({ where: { id: r.id } });
       continue;
     }
 
     const newReceiptNo = generateReceiptNo(r.receipt_date || r.created_at, seq);
     const newId = String(idSeq);
-    console.log(`Updating ${r.id} (${r.payer_name}): ID -> ${newId}, No -> ${newReceiptNo}`);
-    
+    console.log(`✨ Renumbering [${r.payer_name}]: ID ${r.id} -> ${newId} | No: ${r.receipt_no} -> ${newReceiptNo}`);
+
     if (r.id !== newId) {
       await (prisma as any).receipts.delete({ where: { id: r.id } });
       await (prisma as any).receipts.create({
@@ -47,7 +54,7 @@ async function main() {
     idSeq++;
   }
 
-  console.log('Done updating receipts.');
+  console.log('✅ Done updating all receipts to running ID (1, 2, ...) and Receipt No (2569/02-115, ...).');
 }
 
 main()
