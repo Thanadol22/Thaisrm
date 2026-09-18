@@ -27,7 +27,7 @@ import {
   Check,
   ExternalLink,
 } from 'lucide-react';
-import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
+import { TsrmLogo } from '@/components/TsrmLogo';
 import { GoogleIcon } from '@/components/GoogleIcon';
 import { ParticipantSearchModal } from '@/components/ParticipantSearchModal';
 import { ExpiredMemberModal } from '@/components/ExpiredMemberModal';
@@ -645,7 +645,7 @@ export function LoginView({
             <div className="flex items-center gap-2.5 sm:gap-3 group">
               <div className="relative">
                 <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-[#4ade80] rounded-full blur-xs opacity-60 group-hover:opacity-100 transition duration-300" />
-                <ThaiSrmLogo className="relative w-10 h-10 sm:w-12 sm:h-12 shrink-0 group-hover:scale-105 transition-transform" />
+                <TsrmLogo className="relative w-10 h-10 sm:w-12 sm:h-12 shrink-0 group-hover:scale-105 transition-transform" />
               </div>
               <div className="min-w-0">
                 <span className="text-[10px] sm:text-xs font-bold tracking-widest text-[#4ade80] uppercase block truncate">

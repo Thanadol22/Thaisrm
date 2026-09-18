@@ -3,7 +3,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Member, MEMBER_TYPE_LABELS, MemberType } from '@/types/member';
-import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
+import { TsrmLogo } from '@/components/TsrmLogo';
 import { MemberAvatar } from '@/components/MemberAvatar';
 import QRCode from 'qrcode';
 import {
@@ -199,7 +199,7 @@ export function MemberDetailModal({
             {/* Background watermarks */}
             <div className="absolute -right-8 -bottom-8 w-48 h-48 rounded-full bg-white/5 blur-2xl pointer-events-none" />
             <div className="absolute right-4 top-4 opacity-10 pointer-events-none">
-              <ThaiSrmLogo className="w-32 h-32" />
+              <TsrmLogo className="w-32 h-32" />
             </div>
 
             <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
@@ -276,7 +276,7 @@ export function MemberDetailModal({
             <div className="relative z-10 mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between text-[11px] text-blue-200/80 gap-2">
               <div className="flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-[#4ade80]" />
-                <span>สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (Thai SRM)</span>
+                <span>สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (TSRM)</span>
               </div>
               <div className="flex items-center gap-3">
                 {member.membership_type && (

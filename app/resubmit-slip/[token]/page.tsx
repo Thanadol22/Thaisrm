@@ -15,7 +15,7 @@ import {
   Check,
   Trash2,
 } from 'lucide-react';
-import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
+import { TsrmLogo } from '@/components/TsrmLogo';
 import { uploadImageToStorage } from '@/lib/blobUpload';
 
 interface ResubmitPageProps {
@@ -185,7 +185,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
         {/* Header */}
         <div className="bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white p-5 sm:p-6 rounded-3xl shadow-xl relative overflow-hidden">
           <div className="flex items-center gap-3">
-            <ThaiSrmLogo className="w-9 h-9" />
+            <TsrmLogo className="w-9 h-9" />
             <div>
               <span className="text-[10px] font-bold text-blue-200 uppercase block leading-tight">
                 สมาคมเวชศาสตร์การเจริญพันธุ์ไทย

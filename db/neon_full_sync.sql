@@ -1,6 +1,6 @@
 -- ==========================================================
 -- TSRM FULL DATABASE MIGRATION & SYNC FOR NEON POSTGRESQL
--- Generated at: 2026-09-18T04:51:44.633Z
+-- Generated at: 2026-09-18T05:23:21.673Z
 -- ==========================================================
 
 -- 0. Ensure Schema & Columns exist on Neon
@@ -219,7 +219,7 @@ ON CONFLICT (meeting_id) DO UPDATE SET
   status = EXCLUDED.status;
 
 -- 2. Table: members (1078 rows)
-INSERT INTO members (id, member_no, full_name_th, full_name_en, id_last4, mobile, email, line_id, address, workplace, work_phone, work_start_date, position, job_category, job_category_other, scientist_license_no, username, password_hash, referees, photo_url, id_card_doc, degree_cert_doc, work_cert_doc, membership_status, membership_type, applied_at, expire_date, special_expire_date, qr_code_data, qr_code_image_url) VALUES (1077, '0000', 'บัญชีทดสอบ ระบบ', 'Test Account', '0000', '0800000000', 'test0000@thaisrm.com', 'test0000', 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย อาคารเฉลิมพระบารมี ๕๐ ปี ซ.ศูนย์วิจัย ถ.เพชรบุรีตัดใหม่ แขวงบางกะปิ เขตห้วยขวาง กรุงเทพฯ 10310', 'โรงพยาบาลทดสอบ (Test Hospital)', '020000000', '2020-01-01T00:00:00.000Z', 'แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)', 'RM', NULL, 'TEST-0000', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'inactive', 'Regular', '2026-09-15T06:32:57.143Z', '2030-12-31T00:00:00.000Z', NULL, NULL, NULL)
+INSERT INTO members (id, member_no, full_name_th, full_name_en, id_last4, mobile, email, line_id, address, workplace, work_phone, work_start_date, position, job_category, job_category_other, scientist_license_no, username, password_hash, referees, photo_url, id_card_doc, degree_cert_doc, work_cert_doc, membership_status, membership_type, applied_at, expire_date, special_expire_date, qr_code_data, qr_code_image_url) VALUES (1077, '0000', 'บัญชีทดสอบ ระบบ', 'Test Account', '0000', '0800000000', 'test0000@tsrm.com', 'test0000', 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย อาคารเฉลิมพระบารมี ๕๐ ปี ซ.ศูนย์วิจัย ถ.เพชรบุรีตัดใหม่ แขวงบางกะปิ เขตห้วยขวาง กรุงเทพฯ 10310', 'โรงพยาบาลทดสอบ (Test Hospital)', '020000000', '2020-01-01T00:00:00.000Z', 'แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)', 'RM', NULL, 'TEST-0000', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'inactive', 'Regular', '2026-09-15T06:32:57.143Z', '2030-12-31T00:00:00.000Z', NULL, NULL, NULL)
 ON CONFLICT (member_no) DO UPDATE SET
   full_name_th = EXCLUDED.full_name_th,
   full_name_en = EXCLUDED.full_name_en,
@@ -32591,7 +32591,7 @@ ON CONFLICT (member_no) DO UPDATE SET
   special_expire_date = EXCLUDED.special_expire_date,
   qr_code_data = EXCLUDED.qr_code_data,
   qr_code_image_url = EXCLUDED.qr_code_image_url;
-INSERT INTO members (id, member_no, full_name_th, full_name_en, id_last4, mobile, email, line_id, address, workplace, work_phone, work_start_date, position, job_category, job_category_other, scientist_license_no, username, password_hash, referees, photo_url, id_card_doc, degree_cert_doc, work_cert_doc, membership_status, membership_type, applied_at, expire_date, special_expire_date, qr_code_data, qr_code_image_url) VALUES (1081, '1284', 'Nai Test SystemSignup', 'Mr. Test Registration', '8899', '0891234567', 'test.reg.2026@thaisrm.test', 'testline2026', NULL, 'TSRM Medical Research Center', NULL, NULL, 'RM', 'RM', NULL, 'SCI-8899', 'test.reg.2026@thaisrm.test', NULL, NULL, NULL, NULL, NULL, NULL, 'Active', 'Regular', '2026-09-17T04:11:00.354Z', '2027-09-17T00:00:00.000Z', NULL, '{"member_no":"1284"}'::jsonb, NULL)
+INSERT INTO members (id, member_no, full_name_th, full_name_en, id_last4, mobile, email, line_id, address, workplace, work_phone, work_start_date, position, job_category, job_category_other, scientist_license_no, username, password_hash, referees, photo_url, id_card_doc, degree_cert_doc, work_cert_doc, membership_status, membership_type, applied_at, expire_date, special_expire_date, qr_code_data, qr_code_image_url) VALUES (1081, '1284', 'Nai Test SystemSignup', 'Mr. Test Registration', '8899', '0891234567', 'test.reg.2026@tsrm.test', 'testline2026', NULL, 'TSRM Medical Research Center', NULL, NULL, 'RM', 'RM', NULL, 'SCI-8899', 'test.reg.2026@tsrm.test', NULL, NULL, NULL, NULL, NULL, NULL, 'Active', 'Regular', '2026-09-17T04:11:00.354Z', '2027-09-17T00:00:00.000Z', NULL, '{"member_no":"1284"}'::jsonb, NULL)
 ON CONFLICT (member_no) DO UPDATE SET
   full_name_th = EXCLUDED.full_name_th,
   full_name_en = EXCLUDED.full_name_en,
@@ -51759,7 +51759,7 @@ ON CONFLICT (meeting_id, member_no) DO UPDATE SET
   workplace = EXCLUDED.workplace,
   attendance_status = EXCLUDED.attendance_status,
   checkin_time = EXCLUDED.checkin_time;
-INSERT INTO meeting_attendances (attendance_id, meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status, checkin_time) VALUES (2267, 'TSRM34', NULL, 'บัญชีทดสอบ ระบบ', 'test0000@thaisrm.com', NULL, 'โรงพยาบาลทดสอบ (Test Hospital)', 'Non-Member', NULL)
+INSERT INTO meeting_attendances (attendance_id, meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status, checkin_time) VALUES (2267, 'TSRM34', NULL, 'บัญชีทดสอบ ระบบ', 'test0000@tsrm.com', NULL, 'โรงพยาบาลทดสอบ (Test Hospital)', 'Non-Member', NULL)
 ON CONFLICT (meeting_id, member_no) DO UPDATE SET
   attendee_name = EXCLUDED.attendee_name,
   attendee_email = EXCLUDED.attendee_email,
@@ -51795,7 +51795,7 @@ ON CONFLICT (key) DO UPDATE SET
   value = EXCLUDED.value,
   description = EXCLUDED.description,
   updated_at = EXCLUDED.updated_at;
-INSERT INTO system_settings (key, value, description, updated_at) VALUES ('association_contact', 'Website: https://thaisrm.com/ E-mail: tsrm.info@gmail.com', 'ข้อมูลติดต่อสมาคม', '2026-09-17T02:57:48.299Z')
+INSERT INTO system_settings (key, value, description, updated_at) VALUES ('association_contact', 'Website: https://tsrm.com/ E-mail: tsrm.info@gmail.com', 'ข้อมูลติดต่อสมาคม', '2026-09-17T02:57:48.299Z')
 ON CONFLICT (key) DO UPDATE SET
   value = EXCLUDED.value,
   description = EXCLUDED.description,
@@ -51952,12 +51952,12 @@ ON CONFLICT (slip_id) DO UPDATE SET
 
 -- 7. Table: receipts (2 rows)
 INSERT INTO receipts (id, receipt_no, receipt_date, purpose_text, payer_type, payer_name, branch_name, payer_address_line1, payer_address_line2, payer_phone, payer_tax_id, items, total_amount, thai_baht_text_override, payer_signer_name, payer_signer_role, payer_signed_date, authorized_signer_name, authorized_signer_role, authorized_signed_date, prepared_by_name, prepared_by_role, prepared_by_signed_date, association_name_th, association_name_en, association_address, association_contact, association_tax_id, meeting_id, attendee_id, slip_id, status, created_at, updated_at)
-VALUES ('1', '2569/02-108', '18 กันยายน 2569', 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569', 'individual', 'ปราณี นำชัยศรีค้า', NULL, '', '', NULL, NULL, '[{"id":"item-1","title":"ค่าลงทะเบียน","amount":4000,"itemNumber":1,"subDetails":["การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569","ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์","จัดขึ้นวันที่ 20 ตุลาคม 2569","โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ","ปราณี นำชัยศรีค้า"]}]'::jsonb, 4000, NULL, NULL, 'ผู้จ่ายเงิน', NULL, 'แพทย์หญิงพิมพกา ชวนะเวสน์', 'เหรัญญิก / ผู้รับเงิน', NULL, 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม', 'ผู้จัดทำ', NULL, 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย', 'Thai Society for Reproductive Medicine', 'ชั้น 8 อาคารเฉลิมพระบารมี ๕๐ ปี เลขที่ 2 ซอยศูนย์วิจัย ถนนเพชรบุรีตัดใหม่ กรุงเทพฯ', 'Website: https://thaisrm.com/ E-mail: tsrm.info@gmail.com', '0-9930-00367-70-7', 'TSRM34', NULL, 'SLIP-MU68P76Z', 'issued', '2026-09-18T04:08:51.638Z', '2026-09-18T04:47:16.625Z')
+VALUES ('1', '2569/02-108', '18 กันยายน 2569', 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569', 'individual', 'ปราณี นำชัยศรีค้า', NULL, '', '', NULL, NULL, '[{"id":"item-1","title":"ค่าลงทะเบียน","amount":4000,"itemNumber":1,"subDetails":["การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569","ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์","จัดขึ้นวันที่ 20 ตุลาคม 2569","โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ","ปราณี นำชัยศรีค้า"]}]'::jsonb, 4000, NULL, NULL, 'ผู้จ่ายเงิน', NULL, 'แพทย์หญิงพิมพกา ชวนะเวสน์', 'เหรัญญิก / ผู้รับเงิน', NULL, 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม', 'ผู้จัดทำ', NULL, 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย', 'Thai Society for Reproductive Medicine', 'ชั้น 8 อาคารเฉลิมพระบารมี ๕๐ ปี เลขที่ 2 ซอยศูนย์วิจัย ถนนเพชรบุรีตัดใหม่ กรุงเทพฯ', 'Website: https://tsrm.com/ E-mail: tsrm.info@gmail.com', '0-9930-00367-70-7', 'TSRM34', NULL, 'SLIP-MU68P76Z', 'issued', '2026-09-18T04:08:51.638Z', '2026-09-18T05:21:20.937Z')
 ON CONFLICT (receipt_no) DO UPDATE SET
   status = EXCLUDED.status,
   updated_at = EXCLUDED.updated_at;
 INSERT INTO receipts (id, receipt_no, receipt_date, purpose_text, payer_type, payer_name, branch_name, payer_address_line1, payer_address_line2, payer_phone, payer_tax_id, items, total_amount, thai_baht_text_override, payer_signer_name, payer_signer_role, payer_signed_date, authorized_signer_name, authorized_signer_role, authorized_signed_date, prepared_by_name, prepared_by_role, prepared_by_signed_date, association_name_th, association_name_en, association_address, association_contact, association_tax_id, meeting_id, attendee_id, slip_id, status, created_at, updated_at)
-VALUES ('2', '2569/02-109', '18 กันยายน 2569', 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569', 'individual', 'พิชญ์พงษ์ จุทิ่น', NULL, '', '', NULL, NULL, '[{"id":"item-2","title":"ค่าลงทะเบียน","amount":4000,"itemNumber":1,"subDetails":["การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569","ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์","จัดขึ้นวันที่ 20 ตุลาคม 2569","โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ","พิชญ์พงษ์ จุทิ่น"]}]'::jsonb, 4000, NULL, NULL, 'ผู้จ่ายเงิน', NULL, 'แพทย์หญิงพิมพกา ชวนะเวสน์', 'เหรัญญิก / ผู้รับเงิน', NULL, 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม', 'ผู้จัดทำ', NULL, 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย', 'Thai Society for Reproductive Medicine', 'ชั้น 8 อาคารเฉลิมพระบารมี ๕๐ ปี เลขที่ 2 ซอยศูนย์วิจัย ถนนเพชรบุรีตัดใหม่ กรุงเทพฯ', 'Website: https://thaisrm.com/ E-mail: tsrm.info@gmail.com', '0-9930-00367-70-7', 'TSRM34', NULL, 'SLIP-MU6BGSA8', 'issued', '2026-09-18T04:08:51.640Z', '2026-09-18T04:47:16.628Z')
+VALUES ('2', '2569/02-109', '18 กันยายน 2569', 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569', 'individual', 'พิชญ์พงษ์ จุทิ่น', NULL, '', '', NULL, NULL, '[{"id":"item-2","title":"ค่าลงทะเบียน","amount":4000,"itemNumber":1,"subDetails":["การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569","ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์","จัดขึ้นวันที่ 20 ตุลาคม 2569","โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ","พิชญ์พงษ์ จุทิ่น"]}]'::jsonb, 4000, NULL, NULL, 'ผู้จ่ายเงิน', NULL, 'แพทย์หญิงพิมพกา ชวนะเวสน์', 'เหรัญญิก / ผู้รับเงิน', NULL, 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม', 'ผู้จัดทำ', NULL, 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย', 'Thai Society for Reproductive Medicine', 'ชั้น 8 อาคารเฉลิมพระบารมี ๕๐ ปี เลขที่ 2 ซอยศูนย์วิจัย ถนนเพชรบุรีตัดใหม่ กรุงเทพฯ', 'Website: https://tsrm.com/ E-mail: tsrm.info@gmail.com', '0-9930-00367-70-7', 'TSRM34', NULL, 'SLIP-MU6BGSA8', 'issued', '2026-09-18T04:08:51.640Z', '2026-09-18T05:21:20.939Z')
 ON CONFLICT (receipt_no) DO UPDATE SET
   status = EXCLUDED.status,
   updated_at = EXCLUDED.updated_at;

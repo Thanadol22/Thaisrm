@@ -8,8 +8,8 @@ export interface ReceiptItemLine {
 
 export interface ReceiptData {
   id: string;
-  receiptNo: string; // e.g. "2569/02-094"
-  receiptDate: string; // e.g. "10 มีนาคม 2569"
+  receiptNo: string; // e.g. "2569/02-108"
+  receiptDate: string; // e.g. "18 กันยายน 2569"
   
   // Header details (Association info)
   associationNameTh?: string;

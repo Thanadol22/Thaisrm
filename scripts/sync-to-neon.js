@@ -8,7 +8,7 @@ const targetUrl = process.argv[2] || process.env.NEON_DATABASE_URL || process.en
 if (!targetUrl) {
   console.log(`
 ❌ กรุณาระบุ Connection URL ของ Neon:
-   node scripts/sync-to-neon.js "postgresql://<USER>:<PASSWORD>@<NEON_HOST>/thaisrm?sslmode=require"
+   node scripts/sync-to-neon.js "postgresql://<USER>:<PASSWORD>@<NEON_HOST>/tsrm?sslmode=require"
 
 หรือคัดลอกคำสั่งในไฟล์:
    db/neon_full_sync.sql

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
+import { TsrmLogo } from '@/components/TsrmLogo';
 import {
   LayoutDashboard,
   PlusCircle,
@@ -133,12 +133,12 @@ export function AdminNavbar({
         {/* Brand */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-white/10 bg-white/5 shrink-0">
           <div className="w-10 h-10 rounded-2xl bg-white p-1.5 flex items-center justify-center shrink-0 shadow-sm">
-            <ThaiSrmLogo className="w-full h-full object-contain" />
+            <TsrmLogo className="w-full h-full object-contain" />
           </div>
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-black text-white tracking-wider truncate">
-                THAI SRM
+                TSRM
               </span>
               <span className="inline-flex items-center gap-0.5 text-[9.5px] font-black text-[#4ade80] bg-[#4ade80]/20 border border-[#4ade80]/40 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
                 <ShieldCheck className="w-3 h-3 text-[#4ade80]" />
@@ -256,10 +256,10 @@ export function AdminNavbar({
           {/* Brand */}
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 shadow-xs">
-              <ThaiSrmLogo className="w-full h-full object-contain" />
+              <TsrmLogo className="w-full h-full object-contain" />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-black text-white leading-tight">Thai SRM Admin</span>
+              <span className="text-sm font-black text-white leading-tight">TSRM Admin</span>
               <span className="text-[10px] font-bold text-blue-200 flex items-center gap-1">
                 <span>ระบบแอดมิน</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80]"></span>

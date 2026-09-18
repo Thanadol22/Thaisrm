@@ -74,7 +74,7 @@ import { MeetingEditModal } from '@/components/MeetingEditModal';
 import { AdminSlipsView } from '@/components/views/AdminSlipsView';
 import { AdminLoginView } from '@/components/views/AdminLoginView';
 import { AdminSettingsPanel } from '@/components/AdminSettingsPanel';
-import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
+import { TsrmLogo } from '@/components/TsrmLogo';
 import { SystemSettings, DEFAULT_SYSTEM_SETTINGS } from '@/lib/services/settingsService';
 
 /* ─── Data Types & Interfaces ─────────────────────────────────────────── */
@@ -6081,7 +6081,7 @@ export default function AdminPage() {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white font-sans">
         <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 p-2.5 flex items-center justify-center animate-pulse mb-4">
-          <ThaiSrmLogo className="w-full h-full object-contain" />
+          <TsrmLogo className="w-full h-full object-contain" />
         </div>
         <div className="flex items-center gap-2 text-slate-400 text-xs sm:text-sm font-medium">
           <span className="w-2 h-2 rounded-full bg-[#4ade80] animate-ping" />

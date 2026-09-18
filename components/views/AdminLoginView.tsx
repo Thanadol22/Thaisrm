@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ThaiSrmLogo } from '@/components/ThaiSrmLogo';
+import { TsrmLogo } from '@/components/TsrmLogo';
 import {
   ShieldCheck,
   User,
@@ -89,7 +89,7 @@ export function AdminLoginView({ onLoginSuccess }: AdminLoginViewProps) {
           <div className="relative mb-4 group">
             <div className="absolute -inset-2 bg-gradient-to-r from-[#0026b3] to-[#4ade80] rounded-2xl blur-md opacity-70 group-hover:opacity-100 transition duration-500" />
             <div className="relative w-16 h-16 rounded-2xl bg-slate-900 border border-white/20 p-2.5 flex items-center justify-center shadow-lg">
-              <ThaiSrmLogo className="w-full h-full object-contain" />
+              <TsrmLogo className="w-full h-full object-contain" />
             </div>
             <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#4ade80] border-2 border-slate-900 flex items-center justify-center">
               <ShieldCheck className="w-3 h-3 text-slate-950" />
