@@ -23,6 +23,7 @@ import {
   Calendar,
   CalendarX,
   AlertCircle,
+  AlertTriangle,
   Loader2,
   Check,
   ExternalLink,
@@ -610,6 +611,23 @@ export function LoginView({
               ? 'เลือกลงทะเบียนเข้าร่วมงานประชุมวิชาการ หรือ สมัครสมาชิกสมาคมฯ'
               : 'Register for Conference Summit or apply for TSRM membership'}
           </p>
+
+          {/* System Testing and Development Notice Banner */}
+          <div className="mt-3.5 px-3.5 sm:px-4 py-2.5 sm:py-3 bg-amber-500/20 border border-amber-400/40 rounded-xl sm:rounded-2xl backdrop-blur-md flex items-center gap-2.5 sm:gap-3 shadow-sm">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-amber-400/25 flex items-center justify-center shrink-0 border border-amber-300/40 shadow-2xs">
+              <AlertTriangle className="w-4 h-4 text-amber-300 animate-pulse" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs sm:text-sm font-black text-amber-200 tracking-tight leading-snug">
+                {lang === 'th' ? 'ระบบกำลังทดสอบและพัฒนา ยังไม่เปิดให้ใช้บริการ' : 'The system is currently under testing and development (Not yet open for service)'}
+              </p>
+              <p className="text-[10px] sm:text-xs text-amber-200/80 font-medium leading-tight mt-0.5">
+                {lang === 'th'
+                  ? 'ข้อมูลและการทำรายการทั้งหมดในช่วงนี้ใช้เพื่อการทดสอบระบบเท่านั้น'
+                  : 'All data and operations during this period are for testing and development purposes only.'}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
