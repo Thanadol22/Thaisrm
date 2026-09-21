@@ -34,6 +34,7 @@ import { ParticipantSearchModal } from '@/components/ParticipantSearchModal';
 import { ExpiredMemberModal } from '@/components/ExpiredMemberModal';
 import { SignupView } from '@/components/views/SignupView';
 import { PositionSelect } from '@/components/PositionSelect';
+import { SmartEmailInput } from '@/components/SmartEmailInput';
 import { useLanguage } from '@/context/LanguageContext';
 import { parseGoogleName } from '@/lib/utils';
 
@@ -255,7 +256,7 @@ export function LoginView({
     nameTh: '',
     nameEn: '',
     workplace: '',
-    position: 'ไม่ระบุ',
+    position: '',
     positionOther: '',
     specialCode: '',
     email: '',
@@ -289,7 +290,7 @@ export function LoginView({
       nameTh: '',
       nameEn: '',
       workplace: '',
-      position: 'ไม่ระบุ',
+      position: '',
       positionOther: '',
       specialCode: '',
       email: '',
@@ -359,12 +360,12 @@ export function LoginView({
     const programLabel = selectedActivityObjects.map(a => a.name).join(' + ');
     const finalPosition = (formData.position === 'อื่นๆ' || formData.position === '0 อื่นๆ')
       ? (formData.positionOther || (lang === 'th' ? 'อื่นๆ' : 'Other'))
-      : (formData.position || (lang === 'th' ? 'ไม่ระบุ' : 'Unspecified'));
+      : (formData.position || '');
 
     const rawMemberNo = formData.memberNo.trim();
 
     // ── Form Validation ──────────────────────────────────────────────────────────
-    // บังคับกรอก: ชื่อ-นามสกุล (ภาษาไทย), ชื่อ-นามสกุล (ภาษาอังกฤษ), อีเมล, และ หน่วยงาน
+    // บังคับกรอก: ชื่อ-นามสกุล (ภาษาไทย), ชื่อ-นามสกุล (ภาษาอังกฤษ), อีเมล, หน่วยงาน, และ ตำแหน่ง
     if (!formData.nameTh.trim()) {
       alert(lang === 'th' ? 'กรุณากรอกชื่อ-นามสกุล (ภาษาไทย)' : 'Please enter your Full Name (Thai)');
       return;
@@ -389,6 +390,16 @@ export function LoginView({
 
     if (!formData.workplace.trim()) {
       alert(lang === 'th' ? 'กรุณากรอกสถานที่ทำงาน/หน่วยงาน' : 'Please enter your Workplace / Organization');
+      return;
+    }
+
+    if (!formData.position.trim()) {
+      alert(lang === 'th' ? 'กรุณาเลือกตำแหน่ง' : 'Please select your Position');
+      return;
+    }
+
+    if ((formData.position === 'อื่นๆ' || formData.position === '0 อื่นๆ') && !formData.positionOther.trim()) {
+      alert(lang === 'th' ? 'กรุณาระบุตำแหน่งอื่นๆ' : 'Please specify other position');
       return;
     }
 
@@ -758,47 +769,6 @@ export function LoginView({
                     </div>
                   </div>
 
-                  {/* Google Autofill Button with Accent Pill */}
-                  <div className="space-y-1.5 max-w-md mx-auto w-full">
-                    <button
-                      type="button"
-                      onClick={handleGoogleAutofill}
-                      className="w-full bg-slate-50 hover:bg-slate-100 text-slate-800 font-bold py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition flex items-center justify-between gap-2 cursor-pointer active:scale-[0.99] group"
-                    >
-                      <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-                        <GoogleIcon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                        <div className="text-left min-w-0">
-                          <p className="text-[11px] xs:text-xs sm:text-sm font-black text-slate-800 tracking-tight truncate">
-                            {lang === 'th' ? 'กรอกข้อมูลอัตโนมัติด้วย Google' : 'Autofill with Google'}
-                          </p>
-                          <span className="text-[9px] xs:text-[10px] text-slate-500 font-medium block truncate">
-                            {lang === 'th' ? 'ดึงชื่อและอีเมลจากบัญชีของคุณอัตโนมัติ' : 'Automatically fill name and email'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="text-[9px] xs:text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 sm:px-2 py-0.5 rounded-md">
-                          {lang === 'th' ? 'แนะนำ' : 'Recommended'}
-                        </span>
-                        <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 group-hover:translate-x-0.5 transition-transform shrink-0" />
-                      </div>
-                    </button>
-                    {autofillSuccess && (
-                      <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 rounded-xl py-1.5 animate-fade-in">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>{lang === 'th' ? 'กรอกข้อมูลจาก Google สำเร็จ!' : 'Autofilled from Google successfully!'}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Divider */}
-                  <div className="relative flex items-center justify-center my-1.5 sm:my-2">
-                    <div className="border-t border-slate-200 w-full" />
-                    <span className="bg-white px-2.5 sm:px-3 text-[9.5px] xs:text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase absolute">
-                      {lang === 'th' ? 'หรือ กรอกข้อมูลด้วยตนเอง' : 'Or fill in details'}
-                    </span>
-                  </div>
-
                   {/* Registration Form with 7 Specified Fields */}
                   <form onSubmit={handleSubmitRegistration} className="space-y-3 sm:space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5">
@@ -838,19 +808,14 @@ export function LoginView({
 
                       {/* 3. อีเมล (Email) */}
                       <div>
-                        <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
-                          {lang === 'th' ? 'อีเมล (Email)' : 'Email Address'} <span className="text-rose-500 font-bold">*</span>
-                        </label>
-                        <div className="relative">
-                          <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                          <input
-                            type="email"
-                            value={formData.email}
-                            onChange={(e) => handleInputChange('email', e.target.value)}
-                            placeholder={lang === 'th' ? 'เช่น yourname@gmail.com' : 'e.g. yourname@gmail.com'}
-                            className="w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition"
-                          />
-                        </div>
+                        <SmartEmailInput
+                          value={formData.email}
+                          onChange={(val) => handleInputChange('email', val)}
+                          label={lang === 'th' ? 'อีเมล (Email)' : 'Email Address'}
+                          placeholder={lang === 'th' ? 'เช่น yourname@gmail.com' : 'e.g. yourname@gmail.com'}
+                          helperText={lang === 'th' ? 'กรุณากรอกอีเมลที่มีอยู่จริง เพื่อรับ QR Code เข้าร่วมงาน' : 'Please provide a valid email to receive your Event QR Code.'}
+                          required
+                        />
                       </div>
 
                       {/* 4. หน่วยงาน */}
@@ -1133,24 +1098,6 @@ export function LoginView({
                 isEmbedded={true}
                 onNavigateToLogin={() => handleTabChange('conference')}
                 onSubmitSignup={handleMembershipComplete}
-                onGoogleSignUp={() => {
-                  if (onGoogleAutofill) {
-                    onGoogleAutofill('membership');
-                  } else {
-                    onGoogleSignIn();
-                  }
-                }}
-                initialUserData={
-                  autofillTarget === 'membership' && initialGoogleUser
-                    ? {
-                      name: initialGoogleUser.name || undefined,
-                      email: initialGoogleUser.email || undefined,
-                      picture: initialGoogleUser.picture || undefined,
-                      given_name: initialGoogleUser.given_name || undefined,
-                      family_name: initialGoogleUser.family_name || undefined,
-                    }
-                    : null
-                }
               />
             </div>
           )}

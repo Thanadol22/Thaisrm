@@ -13,6 +13,7 @@ import {
 } from '@/types/member';
 import { MemberAvatar } from '@/components/MemberAvatar';
 import { PositionSelect } from '@/components/PositionSelect';
+import { SmartEmailInput } from '@/components/SmartEmailInput';
 import {
   X,
   User,
@@ -472,16 +473,11 @@ export function MemberFormModal({
 
                 {/* อีเมล */}
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                    <Mail className="w-3.5 h-3.5 text-slate-400" />
-                    <span>อีเมล</span>
-                  </label>
-                  <input
-                    type="email"
+                  <SmartEmailInput
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(val) => setEmail(val)}
+                    label="อีเมล"
                     placeholder="เช่น member@example.com"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent"
                   />
                 </div>
 

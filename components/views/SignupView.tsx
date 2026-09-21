@@ -26,12 +26,12 @@ import {
   ArrowLeft,
   Sparkles,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Upload,
 } from 'lucide-react';
-import { GoogleIcon } from '@/components/GoogleIcon';
 import { PositionSelect } from '@/components/PositionSelect';
+import { SmartEmailInput } from '@/components/SmartEmailInput';
 import { useLanguage } from '@/context/LanguageContext';
-import { parseGoogleName } from '@/lib/utils';
 import { uploadImageToStorage } from '@/lib/blobUpload';
 import { CreateMemberInput } from '@/types/member';
 
@@ -65,24 +65,17 @@ export function SignupView({
   initialUserData,
   isEmbedded = false
 }: SignupViewProps) {
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
   const [consentChecked, setConsentChecked] = useState(false);
-  const [autofillSuccess, setAutofillSuccess] = useState(false);
   const { lang, toggleLang, t } = useLanguage();
-
-  const initialNames = parseGoogleName(
-    initialUserData?.name,
-    initialUserData?.given_name,
-    initialUserData?.family_name
-  );
 
   // Form states matching TSRM Member application form
   const [formData, setFormData] = useState({
-    nameTh: initialNames.nameTh,
-    nameEn: initialNames.nameEn,
+    nameTh: '',
+    nameEn: '',
     id4Digits: '',
     mobile: '',
-    email: initialUserData?.email || '',
+    email: '',
     lineId: '',
     workplace: '',
     startDate: '',
@@ -95,61 +88,14 @@ export function SignupView({
     { id: '1', degree: '', institution: '', year: '' },
   ]);
 
-  const [photoPreview, setPhotoPreview] = useState<string | null>(initialUserData?.picture || null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const goToStep = (step: 1 | 2 | 3) => {
+  const goToStep = (step: 1 | 2) => {
     setSubmitError(null);
     setCurrentStep(step);
-  };
-
-  // Synchronize initialUserData prop changes when Google profile is provided
-  useEffect(() => {
-    if (initialUserData && (initialUserData.name || initialUserData.email || initialUserData.picture)) {
-      const { nameTh, nameEn } = parseGoogleName(
-        initialUserData.name,
-        initialUserData.given_name,
-        initialUserData.family_name
-      );
-      setFormData(prev => ({
-        ...prev,
-        nameTh: nameTh || prev.nameTh,
-        nameEn: nameEn || prev.nameEn,
-        email: initialUserData.email || prev.email,
-      }));
-      if (initialUserData.picture) {
-        setPhotoPreview(initialUserData.picture);
-      }
-      setAutofillSuccess(true);
-      const timer = setTimeout(() => setAutofillSuccess(false), 4000);
-      return () => clearTimeout(timer);
-    } else if (initialUserData === null) {
-      setFormData({
-        nameTh: '',
-        nameEn: '',
-        id4Digits: '',
-        mobile: '',
-        email: '',
-        lineId: '',
-        workplace: '',
-        startDate: '',
-        position: '',
-        positionOther: '',
-        scientistNo: '',
-      });
-      setPhotoPreview(null);
-      setSelectedPhotoFile(null);
-      setAutofillSuccess(false);
-    }
-  }, [initialUserData]);
-
-  // Handle Google button: triggers Google OAuth account picker
-  const handleGoogleAutoFill = () => {
-    if (onGoogleSignUp) {
-      onGoogleSignUp();
-    }
   };
 
   const handleClearForm = () => {
@@ -251,7 +197,7 @@ export function SignupView({
     // Validate Thai Name (Required)
     if (!formData.nameTh || !formData.nameTh.trim()) {
       setSubmitError(lang === 'th' ? 'กรุณากรอกชื่อ-นามสกุล (ภาษาไทย)' : 'Please enter your full name in Thai');
-      setCurrentStep(2);
+      setCurrentStep(1);
       return;
     }
 
@@ -279,7 +225,6 @@ export function SignupView({
       }
 
       // 2. Prepare payload - directly matching existing database fields
-      // Unfilled fields are sent as null / empty without creating new fields
       const payload: CreateMemberInput = {
         full_name_th: formData.nameTh.trim(),
         full_name_en: formData.nameEn.trim() || null,
@@ -302,32 +247,38 @@ export function SignupView({
         membership_status: 'Active',
         educations: educationList
           .filter(edu => edu.degree.trim() !== '' || edu.institution.trim() !== '')
-          .map(edu => ({
-            degree: edu.degree.trim() || null,
-            institution: edu.institution.trim() || null,
+          .map((edu, idx) => ({
+            degree: edu.degree.trim(),
+            institution: edu.institution.trim(),
             graduation_year: edu.year.trim() ? parseInt(edu.year.trim(), 10) : null,
-            display_order: 1,
+            display_order: idx + 1,
           })),
       };
 
-      // 3. Save pending registration data to localStorage (Wait for slip approval before inserting to members DB)
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem('membership_registration', JSON.stringify(payload));
-          localStorage.removeItem('tsrm_user');
-          localStorage.removeItem('thaisrm_user');
-        } catch (e) {
-          console.error('Failed to save to localStorage:', e);
+      if (onSubmitSignup) {
+        await onSubmitSignup(payload);
+      } else {
+        const response = await fetch('/api/members', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const resData = await response.json();
+
+        if (!response.ok || !resData.success) {
+          throw new Error(resData.error || (lang === 'th' ? 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' : 'Registration failed'));
+        }
+
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.setItem('membership_registered_email', formData.email.trim());
+          } catch (e) {}
         }
       }
-
-      // 4. Trigger callback to navigate to payment step
-      if (onSubmitSignup) {
-        onSubmitSignup(payload);
-      }
     } catch (err: any) {
-      console.error('Signup submit error:', err);
-      setSubmitError(err.message || (lang === 'th' ? 'ไม่สามารถส่งใบสมัครได้ กรุณาตรวจสอบข้อมูลและลองใหม่อีกครั้ง' : 'Registration failed. Please try again.'));
+      console.error('Signup error:', err);
+      setSubmitError(err.message || (lang === 'th' ? 'เกิดข้อผิดพลาดในการลงทะเบียน' : 'Application submission failed'));
     } finally {
       setSubmitting(false);
     }
@@ -338,21 +289,20 @@ export function SignupView({
       {/* Form Body */}
       <div className={isEmbedded ? "px-0 py-1 flex-1 flex flex-col space-y-3 sm:space-y-4" : "px-3 xs:px-4 sm:px-8 lg:px-12 py-2 sm:py-4 flex-1 flex flex-col space-y-3 sm:space-y-4"}>
 
-        {/* Roadmap Stepper Bar */}
+        {/* Roadmap Stepper Bar (2 Steps) */}
         <div className="bg-white rounded-2xl p-2.5 xs:p-3 sm:p-4 border border-slate-200 shadow-2xs mb-1">
-          <div className="flex items-center justify-between relative px-1 sm:px-6">
+          <div className="flex items-center justify-around relative px-4 sm:px-16">
             {/* Connecting Progress Line */}
-            <div className="absolute top-3.5 xs:top-4 sm:top-5 left-6 xs:left-8 right-6 xs:right-8 sm:left-12 sm:right-12 h-1 bg-slate-200 -z-0">
+            <div className="absolute top-3.5 xs:top-4 sm:top-5 left-16 xs:left-24 sm:left-32 right-16 xs:right-24 sm:right-32 h-1 bg-slate-200 -z-0">
               <div
                 className="h-full bg-[#0026b3] transition-all duration-300 rounded-full"
-                style={{ width: currentStep === 1 ? '0%' : currentStep === 2 ? '50%' : '100%' }}
+                style={{ width: currentStep === 1 ? '0%' : '100%' }}
               />
             </div>
 
             {[
               { id: 1, title: t.signup.step1Title },
               { id: 2, title: t.signup.step2Title },
-              { id: 3, title: t.signup.step3Title },
             ].map((step) => {
               const isCompleted = currentStep > step.id;
               const isCurrent = currentStep === step.id;
@@ -360,22 +310,24 @@ export function SignupView({
                 <button
                   key={step.id}
                   type="button"
-                  onClick={() => goToStep(step.id as 1 | 2 | 3)}
-                  className="flex flex-col items-center relative z-10 group cursor-pointer max-w-[90px] sm:max-w-none text-center"
+                  onClick={() => goToStep(step.id as 1 | 2)}
+                  className="flex flex-col items-center relative z-10 group cursor-pointer max-w-[140px] sm:max-w-none text-center"
                 >
                   <div
-                    className={`w-7 h-7 xs:w-8 xs:h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-black text-[11px] sm:text-sm transition-all shadow-sm ${isCompleted
+                    className={`w-7 h-7 xs:w-8 xs:h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-black text-[11px] sm:text-sm transition-all shadow-sm ${
+                      isCompleted
                         ? 'bg-[#4ade80] text-[#061d08] ring-3 sm:ring-4 ring-[#4ade80]/20'
                         : isCurrent
                           ? 'bg-[#0026b3] text-white ring-3 sm:ring-4 ring-[#0026b3]/20 scale-105 sm:scale-110'
                           : 'bg-slate-100 text-slate-400 border border-slate-300'
-                      }`}
+                    }`}
                   >
                     {isCompleted ? <Check className="w-3.5 h-3.5 sm:w-5 sm:h-5 stroke-[3]" /> : step.id}
                   </div>
                   <span
-                    className={`text-[9.5px] xs:text-[10px] sm:text-xs font-bold mt-1 leading-tight line-clamp-1 transition ${isCurrent ? 'text-[#0026b3] font-black' : isCompleted ? 'text-slate-800' : 'text-slate-400'
-                      }`}
+                    className={`text-[9.5px] xs:text-[10px] sm:text-xs font-bold mt-1 leading-tight line-clamp-1 transition ${
+                      isCurrent ? 'text-[#0026b3] font-black' : isCompleted ? 'text-slate-800' : 'text-slate-400'
+                    }`}
                   >
                     {step.title}
                   </span>
@@ -387,66 +339,19 @@ export function SignupView({
 
         <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 flex-1 flex flex-col justify-between">
 
-          {/* STEP 1: Account Creation, Google Sign-Up & Photo Upload */}
+          {/* STEP 1: Profile Creation & Personal Information */}
           {currentStep === 1 && (
             <div className="space-y-3.5 sm:space-y-4 animate-fade-in">
-              {/* Google Sign-Up Prompt in Step 1 */}
-              <div className="bg-blue-50/80 border border-blue-200/90 rounded-2xl p-3.5 sm:p-5 shadow-2xs space-y-2.5 sm:space-y-3">
-                <div className="flex items-center gap-2 text-[#0026b3]">
-                  <Globe className="w-4 h-4 shrink-0" />
-                  <span className="text-xs sm:text-sm font-extrabold">สมัครสมาชิกแบบรวดเร็วด้วยบัญชี Google</span>
-                </div>
-                <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed">
-                  กดเลือกสมัครด้วย Google เพื่อดึงข้อมูลโปรไฟล์ ชื่อ-นามสกุล, อีเมล และรูปถ่ายเข้าสู่ระบบอัตโนมัติ
-                </p>
-                <button
-                  type="button"
-                  onClick={handleGoogleAutoFill}
-                  className="w-full bg-white hover:bg-slate-50 text-slate-800 font-bold py-2.5 sm:py-3 px-3.5 sm:px-4 rounded-xl border border-slate-300 shadow-2xs hover:shadow transition flex items-center justify-center gap-2.5 cursor-pointer active:scale-[0.99]"
-                >
-                  <GoogleIcon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                  <span className="text-xs sm:text-sm font-bold">{t.signup.googleSignUpButton}</span>
-                </button>
-
-                {autofillSuccess && (
-                  <p className="text-[10px] sm:text-[11px] text-emerald-600 font-bold flex items-center gap-1 justify-center animate-fade-in pt-0.5">
-                    <Sparkles className="w-3 h-3 text-emerald-500" />
-                    <span>{t.signup.googleAutofillSuccessToast}</span>
-                  </p>
-                )}
-              </div>
-
-              {/* Divider */}
-              <div className="relative flex items-center justify-center my-1.5 sm:my-2">
-                <div className="border-t border-slate-200 w-full" />
-                <span className="bg-[#f6f8fc] px-2.5 sm:px-3 text-[10px] sm:text-xs font-semibold text-slate-400 uppercase absolute">
-                  {t.signup.orDivider} กรอกข้อมูลด้วยตนเอง
-                </span>
-              </div>
-
-              {/* Digital Photo Upload Section */}
-              <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-[#0026b3] flex items-center justify-center shrink-0">
-                    <Camera className="w-4 h-4 sm:w-5 sm:h-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm leading-tight">
-                      {t.signup.photoSectionTitle} <span className="text-red-500">*</span>
-                    </h3>
-                    <p className="text-[10.5px] sm:text-xs text-slate-500 mt-0.5 leading-normal">
-                      {t.signup.photoSectionSubtitle}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Photo Preview Container */}
-                <div className="flex items-center gap-3 shrink-0">
-                  <div className="w-20 h-28 xs:w-24 xs:h-32 sm:w-28 sm:h-36 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center relative overflow-hidden group hover:border-[#0026b3] transition cursor-pointer shadow-2xs">
+              
+              {/* Profile Photo Builder Card */}
+              <div className="bg-gradient-to-br from-blue-50/70 via-slate-50 to-white rounded-2xl p-4 sm:p-5 border border-blue-100 shadow-2xs flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+                {/* Avatar Preview & Camera Badge */}
+                <div className="relative group shrink-0">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl sm:rounded-3xl border-2 border-dashed border-blue-300 bg-white flex flex-col items-center justify-center overflow-hidden shadow-xs group-hover:border-[#0026b3] transition-all relative">
                     {photoPreview ? (
                       <img
                         src={photoPreview}
-                        alt="Digital Photo Preview"
+                        alt="Profile Preview"
                         className="w-full h-full object-cover"
                         referrerPolicy="no-referrer"
                         onError={(e) => {
@@ -455,52 +360,68 @@ export function SignupView({
                         }}
                       />
                     ) : (
-                      <div className="flex flex-col items-center px-2 text-center">
-                        <Camera className="w-5 h-5 sm:w-7 sm:h-7 text-slate-400 mb-1 group-hover:text-[#0026b3] transition" />
-                        <span className="text-[9.5px] xs:text-[10px] font-bold text-slate-500 group-hover:text-[#0026b3]">{t.signup.photoChoose}</span>
+                      <div className="flex flex-col items-center justify-center p-2 text-center text-slate-400 group-hover:text-[#0026b3] transition-colors">
+                        <User className="w-8 h-8 sm:w-10 sm:h-10 stroke-[1.5] mb-1" />
+                        <span className="text-[10px] font-bold text-slate-500">{t.signup.photoChoose}</span>
                       </div>
                     )}
                     <input
                       type="file"
                       accept="image/*"
                       onChange={handlePhotoUpload}
-                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                      title="เลือกรูปโปรไฟล์"
                     />
                   </div>
 
-                  {photoPreview && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPhotoPreview(null);
-                        setSelectedPhotoFile(null);
-                      }}
-                      className="text-xs text-red-500 hover:text-red-700 font-bold px-2.5 py-1.5 rounded-lg border border-red-200 hover:bg-red-50 transition shrink-0 whitespace-nowrap"
-                    >
-                      {t.signup.photoDelete}
-                    </button>
-                  )}
+                  {/* Camera Badge */}
+                  <div className="absolute -bottom-1 -right-1 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#0026b3] text-white flex items-center justify-center shadow-md border-2 border-white pointer-events-none group-hover:scale-110 transition-transform">
+                    <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  </div>
+                </div>
+
+                {/* Photo Description & Quick Actions */}
+                <div className="flex-1 text-center sm:text-left space-y-2">
+                  <div>
+                    <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm flex items-center justify-center sm:justify-start gap-1.5">
+                      <span>{t.signup.photoSectionTitle}</span>
+                      <span className="text-red-500 font-bold">*</span>
+                    </h3>
+                    <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 leading-relaxed">
+                      {t.signup.photoSectionSubtitle}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-0.5">
+                    <label className="relative cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold border border-slate-300 shadow-2xs hover:border-[#0026b3] transition">
+                      <Upload className="w-3.5 h-3.5 text-[#0026b3]" />
+                      <span>{photoPreview ? (lang === 'th' ? 'เปลี่ยนรูปถ่าย' : 'Change Photo') : t.signup.photoChoose}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                      />
+                    </label>
+
+                    {photoPreview && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPhotoPreview(null);
+                          setSelectedPhotoFile(null);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 border border-red-200 transition cursor-pointer"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>{t.signup.photoDelete}</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Step 1 Next Button (Primary Blue & Accent Green CTA) */}
-              <button
-                type="button"
-                onClick={() => goToStep(2)}
-                className="w-full bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] hover:brightness-110 text-white font-black text-xs xs:text-sm sm:text-base py-3 sm:py-4 rounded-xl sm:rounded-2xl shadow-xl shadow-blue-900/30 hover:shadow-blue-900/40 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2.5 sm:gap-3 group border border-blue-400/20 relative overflow-hidden"
-              >
-                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#4ade80] to-transparent opacity-90" />
-                <span className="tracking-wide">{t.signup.nextButton}</span>
-                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-[#4ade80] text-[#061d08] flex items-center justify-center shadow-xs group-hover:translate-x-1 transition-transform shrink-0">
-                  <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
-                </div>
-              </button>
-            </div>
-          )}
-
-          {/* STEP 2: Personal Information & Workplace */}
-          {currentStep === 2 && (
-            <div className="space-y-4 animate-fade-in">
+              {/* Personal Information & Workplace */}
               <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-2xs space-y-3.5">
                 <h3 className="font-extrabold text-[#0026b3] text-xs sm:text-sm flex items-center gap-2 border-b border-slate-100 pb-2">
                   <User className="w-4 h-4 text-[#0026b3] shrink-0" />
@@ -581,21 +502,13 @@ export function SignupView({
                 {/* email & Line */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      {t.signup.emailLabel} <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative flex items-center">
-                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none shrink-0" />
-                      <input
-                        type="email"
-                        name="email"
-                        autoComplete="email"
-                        placeholder={t.signup.emailPlaceholder}
-                        value={formData.email}
-                        onChange={(e) => handleInputChange('email', e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 transition outline-none font-medium"
-                      />
-                    </div>
+                    <SmartEmailInput
+                      value={formData.email}
+                      onChange={(val) => handleInputChange('email', val)}
+                      label={t.signup.emailLabel}
+                      placeholder={t.signup.emailPlaceholder}
+                      required
+                    />
                   </div>
 
                   <div>
@@ -617,13 +530,12 @@ export function SignupView({
                   </div>
                 </div>
 
-                {/* ที่ทำงาน** & วันที่เริ่มงาน */}
+                {/* ที่ทำงาน & วันที่เริ่มงาน */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       {t.signup.workplaceLabel} <span className="text-red-500">*</span>
                     </label>
-                    {/* Workplace Input */}
                     <div className="relative flex items-center">
                       <Building className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none shrink-0" />
                       <input
@@ -697,34 +609,38 @@ export function SignupView({
                 </div>
               </div>
 
-              {/* Step 2 Nav Buttons */}
-              <div className="flex items-center gap-2.5 sm:gap-3">
-                <button
-                  type="button"
-                  onClick={() => goToStep(1)}
-                  className="px-3 sm:px-4 py-3 sm:py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-xl sm:rounded-2xl border border-slate-200 transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer active:scale-95"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                  <span>{t.signup.prevButton}</span>
-                </button>
+              {/* Submit Error Banner (if any on step 1) */}
+              {submitError && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-600 font-bold flex items-start gap-2 animate-fade-in">
+                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                  <span>{submitError}</span>
+                </div>
+              )}
 
-                <button
-                  type="button"
-                  onClick={() => goToStep(3)}
-                  className="flex-1 bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] hover:brightness-110 text-white font-black text-xs xs:text-sm sm:text-base py-3 sm:py-4 rounded-xl sm:rounded-2xl shadow-xl shadow-blue-900/30 hover:shadow-blue-900/40 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2.5 sm:gap-3 group border border-blue-400/20 relative overflow-hidden"
-                >
-                  <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#4ade80] to-transparent opacity-90" />
-                  <span className="tracking-wide">{t.signup.nextButton}</span>
-                  <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-[#4ade80] text-[#061d08] flex items-center justify-center shadow-xs group-hover:translate-x-1 transition-transform shrink-0">
-                    <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
-                  </div>
-                </button>
-              </div>
+              {/* Step 1 Next Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!formData.nameTh || !formData.nameTh.trim()) {
+                    setSubmitError(lang === 'th' ? 'กรุณากรอกชื่อ-นามสกุล (ภาษาไทย)' : 'Please enter your full name in Thai');
+                    return;
+                  }
+                  setSubmitError(null);
+                  goToStep(2);
+                }}
+                className="w-full bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] hover:brightness-110 text-white font-black text-xs xs:text-sm sm:text-base py-3 sm:py-4 rounded-xl sm:rounded-2xl shadow-xl shadow-blue-900/30 hover:shadow-blue-900/40 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2.5 sm:gap-3 group border border-blue-400/20 relative overflow-hidden"
+              >
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#4ade80] to-transparent opacity-90" />
+                <span className="tracking-wide">{t.signup.nextButton}</span>
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-[#4ade80] text-[#061d08] flex items-center justify-center shadow-xs group-hover:translate-x-1 transition-transform shrink-0">
+                  <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
+                </div>
+              </button>
             </div>
           )}
 
-          {/* STEP 3: Education Background & Confirmation */}
-          {currentStep === 3 && (
+          {/* STEP 2: Education Background & Confirmation */}
+          {currentStep === 2 && (
             <div className="space-y-3.5 sm:space-y-4 animate-fade-in">
               {/* Educational Background Table */}
               <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-slate-200 shadow-2xs space-y-3 sm:space-y-3.5">
@@ -839,7 +755,7 @@ export function SignupView({
                 </label>
               </div>
 
-              {/* Step 3 Form Action Buttons */}
+              {/* Step 2 Form Action Buttons */}
               <div className="space-y-2.5 sm:space-y-3 pt-1 sm:pt-2">
                 {/* Submit Error Banner */}
                 {submitError && (
@@ -879,7 +795,7 @@ export function SignupView({
                 <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                   <button
                     type="button"
-                    onClick={() => goToStep(2)}
+                    onClick={() => goToStep(1)}
                     className="py-2.5 sm:py-3 px-2 sm:px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-xl border border-slate-200/90 transition flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 shadow-2xs group"
                   >
                     <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-slate-500 group-hover:-translate-x-0.5 transition-transform" />

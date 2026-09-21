@@ -75,6 +75,7 @@ import { AdminSlipsView } from '@/components/views/AdminSlipsView';
 import { AdminLoginView } from '@/components/views/AdminLoginView';
 import { AdminSettingsPanel } from '@/components/AdminSettingsPanel';
 import { TsrmLogo } from '@/components/TsrmLogo';
+import { SmartEmailInput } from '@/components/SmartEmailInput';
 import { SystemSettings, DEFAULT_SYSTEM_SETTINGS } from '@/lib/services/settingsService';
 
 /* ─── Data Types & Interfaces ─────────────────────────────────────────── */
@@ -5469,15 +5470,12 @@ function VerifyAttendeesPanel({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    อีเมล
-                  </label>
-                  <input
-                    type="email"
+                  <SmartEmailInput
                     value={walkInData.email}
-                    onChange={(e) => setWalkInData({ ...walkInData, email: e.target.value })}
+                    onChange={(val) => setWalkInData({ ...walkInData, email: val })}
+                    label="อีเมล"
                     placeholder="doctor@hospital.com"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:bg-white focus:outline-none focus:border-[#0026b3]"
+                    helperText="กรุณากรอกอีเมลที่มีอยู่จริง"
                   />
                 </div>
                 <div>

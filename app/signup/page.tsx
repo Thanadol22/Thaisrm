@@ -1,51 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useSession, signIn, signOut } from 'next-auth/react';
+import React, { useState, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
 import { SignupView } from '@/components/views/SignupView';
 import { ToastNotification } from '@/components/ToastNotification';
 import { useLanguage } from '@/context/LanguageContext';
 
 function SignupContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { data: session } = useSession();
   const { t } = useLanguage();
   const [notification, setNotification] = useState<string | null>(null);
-  const [initialUserData, setInitialUserData] = useState<{
-    name?: string;
-    email?: string;
-    picture?: string;
-    given_name?: string;
-    family_name?: string;
-  } | null>(null);
-
-  const triggerNotification = (msg: string) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(null), 4000);
-  };
-
-  // Auto-fill from NextAuth session ONLY when returning from Google OAuth with ?autofill=true
-  useEffect(() => {
-    if (searchParams.get('autofill') === 'true' && session?.user) {
-      const userData = {
-        name: session.user.name || undefined,
-        email: session.user.email || undefined,
-        picture: (session.user as any).picture || session.user.image || undefined,
-        given_name: (session.user as any).given_name || undefined,
-        family_name: (session.user as any).family_name || undefined,
-      };
-      setInitialUserData(userData);
-      triggerNotification(t.signup.googleAutofillSuccessToast);
-      if (typeof window !== 'undefined' && window.location.search) {
-        window.history.replaceState({}, '', window.location.pathname);
-      }
-    }
-  }, [session, searchParams, t.signup.googleAutofillSuccessToast]);
 
   const handleClearForm = async () => {
-    setInitialUserData(null);
     try {
       localStorage.removeItem('user_data');
       localStorage.removeItem('auth_token');
@@ -56,9 +22,6 @@ function SignupContent() {
       document.cookie = 'tsrm_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
       document.cookie = 'thaisrm_user=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
       document.cookie = 'thaisrm_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
-    } catch (e) { }
-    try {
-      await signOut({ redirect: false });
     } catch (e) { }
   };
 
@@ -71,18 +34,6 @@ function SignupContent() {
     router.push('/payment?type=membership');
   };
 
-  const handleGoogleSignUp = async () => {
-    try {
-      await signIn('google', { callbackUrl: '/signup?autofill=true' }, { prompt: 'select_account' });
-    } catch (err: any) {
-      console.error('Google Sign Up Error:', err);
-    }
-  };
-
-  const handleProceedToPayment = () => {
-    router.push('/payment?type=membership');
-  };
-
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col items-center justify-start selection:bg-[#4ade80] selection:text-slate-900 font-sans">
       <ToastNotification message={notification} />
@@ -91,9 +42,7 @@ function SignupContent() {
         <SignupView
           onNavigateToLogin={handleNavigateToLogin}
           onSubmitSignup={handleSignupSubmit}
-          onGoogleSignUp={handleGoogleSignUp}
           onClearForm={handleClearForm}
-          initialUserData={initialUserData}
         />
       </main>
     </div>

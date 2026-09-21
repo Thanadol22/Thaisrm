@@ -81,7 +81,9 @@ export interface PositionSelectProps {
   className?: string;
   /** Class name for select element */
   selectClassName?: string;
-  /** Text for the unspecified/default option. Default: '-- ไม่ระบุ --' */
+  /** Text for the placeholder/default option. Default: '-- เลือกตำแหน่ง --' */
+  placeholder?: string;
+  /** @deprecated Use placeholder instead */
   unspecifiedLabel?: string;
   /** Whether to automatically show the other text input when 'อื่นๆ' is selected. Default: true */
   showOtherInput?: boolean;
@@ -125,6 +127,7 @@ export function PositionSelect({
   disabled = false,
   className = '',
   selectClassName = '',
+  placeholder,
   unspecifiedLabel,
   showOtherInput = true,
   otherLabel,
@@ -137,7 +140,7 @@ export function PositionSelect({
   const isOther = normalizedVal === 'อื่นๆ';
 
   const defaultLabel = lang === 'th' ? 'ตำแหน่ง / กลุ่มวิชาชีพ' : 'Position / Professional Category';
-  const defaultUnspecified = unspecifiedLabel || (lang === 'th' ? '-- ไม่ระบุ --' : '-- Unspecified --');
+  const defaultPlaceholder = placeholder || unspecifiedLabel || (lang === 'th' ? '-- เลือกตำแหน่ง --' : '-- Select Position --');
   const defaultOtherPlaceholder = otherPlaceholder || (lang === 'th' ? 'โปรดระบุตำแหน่งอื่นๆ...' : 'Please specify other position...');
 
   // Check if current normalized value is a custom value not in known options
@@ -177,7 +180,7 @@ export function PositionSelect({
             showIcon ? 'pl-9 sm:pl-10 pr-9 py-2 sm:py-2.5' : 'px-3.5 pr-9 py-2 sm:py-2.5'
           } ${selectClassName}`}
         >
-          <option value="">{defaultUnspecified}</option>
+          <option value="">{defaultPlaceholder}</option>
           {POSITION_CATEGORY_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {lang === 'th' ? opt.labelTh : opt.labelEn}
