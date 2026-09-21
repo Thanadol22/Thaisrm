@@ -282,7 +282,7 @@ export async function processDailyQrScan(
       try {
         const parsed = JSON.parse(cleanCode);
         cleanCode = parsed.code || parsed.ticket_code || parsed.ticketCode || parsed.member_no || parsed.memberNo || cleanCode;
-      } catch {}
+      } catch { }
     }
 
     dailyRecord = await prisma.meeting_daily_checkins.findFirst({
