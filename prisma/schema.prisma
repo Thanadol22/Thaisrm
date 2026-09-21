@@ -81,6 +81,9 @@ model meetings {
   staff_code           String?                  @db.VarChar(10)
   description          String?
   base_price           Int?                     @default(0)
+  change_format_fee    Int?                     @default(0)
+  change_format_deadline DateTime?              @db.Date
+  change_format_policy String?
   pricing_tiers        Json?
   activities           Json?
   max_seats            Int?                     @default(0)

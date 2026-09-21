@@ -14,6 +14,7 @@ import {
 import { MemberDetailModal } from '@/components/MemberDetailModal';
 import { MemberFormModal } from '@/components/MemberFormModal';
 import { MemberAvatar } from '@/components/MemberAvatar';
+import { PaginationControls } from '@/components/PaginationControls';
 import {
   Users,
   PlusCircle,
@@ -71,11 +72,11 @@ export function MemberManagementPanel() {
   const [sortBy, setSortBy] = useState<'member_no' | 'created_at' | 'full_name_th'>('member_no');
   const [order, setOrder] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(15);
+  const [limit, setLimit] = useState(5);
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
-    limit: 15,
+    limit: 5,
     total_pages: 1,
   });
 
@@ -962,38 +963,20 @@ export function MemberManagementPanel() {
 
         {/* Pagination Footer */}
         {!isLoading && !error && members.length > 0 && (
-          <div className="px-4 sm:px-6 py-4 border-t border-slate-100 bg-slate-50/70 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-            <div className="text-center sm:text-left">
-              แสดงหน้า <span className="font-bold text-slate-900">{pagination.page}</span> จากทั้งหมด{' '}
-              <span className="font-bold text-slate-900">{pagination.total_pages}</span> หน้า (รวม{' '}
-              <span className="font-bold text-slate-900">{pagination.total}</span> รายการ)
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={pagination.page <= 1}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 font-bold transition cursor-pointer"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span>ก่อนหน้า</span>
-              </button>
-
-              <div className="px-3 py-1 font-mono font-bold text-slate-800">
-                {pagination.page} / {pagination.total_pages}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.min(pagination.total_pages, p + 1))}
-                disabled={pagination.page >= pagination.total_pages}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 font-bold transition cursor-pointer"
-              >
-                <span>ถัดไป</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+          <div className="border-t border-slate-100">
+            <PaginationControls
+              currentPage={page}
+              totalItems={pagination.total}
+              pageSize={limit}
+              onPageChange={(newPage) => setPage(newPage)}
+              onPageSizeChange={(newLimit) => {
+                setLimit(newLimit);
+                setPage(1);
+              }}
+              pageSizeOptions={[5, 10, 20, 50]}
+              itemLabel="รายชื่อ"
+              className="rounded-none border-0 shadow-none bg-slate-50/70 px-4 sm:px-6 py-4"
+            />
           </div>
         )}
 

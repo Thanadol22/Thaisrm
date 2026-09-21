@@ -23,6 +23,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { PaginationControls } from '@/components/PaginationControls';
 
 export interface SlipActivityItem {
   id?: string;
@@ -42,6 +43,8 @@ export interface SlipRecord {
   memberNo?: string | null;
   isMember: boolean;
   isMembershipRegistration?: boolean;
+  isFormatChange?: boolean;
+  formatChangePayload?: any;
   memberPayload?: any;
   nameTh: string;
   nameEn: string;
@@ -87,6 +90,10 @@ export function AdminSlipsView() {
   const [selectedSlip, setSelectedSlip] = useState<SlipRecord | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Pagination state (Default 5 items per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+
   // Reject modal state
   const [rejectingSlipId, setRejectingSlipId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('โปรดแนบสลิปที่มียอดเงินและรายละเอียดตรงกับรายการลงทะเบียน');
@@ -104,6 +111,11 @@ export function AdminSlipsView() {
       })
       .catch(() => {});
   }, []);
+
+  // Reset to page 1 on filter or search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter]);
 
   const fetchSlips = async () => {
     try {
@@ -242,6 +254,14 @@ export function AdminSlipsView() {
       return matchesSearch && matchesStatus;
     });
   }, [slips, searchQuery, statusFilter]);
+
+  // Paginated slips (5 items per page)
+  const paginatedSlips = React.useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredSlips.length / pageSize));
+    const validPage = Math.min(Math.max(1, currentPage), totalPages);
+    const start = (validPage - 1) * pageSize;
+    return filteredSlips.slice(start, start + pageSize);
+  }, [filteredSlips, currentPage, pageSize]);
 
   const totalCount = slips.length;
   const pendingCount = React.useMemo(() => slips.filter((s) => s.status === 'pending').length, [slips]);
@@ -419,7 +439,7 @@ export function AdminSlipsView() {
             </p>
           </div>
         ) : (
-          filteredSlips.map((slip) => (
+          paginatedSlips.map((slip) => (
             <div
               key={slip.id}
               onClick={() => setSelectedSlip(slip)}
@@ -550,16 +570,26 @@ export function AdminSlipsView() {
                             <span
                               key={act.id || i}
                               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold shadow-2xs ${
-                                act.type === 'membership_registration'
+                                act.type === 'format_change' || slip.isFormatChange
+                                  ? 'bg-amber-50 text-amber-950 border border-amber-300 ring-1 ring-amber-400/30'
+                                  : act.type === 'membership_registration'
                                   ? 'bg-purple-50 text-purple-900 border border-purple-200'
                                   : 'bg-indigo-50 text-indigo-900 border border-indigo-200'
                               }`}
                             >
-                              <BookOpen className={`w-3 h-3 shrink-0 ${act.type === 'membership_registration' ? 'text-purple-600' : 'text-indigo-600'}`} />
+                              <BookOpen className={`w-3 h-3 shrink-0 ${
+                                act.type === 'format_change' || slip.isFormatChange
+                                  ? 'text-amber-600'
+                                  : act.type === 'membership_registration'
+                                  ? 'text-purple-600'
+                                  : 'text-indigo-600'
+                              }`} />
                               <span>{act.name}</span>
                               {act.price !== undefined && (
                                 <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border font-mono ${
-                                  act.type === 'membership_registration'
+                                  act.type === 'format_change' || slip.isFormatChange
+                                    ? 'text-amber-800 bg-white border-amber-200'
+                                    : act.type === 'membership_registration'
                                     ? 'text-purple-700 bg-white border-purple-100'
                                     : 'text-indigo-700 bg-white border-indigo-100'
                                 }`}>
@@ -633,6 +663,17 @@ export function AdminSlipsView() {
           ))
         )}
       </div>
+
+      {/* Pagination Controls */}
+      <PaginationControls
+        currentPage={currentPage}
+        totalItems={filteredSlips.length}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={setPageSize}
+        pageSizeOptions={[5, 10, 20, 50]}
+        itemLabel={lang === 'th' ? 'สลิป' : 'slips'}
+      />
 
       {/* High Resolution Slip Preview & Action Modal */}
       {mounted &&

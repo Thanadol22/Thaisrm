@@ -58,11 +58,13 @@ import {
   ChevronLeft,
   CreditCard,
   Landmark,
+  Info,
   Wallet,
   Percent,
   Monitor
 } from 'lucide-react';
 import { ThaiDateRangePicker } from '@/components/ThaiDateRangePicker';
+import { ThaiDatePicker } from '@/components/ThaiDatePicker';
 import { ThaiTimeRangePicker } from '@/components/ThaiTimeRangePicker';
 import { ReceiptData } from '@/types/receipt';
 import { generateReceiptNo, DEFAULT_RECEIPT_START_SEQ } from '@/lib/receiptNumber';
@@ -76,6 +78,7 @@ import { AdminLoginView } from '@/components/views/AdminLoginView';
 import { AdminCouponsPanel } from '@/components/AdminCouponsPanel';
 import { AdminSettingsPanel } from '@/components/AdminSettingsPanel';
 import { AdminEmailCenterPanel } from '@/components/AdminEmailCenterPanel';
+import { PaginationControls } from '@/components/PaginationControls';
 import { TsrmLogo } from '@/components/TsrmLogo';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
 import { SystemSettings, DEFAULT_SYSTEM_SETTINGS } from '@/lib/services/settingsService';
@@ -90,8 +93,11 @@ export interface MeetingPricingTiers {
     onlineMember: number;
   };
   changeFee: {
-    label: string;
+    enabled?: boolean;
+    label?: string;
     conditionDate: string;
+    deadlineDate?: string;
+    policyText?: string;
     onsiteMember: number;
     onsiteNonMember: number;
     onlineMember: number;
@@ -107,11 +113,14 @@ export const DEFAULT_PRICING_TIERS: MeetingPricingTiers = {
     onlineMember: 0,
   },
   changeFee: {
-    label: '',
-    conditionDate: '',
-    onsiteMember: 0,
-    onsiteNonMember: 0,
-    onlineMember: 0,
+    enabled: true,
+    label: 'แจ้งเปลี่ยนรูปแบบ',
+    conditionDate: 'After 10 Oct 2026',
+    deadlineDate: '',
+    policyText: '',
+    onsiteMember: 1000,
+    onsiteNonMember: 1000,
+    onlineMember: 1000,
   },
   remark: '',
 };
@@ -2835,6 +2844,8 @@ function AddMeetingPanel({
           staff_code: formData.staffCode || '',
           description: formData.description || '',
           base_price: pricing.participant.onsiteMember || formData.basePrice,
+          change_format_fee: pricing.changeFee?.onsiteMember ?? 1000,
+          change_format_policy: pricing.changeFee?.policyText || null,
           pricing_tiers: pricing,
           activities: activities,
           max_seats: wsSeats || 500,
@@ -3451,11 +3462,10 @@ function AddMeetingPanel({
                         <button
                           type="button"
                           onClick={() => handleUpdateActivity(activity.id, 'format', 'onsite')}
-                          className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                            (activity.format || 'onsite') === 'onsite'
+                          className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${(activity.format || 'onsite') === 'onsite'
                               ? 'bg-emerald-50 text-emerald-800 border-emerald-400 shadow-2xs ring-1 ring-emerald-300 font-extrabold'
                               : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-800'
-                          }`}
+                            }`}
                         >
                           <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                           <span className="truncate">Onsite เท่านั้น</span>
@@ -3464,11 +3474,10 @@ function AddMeetingPanel({
                         <button
                           type="button"
                           onClick={() => handleUpdateActivity(activity.id, 'format', 'online')}
-                          className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                            activity.format === 'online'
+                          className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${activity.format === 'online'
                               ? 'bg-blue-50 text-[#0026b3] border-[#0026b3] shadow-2xs ring-1 ring-blue-300 font-extrabold'
                               : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-800'
-                          }`}
+                            }`}
                         >
                           <Monitor className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
                           <span className="truncate">Online เท่านั้น</span>
@@ -3477,11 +3486,10 @@ function AddMeetingPanel({
                         <button
                           type="button"
                           onClick={() => handleUpdateActivity(activity.id, 'format', 'both')}
-                          className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                            activity.format === 'both'
+                          className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${activity.format === 'both'
                               ? 'bg-indigo-50 text-indigo-800 border-indigo-400 shadow-2xs ring-1 ring-indigo-300 font-extrabold'
                               : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-800'
-                          }`}
+                            }`}
                         >
                           <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                           <span className="truncate">ทั้งสองแบบ (Hybrid)</span>
@@ -3839,23 +3847,24 @@ function AddMeetingPanel({
                   <td className="py-2 px-3 font-extrabold text-slate-900">
                     <div className="flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                      <span className="text-xs">แจ้งเปลี่ยนรูปแบบ</span>
+                      <span className="text-xs">แจ้งเปลี่ยนรูปแบบ (Online ↔ Onsite)</span>
                     </div>
                     <div className="flex items-center gap-1 mt-1 pl-3">
                       <input
                         type="text"
                         value={pricing.changeFee.conditionDate}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const cDate = e.target.value;
                           setPricing({
                             ...pricing,
                             changeFee: {
                               ...pricing.changeFee,
-                              conditionDate: e.target.value,
+                              conditionDate: cDate,
                             },
-                          })
-                        }
+                          });
+                        }}
                         placeholder="After 10 Oct 2026"
-                        className="bg-white border border-amber-300 rounded px-1.5 py-0.5 text-[10px] font-bold text-rose-600 focus:outline-none focus:ring-1 focus:ring-rose-400 w-28"
+                        className="bg-white border border-amber-300 rounded px-1.5 py-0.5 text-[10px] font-bold text-rose-600 focus:outline-none focus:ring-1 focus:ring-rose-400 w-32"
                       />
                     </div>
                   </td>
@@ -3868,15 +3877,18 @@ function AddMeetingPanel({
                         min={0}
                         step={100}
                         value={pricing.changeFee.onsiteMember}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
                           setPricing({
                             ...pricing,
                             changeFee: {
                               ...pricing.changeFee,
-                              onsiteMember: parseInt(e.target.value) || 0,
+                              onsiteMember: val,
+                              onsiteNonMember: val,
+                              onlineMember: val,
                             },
-                          })
-                        }
+                          });
+                        }}
                         className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
                       />
                     </div>
@@ -3890,15 +3902,16 @@ function AddMeetingPanel({
                         min={0}
                         step={100}
                         value={pricing.changeFee.onsiteNonMember}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
                           setPricing({
                             ...pricing,
                             changeFee: {
                               ...pricing.changeFee,
-                              onsiteNonMember: parseInt(e.target.value) || 0,
+                              onsiteNonMember: val,
                             },
-                          })
-                        }
+                          });
+                        }}
                         className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
                       />
                     </div>
@@ -3912,15 +3925,16 @@ function AddMeetingPanel({
                         min={0}
                         step={100}
                         value={pricing.changeFee.onlineMember}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
                           setPricing({
                             ...pricing,
                             changeFee: {
                               ...pricing.changeFee,
-                              onlineMember: parseInt(e.target.value) || 0,
+                              onlineMember: val,
                             },
-                          })
-                        }
+                          });
+                        }}
                         className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-[#0026b3] focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
                       />
                     </div>
@@ -3928,6 +3942,116 @@ function AddMeetingPanel({
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          {/* Format Change Policy Detail Card */}
+          <div className="bg-amber-50/60 border border-amber-200 rounded-2xl p-4 sm:p-4.5 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+                    <span>เงื่อนไขการเปลี่ยนรูปแบบการเข้าร่วม (Online ↔ Onsite Policy)</span>
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+                      เงื่อนไขพิเศษ
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    ระบุข้อความเงื่อนไขหรือค่าปรับเมื่อผู้ลงทะเบียนขอเปลี่ยนรูปแบบ เช่น จาก Online เป็น Onsite
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                  <span>เงื่อนไขวันตัดยอด / Deadline *</span>
+                  <span className="text-[10px] text-rose-600 font-bold">เลือกวันที่ตัดรอบ (ปฏิทิน พ.ศ.)</span>
+                </label>
+                <ThaiDatePicker
+                  value={pricing.changeFee.conditionDate}
+                  onChange={(val) =>
+                    setPricing({
+                      ...pricing,
+                      changeFee: {
+                        ...pricing.changeFee,
+                        conditionDate: val,
+                      },
+                    })
+                  }
+                  placeholder="คลิกเพื่อเลือกวันตัดยอด (เช่น 10 ตุลาคม 2569)"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                  <span>ค่าธรรมเนียมการเปลี่ยนรูปแบบ</span>
+                  <span className="text-[10px] text-slate-400">บาท</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={100}
+                    value={pricing.changeFee.onsiteMember}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      setPricing({
+                        ...pricing,
+                        changeFee: {
+                          ...pricing.changeFee,
+                          onsiteMember: val,
+                          onsiteNonMember: val,
+                          onlineMember: val,
+                        },
+                      });
+                    }}
+                    placeholder="1000"
+                    className="w-full bg-white border border-amber-300 rounded-xl pl-7 pr-3 py-2 text-xs sm:text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                <span>ข้อความประกาศเงื่อนไขแบบกำหนดเอง (Custom Policy Text)</span>
+                <span className="text-[10px] text-slate-400">ปล่อยว่างหากต้องการให้ระบบสร้างข้อความอัตโนมัติ</span>
+              </label>
+              <input
+                type="text"
+                value={pricing.changeFee.policyText || ''}
+                onChange={(e) =>
+                  setPricing({
+                    ...pricing,
+                    changeFee: {
+                      ...pricing.changeFee,
+                      policyText: e.target.value,
+                    },
+                  })
+                }
+                placeholder="เช่น การเปลี่ยนรูปแบบการเข้าร่วมจาก Online เป็น Onsite หลังวันที่ 10 ตุลาคม 2569 จะมีค่าธรรมเนียม 1,000 บาท"
+                className="w-full bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+            </div>
+
+            {/* Live Preview Box */}
+            <div className="bg-white border border-amber-200 rounded-xl p-3 flex items-start gap-2 text-xs">
+              <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold text-slate-900">ตัวอย่างข้อความที่สมาชิกจะเห็นในระบบลงทะเบียน: </span>
+                <span className="text-slate-600">
+                  {pricing.changeFee.policyText?.trim()
+                    ? pricing.changeFee.policyText.trim()
+                    : `หมายเหตุ: หากต้องการเปลี่ยนรูปแบบการเข้าร่วมภายหลัง (เช่น จากออนไลน์เป็นออนไซต์) ${pricing.changeFee.conditionDate ? 'หลังจาก ' + pricing.changeFee.conditionDate : ''
+                    } จะมีค่าธรรมเนียม ${(pricing.changeFee.onsiteMember || 1000).toLocaleString()} บาท ตามที่ระบุไว้ในเงื่อนไขการประชุม`}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Workshop Registration Rates Table in Section 3 (if workshops added) */}
@@ -4268,13 +4392,12 @@ function MeetingHistoryPanel({
                           return (
                             <span
                               key={act.id || aIdx}
-                              className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md border ${
-                                isOnline
+                              className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md border ${isOnline
                                   ? 'bg-blue-50 text-[#0026b3] border-blue-200'
                                   : isBoth
-                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                              }`}
+                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                    : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                }`}
                             >
                               <span>{act.type === 'main' ? '📋' : '🔬'}</span>
                               <span className="font-bold">{act.name}</span>
@@ -4920,13 +5043,12 @@ function VerifyAttendeesPanel({
                     <td className="px-5 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <span
-                          className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap ${
-                            a.paymentStatus === 'paid'
+                          className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap ${a.paymentStatus === 'paid'
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                               : a.paymentStatus === 'rejected'
-                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                              : 'bg-amber-50 text-amber-700 border border-amber-200'
-                          }`}
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}
                         >
                           {a.paymentStatus === 'paid' ? (
                             <>
@@ -4976,11 +5098,10 @@ function VerifyAttendeesPanel({
                         )}
                         <button
                           onClick={() => onToggleCheckIn(a.id)}
-                          className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
-                            a.checkInStatus === 'checked_in'
+                          className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${a.checkInStatus === 'checked_in'
                               ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
                               : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-xs'
-                          }`}
+                            }`}
                         >
                           {a.checkInStatus === 'checked_in' ? 'ยกเลิก' : 'เช็คอิน'}
                         </button>
@@ -5017,85 +5138,15 @@ function VerifyAttendeesPanel({
       </div>
 
       {/* ─── Pagination Controls Bar (Default 5 items) ───────────────────── */}
-      {filteredAttendees.length > 0 && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-white border border-slate-200/90 rounded-2xl shadow-xs">
-          <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-600 font-medium">
-            <span>
-              แสดง <strong className="text-slate-900 font-bold">{(currentPage - 1) * pageSize + 1}</strong> - <strong className="text-slate-900 font-bold">{Math.min(currentPage * pageSize, filteredAttendees.length)}</strong> จากทั้งหมด <strong className="text-slate-900 font-bold">{filteredAttendees.length.toLocaleString()}</strong> รายชื่อ
-            </span>
-            <span className="text-slate-300">|</span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-500">แสดงหน้าละ:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#0026b3] cursor-pointer"
-              >
-                <option value={5}>5 รายชื่อ</option>
-                <option value={10}>10 รายชื่อ</option>
-                <option value={20}>20 รายชื่อ</option>
-                <option value={50}>50 รายชื่อ</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 self-end sm:self-auto">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition ${
-                currentPage === 1
-                  ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
-                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 cursor-pointer shadow-xs'
-              }`}
-            >
-              <ChevronLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">ก่อนหน้า</span>
-            </button>
-
-            <div className="flex items-center gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                .map((p, idx, arr) => {
-                  const prev = arr[idx - 1];
-                  const showEllipsis = prev && p - prev > 1;
-
-                  return (
-                    <React.Fragment key={p}>
-                      {showEllipsis && <span className="px-1 text-slate-400 text-xs">...</span>}
-                      <button
-                        onClick={() => setCurrentPage(p)}
-                        className={`min-w-[32px] h-8 px-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                          currentPage === p
-                            ? 'bg-[#0026b3] text-white shadow-xs'
-                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    </React.Fragment>
-                  );
-                })}
-            </div>
-
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition ${
-                currentPage === totalPages
-                  ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
-                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 cursor-pointer shadow-xs'
-              }`}
-            >
-              <span className="hidden sm:inline">ถัดไป</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
+      <PaginationControls
+        currentPage={currentPage}
+        totalItems={filteredAttendees.length}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={setPageSize}
+        pageSizeOptions={[5, 10, 20, 50]}
+        itemLabel="รายชื่อ"
+      />
 
       {/* ─── Edit Payment Status Modal ────────────────────────────────────── */}
       {editingStatusAttendee && typeof document !== 'undefined' && createPortal(
@@ -5129,11 +5180,10 @@ function VerifyAttendeesPanel({
 
                 <div className="space-y-2">
                   <label
-                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${
-                      editStatusValue === 'paid'
+                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${editStatusValue === 'paid'
                         ? 'bg-emerald-50/70 border-emerald-500 text-emerald-900 ring-1 ring-emerald-500'
                         : 'bg-white border-slate-200 hover:bg-slate-50'
-                    }`}
+                      }`}
                   >
                     <input
                       type="radio"
@@ -5152,11 +5202,10 @@ function VerifyAttendeesPanel({
                   </label>
 
                   <label
-                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${
-                      editStatusValue === 'pending'
+                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${editStatusValue === 'pending'
                         ? 'bg-amber-50/70 border-amber-500 text-amber-900 ring-1 ring-amber-500'
                         : 'bg-white border-slate-200 hover:bg-slate-50'
-                    }`}
+                      }`}
                   >
                     <input
                       type="radio"
@@ -5175,11 +5224,10 @@ function VerifyAttendeesPanel({
                   </label>
 
                   <label
-                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${
-                      editStatusValue === 'rejected'
+                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${editStatusValue === 'rejected'
                         ? 'bg-rose-50/70 border-rose-500 text-rose-900 ring-1 ring-rose-500'
                         : 'bg-white border-slate-200 hover:bg-slate-50'
-                    }`}
+                      }`}
                   >
                     <input
                       type="radio"
@@ -5309,19 +5357,18 @@ function VerifyAttendeesPanel({
                   <span className="text-slate-500">สถานะการชำระเงิน:</span>
                   <div className="flex items-center gap-2">
                     <span
-                      className={`font-bold text-xs px-2.5 py-0.5 rounded-full ${
-                        selectedAttendee.paymentStatus === 'paid'
+                      className={`font-bold text-xs px-2.5 py-0.5 rounded-full ${selectedAttendee.paymentStatus === 'paid'
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           : selectedAttendee.paymentStatus === 'rejected'
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}
                     >
                       {selectedAttendee.paymentStatus === 'paid'
                         ? '✓ ชำระแล้ว'
                         : selectedAttendee.paymentStatus === 'rejected'
-                        ? '✕ สลิปถูกปฏิเสธ'
-                        : '⏳ รอชำระ'}
+                          ? '✕ สลิปถูกปฏิเสธ'
+                          : '⏳ รอชำระ'}
                     </span>
                     {onUpdatePaymentStatus && (
                       <button
@@ -5367,11 +5414,10 @@ function VerifyAttendeesPanel({
                   onToggleCheckIn(selectedAttendee.id);
                   setSelectedAttendee(null);
                 }}
-                className={`px-4 py-2.5 rounded-xl font-bold text-sm cursor-pointer shadow-xs transition ${
-                  selectedAttendee.checkInStatus === 'checked_in'
+                className={`px-4 py-2.5 rounded-xl font-bold text-sm cursor-pointer shadow-xs transition ${selectedAttendee.checkInStatus === 'checked_in'
                     ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                     : 'bg-[#0026b3] hover:bg-[#001f94] text-white'
-                }`}
+                  }`}
               >
                 {selectedAttendee.checkInStatus === 'checked_in' ? 'ยกเลิกการเช็คอิน' : 'เช็คอินผู้เข้าร่วมทันที'}
               </button>
@@ -6014,10 +6060,10 @@ export default function AdminPage() {
       prev.map((a) =>
         a.id === attendeeId
           ? {
-              ...a,
-              paymentStatus: newPaymentStatus,
-              rejectionReason: newPaymentStatus === 'rejected' ? (reason || 'สลิปถูกปฏิเสธโดยเจ้าหน้าที่') : undefined,
-            }
+            ...a,
+            paymentStatus: newPaymentStatus,
+            rejectionReason: newPaymentStatus === 'rejected' ? (reason || 'สลิปถูกปฏิเสธโดยเจ้าหน้าที่') : undefined,
+          }
           : a
       )
     );

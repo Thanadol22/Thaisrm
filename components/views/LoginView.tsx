@@ -32,6 +32,7 @@ import { TsrmLogo } from '@/components/TsrmLogo';
 import { GoogleIcon } from '@/components/GoogleIcon';
 import { ParticipantSearchModal } from '@/components/ParticipantSearchModal';
 import { ExpiredMemberModal } from '@/components/ExpiredMemberModal';
+import { ChangeFormatModal } from '@/components/ChangeFormatModal';
 import { SignupView } from '@/components/views/SignupView';
 import { PositionSelect } from '@/components/PositionSelect';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
@@ -332,6 +333,9 @@ export function LoginView({
   } | null>(null);
   const [pendingRegPayload, setPendingRegPayload] = useState<any | null>(null);
   const [verifyingMember, setVerifyingMember] = useState(false);
+
+  // Change Format Modal state
+  const [isChangeFormatOpen, setIsChangeFormatOpen] = useState(false);
 
   // Submit conference registration
   const handleSubmitRegistration = async (e: React.FormEvent) => {
@@ -1093,15 +1097,43 @@ export function LoginView({
                             </div>
                           )}
 
-                          {/* Format Change Fee Notice (1,000 THB) */}
-                          <div className="flex items-start gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-200/80 text-slate-600 text-[10.5px] xs:text-[11px] leading-relaxed">
-                            <AlertCircle className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
-                            <span>
-                              {lang === 'th'
-                                ? `หมายเหตุ: หากต้องการเปลี่ยนรูปแบบการเข้าร่วมภายหลัง จะมีค่าธรรมเนียมการเปลี่ยนรูปแบบ ${((activeMeeting?.pricing_tiers?.changeFee?.onsiteMember || 1000)).toLocaleString()} บาท ตามที่ระบุไว้ในเงื่อนไขการประชุม`
-                                : `Note: If you request to change attendance format later, a ${((activeMeeting?.pricing_tiers?.changeFee?.onsiteMember || 1000)).toLocaleString()} THB fee will apply as specified in event policy.`}
-                            </span>
-                          </div>
+                          {/* Format Change Fee Notice */}
+                          {(() => {
+                            const changeFeeConfig = activeMeeting?.pricing_tiers?.changeFee;
+                            const feeAmount = (activeMeeting as any)?.change_format_fee || changeFeeConfig?.onsiteMember || 1000;
+                            const conditionDate = changeFeeConfig?.conditionDate || '';
+                            const customPolicy = (activeMeeting as any)?.change_format_policy || changeFeeConfig?.policyText;
+
+                            let noticeText = '';
+                            if (customPolicy && customPolicy.trim()) {
+                              noticeText = customPolicy.trim();
+                            } else if (lang === 'th') {
+                              noticeText = `หมายเหตุ: เปลี่ยนรูปแบบการเข้าร่วม${
+                                conditionDate ? ' (หลัง ' + conditionDate + ')' : ''
+                              } มีค่าธรรมเนียม ${feeAmount.toLocaleString()} บาท`;
+                            } else {
+                              noticeText = `Note: Changing attendance format${
+                                conditionDate ? ' (after ' + conditionDate + ')' : ''
+                              } fee is ${feeAmount.toLocaleString()} THB`;
+                            }
+
+                            return (
+                              <div className="flex items-center gap-1.5 p-2 sm:p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-amber-900 text-[10.5px] xs:text-[11px] leading-normal">
+                                <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                <div className="flex-1 truncate sm:text-clip">
+                                  <span>{noticeText}</span>{' '}
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsChangeFormatOpen(true)}
+                                    className="inline-flex items-center gap-0.5 font-black text-amber-950 hover:text-blue-700 underline underline-offset-2 ml-1 cursor-pointer transition-colors shrink-0 whitespace-nowrap"
+                                  >
+                                    <span>{lang === 'th' ? '[แจ้งเปลี่ยนรูปแบบ]' : '[Change format]'}</span>
+                                    <ExternalLink className="w-3 h-3 inline shrink-0" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })()}
@@ -1180,6 +1212,15 @@ export function LoginView({
         memberNo={expiredMemberInfo?.memberNo}
         expireDate={expiredMemberInfo?.expireDate}
         statusText={expiredMemberInfo?.statusText}
+      />
+
+      {/* Change Attendance Format Modal */}
+      <ChangeFormatModal
+        isOpen={isChangeFormatOpen}
+        onClose={() => setIsChangeFormatOpen(false)}
+        meetingId={activeMeeting?.meeting_id}
+        meetingName={activeMeeting?.meeting_name}
+        defaultMemberNo={formData.memberNo}
       />
     </div>
   );

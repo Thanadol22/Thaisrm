@@ -25,6 +25,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { EmailPreviewModal } from '@/components/EmailPreviewModal';
+import { PaginationControls } from '@/components/PaginationControls';
 import { renderAttendeeTicketEmail } from '@/lib/emailTemplates/attendeeQrTemplate';
 import { renderCustomBroadcastEmail } from '@/lib/emailTemplates/customTemplate';
 
@@ -78,6 +79,15 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
   const [scheduledTasks, setScheduledTasks] = useState<any[]>([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [savingSchedule, setSavingSchedule] = useState(false);
+  const [schedulePage, setSchedulePage] = useState(1);
+  const [schedulePageSize, setSchedulePageSize] = useState(5);
+
+  const paginatedScheduledTasks = React.useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(scheduledTasks.length / schedulePageSize));
+    const validPage = Math.min(Math.max(1, schedulePage), totalPages);
+    const start = (validPage - 1) * schedulePageSize;
+    return scheduledTasks.slice(start, start + schedulePageSize);
+  }, [scheduledTasks, schedulePage, schedulePageSize]);
 
   // --- Sub-Tab 4: SMTP State ---
   const [testingSmtp, setTestingSmtp] = useState(false);
@@ -1155,7 +1165,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs font-medium">
-                  {scheduledTasks.map((task) => (
+                  {paginatedScheduledTasks.map((task) => (
                     <tr key={task.id} className="hover:bg-slate-50/80 transition">
                       <td className="py-3.5 px-3 font-mono font-bold text-slate-500">{task.id}</td>
                       <td className="py-3.5 px-3 font-bold text-slate-900">{task.title}</td>
@@ -1211,6 +1221,19 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
                 </tbody>
               </table>
             </div>
+          )}
+
+          {/* Pagination Controls */}
+          {scheduledTasks.length > 0 && (
+            <PaginationControls
+              currentPage={schedulePage}
+              totalItems={scheduledTasks.length}
+              pageSize={schedulePageSize}
+              onPageChange={setSchedulePage}
+              onPageSizeChange={setSchedulePageSize}
+              pageSizeOptions={[5, 10, 20, 50]}
+              itemLabel="รายการงาน"
+            />
           )}
         </div>
       )}

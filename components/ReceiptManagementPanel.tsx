@@ -6,6 +6,7 @@ import { ReceiptModal } from '@/components/ReceiptModal';
 import { ReceiptFormModal } from '@/components/ReceiptFormModal';
 import { printReceipt } from '@/lib/printReceipt';
 import { generateReceiptNo, DEFAULT_RECEIPT_START_SEQ } from '@/lib/receiptNumber';
+import { PaginationControls } from '@/components/PaginationControls';
 import {
   Receipt,
   PlusCircle,
@@ -50,12 +51,21 @@ export function ReceiptManagementPanel({
   const [filterMeetingId, setFilterMeetingId] = useState('all');
   const [filterType, setFilterType] = useState<'all' | 'company' | 'individual'>('all');
 
+  // Pagination state (Default 5 items per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+
   // Modals state
   const [previewReceipt, setPreviewReceipt] = useState<ReceiptData | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const [editReceipt, setEditReceipt] = useState<ReceiptData | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+
+  // Reset to page 1 on filter/search change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterMeetingId, filterType]);
 
   // Statistics
   const totalAmount = useMemo(() => {
@@ -87,6 +97,14 @@ export function ReceiptManagementPanel({
       return matchMeeting && matchType && matchSearch;
     });
   }, [receipts, filterMeetingId, filterType, search]);
+
+  // Paginated receipts (5 items per page)
+  const paginatedReceipts = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredReceipts.length / pageSize));
+    const validPage = Math.min(Math.max(1, currentPage), totalPages);
+    const start = (validPage - 1) * pageSize;
+    return filteredReceipts.slice(start, start + pageSize);
+  }, [filteredReceipts, currentPage, pageSize]);
 
   const handleOpenCreate = () => {
     let maxSeq = DEFAULT_RECEIPT_START_SEQ - 1;
@@ -348,7 +366,7 @@ export function ReceiptManagementPanel({
                   </td>
                 </tr>
               ) : (
-                filteredReceipts.map((r) => (
+                paginatedReceipts.map((r) => (
                   <tr key={r.id} className="hover:bg-blue-50/40 transition-colors">
                     <td className="py-4 px-4 sm:px-6 whitespace-nowrap min-w-[140px]">
                       <div className="flex items-center gap-2">
@@ -475,6 +493,17 @@ export function ReceiptManagementPanel({
           </table>
         </div>
       </div>
+
+      {/* Pagination Controls */}
+      <PaginationControls
+        currentPage={currentPage}
+        totalItems={filteredReceipts.length}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={setPageSize}
+        pageSizeOptions={[5, 10, 20, 50]}
+        itemLabel="ใบเสร็จ"
+      />
 
       {/* ─── Modals ─────────────────────────────────────────────────── */}
       <ReceiptModal

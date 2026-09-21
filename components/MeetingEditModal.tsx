@@ -28,6 +28,7 @@ import {
   Monitor
 } from 'lucide-react';
 import { ThaiDateRangePicker } from '@/components/ThaiDateRangePicker';
+import { ThaiDatePicker } from '@/components/ThaiDatePicker';
 import { ThaiTimeRangePicker } from '@/components/ThaiTimeRangePicker';
 import { MeetingPricingTiers, DEFAULT_PRICING_TIERS } from '@/app/admin/page';
 
@@ -375,6 +376,8 @@ export function MeetingEditModal({
         staff_code: formData.staffCode.trim() || null,
         description: formData.description.trim() || null,
         base_price: pricing.participant.onsiteMember || formData.basePrice || 0,
+        change_format_fee: pricing.changeFee?.onsiteMember ?? 1000,
+        change_format_policy: pricing.changeFee?.policyText || null,
         pricing_tiers: pricing,
         activities: activities,
         max_seats: wsSeats > 0 ? wsSeats : formData.maxSeats || 500,
@@ -1023,6 +1026,131 @@ export function MeetingEditModal({
                       placeholder="0"
                       className="w-full bg-white border border-indigo-300 rounded-lg pl-7 pr-3 py-2 text-sm font-extrabold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20"
                     />
+                  </div>
+                </div>
+              </div>
+
+              {/* Format Change Policy Detail Card */}
+              <div className="bg-amber-50/60 border border-amber-200 rounded-2xl p-4 sm:p-4.5 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                      <SlidersHorizontal className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+                        <span>เงื่อนไขการเปลี่ยนรูปแบบการเข้าร่วม (Online ↔ Onsite Policy)</span>
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+                          เงื่อนไขพิเศษ
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        ระบุข้อความเงื่อนไขหรือค่าปรับเมื่อผู้ลงทะเบียนขอเปลี่ยนรูปแบบ เช่น จาก Online เป็น Onsite
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                      <span>เงื่อนไขวันตัดยอด / Deadline *</span>
+                      <span className="text-[10px] text-rose-600 font-bold">เลือกวันที่ตัดรอบ (ปฏิทิน พ.ศ.)</span>
+                    </label>
+                    <ThaiDatePicker
+                      value={pricing.changeFee?.conditionDate || ''}
+                      onChange={(val) =>
+                        setPricing({
+                          ...pricing,
+                          changeFee: {
+                            ...(pricing.changeFee || {
+                              label: 'แจ้งเปลี่ยนรูปแบบ',
+                              onsiteMember: 1000,
+                              onsiteNonMember: 1000,
+                              onlineMember: 1000,
+                            }),
+                            conditionDate: val,
+                          },
+                        })
+                      }
+                      placeholder="คลิกเพื่อเลือกวันตัดยอด (เช่น 10 ตุลาคม 2569)"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                      <span>ค่าธรรมเนียมการเปลี่ยนรูปแบบ</span>
+                      <span className="text-[10px] text-slate-400">บาท</span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={100}
+                        value={pricing.changeFee?.onsiteMember !== undefined ? pricing.changeFee.onsiteMember : ''}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
+                          setPricing({
+                            ...pricing,
+                            changeFee: {
+                              ...(pricing.changeFee || {
+                                label: 'แจ้งเปลี่ยนรูปแบบ',
+                                conditionDate: '',
+                              }),
+                              onsiteMember: val,
+                              onsiteNonMember: val,
+                              onlineMember: val,
+                            },
+                          });
+                        }}
+                        placeholder="1000"
+                        className="w-full bg-white border border-amber-300 rounded-xl pl-7 pr-3 py-2 text-xs sm:text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span>ข้อความประกาศเงื่อนไขแบบกำหนดเอง (Custom Policy Text)</span>
+                    <span className="text-[10px] text-slate-400">ปล่อยว่างหากต้องการให้ระบบสร้างข้อความอัตโนมัติ</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={pricing.changeFee?.policyText || ''}
+                    onChange={(e) =>
+                      setPricing({
+                        ...pricing,
+                        changeFee: {
+                          ...(pricing.changeFee || {
+                            label: 'แจ้งเปลี่ยนรูปแบบ',
+                            conditionDate: '',
+                            onsiteMember: 1000,
+                            onsiteNonMember: 1000,
+                            onlineMember: 1000,
+                          }),
+                          policyText: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="เช่น การเปลี่ยนรูปแบบการเข้าร่วมจาก Online เป็น Onsite หลังวันที่ 10 ตุลาคม 2569 จะมีค่าธรรมเนียม 1,000 บาท"
+                    className="w-full bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                </div>
+
+                {/* Live Preview Box */}
+                <div className="bg-white border border-amber-200 rounded-xl p-3 flex items-start gap-2 text-xs">
+                  <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-slate-900">ตัวอย่างข้อความที่สมาชิกจะเห็นในระบบลงทะเบียน: </span>
+                    <span className="text-slate-600">
+                      {pricing.changeFee?.policyText?.trim()
+                        ? pricing.changeFee.policyText.trim()
+                        : `หมายเหตุ: หากต้องการเปลี่ยนรูปแบบการเข้าร่วมภายหลัง (เช่น จากออนไลน์เป็นออนไซต์) ${
+                            pricing.changeFee?.conditionDate ? 'หลังจาก ' + pricing.changeFee.conditionDate : ''
+                          } จะมีค่าธรรมเนียม ${(pricing.changeFee?.onsiteMember || 1000).toLocaleString()} บาท ตามที่ระบุไว้ในเงื่อนไขการประชุม`}
+                    </span>
                   </div>
                 </div>
               </div>

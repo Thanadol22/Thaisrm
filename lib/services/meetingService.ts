@@ -16,6 +16,9 @@ export interface CreateMeetingInput {
   staff_code?: string;
   description?: string;
   base_price?: number;
+  change_format_fee?: number | null;
+  change_format_deadline?: string | Date | null;
+  change_format_policy?: string | null;
   pricing_tiers?: Prisma.JsonValue;
   activities?: Prisma.JsonValue;
   max_seats?: number;
@@ -34,6 +37,9 @@ export interface UpdateMeetingInput {
   staff_code?: string;
   description?: string;
   base_price?: number;
+  change_format_fee?: number | null;
+  change_format_deadline?: string | Date | null;
+  change_format_policy?: string | null;
   pricing_tiers?: Prisma.JsonValue;
   activities?: Prisma.JsonValue;
   max_seats?: number;
@@ -127,6 +133,22 @@ export async function createMeeting(input: CreateMeetingInput) {
     formatted: formattedText,
   };
 
+  // Parse change format deadline if provided
+  let changeFormatDeadline: Date | null = null;
+  if (input.change_format_deadline) {
+    changeFormatDeadline = typeof input.change_format_deadline === 'string'
+      ? parseMeetingDate(input.change_format_deadline)
+      : input.change_format_deadline;
+  }
+
+  const changeFormatFee = input.change_format_fee !== undefined
+    ? input.change_format_fee
+    : ((pricingTiersObj.changeFee as any)?.onsiteMember ?? (pricingTiersObj.changeFee as any)?.amount ?? 0);
+
+  const changeFormatPolicy = input.change_format_policy !== undefined
+    ? input.change_format_policy
+    : ((pricingTiersObj.changeFee as any)?.policyText ?? null);
+
   const meeting = await prisma.meetings.create({
     data: {
       meeting_id: finalMeetingId,
@@ -150,11 +172,14 @@ export async function createMeeting(input: CreateMeetingInput) {
     await prisma.$executeRaw`
       UPDATE meetings
       SET start_date = ${start_at},
-          end_date = ${end_at}
+          end_date = ${end_at},
+          change_format_fee = ${changeFormatFee},
+          change_format_deadline = ${changeFormatDeadline},
+          change_format_policy = ${changeFormatPolicy}
       WHERE meeting_id = ${finalMeetingId}
     `;
   } catch (rawErr) {
-    console.warn('Could not set start_date / end_date in DB:', rawErr);
+    console.warn('Could not set custom columns in DB:', rawErr);
   }
 
   invalidateLatestMeetingCache();
@@ -378,6 +403,22 @@ export async function updateMeeting(meetingId: string, input: UpdateMeetingInput
     pricingTiersObj = { ...(input.pricing_tiers as Record<string, unknown>) };
   }
 
+  // Parse change format fields
+  let changeFormatDeadlineToUpdate: Date | null | undefined = undefined;
+  if (input.change_format_deadline !== undefined) {
+    changeFormatDeadlineToUpdate = typeof input.change_format_deadline === 'string'
+      ? (parseMeetingDate(input.change_format_deadline) || null)
+      : input.change_format_deadline;
+  }
+
+  let changeFormatFeeToUpdate: number | undefined = input.change_format_fee !== undefined
+    ? (input.change_format_fee ?? 0)
+    : (pricingTiersObj?.changeFee as any)?.onsiteMember;
+
+  let changeFormatPolicyToUpdate: string | null | undefined = input.change_format_policy !== undefined
+    ? input.change_format_policy
+    : (pricingTiersObj?.changeFee as any)?.policyText;
+
   let startDateToUpdate: Date | null | undefined = undefined;
   let endDateToUpdate: Date | null | undefined = undefined;
 
@@ -424,31 +465,46 @@ export async function updateMeeting(meetingId: string, input: UpdateMeetingInput
     data,
   });
 
-  if (startDateToUpdate !== undefined || endDateToUpdate !== undefined) {
-    try {
-      if (startDateToUpdate !== undefined && endDateToUpdate !== undefined) {
-        await prisma.$executeRaw`
-          UPDATE meetings
-          SET start_date = ${startDateToUpdate},
-              end_date = ${endDateToUpdate}
-          WHERE meeting_id = ${meetingId}
-        `;
-      } else if (startDateToUpdate !== undefined) {
-        await prisma.$executeRaw`
-          UPDATE meetings
-          SET start_date = ${startDateToUpdate}
-          WHERE meeting_id = ${meetingId}
-        `;
-      } else if (endDateToUpdate !== undefined) {
-        await prisma.$executeRaw`
-          UPDATE meetings
-          SET end_date = ${endDateToUpdate}
-          WHERE meeting_id = ${meetingId}
-        `;
-      }
-    } catch (rawErr) {
-      console.warn('Could not update start_date / end_date in DB:', rawErr);
+  try {
+    if (startDateToUpdate !== undefined && endDateToUpdate !== undefined) {
+      await prisma.$executeRaw`
+        UPDATE meetings
+        SET start_date = ${startDateToUpdate},
+            end_date = ${endDateToUpdate},
+            change_format_fee = COALESCE(${changeFormatFeeToUpdate}, change_format_fee),
+            change_format_deadline = COALESCE(${changeFormatDeadlineToUpdate}, change_format_deadline),
+            change_format_policy = COALESCE(${changeFormatPolicyToUpdate}, change_format_policy)
+        WHERE meeting_id = ${meetingId}
+      `;
+    } else if (startDateToUpdate !== undefined) {
+      await prisma.$executeRaw`
+        UPDATE meetings
+        SET start_date = ${startDateToUpdate},
+            change_format_fee = COALESCE(${changeFormatFeeToUpdate}, change_format_fee),
+            change_format_deadline = COALESCE(${changeFormatDeadlineToUpdate}, change_format_deadline),
+            change_format_policy = COALESCE(${changeFormatPolicyToUpdate}, change_format_policy)
+        WHERE meeting_id = ${meetingId}
+      `;
+    } else if (endDateToUpdate !== undefined) {
+      await prisma.$executeRaw`
+        UPDATE meetings
+        SET end_date = ${endDateToUpdate},
+            change_format_fee = COALESCE(${changeFormatFeeToUpdate}, change_format_fee),
+            change_format_deadline = COALESCE(${changeFormatDeadlineToUpdate}, change_format_deadline),
+            change_format_policy = COALESCE(${changeFormatPolicyToUpdate}, change_format_policy)
+        WHERE meeting_id = ${meetingId}
+      `;
+    } else if (changeFormatFeeToUpdate !== undefined || changeFormatDeadlineToUpdate !== undefined || changeFormatPolicyToUpdate !== undefined) {
+      await prisma.$executeRaw`
+        UPDATE meetings
+        SET change_format_fee = COALESCE(${changeFormatFeeToUpdate}, change_format_fee),
+            change_format_deadline = COALESCE(${changeFormatDeadlineToUpdate}, change_format_deadline),
+            change_format_policy = COALESCE(${changeFormatPolicyToUpdate}, change_format_policy)
+        WHERE meeting_id = ${meetingId}
+      `;
     }
+  } catch (rawErr) {
+    console.warn('Could not update custom columns in DB via raw SQL:', rawErr);
   }
 
   invalidateLatestMeetingCache();

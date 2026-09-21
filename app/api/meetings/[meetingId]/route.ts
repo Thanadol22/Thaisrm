@@ -79,7 +79,7 @@ export async function PUT(
     return NextResponse.json(
       {
         success: false,
-        error: 'เกิดข้อผิดพลาดในการอัปเดตข้อมูลการประชุม',
+        error: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการอัปเดตข้อมูลการประชุม',
       },
       { status: 500 }
     );

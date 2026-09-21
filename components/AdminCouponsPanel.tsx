@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { CouponModal, CouponItem } from '@/components/CouponModal';
 import { CouponUsagesModal } from '@/components/CouponUsagesModal';
+import { PaginationControls } from '@/components/PaginationControls';
 
 interface AdminCouponsPanelProps {
   meetings: Array<{
@@ -48,11 +49,28 @@ export function AdminCouponsPanel({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
+  // Pagination state (Default 5 items per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [couponToEdit, setCouponToEdit] = useState<CouponItem | null>(null);
   const [usagesModalOpen, setUsagesModalOpen] = useState(false);
   const [selectedCouponForUsages, setSelectedCouponForUsages] = useState<CouponItem | null>(null);
+
+  // Reset to page 1 on meeting/search query change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedMeeting, searchQuery]);
+
+  // Paginated coupons (5 items per page)
+  const paginatedCoupons = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(coupons.length / pageSize));
+    const validPage = Math.min(Math.max(1, currentPage), totalPages);
+    const start = (validPage - 1) * pageSize;
+    return coupons.slice(start, start + pageSize);
+  }, [coupons, currentPage, pageSize]);
 
   const fetchCoupons = async () => {
     setLoading(true);
@@ -352,7 +370,7 @@ export function AdminCouponsPanel({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
-                {coupons.map((coupon) => {
+                {paginatedCoupons.map((coupon) => {
                   const percentUsed = coupon.max_uses > 0 ? Math.round((coupon.used_count / coupon.max_uses) * 100) : 0;
                   const isQuotaFull = coupon.used_count >= coupon.max_uses;
                   const isExpired = coupon.expire_date ? new Date() > new Date(coupon.expire_date) : false;
@@ -564,6 +582,17 @@ export function AdminCouponsPanel({
           </div>
         )}
       </div>
+
+      {/* Pagination Controls */}
+      <PaginationControls
+        currentPage={currentPage}
+        totalItems={coupons.length}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={setPageSize}
+        pageSizeOptions={[5, 10, 20, 50]}
+        itemLabel="คูปอง"
+      />
 
       {/* Modal 1: Create / Edit Coupon */}
       <CouponModal

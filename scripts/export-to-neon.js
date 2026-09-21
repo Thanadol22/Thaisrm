@@ -58,6 +58,9 @@ async function exportData() {
   sql += `ALTER TABLE meetings ADD COLUMN IF NOT EXISTS staff_code VARCHAR(10);\n`;
   sql += `ALTER TABLE meetings ADD COLUMN IF NOT EXISTS description TEXT;\n`;
   sql += `ALTER TABLE meetings ADD COLUMN IF NOT EXISTS base_price INTEGER DEFAULT 0;\n`;
+  sql += `ALTER TABLE meetings ADD COLUMN IF NOT EXISTS change_format_fee INTEGER DEFAULT 0;\n`;
+  sql += `ALTER TABLE meetings ADD COLUMN IF NOT EXISTS change_format_deadline DATE;\n`;
+  sql += `ALTER TABLE meetings ADD COLUMN IF NOT EXISTS change_format_policy TEXT;\n`;
   sql += `ALTER TABLE meetings ADD COLUMN IF NOT EXISTS pricing_tiers JSONB;\n`;
   sql += `ALTER TABLE meetings ADD COLUMN IF NOT EXISTS activities JSONB;\n`;
   sql += `ALTER TABLE meetings ADD COLUMN IF NOT EXISTS max_seats INTEGER DEFAULT 0;\n`;

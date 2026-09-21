@@ -40,19 +40,25 @@ export interface SyncStatusResult {
 }
 
 /**
- * ดึงรอบการประชุม 4 ครั้งล่าสุดที่มีผลต่อการคงสถานะสมาชิก (counts_toward_active = true)
+ * ดึงรอบการประชุม 4 ครั้งล่าสุดที่มีผลต่อการคงสถานะสมาชิก
+ * นับเฉพาะการประชุมที่เริ่มแล้วหรือจบแล้วล่าสุด (completed, ongoing หรือ meeting_date/start_date <= วันที่ปัจจุบัน)
  */
 export async function getQualifyingActiveMeetings(limit = 4): Promise<QualifyingMeeting[]> {
   try {
     const now = new Date();
     const meetings = await prisma.meetings.findMany({
       where: {
-        counts_toward_active: true,
         OR: [
-          { status: 'completed' },
+          { status: { in: ['completed', 'ongoing'] } },
           { meeting_date: { lte: now } },
           { start_date: { lte: now } },
         ],
+        NOT: {
+          AND: [
+            { status: 'upcoming' },
+            { meeting_date: { gt: now } },
+          ],
+        },
       },
       select: {
         meeting_id: true,

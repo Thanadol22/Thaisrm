@@ -24,13 +24,13 @@ export async function GET(request: NextRequest) {
     const slipsModel = (prisma as any).payment_slips || (prisma as any).paymentSlip;
 
     const parseActivitiesData = (act: any) => {
-      if (!act) return { activities: [], isMembership: false, memberPayload: null };
+      if (!act) return { activities: [], isMembership: false, isFormatChange: false, formatChangePayload: null, memberPayload: null };
       let parsed = act;
       if (typeof act === 'string') {
         try {
           parsed = JSON.parse(act);
         } catch {
-          return { activities: [], isMembership: false, memberPayload: null };
+          return { activities: [], isMembership: false, isFormatChange: false, formatChangePayload: null, memberPayload: null };
         }
       }
 
@@ -45,15 +45,36 @@ export async function GET(request: NextRequest) {
             rateBadgeEn: 'New Member',
           }],
           isMembership: true,
+          isFormatChange: false,
+          formatChangePayload: null,
           memberPayload: parsed.memberPayload || null,
         };
       }
 
-      if (Array.isArray(parsed)) {
-        return { activities: parsed, isMembership: false, memberPayload: null };
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.isFormatChange) {
+        const origFmt = parsed.originalFormat === 'onsite' ? 'Onsite' : 'Online';
+        const targetFmt = parsed.targetFormat === 'onsite' ? 'Onsite' : 'Online';
+        return {
+          activities: [{
+            id: 'format_change',
+            name: `ค่าธรรมเนียมเปลี่ยนรูปแบบการเข้าร่วม (${origFmt} ➔ ${targetFmt})`,
+            type: 'format_change',
+            price: parsed.changeFee || 1000,
+            rateBadgeTh: `เปลี่ยนเป็น ${targetFmt}`,
+            rateBadgeEn: `Change to ${targetFmt}`,
+          }],
+          isMembership: false,
+          isFormatChange: true,
+          formatChangePayload: parsed,
+          memberPayload: null,
+        };
       }
 
-      return { activities: [], isMembership: false, memberPayload: null };
+      if (Array.isArray(parsed)) {
+        return { activities: parsed, isMembership: false, isFormatChange: false, formatChangePayload: null, memberPayload: null };
+      }
+
+      return { activities: [], isMembership: false, isFormatChange: false, formatChangePayload: null, memberPayload: null };
     };
 
     if (slipsModel) {
@@ -106,7 +127,9 @@ export async function GET(request: NextRequest) {
           ? s.members?.workplace || ''
           : s.guest_workplace || parsedAct.memberPayload?.workplace || '';
 
-        const ticketType = parsedAct.isMembership
+        const ticketType = parsedAct.isFormatChange
+          ? `🔄 ขอเปลี่ยนเป็น ${parsedAct.formatChangePayload?.targetFormat === 'onsite' ? 'Onsite' : 'Online'}`
+          : parsedAct.isMembership
           ? 'Membership Registration'
           : s.is_member
           ? 'Member Pass'
@@ -116,10 +139,16 @@ export async function GET(request: NextRequest) {
           id: s.slip_id,
           dbId: s.id.toString(),
           meetingId: s.meeting_id,
-          meetingName: parsedAct.isMembership ? 'สมัครสมาชิกสมาคม (Membership Registration)' : (s.meetings?.meeting_name || ''),
+          meetingName: parsedAct.isMembership
+            ? 'สมัครสมาชิกสมาคม (Membership Registration)'
+            : parsedAct.isFormatChange
+            ? `แจ้งเปลี่ยนรูปแบบ - ${s.meetings?.meeting_name || ''}`
+            : (s.meetings?.meeting_name || ''),
           memberNo: s.member_no,
           isMember: s.is_member,
           isMembershipRegistration: parsedAct.isMembership,
+          isFormatChange: parsedAct.isFormatChange,
+          formatChangePayload: parsedAct.formatChangePayload,
           memberPayload: parsedAct.memberPayload,
           nameTh,
           nameEn,
@@ -307,17 +336,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if this slip is a membership registration request
+    // Check if this slip is a membership registration or format change request
     let isMembershipRegistration = false;
+    let isFormatChange = false;
     let memberPayload: any = null;
+    let formatChangePayload: any = null;
+
     if (slip.selected_activities) {
       let actObj = slip.selected_activities;
       if (typeof actObj === 'string') {
         try { actObj = JSON.parse(actObj); } catch {}
       }
-      if (actObj && typeof actObj === 'object' && actObj.type === 'membership_registration') {
-        isMembershipRegistration = true;
-        memberPayload = actObj.memberPayload;
+      if (actObj && typeof actObj === 'object') {
+        if (actObj.type === 'membership_registration') {
+          isMembershipRegistration = true;
+          memberPayload = actObj.memberPayload;
+        } else if (actObj.isFormatChange) {
+          isFormatChange = true;
+          formatChangePayload = actObj;
+        }
       }
     }
 
@@ -367,7 +404,64 @@ export async function POST(request: NextRequest) {
         `;
       }
 
-      // 3. If conference meeting attendance exists, update meeting_attendances
+      // 3. If this is a format change slip, update the original registration slip
+      if (isFormatChange && formatChangePayload) {
+        try {
+          const targetFormat = formatChangePayload.targetFormat;
+          const origSlipId = formatChangePayload.originalSlipId;
+
+          let origSlip = null;
+          if (origSlipId) {
+            origSlip = await (prisma as any).payment_slips.findUnique({
+              where: { slip_id: origSlipId },
+            });
+          }
+
+          if (!origSlip && (slip.ticket_code || assignedMemberNo)) {
+            origSlip = await (prisma as any).payment_slips.findFirst({
+              where: {
+                meeting_id: slip.meeting_id,
+                OR: [
+                  ...(slip.ticket_code ? [{ ticket_code: slip.ticket_code }] : []),
+                  ...(assignedMemberNo ? [{ member_no: assignedMemberNo }] : []),
+                ],
+                slip_id: { not: slipId },
+              },
+            });
+          }
+
+          if (origSlip) {
+            let origActs = origSlip.selected_activities;
+            if (typeof origActs === 'string') {
+              try { origActs = JSON.parse(origActs); } catch {}
+            }
+
+            if (Array.isArray(origActs)) {
+              origActs = origActs.map((item: any) => ({
+                ...item,
+                format: targetFormat,
+              }));
+            } else if (origActs && typeof origActs === 'object') {
+              origActs = {
+                ...origActs,
+                format: targetFormat,
+                attendanceType: targetFormat,
+              };
+            }
+
+            await (prisma as any).payment_slips.update({
+              where: { slip_id: origSlip.slip_id },
+              data: {
+                selected_activities: origActs as any,
+              },
+            });
+          }
+        } catch (fmtErr) {
+          console.error('Error updating original registration format:', fmtErr);
+        }
+      }
+
+      // 4. If conference meeting attendance exists, update meeting_attendances
       if (!isMembershipRegistration) {
         if (assignedMemberNo) {
           await prisma.$executeRaw`
