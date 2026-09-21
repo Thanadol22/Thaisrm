@@ -25,6 +25,8 @@ export interface FieldData {
   text: string | null;
   status: 'HAS_DATA' | 'EMPTY' | 'ERROR';
   errorDetail?: string;
+  registrationStatus?: 'approved' | 'pending' | null;
+  ticketCode?: string | null;
 }
 
 export interface MemberRecord {
@@ -217,7 +219,7 @@ export function ParticipantSearchModal({ isOpen, onClose }: ParticipantSearchMod
    */
   const renderField = (
     rawField: FieldData | string | null | undefined,
-    renderValue: (text: string) => React.ReactNode,
+    renderValue: (text: string, field?: FieldData) => React.ReactNode,
     options?: { fallbackText?: string }
   ) => {
     const field = normalizeField(rawField);
@@ -244,7 +246,7 @@ export function ParticipantSearchModal({ isOpen, onClose }: ParticipantSearchMod
 
     // กรณีในช่องมีข้อมูล: พยายามแสดงผล หากเรนเดอร์ไม่สำเร็จให้แจ้ง error
     try {
-      return renderValue(field.text);
+      return renderValue(field.text, field);
     } catch (err) {
       console.error('Render field error:', err);
       return (
@@ -408,14 +410,27 @@ export function ParticipantSearchModal({ isOpen, onClose }: ParticipantSearchMod
           {/* Last Attended Meeting (การเข้าประชุมล่าสุด) */}
           <div className="flex items-center gap-2 text-slate-700 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200/60 mt-1">
             <CalendarCheck2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
               <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 shrink-0">
                 {lang === 'th' ? 'การเข้าประชุมล่าสุด:' : 'Last Meeting:'}
               </span>
-              {renderField(member.lastAttendedMeeting, (text) => (
-                <span className="text-[11px] sm:text-xs font-bold text-emerald-800 truncate">
-                  {text}
-                </span>
+              {renderField(member.lastAttendedMeeting, (text, field) => (
+                <div className="inline-flex items-center gap-1.5 flex-wrap min-w-0">
+                  <span className="text-[11px] sm:text-xs font-bold text-emerald-800 truncate">
+                    {text}
+                  </span>
+                  {/* แสดงสถานะเฉพาะรอบล่าสุดที่มีการบันทึกสถานะ */}
+                  {field?.registrationStatus === 'approved' && (
+                    <span className="inline-flex items-center px-1.5 py-0.2 rounded-md bg-emerald-100 text-emerald-850 border border-emerald-300/80 font-bold text-[10px] shrink-0">
+                      {lang === 'th' ? 'ลงทะเบียนแล้ว' : 'Registered'}
+                    </span>
+                  )}
+                  {field?.registrationStatus === 'pending' && (
+                    <span className="inline-flex items-center px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-850 border border-amber-300/80 font-bold text-[10px] shrink-0">
+                      {lang === 'th' ? 'รอตรวจสอบ' : 'Pending'}
+                    </span>
+                  )}
+                </div>
               ))}
             </div>
           </div>

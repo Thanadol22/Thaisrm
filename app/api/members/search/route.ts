@@ -8,6 +8,8 @@ export interface FieldData {
   text: string | null;
   status: 'HAS_DATA' | 'EMPTY' | 'ERROR';
   errorDetail?: string;
+  registrationStatus?: 'approved' | 'pending' | null;
+  ticketCode?: string | null;
 }
 
 export interface RawMemberResult {
@@ -23,9 +25,12 @@ export interface RawMemberResult {
   position: string | null;
   membership_status: string | null;
   membership_type: string | null;
+  meeting_id: string | null;
   checkin_time: Date | string | null;
   meeting_name: string | null;
   meeting_date: Date | string | null;
+  current_reg_status?: string | null;
+  current_ticket_code?: string | null;
 }
 
 /**
@@ -63,11 +68,23 @@ function parseField(raw: unknown, transform?: (val: string) => string): FieldDat
 /**
  * แปลง Row จากฐานข้อมูลเป็น DTO สำหรับ Frontend
  */
-function formatMemberRow(m: RawMemberResult) {
+function formatMemberRow(m: RawMemberResult, latestMeetingId: string) {
   let lastMeetingData: FieldData = { text: null, status: 'EMPTY' };
   try {
     const meetingName = m.meeting_name;
     const meetingDate = m.checkin_time || m.meeting_date;
+    const isLatestRound = m.meeting_id === latestMeetingId;
+
+    let regStatus: 'approved' | 'pending' | null = null;
+    if (isLatestRound && m.current_reg_status) {
+      const lower = m.current_reg_status.toLowerCase();
+      if (['approved', 'registered', 'attended', 'non-member'].includes(lower)) {
+        regStatus = 'approved';
+      } else if (lower === 'pending') {
+        regStatus = 'pending';
+      }
+    }
+
     if (meetingName && meetingDate) {
       const d = new Date(meetingDate);
       const dateStr = d.toLocaleDateString('th-TH', {
@@ -78,11 +95,15 @@ function formatMemberRow(m: RawMemberResult) {
       lastMeetingData = {
         text: `${meetingName} (${dateStr})`,
         status: 'HAS_DATA',
+        registrationStatus: regStatus,
+        ticketCode: isLatestRound ? m.current_ticket_code || null : null,
       };
     } else if (meetingName) {
       lastMeetingData = {
         text: meetingName,
         status: 'HAS_DATA',
+        registrationStatus: regStatus,
+        ticketCode: isLatestRound ? m.current_ticket_code || null : null,
       };
     }
   } catch (err: unknown) {
@@ -119,13 +140,13 @@ function formatMemberRow(m: RawMemberResult) {
   };
 }
 
-// In-memory cache for search queries (TTL: 60 seconds)
+// In-memory cache for search queries (TTL: 30 seconds)
 interface CacheEntry {
   data: ReturnType<typeof formatMemberRow>[];
   timestamp: number;
 }
 const SEARCH_CACHE = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 60 * 1000;
+const CACHE_TTL_MS = 30 * 1000;
 const MAX_CACHE_SIZE = 200;
 
 function getCachedResult(key: string) {
@@ -155,7 +176,7 @@ export async function GET(req: NextRequest) {
     if (!rawQ) {
       return NextResponse.json(
         { success: true, data: [] },
-        { headers: { 'Cache-Control': 'public, max-age=30, stale-while-revalidate=60' } }
+        { headers: { 'Cache-Control': 'public, max-age=15, stale-while-revalidate=30' } }
       );
     }
 
@@ -164,9 +185,21 @@ export async function GET(req: NextRequest) {
     if (cached) {
       return NextResponse.json(
         { success: true, data: cached },
-        { headers: { 'Cache-Control': 'public, max-age=30, stale-while-revalidate=60' } }
+        { headers: { 'Cache-Control': 'public, max-age=15, stale-while-revalidate=30' } }
       );
     }
+
+    // 1. ดึงข้อมูลงานประชุมรอบล่าสุด (Latest / Upcoming Meeting)
+    const latestMeeting = await prisma.meetings.findFirst({
+      where: { status: 'upcoming' },
+      orderBy: { meeting_date: 'asc' },
+      select: { meeting_id: true, meeting_name: true, meeting_date: true }
+    }) || await prisma.meetings.findFirst({
+      orderBy: { meeting_date: 'desc' },
+      select: { meeting_id: true, meeting_name: true, meeting_date: true }
+    });
+
+    const latestMeetingId = latestMeeting?.meeting_id || 'TSRM34';
 
     // ตัดคำนำหน้าชื่อทางวิชาชีพ/วิชาการ
     const prefixes = [
@@ -190,7 +223,7 @@ export async function GET(req: NextRequest) {
     let membersRaw: RawMemberResult[] = [];
 
     try {
-      // 1. High-Performance CTE Query: คัดกรองสมาชิกตามชื่อก่อน (Limit 50) แล้วจึง Lateral Join ประวัติประชุมเฉพาะผลลัพธ์ที่ตรง
+      // 2. High-Performance CTE Query: ค้นหาตามชื่อเท่านั้น (full_name_th / full_name_en)
       if (cleanQ === rawQ) {
         membersRaw = await prisma.$queryRaw<RawMemberResult[]>`
           WITH matched AS (
@@ -234,20 +267,39 @@ export async function GET(req: NextRequest) {
             m.position,
             m.membership_status,
             m.membership_type,
+            ma.meeting_id,
             ma.checkin_time,
             ma.meeting_name,
-            ma.meeting_date
+            ma.meeting_date,
+            ma.current_reg_status,
+            ma.current_ticket_code
           FROM matched m
           LEFT JOIN LATERAL (
             SELECT 
+              mt_sub.meeting_id,
               ma_sub.checkin_time,
-              ma_sub.meeting_id,
               mt_sub.meeting_name,
-              mt_sub.meeting_date
-            FROM meeting_attendances ma_sub
+              mt_sub.meeting_date,
+              CASE 
+                WHEN mt_sub.meeting_id = ${latestMeetingId} THEN 
+                  COALESCE(s.status, CASE WHEN ma_sub.attendance_status IN ('Registered', 'Attended', 'approved', 'Non-Member') THEN 'approved' ELSE ma_sub.attendance_status END)
+                ELSE NULL 
+              END AS current_reg_status,
+              s.ticket_code AS current_ticket_code
+            FROM (
+              SELECT ma_in.meeting_id, ma_in.checkin_time, ma_in.attendance_status, ma_in.attendance_id
+              FROM meeting_attendances ma_in
+              WHERE (ma_in.member_no = m.member_no OR (m.email IS NOT NULL AND LOWER(ma_in.attendee_email) = LOWER(m.email))) AND ma_in.attendance_status NOT IN ('Cancelled', 'Rejected')
+              UNION ALL
+              SELECT s_in.meeting_id, NULL::timestamptz AS checkin_time, s_in.status AS attendance_status, 999999::bigint AS attendance_id
+              FROM payment_slips s_in
+              WHERE (s_in.member_no = m.member_no OR (m.email IS NOT NULL AND LOWER(s_in.guest_email) = LOWER(m.email)))
+                AND s_in.status IN ('approved', 'pending')
+            ) ma_sub
             LEFT JOIN meetings mt_sub ON mt_sub.meeting_id = ma_sub.meeting_id
-            WHERE ma_sub.member_no = m.member_no
+            LEFT JOIN payment_slips s ON s.meeting_id = ${latestMeetingId} AND (s.member_no = m.member_no OR (m.email IS NOT NULL AND LOWER(s.guest_email) = LOWER(m.email))) AND s.status IN ('approved', 'pending')
             ORDER BY 
+              CASE WHEN mt_sub.meeting_id = ${latestMeetingId} THEN 0 ELSE 1 END,
               COALESCE(ma_sub.checkin_time, mt_sub.start_date, mt_sub.meeting_date) DESC NULLS LAST,
               mt_sub.meeting_date DESC NULLS LAST,
               ma_sub.attendance_id DESC
@@ -301,20 +353,39 @@ export async function GET(req: NextRequest) {
             m.position,
             m.membership_status,
             m.membership_type,
+            ma.meeting_id,
             ma.checkin_time,
             ma.meeting_name,
-            ma.meeting_date
+            ma.meeting_date,
+            ma.current_reg_status,
+            ma.current_ticket_code
           FROM matched m
           LEFT JOIN LATERAL (
             SELECT 
+              mt_sub.meeting_id,
               ma_sub.checkin_time,
-              ma_sub.meeting_id,
               mt_sub.meeting_name,
-              mt_sub.meeting_date
-            FROM meeting_attendances ma_sub
+              mt_sub.meeting_date,
+              CASE 
+                WHEN mt_sub.meeting_id = ${latestMeetingId} THEN 
+                  COALESCE(s.status, CASE WHEN ma_sub.attendance_status IN ('Registered', 'Attended', 'approved', 'Non-Member') THEN 'approved' ELSE ma_sub.attendance_status END)
+                ELSE NULL 
+              END AS current_reg_status,
+              s.ticket_code AS current_ticket_code
+            FROM (
+              SELECT ma_in.meeting_id, ma_in.checkin_time, ma_in.attendance_status, ma_in.attendance_id
+              FROM meeting_attendances ma_in
+              WHERE (ma_in.member_no = m.member_no OR (m.email IS NOT NULL AND LOWER(ma_in.attendee_email) = LOWER(m.email))) AND ma_in.attendance_status NOT IN ('Cancelled', 'Rejected')
+              UNION ALL
+              SELECT s_in.meeting_id, NULL::timestamptz AS checkin_time, s_in.status AS attendance_status, 999999::bigint AS attendance_id
+              FROM payment_slips s_in
+              WHERE (s_in.member_no = m.member_no OR (m.email IS NOT NULL AND LOWER(s_in.guest_email) = LOWER(m.email)))
+                AND s_in.status IN ('approved', 'pending')
+            ) ma_sub
             LEFT JOIN meetings mt_sub ON mt_sub.meeting_id = ma_sub.meeting_id
-            WHERE ma_sub.member_no = m.member_no
+            LEFT JOIN payment_slips s ON s.meeting_id = ${latestMeetingId} AND (s.member_no = m.member_no OR (m.email IS NOT NULL AND LOWER(s.guest_email) = LOWER(m.email))) AND s.status IN ('approved', 'pending')
             ORDER BY 
+              CASE WHEN mt_sub.meeting_id = ${latestMeetingId} THEN 0 ELSE 1 END,
               COALESCE(ma_sub.checkin_time, mt_sub.start_date, mt_sub.meeting_date) DESC NULLS LAST,
               mt_sub.meeting_date DESC NULLS LAST,
               ma_sub.attendance_id DESC
@@ -326,7 +397,7 @@ export async function GET(req: NextRequest) {
     } catch (queryErr) {
       console.warn('CTE search query failed, attempting fallback to members table:', queryErr);
 
-      // 2. Fallback Query: ค้นหาตรงจากตาราง members
+      // Fallback Query: ค้นหาตามชื่อเท่านั้น
       membersRaw = await prisma.$queryRaw<RawMemberResult[]>`
         SELECT 
           m.member_no::text AS member_no,
@@ -341,9 +412,12 @@ export async function GET(req: NextRequest) {
           m.position,
           m.membership_status,
           m.membership_type,
+          NULL::text AS meeting_id,
           NULL::timestamptz AS checkin_time,
           NULL::text AS meeting_name,
-          NULL::date AS meeting_date
+          NULL::date AS meeting_date,
+          NULL::text AS current_reg_status,
+          NULL::text AS current_ticket_code
         FROM members m
         WHERE 
           m.full_name_th ILIKE ${patternRaw}
@@ -362,12 +436,12 @@ export async function GET(req: NextRequest) {
       `;
     }
 
-    const data = membersRaw.map(formatMemberRow);
+    const data = membersRaw.map((m) => formatMemberRow(m, latestMeetingId));
     setCachedResult(cacheKey, data);
 
     return NextResponse.json(
       { success: true, data },
-      { headers: { 'Cache-Control': 'public, max-age=30, stale-while-revalidate=60' } }
+      { headers: { 'Cache-Control': 'public, max-age=15, stale-while-revalidate=30' } }
     );
   } catch (error) {
     console.error('API /api/members/search error:', error);
