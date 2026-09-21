@@ -50,6 +50,11 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
   const [selectedMeetingId, setSelectedMeetingId] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('Registered');
   const [extraNote, setExtraNote] = useState<string>('');
+  const [isDailyPassMode, setIsDailyPassMode] = useState<boolean>(true);
+  const [selectedDailyDate, setSelectedDailyDate] = useState<string>('');
+  const [dailyPrograms, setDailyPrograms] = useState<Array<{ date: string; programName: string; isMainProgram: boolean }>>([]);
+  const [loadingDailyPrograms, setLoadingDailyPrograms] = useState(false);
+  const [autoScheduling, setAutoScheduling] = useState(false);
   const [sendingTickets, setSendingTickets] = useState(false);
   const [ticketSendProgress, setTicketSendProgress] = useState<{
     total: number;
@@ -107,6 +112,29 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
     loadMeetings();
   }, []);
 
+  // 1.1 Fetch Daily Programs whenever selectedMeetingId changes
+  useEffect(() => {
+    if (!selectedMeetingId) return;
+    async function loadDailyPrograms() {
+      try {
+        setLoadingDailyPrograms(true);
+        const res = await fetch(`/api/meetings/${selectedMeetingId}/daily-programs`);
+        const json = await res.json();
+        if (json.success && json.data?.programs) {
+          setDailyPrograms(json.data.programs);
+          if (json.data.programs.length > 0) {
+            setSelectedDailyDate(json.data.programs[0].date);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load daily programs:', err);
+      } finally {
+        setLoadingDailyPrograms(false);
+      }
+    }
+    loadDailyPrograms();
+  }, [selectedMeetingId]);
+
   // 2. Fetch scheduled queue when opening schedule tab
   const fetchScheduledQueue = async () => {
     try {
@@ -144,7 +172,12 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
     }
 
     const meeting = meetings.find((m) => m.meeting_id === selectedMeetingId);
-    const confirmMsg = `ยืนยันการส่งอีเมลบัตร QR Code สำหรับงาน "${meeting?.meeting_name || selectedMeetingId}" (สถานะ: ${statusFilter})?`;
+    const selectedProgram = dailyPrograms.find((p) => p.date === selectedDailyDate);
+    const modeDesc = isDailyPassMode
+      ? `แบบ QR รายวัน (วันที่ ${selectedDailyDate} - ${selectedProgram?.programName || 'Main Program'})`
+      : 'แบบบัตรทั่วไป (General Pass)';
+
+    const confirmMsg = `ยืนยันการส่งอีเมล ${modeDesc} สำหรับงาน "${meeting?.meeting_name || selectedMeetingId}" (กลุ่ม: ${statusFilter})?`;
     if (!window.confirm(confirmMsg)) return;
 
     try {
@@ -158,6 +191,9 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
           meetingId: selectedMeetingId,
           statusFilter,
           extraNote,
+          isDailyMode: isDailyPassMode,
+          targetDate: selectedDailyDate,
+          programName: selectedProgram?.programName,
         }),
       });
 
@@ -180,22 +216,62 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
     }
   };
 
+  // 1.1 Auto-schedule all daily QR dispatches (07:00 AM every meeting day)
+  const handleAutoScheduleDaily = async () => {
+    if (!selectedMeetingId) {
+      notify('กรุณาเลือกการประชุมที่ต้องการตั้งเวลา');
+      return;
+    }
+    const meeting = meetings.find((m) => m.meeting_id === selectedMeetingId);
+    const confirmMsg = `ยืนยันการตั้งระบบส่ง QR Code ประจำวันอัตโนมัติ ทุกเช้าเวลา 07:00 น. ตลอดทุกวันของงาน "${meeting?.meeting_name || selectedMeetingId}"?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      setAutoScheduling(true);
+      const res = await fetch('/api/email/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'auto_schedule_daily',
+          meetingId: selectedMeetingId,
+          dispatchTime: '07:00',
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        notify(json.message || 'ตั้งเวลาส่ง QR Code รายวันอัตโนมัติสำเร็จ');
+        fetchScheduledQueue();
+      } else {
+        notify(`ข้อผิดพลาด: ${json.error}`);
+      }
+    } catch (err: any) {
+      notify(`เกิดข้อผิดพลาด: ${err?.message}`);
+    } finally {
+      setAutoScheduling(false);
+    }
+  };
+
   // 2. Preview Ticket Email
   const handlePreviewTicket = () => {
     const meeting = meetings.find((m) => m.meeting_id === selectedMeetingId);
+    const selectedProgram = dailyPrograms.find((p) => p.date === selectedDailyDate);
+    const dateDisplay = isDailyPassMode
+      ? `ประจำวันที่ ${selectedDailyDate || '21 ตุลาคม 2569'} (${selectedProgram?.programName || 'Main Program'})`
+      : (meeting?.meeting_date ? new Date(meeting.meeting_date).toLocaleDateString('th-TH') : '21 - 22 ตุลาคม 2569');
+
     const sampleHtml = renderAttendeeTicketEmail({
       recipientName: 'นายแพทย์สมชาย ตัวอย่างแพทย์',
       meetingName: meeting?.meeting_name || 'การประชุมวิชาการประจำปี TSRM 2026',
-      meetingDate: meeting?.meeting_date ? new Date(meeting.meeting_date).toLocaleDateString('th-TH') : '21 - 22 ตุลาคม 2569',
+      meetingDate: dateDisplay,
       location: meeting?.location || 'โรงแรมสยาม เคมปินสกี้ กรุงเทพฯ',
-      ticketCode: 'TSRM-2026-8899',
+      ticketCode: isDailyPassMode ? `TSRM-DAY-${selectedMeetingId.substring(0, 6) || '2026'}-0012` : 'TSRM-2026-8899',
       memberNo: '0123',
       attendanceStatus: 'ยืนยันสิทธิ์เรียบร้อย (Registered)',
-      qrCodeUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=TSRM-PASS:TSRM-2026-8899',
-      extraNote: extraNote || 'กรุณาแสดง QR Code นี้แก่เจ้าหน้าที่ ณ จุดลงทะเบียนหน้างาน',
+      qrCodeUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=TSRM-PASS:TSRM-DAY-SAMPLE-PASS',
+      extraNote: extraNote || (isDailyPassMode ? `บัตรสำหรับเข้าร่วม: ${selectedProgram?.programName || 'Main Program'} • QR Code นี้ใช้ได้เฉพาะวันนี้ 1 ครั้งเท่านั้น` : 'กรุณาแสดง QR Code นี้แก่เจ้าหน้าที่ ณ จุดลงทะเบียนหน้างาน'),
     });
 
-    setPreviewSubject(`[ตัวอย่าง] บัตรเข้างาน (E-Ticket) ${meeting?.meeting_name || 'TSRM 2026'}`);
+    setPreviewSubject(`[ตัวอย่าง] บัตรเข้างาน (E-Ticket) ${meeting?.meeting_name || 'TSRM 2026'}${isDailyPassMode ? ` (${selectedProgram?.programName || 'Daily Pass'})` : ''}`);
     setPreviewHtml(sampleHtml);
     setIsPreviewOpen(true);
   };
@@ -568,6 +644,86 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
               </select>
             </div>
 
+            {/* 1.5 Mode Selection (Daily Dynamic QR vs General Pass) */}
+            <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  <span className="text-xs font-black text-slate-800">รูปแบบการสร้างและส่ง QR Code:</span>
+                </div>
+                <div className="flex items-center gap-1 bg-slate-200/80 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setIsDailyPassMode(true)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      isDailyPassMode ? 'bg-[#0026b3] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    🎟️ QR Code ประจำวัน (1 สิทธิ์/วัน)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsDailyPassMode(false)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      !isDailyPassMode ? 'bg-[#0026b3] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    📄 บัตรทั่วไป (Master Pass)
+                  </button>
+                </div>
+              </div>
+
+              {isDailyPassMode && (
+                <div className="pt-2 border-t border-slate-200/60 space-y-2">
+                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-blue-600" />
+                      <span>เลือกวันที่และหลักสูตรที่ต้องการส่ง QR Code ประจำวัน:</span>
+                    </span>
+                    {loadingDailyPrograms && <span className="text-[10px] text-slate-400">กำลังโหลด...</span>}
+                  </label>
+
+                  {dailyPrograms.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {dailyPrograms.map((prog) => {
+                        const isSelected = selectedDailyDate === prog.date;
+                        return (
+                          <button
+                            key={prog.date}
+                            type="button"
+                            onClick={() => setSelectedDailyDate(prog.date)}
+                            className={`p-3 rounded-xl text-left border transition cursor-pointer ${
+                              isSelected
+                                ? 'bg-blue-50 border-[#0026b3] text-[#0026b3] ring-1 ring-[#0026b3]'
+                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-black">{prog.date}</span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${prog.isMainProgram ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'}`}>
+                                {prog.isMainProgram ? 'Main Program' : 'Workshop / พิเศษ'}
+                              </span>
+                            </div>
+                            <div className="text-xs font-bold text-slate-800 mt-1">{prog.programName}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <input
+                      type="date"
+                      value={selectedDailyDate}
+                      onChange={(e) => setSelectedDailyDate(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-hidden"
+                    />
+                  )}
+                  <p className="text-[11px] text-slate-500">
+                    💡 ระบบจะสร้างรหัส Token ประจำวันและบันทึกลงตาราง <code className="bg-slate-200 px-1 py-0.5 rounded text-[10px]">meeting_daily_checkins</code> ทันทีที่ส่ง
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* 2. Status Filter */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -684,6 +840,30 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
               </p>
 
               <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={handleAutoScheduleDaily}
+                  disabled={autoScheduling}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-xs font-black hover:from-amber-300 hover:to-amber-400 transition cursor-pointer shadow-sm disabled:opacity-50"
+                >
+                  {autoScheduling ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>กำลังสร้างตารางส่ง...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>ตั้งเวลาส่ง QR ประจำวันอัตโนมัติ (ทุกเช้า 07:00 น.)</span>
+                    </>
+                  )}
+                </button>
+
+                <div className="relative flex items-center justify-center">
+                  <div className="border-t border-white/20 w-full"></div>
+                  <span className="bg-indigo-950 px-2 text-[10px] text-blue-200/60 font-bold uppercase">หรือระบุเวลาเอง</span>
+                </div>
+
                 <input
                   type="datetime-local"
                   value={scheduleDateTime}

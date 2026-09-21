@@ -121,6 +121,64 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (action === 'auto_schedule_daily') {
+      const { meetingId, dispatchTime = '07:00' } = body;
+      if (!meetingId) {
+        return NextResponse.json({ success: false, error: 'Meeting ID required' }, { status: 400 });
+      }
+
+      const meeting = await prisma.meetings.findUnique({
+        where: { meeting_id: meetingId },
+      });
+      if (!meeting) {
+        return NextResponse.json({ success: false, error: 'Meeting not found' }, { status: 404 });
+      }
+
+      const { getMeetingProgramsAndDates } = await import('@/lib/services/dailyCheckinService');
+      const programs = getMeetingProgramsAndDates(meeting);
+
+      const addedTasks: ScheduledEmailTask[] = [];
+      for (const prog of programs) {
+        // Scheduled at dispatchTime Bangkok time (e.g. "2026-10-21T07:00:00+07:00")
+        const scheduledIso = new Date(`${prog.date}T${dispatchTime}:00+07:00`).toISOString();
+        const taskId = `SCHED-DAILY-${meetingId}-${prog.date.replace(/-/g, '')}`;
+
+        // Check if already in queue
+        const existingIdx = queue.findIndex((t) => t.id === taskId);
+        const taskData: ScheduledEmailTask = {
+          id: taskId,
+          title: `🎟️ ส่ง QR Code ประจำวัน: ${meeting.meeting_name} (${prog.programName})`,
+          taskType: 'tickets',
+          scheduledAt: scheduledIso,
+          createdAt: new Date().toISOString(),
+          status: 'pending',
+          payload: {
+            meetingId,
+            meetingName: meeting.meeting_name,
+            statusFilter: 'Registered',
+            extraNote: `บัตรเข้างานประจำวัน: ${prog.programName}`,
+            // Daily props
+            ...( { isDailyMode: true, targetDate: prog.date, programName: prog.programName } as any ),
+          },
+        };
+
+        if (existingIdx !== -1) {
+          queue[existingIdx] = taskData;
+        } else {
+          queue.push(taskData);
+        }
+        addedTasks.push(taskData);
+      }
+
+      await saveQueue(queue);
+
+      return NextResponse.json({
+        success: true,
+        data: addedTasks,
+        message: `ตั้งเวลาส่ง QR Code ประจำวันอัตโนมัติสำเร็จ (${addedTasks.length} วัน/หลักสูตร)`,
+      });
+    }
+
     if (action === 'cancel') {
       const { taskId } = body;
       const index = queue.findIndex((t) => t.id === taskId);

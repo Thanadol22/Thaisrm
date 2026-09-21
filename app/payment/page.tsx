@@ -66,6 +66,14 @@ function PaymentContent() {
     position?: string;
     positionCode?: string;
     specialCode?: string;
+    couponData?: {
+      code: string;
+      companyName: string;
+      discountType: string;
+      discountValue: number;
+      isFullFree: boolean;
+      discountAmount: number;
+    };
     registeredAt?: string;
   } | null>(null);
 
@@ -124,11 +132,14 @@ function PaymentContent() {
     }
   }, [paymentType]);
 
-  // Dynamic Pricing Calculation (Main Program uses Participant pricing + Workshops)
+  // Dynamic Pricing Calculation (Main Program uses Participant pricing + Workshops + Coupon deduction)
   const calculationResult = React.useMemo(() => {
     if (paymentType !== 'registration' || !regData) {
       return {
+        originalAmount: systemSettings.annual_membership_fee,
         totalAmount: systemSettings.annual_membership_fee,
+        discountAmount: 0,
+        isCouponSponsored: false,
         items: [] as Array<{
           id: string;
           name: string;
@@ -210,10 +221,33 @@ function PaymentContent() {
       };
     });
 
-    const totalAmount = items.reduce((sum, item) => sum + item.price, 0);
+    const originalAmount = items.reduce((sum, item) => sum + item.price, 0);
+
+    // Coupon Calculation
+    let discountAmount = 0;
+    let isCouponSponsored = false;
+
+    if (regData.couponData) {
+      if (regData.couponData.isFullFree || regData.couponData.discountType === 'free') {
+        discountAmount = originalAmount;
+        isCouponSponsored = true;
+      } else if (regData.couponData.discountType === 'fixed') {
+        discountAmount = Math.min(originalAmount, regData.couponData.discountValue || 0);
+        isCouponSponsored = discountAmount >= originalAmount;
+      } else if (regData.couponData.discountType === 'percent') {
+        const pct = Math.min(100, Math.max(0, regData.couponData.discountValue || 0));
+        discountAmount = Math.round((originalAmount * pct) / 100);
+        isCouponSponsored = pct === 100 || discountAmount >= originalAmount;
+      }
+    }
+
+    const totalAmount = Math.max(0, originalAmount - discountAmount);
 
     return {
+      originalAmount,
       totalAmount,
+      discountAmount,
+      isCouponSponsored,
       items,
       isMemberUser,
       attendType,
@@ -244,7 +278,9 @@ function PaymentContent() {
   };
 
   const handleConfirmPayment = async () => {
-    if (!uploadedSlipData) {
+    const isFreeOrSponsored = calculationResult.isCouponSponsored || calculationResult.totalAmount === 0;
+
+    if (!isFreeOrSponsored && !uploadedSlipData) {
       triggerNotification(t.payment.noSlipWarning);
       setUploadModalOpen(true);
       return;
@@ -279,8 +315,10 @@ function PaymentContent() {
             guestPhone: undefined,
             guestWorkplace: !isMember ? (regData?.workplace || null) : undefined,
             amount: calculationResult.totalAmount,
-            bank: systemSettings.bank_name,
-            slipUrl: uploadedSlipData.fileUrl,
+            originalAmount: calculationResult.originalAmount,
+            couponCode: regData?.couponData?.code || regData?.specialCode || undefined,
+            bank: isFreeOrSponsored ? `สิทธิ์สปอนเซอร์: ${regData?.couponData?.companyName || 'Corporate Pass'}` : systemSettings.bank_name,
+            slipUrl: uploadedSlipData?.fileUrl || (isFreeOrSponsored ? `SPONSORED:${regData?.couponData?.companyName || 'COUPON'}` : undefined),
             selectedActivities: selectedActivitiesPayload,
           }),
         });
@@ -319,7 +357,7 @@ function PaymentContent() {
             memberPayload: membershipRegData,
             amount: systemSettings.annual_membership_fee,
             bank: systemSettings.bank_name,
-            slipUrl: uploadedSlipData.fileUrl,
+            slipUrl: uploadedSlipData?.fileUrl || '',
           }),
         });
 
@@ -359,7 +397,9 @@ function PaymentContent() {
     : `Amount: ${totalAmountValue.toLocaleString()} THB`;
 
   const successModalTitle = paymentType === 'registration'
-    ? (t.successModal as any).paymentSuccessTitle || (lang === 'th' ? 'ลงทะเบียนเข้าร่วมงานประชุมสำเร็จ' : 'Conference Registration Submitted')
+    ? (calculationResult.isCouponSponsored
+        ? (lang === 'th' ? 'ลงทะเบียนด้วยสิทธิ์คูปองสปอนเซอร์สำเร็จ' : 'Sponsor Registration Confirmed')
+        : (t.successModal as any).paymentSuccessTitle || (lang === 'th' ? 'ลงทะเบียนเข้าร่วมงานประชุมสำเร็จ' : 'Conference Registration Submitted'))
     : (lang === 'th' ? 'ส่งใบสมัครและหลักฐานการชำระเงินเรียบร้อยแล้ว' : 'Membership Application & Slip Submitted');
 
 
@@ -385,6 +425,10 @@ function PaymentContent() {
           isExpiredMember={regData?.isExpiredMember}
           attendanceType={calculationResult.attendType}
           itemizedActivities={calculationResult.items}
+          isCouponSponsored={calculationResult.isCouponSponsored}
+          sponsorCompanyName={regData?.couponData?.companyName}
+          couponCode={regData?.couponData?.code || regData?.specialCode}
+          discountAmount={calculationResult.discountAmount}
           submitting={submitting}
           onOpenUploadModal={() => setUploadModalOpen(true)}
           onCopyBank={handleCopyBank}

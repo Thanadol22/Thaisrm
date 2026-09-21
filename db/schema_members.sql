@@ -110,3 +110,29 @@ CREATE INDEX IF NOT EXISTS idx_attendance_meeting ON meeting_attendances (meetin
 CREATE INDEX IF NOT EXISTS idx_attendance_member ON meeting_attendances (member_no);
 
 COMMENT ON TABLE meeting_attendances IS 'บันทึกการเช็คอินและการเข้าร่วมประชุมของสมาชิก';
+
+-- ------------------------------------------------------------
+-- 5. ตารางการเช็คอินรายวัน / QR Code ประจำวัน (meeting_daily_checkins)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS meeting_daily_checkins (
+    id                  BIGSERIAL PRIMARY KEY,
+    meeting_id          VARCHAR(50) NOT NULL REFERENCES meetings(meeting_id) ON DELETE CASCADE,
+    attendance_id       BIGINT REFERENCES meeting_attendances(attendance_id) ON DELETE CASCADE,
+    member_no           VARCHAR(20) REFERENCES members(member_no) ON DELETE CASCADE,
+    ticket_code         VARCHAR(50) NOT NULL,
+    checkin_date        DATE NOT NULL,
+    program_name        VARCHAR(255),
+    daily_qr_token      VARCHAR(100) UNIQUE,
+    checkin_status      VARCHAR(50) DEFAULT 'pending',
+    checkin_time        TIMESTAMPTZ,
+    created_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT uq_meeting_ticket_daily UNIQUE (meeting_id, ticket_code, checkin_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_checkin_meeting ON meeting_daily_checkins (meeting_id);
+CREATE INDEX IF NOT EXISTS idx_daily_checkin_token ON meeting_daily_checkins (daily_qr_token);
+CREATE INDEX IF NOT EXISTS idx_daily_checkin_date ON meeting_daily_checkins (checkin_date);
+
+COMMENT ON TABLE meeting_daily_checkins IS 'บันทึกการเช็คอินรายวันและ QR Code Dynamic ประจำวันตามหลักสูตร';

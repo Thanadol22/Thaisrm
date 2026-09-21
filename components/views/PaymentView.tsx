@@ -13,7 +13,8 @@ import {
   CheckCircle2, 
   Trash2, 
   RotateCw,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles
 } from 'lucide-react';
 import { TsrmLogo } from '@/components/TsrmLogo';
 import { useLanguage } from '@/context/LanguageContext';
@@ -43,6 +44,10 @@ interface PaymentViewProps {
   attendanceType?: 'onsite' | 'online';
   itemizedActivities?: ItemizedActivity[];
   selectedActivities?: Array<{ id: string; name: string; price: number; type?: string }>;
+  isCouponSponsored?: boolean;
+  sponsorCompanyName?: string;
+  couponCode?: string;
+  discountAmount?: number;
   submitting?: boolean;
   onNavigateBack?: () => void;
   onOpenUploadModal: () => void;
@@ -68,6 +73,10 @@ export function PaymentView({
   attendanceType = 'onsite',
   itemizedActivities,
   selectedActivities,
+  isCouponSponsored = false,
+  sponsorCompanyName,
+  couponCode,
+  discountAmount = 0,
   submitting = false,
   onNavigateBack,
   onOpenUploadModal,
@@ -315,46 +324,77 @@ export function PaymentView({
             )}
           </div>
 
-          {/* Grand Total Amount Due */}
-          <div className="border-t border-slate-200/90 pt-4 flex items-baseline justify-between bg-blue-50/40 -mx-5 sm:-mx-6 -mb-5 sm:-mb-6 p-4 sm:p-5 rounded-b-3xl">
-            <div>
-              <span className="text-xs sm:text-sm font-extrabold text-slate-700 block">{t.payment.totalDue}</span>
-              {isRegistration && (
-                <span className="text-[11px] text-slate-500 font-medium">
-                  {lang === 'th' ? `คำนวณตามรูปแบบ: ${attendanceType === 'online' ? 'Online' : 'Onsite'}` : `Calculated for: ${attendanceType === 'online' ? 'Online' : 'Onsite'}`}
-                </span>
-              )}
+          {/* Grand Total Amount Due or Sponsor Pass Notice */}
+          {isCouponSponsored ? (
+            <div className="border-t border-emerald-200 pt-4 bg-gradient-to-r from-emerald-50 via-teal-50/50 to-blue-50/50 -mx-5 sm:-mx-6 -mb-5 sm:-mb-6 p-4 sm:p-5 rounded-b-3xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-sm shrink-0">
+                  <Sparkles className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-md">
+                      {lang === 'th' ? 'สิทธิ์สปอนเซอร์ (Sponsor Pass)' : 'Sponsor Pass'}
+                    </span>
+                    {couponCode && (
+                      <span className="text-[10px] font-mono font-black text-slate-700 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                        Code: {couponCode}
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-tight mt-1 truncate">
+                    {lang === 'th' ? 'ได้รับการสนับสนุนค่าลงทะเบียนโดย:' : 'Sponsored by:'}{' '}
+                    <span className="text-[#0026b3] font-black">{sponsorCompanyName || 'Sponsor Partner'}</span>
+                  </h4>
+                  <p className="text-[11px] text-emerald-700 font-bold mt-0.5">
+                    {lang === 'th' ? '✓ ได้รับสิทธิ์เข้าร่วมงานประชุมฟรีเต็มจำนวน ไม่ต้องชำระเงิน' : '✓ Full coverage: No payment required'}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="text-right">
-              <span className="text-2xl sm:text-3xl font-black text-[#0026b3] tracking-tight">
-                {totalAmount} <span className="text-base sm:text-lg font-bold text-slate-700">{t.payment.currency}</span>
+          ) : (
+            <div className="border-t border-slate-200/90 pt-4 flex items-baseline justify-between bg-blue-50/40 -mx-5 sm:-mx-6 -mb-5 sm:-mb-6 p-4 sm:p-5 rounded-b-3xl">
+              <div>
+                <span className="text-xs sm:text-sm font-extrabold text-slate-700 block">{t.payment.totalDue}</span>
+                {isRegistration && (
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    {lang === 'th' ? `คำนวณตามรูปแบบ: ${attendanceType === 'online' ? 'Online' : 'Onsite'}` : `Calculated for: ${attendanceType === 'online' ? 'Online' : 'Onsite'}`}
+                  </span>
+                )}
+              </div>
+              <div className="text-right">
+                <span className="text-2xl sm:text-3xl font-black text-[#0026b3] tracking-tight">
+                  {totalAmount} <span className="text-base sm:text-lg font-bold text-slate-700">{t.payment.currency}</span>
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Bank Account Info Card (Only shown if payment is required) */}
+        {!isCouponSponsored && (
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 flex items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="text-[#0026b3] font-black text-sm sm:text-lg tracking-wider truncate">
+                {bankAccount}
+              </span>
+              {/* Kasikorn K+ Badge */}
+              <span className="bg-[#00a950] text-white text-[10px] sm:text-[11px] font-black px-2 py-0.5 rounded shadow-2xs shrink-0 whitespace-nowrap">
+                K+
               </span>
             </div>
+            <button
+              onClick={onCopyBank}
+              className="text-xs font-bold text-[#0026b3] hover:bg-blue-50 px-3 py-1.5 sm:py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap border border-blue-100"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedBank ? t.payment.copiedButton : t.payment.copyButton}</span>
+            </button>
           </div>
-        </div>
+        )}
 
-        {/* Bank Account Info Card */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 flex items-center justify-between gap-3 shadow-2xs">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="text-[#0026b3] font-black text-sm sm:text-lg tracking-wider truncate">
-              {bankAccount}
-            </span>
-            {/* Kasikorn K+ Badge */}
-            <span className="bg-[#00a950] text-white text-[10px] sm:text-[11px] font-black px-2 py-0.5 rounded shadow-2xs shrink-0 whitespace-nowrap">
-              K+
-            </span>
-          </div>
-          <button
-            onClick={onCopyBank}
-            className="text-xs font-bold text-[#0026b3] hover:bg-blue-50 px-3 py-1.5 sm:py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap border border-blue-100"
-          >
-            <Copy className="w-3.5 h-3.5" />
-            <span>{copiedBank ? t.payment.copiedButton : t.payment.copyButton}</span>
-          </button>
-        </div>
-
-        {/* Uploaded Slip Card (When slip is attached) */}
-        {uploadedSlipData && (
+        {/* Uploaded Slip Card (When slip is attached and required) */}
+        {!isCouponSponsored && uploadedSlipData && (
           <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-[#4ade80]/60 bg-gradient-to-b from-white to-emerald-50/30 shadow-2xs space-y-3 animate-fade-in">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -427,7 +467,7 @@ export function PaymentView({
 
         {/* Action Buttons Section */}
         <div className="space-y-2.5 pt-2">
-          {!uploadedSlipData ? (
+          {!isCouponSponsored && !uploadedSlipData ? (
             <button
               onClick={onOpenUploadModal}
               className="w-full bg-white hover:bg-blue-50/50 text-[#0026b3] border-2 border-dashed border-[#0026b3]/40 font-bold text-sm sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-2xs transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
@@ -437,17 +477,24 @@ export function PaymentView({
             </button>
           ) : null}
 
-          {/* Confirm Payment Button */}
+          {/* Confirm Payment / Confirm Sponsor Pass Button */}
           <button
             onClick={onConfirmPayment}
-            className={`w-full font-bold text-sm sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-md transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2 ${
-              uploadedSlipData
+            disabled={submitting}
+            className={`w-full font-black text-sm sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-md transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2 ${
+              isCouponSponsored
+                ? 'bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] ring-4 ring-[#4ade80]/25 shadow-emerald-950/20'
+                : uploadedSlipData
                 ? 'bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] ring-4 ring-[#4ade80]/20'
                 : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-blue-900/10'
             }`}
           >
             <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
-            <span>{t.payment.confirmPaymentButton}</span>
+            <span>
+              {isCouponSponsored
+                ? (lang === 'th' ? 'ยืนยันการลงทะเบียน (ใช้สิทธิ์คูปอง)' : 'Confirm Registration (Use Sponsor Pass)')
+                : t.payment.confirmPaymentButton}
+            </span>
           </button>
         </div>
 

@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { sendAttendeeTicketEmail } from '@/lib/email';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
+import {
+  ensureDailyCheckinsForMeeting,
+  formatBangkokDate,
+  formatThaiDate,
+  getMeetingProgramsAndDates,
+} from '@/lib/services/dailyCheckinService';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +24,9 @@ export async function POST(req: NextRequest) {
       statusFilter = 'Registered', // 'Registered' | 'all' | 'Checked_In' | 'Non-Member'
       customRecipientList, // Optional array of { name, email, ticketCode, memberNo, status }
       extraNote,
+      isDailyMode = false,
+      targetDate, // e.g. "2026-10-21"
+      programName, // e.g. "Main Program (Day 1)"
     } = body;
 
     if (!meetingId && (!customRecipientList || customRecipientList.length === 0)) {
@@ -33,19 +42,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Meeting not found' }, { status: 404 });
     }
 
-    const meetingDateStr = meeting.meeting_date ? new Date(meeting.meeting_date).toLocaleDateString('th-TH', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    }) : undefined;
+    // 2. If Daily Mode is active, ensure daily check-in records are generated/synced in DB first
+    let dailyRecordsMap = new Map<string, any>();
+    const selectedDateStr = targetDate || formatBangkokDate(meeting.meeting_date);
+    let resolvedProgramName = programName;
 
-    // 2. Fetch attendees according to filters
+    if (isDailyMode) {
+      const dailySync = await ensureDailyCheckinsForMeeting(meetingId, selectedDateStr);
+      for (const rec of dailySync.dailyRecords) {
+        dailyRecordsMap.set(rec.ticket_code, rec);
+        if (!resolvedProgramName && rec.program_name) {
+          resolvedProgramName = rec.program_name;
+        }
+      }
+    }
+
+    const meetingDateStr = isDailyMode
+      ? `ประจำวันที่ ${formatThaiDate(selectedDateStr)} (${resolvedProgramName || 'Main Program'})`
+      : (meeting.meeting_date ? new Date(meeting.meeting_date).toLocaleDateString('th-TH', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        }) : undefined);
+
+    // 3. Fetch attendees according to filters
     let targetList: Array<{
       name: string;
       email: string;
       ticketCode: string;
       memberNo?: string;
       status: string;
+      dailyQrToken?: string;
+      dailyProgram?: string;
     }> = [];
 
     if (customRecipientList && Array.isArray(customRecipientList) && customRecipientList.length > 0) {
@@ -90,12 +118,16 @@ export async function POST(req: NextRequest) {
         const name = r.member_name || r.attendee_name || 'ผู้เข้าร่วมประชุม';
         const email = r.member_email || r.attendee_email || '';
         const ticketCode = r.ticket_code || (r.member_no ? `TSRM-${r.member_no}` : `TSRM-ATTD-${r.attendance_id}`);
+        const dailyRec = dailyRecordsMap.get(ticketCode);
+
         return {
           name,
           email,
           ticketCode,
           memberNo: r.member_no || undefined,
           status: r.attendance_status,
+          dailyQrToken: dailyRec?.daily_qr_token,
+          dailyProgram: dailyRec?.program_name || resolvedProgramName,
         };
       }).filter((t) => t.email && t.email.includes('@'));
     }
@@ -107,13 +139,21 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // 3. Batch dispatch emails
+    // 4. Batch dispatch emails
     let successCount = 0;
     let failedCount = 0;
     const errors: string[] = [];
 
     for (const recipient of targetList) {
       try {
+        const qrPayload = isDailyMode && recipient.dailyQrToken
+          ? `TSRM-PASS:${recipient.dailyQrToken}`
+          : `TSRM-PASS:${recipient.ticketCode}`;
+
+        const dailyNote = isDailyMode
+          ? `บัตรเข้าร่วมหลักสูตร: ${recipient.dailyProgram || resolvedProgramName || 'Main Program'} • QR Code นี้ใช้สำหรับเข้างานวันที่ ${formatThaiDate(selectedDateStr)} เท่านั้น (1 สิทธิ์/วัน)${extraNote ? `\n\n${extraNote}` : ''}`
+          : extraNote;
+
         const result = await sendAttendeeTicketEmail({
           to: recipient.email,
           recipientName: recipient.name,
@@ -123,7 +163,9 @@ export async function POST(req: NextRequest) {
           ticketCode: recipient.ticketCode,
           memberNo: recipient.memberNo,
           attendanceStatus: recipient.status,
-          extraNote,
+          qrCodeData: qrPayload,
+          dailyProgram: isDailyMode ? (recipient.dailyProgram || resolvedProgramName || 'Daily Pass') : undefined,
+          extraNote: dailyNote,
         });
 
         if (result.success) {
@@ -138,15 +180,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const modeLabel = isDailyMode ? ` (QR รายวัน: ${formatThaiDate(selectedDateStr)})` : '';
     return NextResponse.json({
       success: true,
       data: {
         total: targetList.length,
         successCount,
         failedCount,
-        errors: errors.slice(0, 5), // Return first 5 errors if any
+        errors: errors.slice(0, 5),
       },
-      message: `ส่งอีเมลบัตรเข้างานสำเร็จ ${successCount} จากทั้งหมด ${targetList.length} ท่าน`,
+      message: `ส่งอีเมลบัตรเข้างานสำเร็จ ${successCount} จากทั้งหมด ${targetList.length} ท่าน${modeLabel}`,
     });
   } catch (error: any) {
     console.error('API /api/email/send-tickets error:', error);

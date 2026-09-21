@@ -16,7 +16,7 @@ function escapeSqlString(val) {
 async function exportData() {
   console.log('📦 Starting full database export from Local PostgreSQL for Neon...');
 
-  const [members, educations, meetings, attendances, paymentSlips, systemSettings, receipts] = await Promise.all([
+  const [members, educations, meetings, attendances, paymentSlips, systemSettings, receipts, dailyCheckins] = await Promise.all([
     prisma.member.findMany({ orderBy: { member_no: 'asc' } }),
     prisma.member_educations.findMany({ orderBy: { edu_id: 'asc' } }),
     prisma.meetings.findMany({ orderBy: { meeting_id: 'asc' } }),
@@ -24,6 +24,7 @@ async function exportData() {
     prisma.payment_slips.findMany({ orderBy: { id: 'asc' } }),
     prisma.system_settings.findMany({ orderBy: { key: 'asc' } }),
     prisma.receipts.findMany({ orderBy: { receipt_no: 'asc' } }),
+    prisma.meeting_daily_checkins.findMany({ orderBy: { id: 'asc' } }),
   ]);
 
   console.log(`Found in Local DB:
@@ -34,6 +35,7 @@ async function exportData() {
   - Payment Slips: ${paymentSlips.length}
   - System Settings: ${systemSettings.length}
   - Receipts: ${receipts.length}
+  - Daily Checkins: ${dailyCheckins.length}
   `);
 
   let sql = `-- ==========================================================\n`;
@@ -139,6 +141,23 @@ async function exportData() {
     status                  VARCHAR(20) DEFAULT 'issued',
     created_at              TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at              TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);\n\n`;
+
+  // meeting_daily_checkins schema
+  sql += `CREATE TABLE IF NOT EXISTS meeting_daily_checkins (
+    id                  BIGSERIAL PRIMARY KEY,
+    meeting_id          VARCHAR(50) REFERENCES meetings(meeting_id) ON DELETE CASCADE,
+    attendance_id       BIGINT REFERENCES meeting_attendances(attendance_id) ON DELETE CASCADE,
+    member_no           VARCHAR(20) REFERENCES members(member_no) ON DELETE CASCADE,
+    ticket_code         VARCHAR(50) NOT NULL,
+    checkin_date        DATE NOT NULL,
+    program_name        VARCHAR(255),
+    daily_qr_token      VARCHAR(100) UNIQUE,
+    checkin_status      VARCHAR(50) DEFAULT 'pending',
+    checkin_time        TIMESTAMPTZ,
+    created_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_meeting_ticket_daily UNIQUE (meeting_id, ticket_code, checkin_date)
 );\n\n`;
 
   sql += `BEGIN;\n\n`;
@@ -377,13 +396,50 @@ ON CONFLICT (receipt_no) DO UPDATE SET
     sql += `\n`;
   }
 
+  // 8. meeting_daily_checkins
+  if (dailyCheckins.length > 0) {
+    sql += `-- 8. Table: meeting_daily_checkins (${dailyCheckins.length} rows)\n`;
+    for (const d of dailyCheckins) {
+      const cols = [
+        'id', 'meeting_id', 'attendance_id', 'member_no', 'ticket_code',
+        'checkin_date', 'program_name', 'daily_qr_token', 'checkin_status',
+        'checkin_time', 'created_at', 'updated_at'
+      ];
+      const vals = [
+        d.id.toString(),
+        escapeSqlString(d.meeting_id),
+        d.attendance_id ? d.attendance_id.toString() : 'NULL',
+        escapeSqlString(d.member_no),
+        escapeSqlString(d.ticket_code),
+        escapeSqlString(d.checkin_date),
+        escapeSqlString(d.program_name),
+        escapeSqlString(d.daily_qr_token),
+        escapeSqlString(d.checkin_status),
+        escapeSqlString(d.checkin_time),
+        escapeSqlString(d.created_at),
+        escapeSqlString(d.updated_at),
+      ];
+      sql += `INSERT INTO meeting_daily_checkins (${cols.join(', ')}) VALUES (${vals.join(', ')})
+ON CONFLICT (meeting_id, ticket_code, checkin_date) DO UPDATE SET
+  attendance_id = EXCLUDED.attendance_id,
+  member_no = EXCLUDED.member_no,
+  program_name = EXCLUDED.program_name,
+  daily_qr_token = EXCLUDED.daily_qr_token,
+  checkin_status = EXCLUDED.checkin_status,
+  checkin_time = EXCLUDED.checkin_time,
+  updated_at = EXCLUDED.updated_at;\n`;
+    }
+    sql += `\n`;
+  }
+
   // Sequences update
-  sql += `-- 8. Update Sequences\n`;
+  sql += `-- 9. Update Sequences\n`;
   sql += `SELECT setval('member_no_seq', GREATEST(COALESCE((SELECT MAX(NULLIF(regexp_replace(member_no, '\\D', '', 'g'), '')::bigint) FROM members), 0) + 1, 1281), false);\n`;
   sql += `SELECT setval('members_id_seq', COALESCE((SELECT MAX(id) FROM members), 1), true);\n`;
   sql += `SELECT setval('member_educations_edu_id_seq', COALESCE((SELECT MAX(edu_id) FROM member_educations), 1), true);\n`;
   sql += `SELECT setval('meeting_attendances_attendance_id_seq', COALESCE((SELECT MAX(attendance_id) FROM meeting_attendances), 1), true);\n`;
-  sql += `SELECT setval('payment_slips_id_seq', COALESCE((SELECT MAX(id) FROM payment_slips), 1), true);\n\n`;
+  sql += `SELECT setval('payment_slips_id_seq', COALESCE((SELECT MAX(id) FROM payment_slips), 1), true);\n`;
+  sql += `SELECT setval('meeting_daily_checkins_id_seq', COALESCE((SELECT MAX(id) FROM meeting_daily_checkins), 1), true);\n\n`;
 
   sql += `COMMIT;\n`;
 

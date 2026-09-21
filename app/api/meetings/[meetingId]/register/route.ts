@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import crypto from 'crypto';
 
 export async function POST(
   request: NextRequest,
@@ -24,6 +23,8 @@ export async function POST(
       refNo,
       slipUrl,
       selectedActivities,
+      couponCode,
+      originalAmount,
     } = body;
 
     if (!meetingId) {
@@ -33,7 +34,10 @@ export async function POST(
       );
     }
 
-    if (!slipUrl) {
+    const numericAmount = Math.max(0, Number(amount) || 0);
+    const isFreeRegistration = numericAmount === 0;
+
+    if (!slipUrl && !isFreeRegistration) {
       return NextResponse.json(
         { success: false, error: 'Payment slip image is required' },
         { status: 400 }
@@ -41,11 +45,9 @@ export async function POST(
     }
 
     // Verify meeting exists
-    console.log('Prisma keys in route:', Object.keys(prisma));
     const meeting = await prisma.meetings.findUnique({
       where: { meeting_id: meetingId },
     });
-
 
     if (!meeting) {
       return NextResponse.json(
@@ -55,6 +57,10 @@ export async function POST(
     }
 
     let validMemberNo: string | null = null;
+    let effectiveAttendeeName = guestName || '';
+    let effectiveAttendeeEmail = guestEmail || '';
+    let effectiveAttendeePhone = guestPhone || null;
+    let effectiveAttendeeWorkplace = guestWorkplace || null;
 
     if (isMember) {
       if (!memberNo) {
@@ -77,6 +83,10 @@ export async function POST(
       }
 
       validMemberNo = member.member_no;
+      effectiveAttendeeName = member.fullNameTh || member.fullNameEn || effectiveAttendeeName;
+      effectiveAttendeeEmail = member.email || effectiveAttendeeEmail;
+      effectiveAttendeePhone = member.mobile || effectiveAttendeePhone;
+      effectiveAttendeeWorkplace = member.workplace || effectiveAttendeeWorkplace;
 
       // Duplicate registration check for member
       const memberSlips = await prisma.$queryRaw<Array<{ slip_id: string; status: string }>>`
@@ -159,12 +169,46 @@ export async function POST(
       }
     }
 
+    // 1. Check & Validate Coupon if supplied
+    let couponRecord: any = null;
+    let discountAppliedAmount = 0;
+
+    if (couponCode && couponCode.trim()) {
+      const cleanCouponCode = couponCode.trim().toUpperCase();
+      couponRecord = await (prisma as any).coupons.findUnique({
+        where: { code: cleanCouponCode },
+      });
+
+      if (couponRecord) {
+        if (!couponRecord.is_active || couponRecord.used_count >= couponRecord.max_uses || (couponRecord.meeting_id && couponRecord.meeting_id !== meetingId)) {
+          return NextResponse.json(
+            { success: false, error: 'รหัสคูปองไม่ถูกต้อง ไม่ตรงรอบการประชุม หรือโควตาสิทธิ์เต็มแล้ว' },
+            { status: 400 }
+          );
+        }
+
+        // Calculate discount applied
+        const origAmt = Number(originalAmount) || numericAmount;
+        if (couponRecord.discount_type === 'free') {
+          discountAppliedAmount = origAmt;
+        } else if (couponRecord.discount_type === 'fixed') {
+          discountAppliedAmount = Math.min(origAmt, couponRecord.discount_value);
+        } else if (couponRecord.discount_type === 'percent') {
+          const pct = Math.min(100, Math.max(0, couponRecord.discount_value));
+          discountAppliedAmount = Math.round((origAmt * pct) / 100);
+        }
+      }
+    }
+
     // Generate unique Ticket Code: TSRM-YYYY-XXXX
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const ticketCode = `TSRM-${new Date().getFullYear()}-${randomSuffix}`;
     const slipId = `SLIP-${Date.now().toString(36).toUpperCase()}`;
+    const registrationStatus = isFreeRegistration ? 'approved' : 'pending';
+    const attendanceStatus = isFreeRegistration ? 'Registered' : (isMember ? 'Pending_Payment' : 'Non-Member-Pending');
+    const effectiveSlipUrl = slipUrl || (couponRecord ? `COUPON_SPONSORED:${couponRecord.company_name}` : 'FREE_REGISTRATION');
 
-    // 1. Record payment slip in payment_slips table
+    // 2. Record payment slip in payment_slips table
     let slip: any = null;
     if ((prisma as any).payment_slips) {
       slip = await (prisma as any).payment_slips.create({
@@ -178,14 +222,16 @@ export async function POST(
           guest_workplace: !isMember ? (guestWorkplace || null) : null,
           is_member: !!isMember,
           ticket_code: ticketCode,
-          amount: Number(amount) || 0,
-          bank: bank || null,
+          amount: numericAmount,
+          bank: bank || (couponRecord ? `สิทธิ์คูปอง: ${couponRecord.company_name}` : null),
           transfer_date: transferDate || null,
           transfer_time: transferTime || null,
-          ref_no: refNo || null,
-          slip_url: slipUrl,
-          status: 'pending',
+          ref_no: refNo || (couponRecord ? `COUPON:${couponRecord.code}` : null),
+          slip_url: effectiveSlipUrl,
+          status: registrationStatus,
           selected_activities: selectedActivities || null,
+          reviewed_by: isFreeRegistration ? (couponRecord ? `SYSTEM:COUPON(${couponRecord.code})` : 'SYSTEM:AUTO_FREE') : null,
+          reviewed_at: isFreeRegistration ? new Date() : null,
         },
       });
     } else {
@@ -194,26 +240,27 @@ export async function POST(
         INSERT INTO payment_slips (
           slip_id, meeting_id, member_no, guest_name, guest_email, guest_phone, guest_workplace,
           is_member, ticket_code, amount, bank, transfer_date, transfer_time, ref_no, slip_url,
-          status, selected_activities, created_at, updated_at
+          status, selected_activities, reviewed_by, reviewed_at, created_at, updated_at
         ) VALUES (
           ${slipId}, ${meetingId}, ${validMemberNo}, ${!isMember ? guestName : null}, ${!isMember ? guestEmail : null},
           ${!isMember ? (guestPhone || null) : null}, ${!isMember ? (guestWorkplace || null) : null},
-          ${!!isMember}, ${ticketCode}, ${Number(amount) || 0}, ${bank || null}, ${transferDate || null},
-          ${transferTime || null}, ${refNo || null}, ${slipUrl}, 'pending', ${actJson}::jsonb, NOW(), NOW()
+          ${!!isMember}, ${ticketCode}, ${numericAmount}, ${bank || (couponRecord ? `สิทธิ์คูปอง: ${couponRecord.company_name}` : null)}, ${transferDate || null},
+          ${transferTime || null}, ${refNo || (couponRecord ? `COUPON:${couponRecord.code}` : null)}, ${effectiveSlipUrl}, 
+          ${registrationStatus}, ${actJson}::jsonb, ${isFreeRegistration ? 'SYSTEM:AUTO' : null}, ${isFreeRegistration ? new Date() : null}, NOW(), NOW()
         )
       `;
       slip = { slip_id: slipId };
     }
 
-    // 2. Record attendance in meeting_attendances table
+    // 3. Record attendance in meeting_attendances table
     if (isMember && validMemberNo) {
       await prisma.$executeRaw`
         INSERT INTO meeting_attendances (
           meeting_id, member_no, attendance_status
         ) VALUES (
-          ${meetingId}, ${validMemberNo}, 'Pending_Payment'
+          ${meetingId}, ${validMemberNo}, ${attendanceStatus}
         ) ON CONFLICT (meeting_id, member_no)
-        DO UPDATE SET attendance_status = 'Pending_Payment'
+        DO UPDATE SET attendance_status = ${attendanceStatus}
       `;
     } else {
       // Create non-member attendance record
@@ -221,19 +268,53 @@ export async function POST(
         INSERT INTO meeting_attendances (
           meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status
         ) VALUES (
-          ${meetingId}, NULL, ${guestName}, ${guestEmail}, ${guestPhone || null}, ${guestWorkplace || null}, 'Non-Member-Pending'
+          ${meetingId}, NULL, ${guestName}, ${guestEmail}, ${guestPhone || null}, ${guestWorkplace || null}, ${attendanceStatus}
         )
       `;
     }
 
+    // 4. Record Coupon Usage & increment used_count if coupon was used
+    if (couponRecord) {
+      try {
+        await (prisma as any).coupon_usages.create({
+          data: {
+            coupon_id: couponRecord.id,
+            meeting_id: meetingId,
+            member_no: validMemberNo,
+            attendee_name: effectiveAttendeeName,
+            attendee_email: effectiveAttendeeEmail,
+            attendee_phone: effectiveAttendeePhone,
+            workplace: effectiveAttendeeWorkplace,
+            discount_applied: discountAppliedAmount,
+            final_amount: numericAmount,
+            ticket_code: ticketCode,
+            slip_id: slip.slip_id,
+          },
+        });
+
+        // Increment used_count in coupons
+        await (prisma as any).coupons.update({
+          where: { id: couponRecord.id },
+          data: {
+            used_count: { increment: 1 },
+          },
+        });
+      } catch (couponErr) {
+        console.error('Failed to log coupon usage:', couponErr);
+      }
+    }
 
     return NextResponse.json({
       success: true,
       data: {
         slipId: slip.slip_id,
         ticketCode: ticketCode,
-        status: 'pending',
-        message: 'Registration submitted successfully, pending staff verification.',
+        status: registrationStatus,
+        isFreeRegistration,
+        sponsorCompany: couponRecord?.company_name || null,
+        message: isFreeRegistration
+          ? 'ลงทะเบียนสำเร็จด้วยสิทธิ์คูปองเรียบร้อยแล้ว ได้รับการยืนยันเข้าร่วมงานทันที!'
+          : 'Registration submitted successfully, pending staff verification.',
       },
     });
   } catch (error: any) {
@@ -244,7 +325,3 @@ export async function POST(
     );
   }
 }
-
-
-
-

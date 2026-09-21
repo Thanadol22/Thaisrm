@@ -117,6 +117,52 @@ async function main() {
         status                  VARCHAR(20) DEFAULT 'issued',
         created_at              TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at              TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS meeting_daily_checkins (
+        id                  BIGSERIAL PRIMARY KEY,
+        meeting_id          VARCHAR(50) REFERENCES meetings(meeting_id) ON DELETE CASCADE,
+        attendance_id       BIGINT REFERENCES meeting_attendances(attendance_id) ON DELETE CASCADE,
+        member_no           VARCHAR(20) REFERENCES members(member_no) ON DELETE CASCADE,
+        ticket_code         VARCHAR(50) NOT NULL,
+        checkin_date        DATE NOT NULL,
+        program_name        VARCHAR(255),
+        daily_qr_token      VARCHAR(100) UNIQUE,
+        checkin_status      VARCHAR(50) DEFAULT 'pending',
+        checkin_time        TIMESTAMPTZ,
+        created_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_meeting_ticket_daily UNIQUE (meeting_id, ticket_code, checkin_date)
+    )`,
+    `CREATE TABLE IF NOT EXISTS coupons (
+        id               VARCHAR(50) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        code             VARCHAR(50) UNIQUE NOT NULL,
+        company_name     VARCHAR(255) NOT NULL,
+        meeting_id       VARCHAR(50) REFERENCES meetings(meeting_id) ON DELETE CASCADE,
+        discount_type    VARCHAR(20) DEFAULT 'free',
+        discount_value   INTEGER DEFAULT 0,
+        applicable_type  VARCHAR(20) DEFAULT 'all',
+        max_uses         INTEGER DEFAULT 1,
+        used_count       INTEGER DEFAULT 0,
+        expire_date      DATE,
+        is_active        BOOLEAN DEFAULT true,
+        remarks          VARCHAR(500),
+        created_at       TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at       TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS coupon_usages (
+        id               BIGSERIAL PRIMARY KEY,
+        coupon_id        VARCHAR(50) REFERENCES coupons(id) ON DELETE CASCADE,
+        meeting_id       VARCHAR(50) REFERENCES meetings(meeting_id) ON DELETE CASCADE,
+        member_no        VARCHAR(20) REFERENCES members(member_no) ON DELETE SET NULL,
+        attendee_name    VARCHAR(255) NOT NULL,
+        attendee_email   VARCHAR(255) NOT NULL,
+        attendee_phone   VARCHAR(50),
+        workplace        VARCHAR(255),
+        discount_applied INTEGER DEFAULT 0,
+        final_amount     INTEGER DEFAULT 0,
+        ticket_code      VARCHAR(50),
+        slip_id          VARCHAR(50),
+        used_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     )`
   ];
 
@@ -131,7 +177,7 @@ async function main() {
 
   // STEP 1: Fetch local data
   console.log('📥 1. อ่านข้อมูลจาก Local PostgreSQL...');
-  const [localMembers, localEducations, localMeetings, localAttendances, localSlips, localSettings, localReceipts] = await Promise.all([
+  const [localMembers, localEducations, localMeetings, localAttendances, localSlips, localSettings, localReceipts, localCoupons, localCouponUsages] = await Promise.all([
     localPrisma.member.findMany(),
     localPrisma.member_educations.findMany(),
     localPrisma.meetings.findMany(),
@@ -139,6 +185,8 @@ async function main() {
     localPrisma.payment_slips.findMany(),
     localPrisma.system_settings.findMany(),
     localPrisma.receipts.findMany(),
+    (localPrisma.coupons ? localPrisma.coupons.findMany() : []),
+    (localPrisma.coupon_usages ? localPrisma.coupon_usages.findMany() : []),
   ]);
 
   console.log(`   - Members: ${localMembers.length}`);
@@ -147,7 +195,9 @@ async function main() {
   console.log(`   - Attendances: ${localAttendances.length}`);
   console.log(`   - Slips: ${localSlips.length}`);
   console.log(`   - System Settings: ${localSettings.length}`);
-  console.log(`   - Receipts: ${localReceipts.length}\n`);
+  console.log(`   - Receipts: ${localReceipts.length}`);
+  console.log(`   - Coupons: ${localCoupons.length}`);
+  console.log(`   - Coupon Usages: ${localCouponUsages.length}\n`);
 
   // STEP 2: Meetings Sync
   console.log('📤 2. Syncing Meetings (ทุกคอลัมน์)...');
@@ -440,7 +490,126 @@ async function main() {
       },
     });
   }
-  console.log('   ✅ Receipts sync completed.');
+  // STEP 7.8: Daily Checkins Sync
+  const localDailyCheckins = await localPrisma.meeting_daily_checkins.findMany();
+  if (localDailyCheckins.length > 0) {
+    console.log('   Syncing Daily Checkins...');
+    for (const d of localDailyCheckins) {
+      await neonPrisma.meeting_daily_checkins.upsert({
+        where: {
+          meeting_id_ticket_code_checkin_date: {
+            meeting_id: d.meeting_id,
+            ticket_code: d.ticket_code,
+            checkin_date: d.checkin_date,
+          },
+        },
+        update: {
+          attendance_id: d.attendance_id,
+          member_no: d.member_no,
+          program_name: d.program_name,
+          daily_qr_token: d.daily_qr_token,
+          checkin_status: d.checkin_status,
+          checkin_time: d.checkin_time,
+          updated_at: d.updated_at,
+        },
+        create: {
+          id: d.id,
+          meeting_id: d.meeting_id,
+          attendance_id: d.attendance_id,
+          member_no: d.member_no,
+          ticket_code: d.ticket_code,
+          checkin_date: d.checkin_date,
+          program_name: d.program_name,
+          daily_qr_token: d.daily_qr_token,
+          checkin_status: d.checkin_status,
+          checkin_time: d.checkin_time,
+          created_at: d.created_at,
+          updated_at: d.updated_at,
+        },
+      });
+    }
+    console.log('   ✅ Daily checkins sync completed.');
+  }
+
+  // STEP 7.9: Coupons & Coupon Usages Sync
+  if (localCoupons.length > 0) {
+    console.log('   Syncing Coupons...');
+    for (const c of localCoupons) {
+      await neonPrisma.coupons.upsert({
+        where: { id: c.id },
+        update: {
+          code: c.code,
+          company_name: c.company_name,
+          meeting_id: c.meeting_id,
+          discount_type: c.discount_type,
+          discount_value: c.discount_value,
+          applicable_type: c.applicable_type,
+          max_uses: c.max_uses,
+          used_count: c.used_count,
+          expire_date: c.expire_date,
+          is_active: c.is_active,
+          remarks: c.remarks,
+          updated_at: c.updated_at,
+        },
+        create: {
+          id: c.id,
+          code: c.code,
+          company_name: c.company_name,
+          meeting_id: c.meeting_id,
+          discount_type: c.discount_type,
+          discount_value: c.discount_value,
+          applicable_type: c.applicable_type,
+          max_uses: c.max_uses,
+          used_count: c.used_count,
+          expire_date: c.expire_date,
+          is_active: c.is_active,
+          remarks: c.remarks,
+          created_at: c.created_at,
+          updated_at: c.updated_at,
+        },
+      });
+    }
+    console.log('   ✅ Coupons sync completed.');
+  }
+
+  if (localCouponUsages.length > 0) {
+    console.log('   Syncing Coupon Usages...');
+    for (const u of localCouponUsages) {
+      await neonPrisma.coupon_usages.upsert({
+        where: { id: u.id },
+        update: {
+          coupon_id: u.coupon_id,
+          meeting_id: u.meeting_id,
+          member_no: u.member_no,
+          attendee_name: u.attendee_name,
+          attendee_email: u.attendee_email,
+          attendee_phone: u.attendee_phone,
+          workplace: u.workplace,
+          discount_applied: u.discount_applied,
+          final_amount: u.final_amount,
+          ticket_code: u.ticket_code,
+          slip_id: u.slip_id,
+          used_at: u.used_at,
+        },
+        create: {
+          id: u.id,
+          coupon_id: u.coupon_id,
+          meeting_id: u.meeting_id,
+          member_no: u.member_no,
+          attendee_name: u.attendee_name,
+          attendee_email: u.attendee_email,
+          attendee_phone: u.attendee_phone,
+          workplace: u.workplace,
+          discount_applied: u.discount_applied,
+          final_amount: u.final_amount,
+          ticket_code: u.ticket_code,
+          slip_id: u.slip_id,
+          used_at: u.used_at,
+        },
+      });
+    }
+    console.log('   ✅ Coupon Usages sync completed.');
+  }
 
   // STEP 8: Reset Sequences on Neon
   const seqQueries = [
@@ -449,6 +618,8 @@ async function main() {
     `SELECT setval('member_educations_edu_id_seq', COALESCE((SELECT MAX(edu_id) FROM member_educations), 1), true)`,
     `SELECT setval('meeting_attendances_attendance_id_seq', COALESCE((SELECT MAX(attendance_id) FROM meeting_attendances), 1), true)`,
     `SELECT setval('payment_slips_id_seq', COALESCE((SELECT MAX(id) FROM payment_slips), 1), true)`,
+    `SELECT setval('meeting_daily_checkins_id_seq', COALESCE((SELECT MAX(id) FROM meeting_daily_checkins), 1), true)`,
+    `SELECT setval('coupon_usages_id_seq', COALESCE((SELECT MAX(id) FROM coupon_usages), 1), true)`,
   ];
   for (const q of seqQueries) {
     try {
@@ -461,13 +632,16 @@ async function main() {
 
   // STEP 9: Summary
   console.log('\n🔍 5. ตรวจสอบจำนวนข้อมูลบน Neon Cloud DB...');
-  const [neonMembers, neonEducations, neonMeetings, neonAttendances, neonSettings, neonReceipts] = await Promise.all([
+  const [neonMembers, neonEducations, neonMeetings, neonAttendances, neonSettings, neonReceipts, neonDailyCheckins, neonCoupons, neonCouponUsages] = await Promise.all([
     neonPrisma.member.count(),
     neonPrisma.member_educations.count(),
     neonPrisma.meetings.count(),
     neonPrisma.meeting_attendances.count(),
     neonPrisma.system_settings.count(),
     neonPrisma.receipts.count(),
+    neonPrisma.meeting_daily_checkins.count(),
+    neonPrisma.coupons.count(),
+    neonPrisma.coupon_usages.count(),
   ]);
 
   console.log(`
@@ -480,6 +654,9 @@ async function main() {
   - ผู้เข้าร่วม (Attendances):     ${neonAttendances} รายการ (Local: ${localAttendances.length})
   - การตั้งค่าระบบ (Settings):     ${neonSettings} รายการ (Local: ${localSettings.length})
   - ใบเสร็จรับเงิน (Receipts):     ${neonReceipts} รายการ (Local: ${localReceipts.length})
+  - เช็คอินรายวัน (Daily):        ${neonDailyCheckins} รายการ (Local: ${localDailyCheckins.length})
+  - คูปองสปอนเซอร์ (Coupons):     ${neonCoupons} รายการ (Local: ${localCoupons.length})
+  - ประวัติใช้คูปอง (Coupon Uses): ${neonCouponUsages} รายการ (Local: ${localCouponUsages.length})
 ======================================================
 `);
 }

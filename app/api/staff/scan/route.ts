@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { processDailyQrScan, formatBangkokDate } from '@/lib/services/dailyCheckinService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -54,6 +55,39 @@ export async function POST(req: NextRequest) {
         { success: false, error: 'ไม่พบรอบการประชุมที่เปิดใช้งาน' },
         { status: 404 }
       );
+    }
+
+    // 1.5 Try Daily Dynamic QR Scan first if code is daily token or matches daily checkin
+    const dailyResult = await processDailyQrScan(rawCode, targetMeetingId);
+    if (dailyResult.success || dailyResult.status === 'duplicate' || (dailyResult.status === 'invalid' && dailyResult.message.includes('ไม่ตรงกับวันที่'))) {
+      const todayBangkok = formatBangkokDate();
+      const todayDateObj = new Date(`${todayBangkok}T00:00:00.000Z`);
+
+      const [totalCount, checkedInCount] = await Promise.all([
+        prisma.meeting_daily_checkins.count({
+          where: { meeting_id: targetMeetingId, checkin_date: todayDateObj },
+        }).then(async (c) => c > 0 ? c : prisma.meeting_attendances.count({ where: { meeting_id: targetMeetingId } })),
+        prisma.meeting_daily_checkins.count({
+          where: {
+            meeting_id: targetMeetingId,
+            checkin_date: todayDateObj,
+            OR: [{ checkin_status: 'attended' }, { checkin_time: { not: null } }],
+          },
+        }).then(async (c) => c > 0 ? c : prisma.meeting_attendances.count({
+          where: {
+            meeting_id: targetMeetingId,
+            OR: [{ checkin_time: { not: null } }, { attendance_status: 'Attended' }],
+          },
+        })),
+      ]);
+
+      return NextResponse.json({
+        ...dailyResult,
+        stats: {
+          total: totalCount,
+          checkedIn: checkedInCount,
+        },
+      });
     }
 
     // 2. Parse decoded code (Handle JSON QR Code if present)

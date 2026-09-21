@@ -1,6 +1,6 @@
 -- ==========================================================
 -- TSRM FULL DATABASE MIGRATION & SYNC FOR NEON POSTGRESQL
--- Generated at: 2026-09-21T02:31:01.082Z
+-- Generated at: 2026-09-21T04:09:43.974Z
 -- ==========================================================
 
 -- 0. Ensure Schema & Columns exist on Neon
@@ -95,9 +95,42 @@ CREATE TABLE IF NOT EXISTS receipts (
     updated_at              TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS meeting_daily_checkins (
+    id                  BIGSERIAL PRIMARY KEY,
+    meeting_id          VARCHAR(50) REFERENCES meetings(meeting_id) ON DELETE CASCADE,
+    attendance_id       BIGINT REFERENCES meeting_attendances(attendance_id) ON DELETE CASCADE,
+    member_no           VARCHAR(20) REFERENCES members(member_no) ON DELETE CASCADE,
+    ticket_code         VARCHAR(50) NOT NULL,
+    checkin_date        DATE NOT NULL,
+    program_name        VARCHAR(255),
+    daily_qr_token      VARCHAR(100) UNIQUE,
+    checkin_status      VARCHAR(50) DEFAULT 'pending',
+    checkin_time        TIMESTAMPTZ,
+    created_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_meeting_ticket_daily UNIQUE (meeting_id, ticket_code, checkin_date)
+);
+
 BEGIN;
 
--- 1. Table: meetings (7 rows)
+-- 1. Table: meetings (8 rows)
+INSERT INTO meetings (meeting_id, meeting_name, meeting_date, start_date, end_date, counts_toward_active, meeting_time, location, meeting_type, staff_code, description, base_price, pricing_tiers, activities, max_seats, status) VALUES ('TEST-CONF-2026', 'การประชุมวิชาการประจำปี TSRM 2026', '2026-10-21T00:00:00.000Z', '2026-10-21T00:00:00.000Z', '2026-10-22T00:00:00.000Z', TRUE, NULL, 'โรงแรมสยาม เคมปินสกี้ กรุงเทพฯ', 'onsite', '1234', NULL, 0, NULL, '[{"date":"2026-10-20","name":"Pre-congress Workshop: Advanced ART"}]'::jsonb, 0, 'upcoming')
+ON CONFLICT (meeting_id) DO UPDATE SET
+  meeting_name = EXCLUDED.meeting_name,
+  meeting_date = EXCLUDED.meeting_date,
+  start_date = EXCLUDED.start_date,
+  end_date = EXCLUDED.end_date,
+  counts_toward_active = EXCLUDED.counts_toward_active,
+  meeting_time = EXCLUDED.meeting_time,
+  location = EXCLUDED.location,
+  meeting_type = EXCLUDED.meeting_type,
+  staff_code = EXCLUDED.staff_code,
+  description = EXCLUDED.description,
+  base_price = EXCLUDED.base_price,
+  pricing_tiers = EXCLUDED.pricing_tiers,
+  activities = EXCLUDED.activities,
+  max_seats = EXCLUDED.max_seats,
+  status = EXCLUDED.status;
 INSERT INTO meetings (meeting_id, meeting_name, meeting_date, start_date, end_date, counts_toward_active, meeting_time, location, meeting_type, staff_code, description, base_price, pricing_tiers, activities, max_seats, status) VALUES ('TSRM2023', 'TSRM 2023', '2023-11-10T00:00:00.000Z', NULL, NULL, FALSE, NULL, NULL, 'onsite', NULL, NULL, 0, NULL, NULL, 0, 'completed')
 ON CONFLICT (meeting_id) DO UPDATE SET
   meeting_name = EXCLUDED.meeting_name,
@@ -218,7 +251,7 @@ ON CONFLICT (meeting_id) DO UPDATE SET
   max_seats = EXCLUDED.max_seats,
   status = EXCLUDED.status;
 
--- 2. Table: members (1076 rows)
+-- 2. Table: members (1077 rows)
 INSERT INTO members (id, member_no, full_name_th, full_name_en, id_last4, mobile, email, line_id, address, workplace, work_phone, work_start_date, position, job_category, job_category_other, scientist_license_no, username, password_hash, referees, photo_url, id_card_doc, degree_cert_doc, work_cert_doc, membership_status, membership_type, applied_at, expire_date, special_expire_date, qr_code_data, qr_code_image_url) VALUES (1077, '0000', 'บัญชีทดสอบ ระบบ', 'Test Account', '0000', '0800000000', 'test0000@thaisrm.com', 'test0000', 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย อาคารเฉลิมพระบารมี ๕๐ ปี ซ.ศูนย์วิจัย ถ.เพชรบุรีตัดใหม่ แขวงบางกะปิ เขตห้วยขวาง กรุงเทพฯ 10310', 'โรงพยาบาลทดสอบ (Test Hospital)', '020000000', '2020-01-01T00:00:00.000Z', 'แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)', 'RM', NULL, 'TEST-0000', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'inactive', 'Regular', '2026-09-15T06:32:57.143Z', '2030-12-31T00:00:00.000Z', NULL, NULL, NULL)
 ON CONFLICT (member_no) DO UPDATE SET
   full_name_th = EXCLUDED.full_name_th,
@@ -32561,6 +32594,36 @@ ON CONFLICT (member_no) DO UPDATE SET
   special_expire_date = EXCLUDED.special_expire_date,
   qr_code_data = EXCLUDED.qr_code_data,
   qr_code_image_url = EXCLUDED.qr_code_image_url;
+INSERT INTO members (id, member_no, full_name_th, full_name_en, id_last4, mobile, email, line_id, address, workplace, work_phone, work_start_date, position, job_category, job_category_other, scientist_license_no, username, password_hash, referees, photo_url, id_card_doc, degree_cert_doc, work_cert_doc, membership_status, membership_type, applied_at, expire_date, special_expire_date, qr_code_data, qr_code_image_url) VALUES (1083, '1285', 'นพ. วิทยา วงศ์สว่าง', NULL, NULL, '0812345678', 'test.doctor@thaisrm.org', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Active', 'Regular', '2026-09-21T04:05:04.905Z', NULL, NULL, NULL, NULL)
+ON CONFLICT (member_no) DO UPDATE SET
+  full_name_th = EXCLUDED.full_name_th,
+  full_name_en = EXCLUDED.full_name_en,
+  id_last4 = EXCLUDED.id_last4,
+  mobile = EXCLUDED.mobile,
+  email = EXCLUDED.email,
+  line_id = EXCLUDED.line_id,
+  address = EXCLUDED.address,
+  workplace = EXCLUDED.workplace,
+  work_phone = EXCLUDED.work_phone,
+  work_start_date = EXCLUDED.work_start_date,
+  position = EXCLUDED.position,
+  job_category = EXCLUDED.job_category,
+  job_category_other = EXCLUDED.job_category_other,
+  scientist_license_no = EXCLUDED.scientist_license_no,
+  username = EXCLUDED.username,
+  password_hash = EXCLUDED.password_hash,
+  referees = EXCLUDED.referees,
+  photo_url = EXCLUDED.photo_url,
+  id_card_doc = EXCLUDED.id_card_doc,
+  degree_cert_doc = EXCLUDED.degree_cert_doc,
+  work_cert_doc = EXCLUDED.work_cert_doc,
+  membership_status = EXCLUDED.membership_status,
+  membership_type = EXCLUDED.membership_type,
+  applied_at = EXCLUDED.applied_at,
+  expire_date = EXCLUDED.expire_date,
+  special_expire_date = EXCLUDED.special_expire_date,
+  qr_code_data = EXCLUDED.qr_code_data,
+  qr_code_image_url = EXCLUDED.qr_code_image_url;
 
 -- 3. Table: member_educations (244 rows)
 INSERT INTO member_educations (edu_id, member_no, degree, institution, graduation_year) VALUES (1, '0001', 'RM cerrt.', '-', NULL)
@@ -34028,7 +34091,7 @@ ON CONFLICT (edu_id) DO UPDATE SET
   institution = EXCLUDED.institution,
   graduation_year = EXCLUDED.graduation_year;
 
--- 4. Table: meeting_attendances (2211 rows)
+-- 4. Table: meeting_attendances (2212 rows)
 INSERT INTO meeting_attendances (attendance_id, meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status, checkin_time) VALUES (1, 'TSRM2026', '1211', NULL, NULL, NULL, NULL, 'Attended', NULL)
 ON CONFLICT (meeting_id, member_no) DO UPDATE SET
   attendee_name = EXCLUDED.attendee_name,
@@ -51717,6 +51780,14 @@ ON CONFLICT (meeting_id, member_no) DO UPDATE SET
   workplace = EXCLUDED.workplace,
   attendance_status = EXCLUDED.attendance_status,
   checkin_time = EXCLUDED.checkin_time;
+INSERT INTO meeting_attendances (attendance_id, meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status, checkin_time) VALUES (2270, 'TEST-CONF-2026', '1285', NULL, NULL, NULL, NULL, 'Attended', '2026-09-21T04:05:04.956Z')
+ON CONFLICT (meeting_id, member_no) DO UPDATE SET
+  attendee_name = EXCLUDED.attendee_name,
+  attendee_email = EXCLUDED.attendee_email,
+  attendee_phone = EXCLUDED.attendee_phone,
+  workplace = EXCLUDED.workplace,
+  attendance_status = EXCLUDED.attendance_status,
+  checkin_time = EXCLUDED.checkin_time;
 
 -- 5. Table: system_settings (29 rows)
 INSERT INTO system_settings (key, value, description, updated_at) VALUES ('annual_membership_fee', '1000', 'ค่าสมัคร/ต่ออายุสมาชิกรายปี', '2026-09-17T02:57:48.295Z')
@@ -51901,11 +51972,32 @@ ON CONFLICT (receipt_no) DO UPDATE SET
   status = EXCLUDED.status,
   updated_at = EXCLUDED.updated_at;
 
--- 8. Update Sequences
+-- 8. Table: meeting_daily_checkins (2 rows)
+INSERT INTO meeting_daily_checkins (id, meeting_id, attendance_id, member_no, ticket_code, checkin_date, program_name, daily_qr_token, checkin_status, checkin_time, created_at, updated_at) VALUES (1, 'TEST-CONF-2026', 2270, '1285', 'TSRM-1285', '2026-09-21T00:00:00.000Z', 'Main Program', 'TSRM-DAY-TESTCONF20-20260921-TSRM1285', 'attended', '2026-09-21T04:05:04.956Z', '2026-09-21T04:05:04.946Z', '2026-09-21T04:05:04.957Z')
+ON CONFLICT (meeting_id, ticket_code, checkin_date) DO UPDATE SET
+  attendance_id = EXCLUDED.attendance_id,
+  member_no = EXCLUDED.member_no,
+  program_name = EXCLUDED.program_name,
+  daily_qr_token = EXCLUDED.daily_qr_token,
+  checkin_status = EXCLUDED.checkin_status,
+  checkin_time = EXCLUDED.checkin_time,
+  updated_at = EXCLUDED.updated_at;
+INSERT INTO meeting_daily_checkins (id, meeting_id, attendance_id, member_no, ticket_code, checkin_date, program_name, daily_qr_token, checkin_status, checkin_time, created_at, updated_at) VALUES (2, 'TEST-CONF-2026', NULL, NULL, 'TSRM-1285', '2099-12-31T00:00:00.000Z', 'Main Program (Future Day)', 'TSRM-DAY-TESTCONF-20991231-TSRM-1285', 'pending', NULL, '2026-09-21T04:05:04.964Z', '2026-09-21T04:05:04.964Z')
+ON CONFLICT (meeting_id, ticket_code, checkin_date) DO UPDATE SET
+  attendance_id = EXCLUDED.attendance_id,
+  member_no = EXCLUDED.member_no,
+  program_name = EXCLUDED.program_name,
+  daily_qr_token = EXCLUDED.daily_qr_token,
+  checkin_status = EXCLUDED.checkin_status,
+  checkin_time = EXCLUDED.checkin_time,
+  updated_at = EXCLUDED.updated_at;
+
+-- 9. Update Sequences
 SELECT setval('member_no_seq', GREATEST(COALESCE((SELECT MAX(NULLIF(regexp_replace(member_no, '\D', '', 'g'), '')::bigint) FROM members), 0) + 1, 1281), false);
 SELECT setval('members_id_seq', COALESCE((SELECT MAX(id) FROM members), 1), true);
 SELECT setval('member_educations_edu_id_seq', COALESCE((SELECT MAX(edu_id) FROM member_educations), 1), true);
 SELECT setval('meeting_attendances_attendance_id_seq', COALESCE((SELECT MAX(attendance_id) FROM meeting_attendances), 1), true);
 SELECT setval('payment_slips_id_seq', COALESCE((SELECT MAX(id) FROM payment_slips), 1), true);
+SELECT setval('meeting_daily_checkins_id_seq', COALESCE((SELECT MAX(id) FROM meeting_daily_checkins), 1), true);
 
 COMMIT;

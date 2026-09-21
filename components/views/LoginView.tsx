@@ -480,6 +480,55 @@ export function LoginView({
       }
     }
 
+    // 4. If specialCode/couponCode is provided, validate with backend coupon system
+    let validatedCouponData: any = null;
+    const cleanCouponCode = formData.specialCode.trim();
+
+    if (cleanCouponCode) {
+      try {
+        setVerifyingMember(true);
+        const emailToCheck = formData.email.trim() || memberDataFound?.email || '';
+        const validateRes = await fetch('/api/coupons/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: cleanCouponCode,
+            meetingId: activeMeeting.meeting_id,
+            memberNo: rawMemberNo || undefined,
+            email: emailToCheck || undefined,
+          }),
+        });
+
+        const validateData = await validateRes.json();
+        if (!validateRes.ok || !validateData.success || !validateData.valid) {
+          alert(
+            validateData.error ||
+            (lang === 'th'
+              ? `รหัสคูปอง "${cleanCouponCode}" ไม่ถูกต้อง หรือไม่สามารถใช้งานได้`
+              : `Coupon code "${cleanCouponCode}" is invalid.`)
+          );
+          setVerifyingMember(false);
+          return;
+        }
+
+        validatedCouponData = {
+          code: validateData.coupon.code,
+          companyName: validateData.coupon.company_name,
+          discountType: validateData.coupon.discount_type,
+          discountValue: validateData.coupon.discount_value,
+          isFullFree: validateData.calculation.isFullFree,
+          discountAmount: validateData.calculation.discountAmount,
+        };
+      } catch (couponErr: any) {
+        console.error('Error validating coupon:', couponErr);
+        alert(lang === 'th' ? 'เกิดข้อผิดพลาดในการตรวจสอบรหัสคูปอง กรุณาลองใหม่อีกครั้ง' : 'Failed to validate coupon code.');
+        setVerifyingMember(false);
+        return;
+      } finally {
+        setVerifyingMember(false);
+      }
+    }
+
     const regPayload = {
       category: 'conference',
       meetingId: activeMeeting.meeting_id,
@@ -504,7 +553,8 @@ export function LoginView({
       workplace: formData.workplace.trim() || memberDataFound?.workplace || '',
       position: finalPosition,
       positionCode: formData.position,
-      specialCode: formData.specialCode.trim(),
+      specialCode: cleanCouponCode,
+      couponData: validatedCouponData,
       email: formData.email.trim() || memberDataFound?.email || 'attendee@tsrm.org',
       registeredAt: new Date().toISOString(),
     };

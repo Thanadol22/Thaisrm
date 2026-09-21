@@ -73,6 +73,7 @@ import { ToastNotification } from '@/components/ToastNotification';
 import { MeetingEditModal } from '@/components/MeetingEditModal';
 import { AdminSlipsView } from '@/components/views/AdminSlipsView';
 import { AdminLoginView } from '@/components/views/AdminLoginView';
+import { AdminCouponsPanel } from '@/components/AdminCouponsPanel';
 import { AdminSettingsPanel } from '@/components/AdminSettingsPanel';
 import { AdminEmailCenterPanel } from '@/components/AdminEmailCenterPanel';
 import { TsrmLogo } from '@/components/TsrmLogo';
@@ -194,7 +195,7 @@ const INITIAL_RECEIPTS: ReceiptData[] = [];
 /* ─── 1. OVERVIEW DASHBOARD PANEL (Light Theme) ──────────────────────────── */
 
 interface DashboardOverviewProps {
-  onNavigateTab: (tab: AdminTab) => void;
+  onNavigateTab: (tab: AdminTab, meetingId?: string) => void;
   meetings: MeetingItem[];
   slips: SlipItem[];
   attendees: AttendeeItem[];
@@ -425,7 +426,7 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onE
 
         {/* Card 2: Total Registered */}
         <div
-          onClick={() => onNavigateTab('verify-attendees')}
+          onClick={() => onNavigateTab('verify-attendees', activeMeetingId !== 'all' ? activeMeetingId : undefined)}
           className="group cursor-pointer bg-white hover:bg-blue-50/40 border border-slate-200/90 hover:border-[#0026b3]/40 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all duration-200"
         >
           <div className="flex items-center justify-between mb-3">
@@ -450,7 +451,7 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onE
 
         {/* Card 3: Live Checked-in */}
         <div
-          onClick={() => onNavigateTab('verify-attendees')}
+          onClick={() => onNavigateTab('verify-attendees', activeMeetingId !== 'all' ? activeMeetingId : undefined)}
           className="group cursor-pointer bg-white hover:bg-emerald-50/40 border border-slate-200/90 hover:border-emerald-300 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all duration-200"
         >
           <div className="flex items-center justify-between mb-3">
@@ -718,7 +719,7 @@ function DashboardOverviewPanel({ onNavigateTab, meetings, slips, attendees, onE
               </div>
 
               <div
-                onClick={() => onNavigateTab('verify-attendees')}
+                onClick={() => onNavigateTab('verify-attendees', activeMeetingId !== 'all' ? activeMeetingId : undefined)}
                 className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200/80 hover:bg-blue-100/70 transition cursor-pointer flex items-center justify-between"
               >
                 <div className="flex items-center gap-3">
@@ -746,10 +747,17 @@ interface RevenueReportProps {
   meetings: MeetingItem[];
   slips: SlipItem[];
   attendees?: AttendeeItem[];
+  initialMeetingId?: string;
 }
 
-function RevenueReportPanel({ meetings, slips, attendees = [] }: RevenueReportProps) {
-  const [selectedMeetingId, setSelectedMeetingId] = useState<string>('all');
+function RevenueReportPanel({ meetings, slips, attendees = [], initialMeetingId }: RevenueReportProps) {
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string>(initialMeetingId || 'all');
+
+  useEffect(() => {
+    if (initialMeetingId) {
+      setSelectedMeetingId(initialMeetingId);
+    }
+  }, [initialMeetingId]);
   const [filterType, setFilterType] = useState<'all' | 'hybrid' | 'onsite' | 'online'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'ongoing' | 'upcoming' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -4081,7 +4089,7 @@ function MeetingHistoryPanel({
   onEditMeeting,
 }: {
   meetings: MeetingItem[];
-  onNavigateTab?: (tab: AdminTab) => void;
+  onNavigateTab?: (tab: AdminTab, meetingId?: string) => void;
   onUpdateStatus?: (id: string, status: 'upcoming' | 'ongoing' | 'completed') => void;
   onDeleteMeeting?: (id: string) => void;
   onEditMeeting?: (meeting: MeetingItem) => void;
@@ -4330,7 +4338,7 @@ function MeetingHistoryPanel({
                       <>
                         <button
                           type="button"
-                          onClick={() => onNavigateTab('verify-attendees')}
+                          onClick={() => onNavigateTab('verify-attendees', m.id)}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#0026b3] text-xs font-bold border border-blue-200 transition cursor-pointer"
                         >
                           <UserCheck className="w-3.5 h-3.5" />
@@ -4338,7 +4346,7 @@ function MeetingHistoryPanel({
                         </button>
                         <button
                           type="button"
-                          onClick={() => onNavigateTab('revenue-report')}
+                          onClick={() => onNavigateTab('revenue-report', m.id)}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold border border-slate-200 transition cursor-pointer"
                         >
                           <DollarSign className="w-3.5 h-3.5" />
@@ -4390,6 +4398,7 @@ function MeetingHistoryPanel({
 function VerifyAttendeesPanel({
   attendees,
   meetings,
+  initialMeetingId,
   onToggleCheckIn,
   onAddAttendee,
   onPrintReceipt,
@@ -4397,6 +4406,7 @@ function VerifyAttendeesPanel({
 }: {
   attendees: AttendeeItem[];
   meetings: MeetingItem[];
+  initialMeetingId?: string;
   onToggleCheckIn: (id: string) => void;
   onAddAttendee?: (newAttendee: AttendeeItem) => void;
   onPrintReceipt?: (attendee: AttendeeItem) => void;
@@ -4407,7 +4417,13 @@ function VerifyAttendeesPanel({
     return meetings.find((m) => m.status === 'ongoing') || meetings.find((m) => m.status === 'upcoming') || meetings[0];
   }, [meetings]);
 
-  const [selectedMeetingId, setSelectedMeetingId] = useState<string>('default');
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string>(initialMeetingId || 'default');
+
+  useEffect(() => {
+    if (initialMeetingId) {
+      setSelectedMeetingId(initialMeetingId);
+    }
+  }, [initialMeetingId]);
 
   const activeMeetingId = selectedMeetingId === 'default'
     ? (currentOngoingMeeting ? currentOngoingMeeting.id : 'all')
@@ -5591,12 +5607,25 @@ function VerifyAttendeesPanel({
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const [selectedAttendeeMeetingId, setSelectedAttendeeMeetingId] = useState<string>('default');
+  const [selectedRevenueMeetingId, setSelectedRevenueMeetingId] = useState<string>('all');
   const [meetings, setMeetings] = useState<MeetingItem[]>(INITIAL_MEETINGS);
   const [slips, setSlips] = useState<SlipItem[]>(INITIAL_SLIPS);
   const [attendees, setAttendees] = useState<AttendeeItem[]>(INITIAL_ATTENDEES);
   const [receipts, setReceipts] = useState<ReceiptData[]>(INITIAL_RECEIPTS);
   const [membersCount, setMembersCount] = useState<number>(0);
   const [systemSettings, setSystemSettings] = useState<SystemSettings>(DEFAULT_SYSTEM_SETTINGS);
+
+  const handleNavigateTab = (tab: AdminTab, meetingId?: string) => {
+    if (meetingId) {
+      if (tab === 'verify-attendees') {
+        setSelectedAttendeeMeetingId(meetingId);
+      } else if (tab === 'revenue-report') {
+        setSelectedRevenueMeetingId(meetingId);
+      }
+    }
+    setActiveTab(tab);
+  };
 
   // ─── Admin Authentication State ───
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -6327,7 +6356,7 @@ export default function AdminPage() {
       case 'dashboard':
         return (
           <DashboardOverviewPanel
-            onNavigateTab={setActiveTab}
+            onNavigateTab={handleNavigateTab}
             meetings={meetings}
             slips={slips}
             attendees={attendees}
@@ -6342,6 +6371,7 @@ export default function AdminPage() {
             meetings={meetings}
             slips={slips}
             attendees={attendees}
+            initialMeetingId={selectedRevenueMeetingId}
           />
         );
       case 'receipts':
@@ -6354,12 +6384,12 @@ export default function AdminPage() {
           />
         );
       case 'add-meeting':
-        return <AddMeetingPanel onMeetingCreated={handleMeetingCreated} onNavigateTab={setActiveTab} />;
+        return <AddMeetingPanel onMeetingCreated={handleMeetingCreated} onNavigateTab={handleNavigateTab} />;
       case 'meeting-history':
         return (
           <MeetingHistoryPanel
             meetings={meetings}
-            onNavigateTab={setActiveTab}
+            onNavigateTab={handleNavigateTab}
             onUpdateStatus={handleUpdateMeetingStatus}
             onDeleteMeeting={handleDeleteMeeting}
             onEditMeeting={handleEditMeeting}
@@ -6372,10 +6402,21 @@ export default function AdminPage() {
           <VerifyAttendeesPanel
             attendees={attendees}
             meetings={meetings}
+            initialMeetingId={selectedAttendeeMeetingId}
             onToggleCheckIn={handleToggleCheckIn}
             onPrintReceipt={handlePrintAttendeeReceipt}
             onAddAttendee={handleAddAttendee}
             onUpdatePaymentStatus={handleUpdatePaymentStatus}
+          />
+        );
+      case 'coupons':
+        return (
+          <AdminCouponsPanel
+            meetings={meetings}
+            onNotification={(msg) => {
+              setGlobalToastMessage(msg);
+              setTimeout(() => setGlobalToastMessage(null), 4000);
+            }}
           />
         );
       case 'emails':

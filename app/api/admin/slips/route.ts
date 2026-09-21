@@ -508,6 +508,32 @@ export async function POST(request: NextRequest) {
             WHERE meeting_id = ${slip.meeting_id} AND attendee_email = ${slip.guest_email}
           `;
         }
+
+        // Auto Rollback Coupon Quota if this slip was associated with a coupon
+        try {
+          const couponUsage = await (prisma as any).coupon_usages.findFirst({
+            where: {
+              OR: [
+                { slip_id: slip.slip_id },
+                { ticket_code: slip.ticket_code },
+              ],
+            },
+          });
+
+          if (couponUsage) {
+            await (prisma as any).coupons.update({
+              where: { id: couponUsage.coupon_id },
+              data: {
+                used_count: { decrement: 1 },
+              },
+            });
+            await (prisma as any).coupon_usages.delete({
+              where: { id: couponUsage.id },
+            });
+          }
+        } catch (couponRollbackErr) {
+          console.error('Failed to auto-rollback coupon quota on slip rejection:', couponRollbackErr);
+        }
       }
 
       // Send rejection & resubmit email stub

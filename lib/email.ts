@@ -265,6 +265,8 @@ export interface SendAttendeeTicketParams {
   memberNo?: string;
   attendanceStatus?: string;
   extraNote?: string;
+  qrCodeData?: string;
+  dailyProgram?: string;
   customConfig?: SmtpConfig;
 }
 
@@ -272,7 +274,8 @@ export interface SendAttendeeTicketParams {
  * Send Attendee E-Ticket with QR Code to meeting participants
  */
 export async function sendAttendeeTicketEmail(params: SendAttendeeTicketParams): Promise<EmailSendResult> {
-  const qrCodeUrl = await generateQrCodeDataUrl(`TSRM-PASS:${params.ticketCode}`);
+  const qrPayload = params.qrCodeData || `TSRM-PASS:${params.ticketCode}`;
+  const qrCodeUrl = await generateQrCodeDataUrl(qrPayload);
 
   const html = renderAttendeeTicketEmail({
     recipientName: params.recipientName,
@@ -286,9 +289,10 @@ export async function sendAttendeeTicketEmail(params: SendAttendeeTicketParams):
     extraNote: params.extraNote,
   });
 
+  const subjectPrefix = params.dailyProgram ? `🎟️ [${params.dailyProgram}] ` : `🎟️ `;
   return dispatchEmail({
     to: params.to,
-    subject: `🎟️ บัตรเข้างาน (E-Ticket) ${params.meetingName} - คุณ ${params.recipientName}`,
+    subject: `${subjectPrefix}บัตรเข้างาน (E-Ticket) ${params.meetingName} - คุณ ${params.recipientName}`,
     html,
     customConfig: params.customConfig,
   });

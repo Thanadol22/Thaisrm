@@ -19,10 +19,11 @@ import {
   DollarSign,
   Users,
   Settings,
-  Mail
+  Mail,
+  Ticket
 } from 'lucide-react';
 
-export type AdminTab = 'dashboard' | 'revenue-report' | 'members' | 'add-meeting' | 'meeting-history' | 'verify-slip' | 'verify-attendees' | 'receipts' | 'emails' | 'settings';
+export type AdminTab = 'dashboard' | 'revenue-report' | 'members' | 'add-meeting' | 'meeting-history' | 'coupons' | 'verify-slip' | 'verify-attendees' | 'receipts' | 'emails' | 'settings';
 
 interface AdminNavbarProps {
   activeTab: AdminTab;
@@ -33,6 +34,7 @@ interface AdminNavbarProps {
   checkedInCount?: number;
   receiptsCount?: number;
   membersCount?: number;
+  couponsCount?: number;
 }
 
 const navItems: {
@@ -40,7 +42,7 @@ const navItems: {
   labelTh: string;
   labelEn: string;
   icon: React.ElementType;
-  badgeKey?: 'slips' | 'attendees' | 'receipts' | 'members';
+  badgeKey?: 'slips' | 'attendees' | 'receipts' | 'members' | 'coupons';
 }[] = [
     {
       id: 'dashboard',
@@ -81,6 +83,13 @@ const navItems: {
       icon: ClipboardList,
     },
     {
+      id: 'coupons',
+      labelTh: 'จัดการคูปอง',
+      labelEn: 'Coupons & Sponsor',
+      icon: Ticket,
+      badgeKey: 'coupons',
+    },
+    {
       id: 'verify-slip',
       labelTh: 'ตรวจสอบสลิป',
       labelEn: 'Verify Slips',
@@ -117,14 +126,16 @@ export function AdminNavbar({
   checkedInCount = 0,
   receiptsCount = 0,
   membersCount,
+  couponsCount,
 }: AdminNavbarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  const getBadge = (key?: 'slips' | 'attendees' | 'receipts' | 'members') => {
+  const getBadge = (key?: 'slips' | 'attendees' | 'receipts' | 'members' | 'coupons') => {
     if (key === 'slips') return pendingSlipsCount > 0 ? pendingSlipsCount : undefined;
     if (key === 'attendees') return totalAttendeesCount > 0 ? `${checkedInCount}/${totalAttendeesCount}` : undefined;
     if (key === 'receipts') return receiptsCount > 0 ? receiptsCount : undefined;
     if (key === 'members' && typeof membersCount === 'number') return membersCount;
+    if (key === 'coupons' && typeof couponsCount === 'number') return couponsCount;
     return undefined;
   };
 
