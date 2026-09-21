@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMemberByCodeOrNo } from '@/lib/services/memberService';
+import { evaluateMemberAttendanceStatus } from '@/lib/services/membershipStatusService';
 import { ApiResponse } from '@/types/member';
 
 export const dynamic = 'force-dynamic';
@@ -39,9 +40,16 @@ export async function GET(
       );
     }
 
-    const response: ApiResponse = {
+    // ประเมินสถานะตามกฎการขาดประชุม 4 ครั้งล่าสุด
+    let attendanceEvaluation = null;
+    if (member.member_no) {
+      attendanceEvaluation = await evaluateMemberAttendanceStatus(member.member_no);
+    }
+
+    const response: ApiResponse & { attendanceEvaluation?: typeof attendanceEvaluation } = {
       success: true,
       data: member,
+      attendanceEvaluation,
     };
 
     return NextResponse.json(response, { status: 200 });

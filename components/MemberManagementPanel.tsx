@@ -43,7 +43,8 @@ import {
   Crown,
   CheckCircle,
   XCircle,
-  Calendar
+  Calendar,
+  CalendarCheck2,
 } from 'lucide-react';
 
 export function MemberManagementPanel() {
@@ -88,6 +89,13 @@ export function MemberManagementPanel() {
   const [deletingMember, setDeletingMember] = useState<Member | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Sync Status Modal State (4 Consecutive Meetings Rule)
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [syncPreview, setSyncPreview] = useState<any>(null);
+  const [isLoadingSyncPreview, setIsLoadingSyncPreview] = useState(false);
 
   // Toast Notification
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -277,6 +285,51 @@ export function MemberManagementPanel() {
     showToast('ส่งออกไฟล์ CSV สำเร็จ', 'success');
   };
 
+  // Open Sync Status Modal (4 Consecutive Meetings Rule)
+  const handleOpenSyncModal = async () => {
+    setIsSyncModalOpen(true);
+    setIsLoadingSyncPreview(true);
+    try {
+      const res = await fetch('/api/admin/members/sync-status');
+      const data = await res.json();
+      if (data.success) {
+        setSyncPreview(data);
+      } else {
+        showToast(data.error || 'เกิดข้อผิดพลาดในการคำนวณตัวอย่างสถานะ', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('ไม่สามารถดึงข้อมูลตัวอย่างสถานะได้', 'error');
+    } finally {
+      setIsLoadingSyncPreview(false);
+    }
+  };
+
+  // Confirm Batch Sync
+  const handleConfirmSync = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch('/api/admin/members/sync-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dryRun: false }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || 'ประมวลผลสถานะสมาชิกสำเร็จ', 'success');
+        setIsSyncModalOpen(false);
+        fetchMembers(true);
+      } else {
+        showToast(data.error || 'เกิดข้อผิดพลาดในการอัปเดตสถานะ', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // Helper for Position/Job Category styling
   const getJobCategoryBadge = (cat?: string | null) => {
     if (!cat) return 'bg-slate-100 text-slate-700 border-slate-200';
@@ -395,6 +448,16 @@ export function MemberManagementPanel() {
 
           {/* Top Actions */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleOpenSyncModal}
+              className="flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-bold transition cursor-pointer border border-white/20 backdrop-blur-md shadow-xs active:scale-95"
+              title="ประมวลผลสถานะสมาชิกตามกฎขาดประชุม 4 ครั้งล่าสุด"
+            >
+              <CalendarCheck2 className="w-4 h-4 text-[#4ade80]" />
+              <span>ประมวลผล 4 การประชุม</span>
+            </button>
+
             <button
               type="button"
               onClick={handleExportCSV}
@@ -1005,6 +1068,164 @@ export function MemberManagementPanel() {
                 )}
               </button>
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Sync Status Modal (4 Consecutive Meetings Rule) */}
+      {isSyncModalOpen && mounted && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden animate-scale-up flex flex-col max-h-[90vh]">
+            
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#0026b3] via-[#001f94] to-[#001c8c] p-5 sm:p-6 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-white/10 text-[#4ade80] border border-white/15">
+                  <CalendarCheck2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black">
+                    ประมวลผลสถานะสมาชิกตาม 4 การประชุมล่าสุด
+                  </h3>
+                  <p className="text-xs text-blue-100/80 mt-0.5">
+                    ตามข้อบังคับ: สมาชิกสามัญที่ขาดประชุม 4 ครั้งล่าสุดติดต่อกันจะถูกปรับเป็นสถานะหมดอายุ (Inactive)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSyncModalOpen(false)}
+                disabled={isSyncing}
+                className="p-1.5 rounded-xl text-white/70 hover:text-white hover:bg-white/15 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
+              {isLoadingSyncPreview ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-500">
+                  <Loader2 className="w-8 h-8 text-[#0026b3] animate-spin" />
+                  <span className="text-xs font-bold">กำลังประมวลผลและจำลองผลลัพธ์ (Dry Run)...</span>
+                </div>
+              ) : syncPreview ? (
+                <>
+                  {/* Qualifying Meetings List */}
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-[#0026b3]" />
+                      4 รอบการประชุมที่นำมาประเมิน (นับสิทธิ์คงสถานะ):
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {syncPreview.qualifyingMeetings?.map((qm: any, idx: number) => (
+                        <div key={qm.meeting_id} className="p-2 rounded-xl bg-white border border-slate-200 text-xs flex items-center justify-between">
+                          <div className="font-bold text-slate-800 truncate pr-2">
+                            {idx + 1}. {qm.meeting_name}
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-mono shrink-0">
+                            {qm.meeting_date ? new Date(qm.meeting_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Summary Stats */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div className="p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl text-center">
+                      <div className="text-[10px] font-bold text-blue-700">สมาชิกที่ประเมิน</div>
+                      <div className="text-lg font-black text-[#0026b3]">
+                        {syncPreview.summary?.total_members_evaluated?.toLocaleString() || 0}
+                      </div>
+                    </div>
+                    <div className="p-3 bg-rose-50/70 border border-rose-200/80 rounded-xl text-center">
+                      <div className="text-[10px] font-bold text-rose-700">จะเปลี่ยนเป็น หมดอายุ</div>
+                      <div className="text-lg font-black text-rose-700">
+                        {syncPreview.summary?.updated_to_inactive?.toLocaleString() || 0}
+                      </div>
+                    </div>
+                    <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-xl text-center">
+                      <div className="text-[10px] font-bold text-emerald-700">จะเปลี่ยนเป็น ปกติ</div>
+                      <div className="text-lg font-black text-emerald-700">
+                        {syncPreview.summary?.updated_to_active?.toLocaleString() || 0}
+                      </div>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+                      <div className="text-[10px] font-bold text-slate-600">สถานะไม่เปลี่ยนแปลง</div>
+                      <div className="text-lg font-black text-slate-800">
+                        {syncPreview.summary?.unchanged_count?.toLocaleString() || 0}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Changes Details Preview */}
+                  {syncPreview.summary?.details && syncPreview.summary.details.length > 0 ? (
+                    <div className="space-y-2">
+                      <span className="text-xs font-bold text-slate-700 block">
+                        รายชื่อสมาชิกที่จะมีการปรับเปลี่ยนสถานะ ({syncPreview.summary.details.length} ราย):
+                      </span>
+                      <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-white">
+                        {syncPreview.summary.details.map((d: any) => (
+                          <div key={d.member_no} className="p-2.5 flex items-center justify-between text-xs hover:bg-slate-50">
+                            <div>
+                              <span className="font-bold text-slate-900 font-mono mr-2">#{d.member_no}</span>
+                              <span className="font-medium text-slate-800">{d.full_name_th}</span>
+                              <div className="text-[10px] text-slate-500">{d.reason}</div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="text-[10px] text-slate-400 line-through">{d.previous_status}</span>
+                              <span>→</span>
+                              <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                                d.new_status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                              }`}>
+                                {d.new_status === 'Active' ? 'ปกติ' : 'หมดอายุ'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-center text-xs font-bold text-emerald-800">
+                      ✓ สถานะสมาชิกทุกคนในระบบตรงตามกฎ 4 ครั้งล่าสุดเรียบร้อยแล้ว ไม่มีการเปลี่ยนแปลง
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsSyncModalOpen(false)}
+                disabled={isSyncing}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200/70 transition cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSync}
+                disabled={isSyncing || isLoadingSyncPreview}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0026b3] hover:bg-[#001f94] text-white text-xs font-bold transition cursor-pointer disabled:opacity-50 shadow-md shadow-[#0026b3]/25 active:scale-95"
+              >
+                {isSyncing ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>กำลังบันทึกสถานะ...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#4ade80]" />
+                    <span>ยืนยันการประมวลผลสถานะ</span>
+                  </>
+                )}
+              </button>
+            </div>
+
           </div>
         </div>,
         document.body

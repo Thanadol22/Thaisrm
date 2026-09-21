@@ -23,7 +23,11 @@ import {
   Edit3,
   Copy,
   Check,
-  MessageSquare
+  MessageSquare,
+  CalendarCheck2,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface MemberDetailModalProps {
@@ -42,6 +46,9 @@ export function MemberDetailModal({
   const [mounted, setMounted] = useState(false);
   const [copiedField, setCopiedField] = React.useState<string | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = React.useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [attendanceInfo, setAttendanceInfo] = useState<any>(null);
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -53,7 +60,23 @@ export function MemberDetailModal({
   React.useEffect(() => {
     if (!member) {
       setQrCodeDataUrl(null);
+      setAttendanceInfo(null);
       return;
+    }
+
+    // Fetch attendance evaluation for 4 qualifying meetings
+    const memberCode = member.member_no || member.code || member.membership_no;
+    if (memberCode) {
+      setLoadingAttendance(true);
+      fetch(`/api/members/verify/${encodeURIComponent(memberCode)}`)
+        .then((res) => res.json())
+        .then((res) => {
+          if (res.success && res.attendanceEvaluation) {
+            setAttendanceInfo(res.attendanceEvaluation);
+          }
+        })
+        .catch((err) => console.warn('Failed to load member attendance evaluation:', err))
+        .finally(() => setLoadingAttendance(false));
     }
 
     if (member.qr_code_path && member.qr_code_path.startsWith('data:image/')) {
@@ -448,7 +471,92 @@ export function MemberDetailModal({
 
           </div>
 
-          {/* 3. ประวัติการศึกษา */}
+          {/* 3. สถานะการเข้าร่วมประชุม 4 ครั้งล่าสุด (4 Consecutive Meetings Rule) */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                <CalendarCheck2 className="w-4 h-4 text-[#0026b3]" />
+                <span>การคงสถานะสมาชิกตามรอบการประชุมล่าสุด</span>
+              </h4>
+              {attendanceInfo && (
+                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                  attendanceInfo.calculated_status === 'Active'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                    : 'bg-rose-50 text-rose-700 border-rose-300'
+                }`}>
+                  {attendanceInfo.calculated_status === 'Active' ? '✓ สถานะปกติ' : '✕ หมดอายุ (ขาดประชุม 4 ครั้ง)'}
+                </span>
+              )}
+            </div>
+
+            {loadingAttendance ? (
+              <div className="py-4 text-center text-xs text-slate-400 animate-pulse">
+                กำลังตรวจสอบประวัติ 4 การประชุมล่าสุด...
+              </div>
+            ) : attendanceInfo ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-white border border-slate-200/70 text-xs">
+                  <span className="text-slate-600 font-medium">ผลการประเมิน:</span>
+                  <span className="font-bold text-slate-800">{attendanceInfo.reason}</span>
+                </div>
+
+                {attendanceInfo.qualifying_meetings && attendanceInfo.qualifying_meetings.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                      รอบการประชุมที่นำมาประเมิน:
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {attendanceInfo.qualifying_meetings.map((qm: any) => {
+                        const isAttended = attendanceInfo.attended_meeting_ids?.includes(qm.meeting_id);
+                        const mDate = qm.meeting_date
+                          ? new Date(qm.meeting_date).toLocaleDateString('th-TH', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })
+                          : '';
+
+                        return (
+                          <div
+                            key={qm.meeting_id}
+                            className={`p-2.5 rounded-xl border flex items-center justify-between text-xs transition ${
+                              isAttended
+                                ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                                : 'bg-slate-50 border-slate-200/80 text-slate-600'
+                            }`}
+                          >
+                            <div className="min-w-0 pr-2">
+                              <div className="font-bold truncate">{qm.meeting_name}</div>
+                              <div className="text-[10px] opacity-75">{mDate}</div>
+                            </div>
+                            <div className="shrink-0">
+                              {isAttended ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  เข้าร่วม
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-200/70 text-slate-600">
+                                  <XCircle className="w-3 h-3 text-slate-400" />
+                                  ไม่เข้าร่วม
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic py-2 text-center">
+                ไม่พบข้อมูลรอบการประชุมที่ต้องประเมิน
+              </p>
+            )}
+          </div>
+
+          {/* 4. ประวัติการศึกษา */}
           <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
             <h4 className="text-xs font-black uppercase tracking-wider text-slate-500 flex items-center gap-2">
               <GraduationCap className="w-4 h-4 text-[#0026b3]" />

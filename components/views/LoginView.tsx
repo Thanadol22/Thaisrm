@@ -411,6 +411,14 @@ export function LoginView({
             active = false;
           }
 
+          // ตรวจสอบการประเมินการเข้าประชุม 4 ครั้งล่าสุด (4 Consecutive Missed Meetings Rule)
+          if (result.attendanceEvaluation) {
+            if (result.attendanceEvaluation.calculated_status === 'Inactive') {
+              active = false;
+              memberDataFound.membership_status = result.attendanceEvaluation.reason || 'หมดอายุ (ขาดประชุม 4 ครั้ง)';
+            }
+          }
+
           if (memberDataFound.expire_date) {
             const expDate = new Date(memberDataFound.expire_date);
             if (!isNaN(expDate.getTime())) {

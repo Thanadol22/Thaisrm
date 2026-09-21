@@ -235,17 +235,24 @@ export async function GET(req: NextRequest) {
             m.membership_status,
             m.membership_type,
             ma.checkin_time,
-            mt.meeting_name,
-            mt.meeting_date
+            ma.meeting_name,
+            ma.meeting_date
           FROM matched m
           LEFT JOIN LATERAL (
-            SELECT checkin_time, meeting_id
-            FROM meeting_attendances
-            WHERE member_no = m.member_no
-            ORDER BY checkin_time DESC NULLS LAST
+            SELECT 
+              ma_sub.checkin_time,
+              ma_sub.meeting_id,
+              mt_sub.meeting_name,
+              mt_sub.meeting_date
+            FROM meeting_attendances ma_sub
+            LEFT JOIN meetings mt_sub ON mt_sub.meeting_id = ma_sub.meeting_id
+            WHERE ma_sub.member_no = m.member_no
+            ORDER BY 
+              COALESCE(ma_sub.checkin_time, mt_sub.start_date, mt_sub.meeting_date) DESC NULLS LAST,
+              mt_sub.meeting_date DESC NULLS LAST,
+              ma_sub.attendance_id DESC
             LIMIT 1
           ) ma ON true
-          LEFT JOIN meetings mt ON mt.meeting_id = ma.meeting_id
           ORDER BY m.sort_rank, m.full_name_th ASC;
         `;
       } else {
@@ -295,17 +302,24 @@ export async function GET(req: NextRequest) {
             m.membership_status,
             m.membership_type,
             ma.checkin_time,
-            mt.meeting_name,
-            mt.meeting_date
+            ma.meeting_name,
+            ma.meeting_date
           FROM matched m
           LEFT JOIN LATERAL (
-            SELECT checkin_time, meeting_id
-            FROM meeting_attendances
-            WHERE member_no = m.member_no
-            ORDER BY checkin_time DESC NULLS LAST
+            SELECT 
+              ma_sub.checkin_time,
+              ma_sub.meeting_id,
+              mt_sub.meeting_name,
+              mt_sub.meeting_date
+            FROM meeting_attendances ma_sub
+            LEFT JOIN meetings mt_sub ON mt_sub.meeting_id = ma_sub.meeting_id
+            WHERE ma_sub.member_no = m.member_no
+            ORDER BY 
+              COALESCE(ma_sub.checkin_time, mt_sub.start_date, mt_sub.meeting_date) DESC NULLS LAST,
+              mt_sub.meeting_date DESC NULLS LAST,
+              ma_sub.attendance_id DESC
             LIMIT 1
           ) ma ON true
-          LEFT JOIN meetings mt ON mt.meeting_id = ma.meeting_id
           ORDER BY m.sort_rank, m.full_name_th ASC;
         `;
       }
