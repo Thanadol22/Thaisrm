@@ -74,6 +74,7 @@ import { MeetingEditModal } from '@/components/MeetingEditModal';
 import { AdminSlipsView } from '@/components/views/AdminSlipsView';
 import { AdminLoginView } from '@/components/views/AdminLoginView';
 import { AdminSettingsPanel } from '@/components/AdminSettingsPanel';
+import { AdminEmailCenterPanel } from '@/components/AdminEmailCenterPanel';
 import { TsrmLogo } from '@/components/TsrmLogo';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
 import { SystemSettings, DEFAULT_SYSTEM_SETTINGS } from '@/lib/services/settingsService';
@@ -6375,6 +6376,15 @@ export default function AdminPage() {
             onPrintReceipt={handlePrintAttendeeReceipt}
             onAddAttendee={handleAddAttendee}
             onUpdatePaymentStatus={handleUpdatePaymentStatus}
+          />
+        );
+      case 'emails':
+        return (
+          <AdminEmailCenterPanel
+            onShowToast={(msg) => {
+              setGlobalToastMessage(msg);
+              setTimeout(() => setGlobalToastMessage(null), 4000);
+            }}
           />
         );
       case 'settings':
