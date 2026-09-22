@@ -11,7 +11,7 @@ async function main() {
     fullNameEn: 'Test Account',
     idLast4: '0000',
     mobile: '0800000000',
-    email: 'test0000@tsrm.com',
+    email: 'test0000@thaisrm.com',
     lineId: 'test0000',
     address: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย อาคารเฉลิมพระบารมี ๕๐ ปี ซ.ศูนย์วิจัย ถ.เพชรบุรีตัดใหม่ แขวงบางกะปิ เขตห้วยขวาง กรุงเทพฯ 10310',
     workplace: 'โรงพยาบาลทดสอบ (Test Hospital)',
@@ -20,10 +20,10 @@ async function main() {
     position: 'แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)',
     job_category: 'RM',
     scientist_license_no: 'TEST-0000',
-    membership_status: 'Inactive',
+    membership_status: 'Active',
     membership_type: 'Regular',
-    applied_at: new Date(),
-    expire_date: new Date('2020-12-31'),
+    applied_at: new Date('2020-01-01'),
+    expire_date: new Date('2030-12-31'),
     special_expire_date: null,
   };
 

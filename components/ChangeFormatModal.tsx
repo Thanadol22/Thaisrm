@@ -206,8 +206,8 @@ export function ChangeFormatModal({
   const feeAmount = regData?.changeFee || 1000;
   const bankInfo = regData?.bankInfo || {
     bankName: 'Kasikorn (KBANK)',
-    accountNo: '040-8-55259-2',
-    accountName: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย',
+    accountNo: '020-8-16398-1',
+    accountName: 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (TSRM)',
   };
 
   return createPortal(

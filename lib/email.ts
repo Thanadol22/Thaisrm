@@ -15,6 +15,10 @@ import {
   AttendeeTicketEmailOptions,
 } from './emailTemplates/attendeeQrTemplate';
 import {
+  renderAttendeeOnlineEmail,
+  AttendeeOnlineEmailOptions,
+} from './emailTemplates/attendeeOnlineTemplate';
+import {
   renderCustomBroadcastEmail,
   CustomBroadcastEmailOptions,
 } from './emailTemplates/customTemplate';
@@ -293,6 +297,48 @@ export async function sendAttendeeTicketEmail(params: SendAttendeeTicketParams):
   return dispatchEmail({
     to: params.to,
     subject: `${subjectPrefix}บัตรเข้างาน (E-Ticket) ${params.meetingName} - คุณ ${params.recipientName}`,
+    html,
+    customConfig: params.customConfig,
+  });
+}
+
+export interface SendAttendeeOnlineParams {
+  to: string;
+  recipientName: string;
+  meetingName: string;
+  meetingDate?: string;
+  ticketCode: string;
+  memberNo?: string;
+  attendanceStatus?: string;
+  zoomUrl?: string;
+  meetingIdCredentials?: string;
+  passcode?: string;
+  onlineInstructions?: string;
+  extraNote?: string;
+  customConfig?: SmtpConfig;
+}
+
+/**
+ * Send Online Access Confirmation (No QR code) to online meeting participants
+ */
+export async function sendAttendeeOnlineEmail(params: SendAttendeeOnlineParams): Promise<EmailSendResult> {
+  const html = renderAttendeeOnlineEmail({
+    recipientName: params.recipientName,
+    meetingName: params.meetingName,
+    meetingDate: params.meetingDate,
+    ticketCode: params.ticketCode,
+    memberNo: params.memberNo,
+    attendanceStatus: params.attendanceStatus,
+    zoomUrl: params.zoomUrl,
+    meetingIdCredentials: params.meetingIdCredentials,
+    passcode: params.passcode,
+    onlineInstructions: params.onlineInstructions,
+    extraNote: params.extraNote,
+  });
+
+  return dispatchEmail({
+    to: params.to,
+    subject: `🌐 ยืนยันสิทธิ์เข้าร่วมประชุมออนไลน์ (Online Pass) ${params.meetingName} - คุณ ${params.recipientName}`,
     html,
     customConfig: params.customConfig,
   });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getSystemSettings } from '@/lib/services/settingsService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -243,21 +244,11 @@ export async function GET(
       ticketCode = memberNo ? `TSRM-${effectiveMeetingId}-${memberNo}` : `M-${memberNo}`;
     }
 
-    // Get default bank info from system settings if available
-    const bankSetting = await prisma.system_settings.findUnique({
-      where: { key: 'bank_account_info' },
-    });
-    let defaultBank = 'Kasikorn (KBANK)';
-    let defaultAccount = '040-8-55259-2';
-    let defaultAccName = 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย';
-    if (bankSetting && bankSetting.value) {
-      try {
-        const parsed = JSON.parse(bankSetting.value);
-        if (parsed.bankName) defaultBank = parsed.bankName;
-        if (parsed.accountNo) defaultAccount = parsed.accountNo;
-        if (parsed.accountName) defaultAccName = parsed.accountName;
-      } catch {}
-    }
+    // Get bank info from system settings
+    const systemSettings = await getSystemSettings();
+    const defaultBank = systemSettings.bank_name || 'Kasikorn (KBANK)';
+    const defaultAccount = systemSettings.bank_account_no || '020-8-16398-1';
+    const defaultAccName = systemSettings.bank_account_name || 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (TSRM)';
 
     return NextResponse.json({
       success: true,

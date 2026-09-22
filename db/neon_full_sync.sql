@@ -252,7 +252,7 @@ ON CONFLICT (meeting_id) DO UPDATE SET
   status = EXCLUDED.status;
 
 -- 2. Table: members (1077 rows)
-INSERT INTO members (id, member_no, full_name_th, full_name_en, id_last4, mobile, email, line_id, address, workplace, work_phone, work_start_date, position, job_category, job_category_other, scientist_license_no, username, password_hash, referees, photo_url, id_card_doc, degree_cert_doc, work_cert_doc, membership_status, membership_type, applied_at, expire_date, special_expire_date, qr_code_data, qr_code_image_url) VALUES (1077, '0000', 'บัญชีทดสอบ ระบบ', 'Test Account', '0000', '0800000000', 'test0000@thaisrm.com', 'test0000', 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย อาคารเฉลิมพระบารมี ๕๐ ปี ซ.ศูนย์วิจัย ถ.เพชรบุรีตัดใหม่ แขวงบางกะปิ เขตห้วยขวาง กรุงเทพฯ 10310', 'โรงพยาบาลทดสอบ (Test Hospital)', '020000000', '2020-01-01T00:00:00.000Z', 'แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)', 'RM', NULL, 'TEST-0000', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'inactive', 'Regular', '2026-09-15T06:32:57.143Z', '2030-12-31T00:00:00.000Z', NULL, NULL, NULL)
+INSERT INTO members (id, member_no, full_name_th, full_name_en, id_last4, mobile, email, line_id, address, workplace, work_phone, work_start_date, position, job_category, job_category_other, scientist_license_no, username, password_hash, referees, photo_url, id_card_doc, degree_cert_doc, work_cert_doc, membership_status, membership_type, applied_at, expire_date, special_expire_date, qr_code_data, qr_code_image_url) VALUES (1077, '0000', 'บัญชีทดสอบ ระบบ', 'Test Account', '0000', '0800000000', 'test0000@thaisrm.com', 'test0000', 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย อาคารเฉลิมพระบารมี ๕๐ ปี ซ.ศูนย์วิจัย ถ.เพชรบุรีตัดใหม่ แขวงบางกะปิ เขตห้วยขวาง กรุงเทพฯ 10310', 'โรงพยาบาลทดสอบ (Test Hospital)', '020000000', '2020-01-01T00:00:00.000Z', 'แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)', 'RM', NULL, 'TEST-0000', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Active', 'Regular', '2026-09-15T06:32:57.143Z', '2030-12-31T00:00:00.000Z', NULL, NULL, NULL)
 ON CONFLICT (member_no) DO UPDATE SET
   full_name_th = EXCLUDED.full_name_th,
   full_name_en = EXCLUDED.full_name_en,
@@ -51756,7 +51756,7 @@ ON CONFLICT (meeting_id, member_no) DO UPDATE SET
   workplace = EXCLUDED.workplace,
   attendance_status = EXCLUDED.attendance_status,
   checkin_time = EXCLUDED.checkin_time;
-INSERT INTO meeting_attendances (attendance_id, meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status, checkin_time) VALUES (2267, 'TSRM34', NULL, 'บัญชีทดสอบ ระบบ', 'test0000@thaisrm.com', NULL, 'โรงพยาบาลทดสอบ (Test Hospital)', 'Non-Member', NULL)
+INSERT INTO meeting_attendances (attendance_id, meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status, checkin_time) VALUES (2267, 'TSRM34', '0000', 'บัญชีทดสอบ ระบบ', 'test0000@thaisrm.com', NULL, 'โรงพยาบาลทดสอบ (Test Hospital)', 'Attended', NULL)
 ON CONFLICT (meeting_id, member_no) DO UPDATE SET
   attendee_name = EXCLUDED.attendee_name,
   attendee_email = EXCLUDED.attendee_email,
