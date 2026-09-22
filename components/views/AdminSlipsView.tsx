@@ -749,7 +749,7 @@ export function AdminSlipsView() {
                   <div className="bg-purple-50/70 border border-purple-200 rounded-2xl p-4 space-y-3">
                     <div className="flex items-center gap-2 text-purple-900 font-extrabold text-xs sm:text-sm border-b border-purple-200/80 pb-2">
                       <Sparkles className="w-4 h-4 text-purple-600" />
-                      <span>ข้อมูลผู้สมัครสมาชิกใหม่ (Applicant Details)</span>
+                      <span>ข้อมูลผู้สมัครสมาชิกใหม่</span>
                     </div>
 
                     <div className="flex items-start gap-3">

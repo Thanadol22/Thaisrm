@@ -215,7 +215,7 @@ export function PaymentView({
               </h4>
               <p className="text-[11px] sm:text-xs text-amber-700 leading-relaxed font-normal">
                 {lang === 'th'
-                  ? 'ระบบได้คำนวณอัตราค่าธรรมเนียมการลงทะเบียนเป็นราคาสำหรับบุคคลทั่วไป (Non-member Rate) ท่านสามารถต่ออายุสมาชิก TSRM ภายหลังเพื่อรับสิทธิ์ประโยชน์สมาชิกอย่างต่อเนื่อง'
+                  ? 'ระบบได้คำนวณอัตราค่าธรรมเนียมการลงทะเบียนเป็นราคาสำหรับบุคคลทั่วไป ท่านสามารถต่ออายุสมาชิก TSRM ภายหลังเพื่อรับสิทธิ์ประโยชน์สมาชิกอย่างต่อเนื่อง'
                   : 'Your registration fees are calculated at Non-member rates because your membership has expired. You may renew your membership at any time.'}
               </p>
             </div>
@@ -334,7 +334,7 @@ export function PaymentView({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-md">
-                      {lang === 'th' ? 'สิทธิ์สปอนเซอร์ (Sponsor Pass)' : 'Sponsor Pass'}
+                      {lang === 'th' ? 'สิทธิ์สปอนเซอร์' : 'Sponsor Pass'}
                     </span>
                     {couponCode && (
                       <span className="text-[10px] font-mono font-black text-slate-700 bg-white border border-slate-200 px-2 py-0.5 rounded-md">

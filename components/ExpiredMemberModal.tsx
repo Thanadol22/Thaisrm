@@ -24,7 +24,7 @@ export function ExpiredMemberModal({
   memberName,
   memberNo,
   expireDate,
-  statusText = 'หมดอายุ (Expired)',
+  statusText = 'หมดอายุ',
 }: ExpiredMemberModalProps) {
   const { lang } = useLanguage();
   const [mounted, setMounted] = useState(false);
@@ -103,7 +103,7 @@ export function ExpiredMemberModal({
         <div className="space-y-2 text-xs sm:text-sm text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
           <p className="font-bold text-slate-800">
             {lang === 'th' 
-              ? 'ระบบจะทำการคำนวณค่าลงทะเบียนในอัตราบุคคลทั่วไป (Non-member Rate)'
+              ? 'ระบบจะทำการคำนวณค่าลงทะเบียนในอัตราบุคคลทั่วไป'
               : 'Registration fees will be calculated at Non-member Rates.'}
           </p>
           <p className="text-slate-500 text-xs">

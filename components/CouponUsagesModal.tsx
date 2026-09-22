@@ -84,7 +84,7 @@ export function CouponUsagesModal({
   if (!isOpen || !mounted || !coupon) return null;
 
   const handleRevokeUsage = async (u: UsageRecord) => {
-    const confirmMsg = `ยืนยันการยกเลิกและคืนสิทธิ์คูปองของ "${u.attendee_name}" ใช่หรือไม่?\n\n- สิทธิ์คูปองจะกลับมาเพิ่มขึ้น 1 สิทธิ์\n- สถานะการลงทะเบียนจะถูกยกเลิก (Cancelled)`;
+    const confirmMsg = `ยืนยันการยกเลิกและคืนสิทธิ์คูปองของ "${u.attendee_name}" ใช่หรือไม่?\n\n- สิทธิ์คูปองจะกลับมาเพิ่มขึ้น 1 สิทธิ์\n- สถานะการลงทะเบียนจะถูกยกเลิก`;
     if (!confirm(confirmMsg)) return;
 
     setRevokingId(u.id);

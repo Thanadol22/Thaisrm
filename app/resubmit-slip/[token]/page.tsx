@@ -191,7 +191,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
                 สมาคมเวชศาสตร์การเจริญพันธุ์ไทย
               </span>
               <span className="font-extrabold text-white text-xs xs:text-sm sm:text-base tracking-wide block leading-tight">
-                แนบสลิปการโอนเงินใหม่ (Resubmit Slip)
+                แนบสลิปการโอนเงินใหม่
               </span>
             </div>
           </div>

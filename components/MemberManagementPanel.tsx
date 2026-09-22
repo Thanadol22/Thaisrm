@@ -434,7 +434,7 @@ export function MemberManagementPanel() {
         <div className="absolute bottom-0 right-1/4 -mb-10 w-48 h-48 rounded-full bg-[#4ade80]/15 blur-xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-5">
-          <div className="space-y-1.5 sm:space-y-2 max-w-xl">
+          <div className="space-y-1.5 sm:space-y-2 max-w-3xl">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-white/10 backdrop-blur-md text-[#4ade80] border border-white/20">
               <Sparkles className="w-3.5 h-3.5 text-[#4ade80]" />
               <span>ระบบฐานข้อมูลสมาชิกสมาคม TSRM</span>
@@ -442,38 +442,38 @@ export function MemberManagementPanel() {
             <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white">
               จัดการข้อมูลสมาชิก
             </h1>
-            <p className="text-xs sm:text-sm text-blue-100/90 leading-relaxed font-medium">
+            <p className="text-xs sm:text-sm text-blue-100/90 leading-relaxed font-medium text-pretty break-words">
               สืบค้น ค้นหากรองตามสถานะ เพิ่ม แก้ไข และตรวจสอบข้อมูลสมาชิกสมาคมเวชศาสตร์การเจริญพันธุ์ไทย
             </p>
           </div>
 
           {/* Top Actions */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0 w-full sm:w-auto">
             <button
               type="button"
               onClick={handleOpenSyncModal}
-              className="flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-bold transition cursor-pointer border border-white/20 backdrop-blur-md shadow-xs active:scale-95"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-bold transition cursor-pointer border border-white/20 backdrop-blur-md shadow-xs active:scale-95 whitespace-nowrap"
               title="ประมวลผลสถานะสมาชิกตามกฎขาดประชุม 4 ครั้งล่าสุด"
             >
-              <CalendarCheck2 className="w-4 h-4 text-[#4ade80]" />
+              <CalendarCheck2 className="w-4 h-4 text-[#4ade80] shrink-0" />
               <span>ประมวลผล 4 การประชุม</span>
             </button>
 
             <button
               type="button"
               onClick={handleExportCSV}
-              className="flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-bold transition cursor-pointer border border-white/20 backdrop-blur-md shadow-xs active:scale-95"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-bold transition cursor-pointer border border-white/20 backdrop-blur-md shadow-xs active:scale-95 whitespace-nowrap"
             >
-              <FileSpreadsheet className="w-4 h-4 text-[#4ade80]" />
+              <FileSpreadsheet className="w-4 h-4 text-[#4ade80] shrink-0" />
               <span>ส่งออก CSV</span>
             </button>
 
             <button
               type="button"
               onClick={handleOpenCreate}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#4ade80] hover:bg-[#3ecb72] text-slate-950 text-xs sm:text-sm font-black transition cursor-pointer shadow-lg shadow-[#4ade80]/25 active:scale-95"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#4ade80] hover:bg-[#3ecb72] text-slate-950 text-xs sm:text-sm font-black transition cursor-pointer shadow-lg shadow-[#4ade80]/25 active:scale-95 whitespace-nowrap"
             >
-              <PlusCircle className="w-4 h-4 text-slate-950" />
+              <PlusCircle className="w-4 h-4 text-slate-950 shrink-0" />
               <span>เพิ่มสมาชิกใหม่</span>
             </button>
           </div>
@@ -1072,7 +1072,7 @@ export function MemberManagementPanel() {
                     ประมวลผลสถานะสมาชิกตาม 4 การประชุมล่าสุด
                   </h3>
                   <p className="text-xs text-blue-100/80 mt-0.5">
-                    ตามข้อบังคับ: สมาชิกสามัญที่ขาดประชุม 4 ครั้งล่าสุดติดต่อกันจะถูกปรับเป็นสถานะหมดอายุ (Inactive)
+                    ตามข้อบังคับ: สมาชิกสามัญที่ขาดประชุม 4 ครั้งล่าสุดติดต่อกันจะถูกปรับเป็นสถานะหมดอายุ
                   </p>
                 </div>
               </div>
@@ -1091,7 +1091,7 @@ export function MemberManagementPanel() {
               {isLoadingSyncPreview ? (
                 <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-500">
                   <Loader2 className="w-8 h-8 text-[#0026b3] animate-spin" />
-                  <span className="text-xs font-bold">กำลังประมวลผลและจำลองผลลัพธ์ (Dry Run)...</span>
+                  <span className="text-xs font-bold">กำลังประมวลผลและจำลองผลลัพธ์...</span>
                 </div>
               ) : syncPreview ? (
                 <>

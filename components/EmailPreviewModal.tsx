@@ -122,15 +122,15 @@ export function EmailPreviewModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="bg-white border-t border-slate-200 px-5 py-3.5 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-            <Sparkles className="w-4 h-4 text-[#0026b3]" />
+        <div className="bg-white border-t border-slate-200 px-4 sm:px-5 py-3 flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 text-[11px] sm:text-xs text-slate-500 font-medium text-center sm:text-left">
+            <Sparkles className="w-4 h-4 text-[#0026b3] shrink-0" />
             <span>เทมเพลตรองรับทั้ง Gmail, Outlook และ Mobile Clients แบบ Responsive</span>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+            className="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
           >
             ปิดหน้าต่างตัวอย่าง
           </button>

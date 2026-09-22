@@ -614,7 +614,7 @@ export function StaffScannerView() {
             <div className="flex items-center gap-1.5 mb-1">
               <span className="bg-[#4ade80] text-[#061d08] text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-md shadow-xs flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3 stroke-[2.5]" />
-                <span>จุดเช็คอินสตาฟ (STAFF)</span>
+                <span>จุดเช็คอินสตาฟ</span>
               </span>
               {activeMeeting?.id && (
                 <span className="bg-white/20 text-white font-mono text-[9px] sm:text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-white/20">

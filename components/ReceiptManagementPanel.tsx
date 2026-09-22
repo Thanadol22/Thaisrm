@@ -264,42 +264,42 @@ export function ReceiptManagementPanel({
 
       {/* ─── Control Bar: Search, Filters & Create ─────────────────────── */}
       <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-[#0026b3]" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-[#0026b3] shrink-0" />
               <span>ระบบพิมพ์และออกใบเสร็จรับเงิน</span>
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 text-pretty break-words mt-0.5">
               สร้าง พิมพ์ และส่งออกใบเสร็จตามแบบมาตรฐานสมาคมเวชศาสตร์การเจริญพันธุ์ไทย 100%
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <button
               type="button"
               onClick={() => receipts.length > 0 && handleDirectPrint(receipts[0])}
               disabled={receipts.length === 0}
-              className="px-3.5 py-2 text-xs font-bold text-[#0026b3] bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 sm:flex-initial px-3.5 py-2.5 sm:py-2 text-xs font-bold text-[#0026b3] bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               title="พิมพ์ใบเสร็จล่าสุด"
             >
-              <Sparkles className="w-3.5 h-3.5 text-[#0026b3]" />
+              <Sparkles className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
               <span>พิมพ์ใบเสร็จล่าสุด</span>
             </button>
 
             <button
               type="button"
               onClick={handleOpenCreate}
-              className="px-4 py-2 text-xs font-bold text-white bg-[#0026b3] hover:bg-[#001f94] shadow-md shadow-[#0026b3]/25 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+              className="flex-1 sm:flex-initial px-4 py-2.5 sm:py-2 text-xs font-bold text-white bg-[#0026b3] hover:bg-[#001f94] shadow-md shadow-[#0026b3]/25 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
             >
-              <PlusCircle className="w-4 h-4 text-[#4ade80]" />
+              <PlusCircle className="w-4 h-4 text-[#4ade80] shrink-0" />
               <span>ออกใบเสร็จใหม่</span>
             </button>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-3 border-t border-slate-100">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t border-slate-100">
           <div className="sm:col-span-2 relative">
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -327,7 +327,7 @@ export function ReceiptManagementPanel({
             <select
               value={filterMeetingId}
               onChange={(e) => setFilterMeetingId(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-slate-700 font-medium"
+              className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-slate-700 font-medium truncate"
             >
               <option value="all">การประชุม: ทั้งหมด</option>
               {meetings.map((m) => (
@@ -380,9 +380,9 @@ export function ReceiptManagementPanel({
                       </div>
                     </td>
 
-                    <td className="py-4 px-4 min-w-[180px]">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-slate-800 line-clamp-1">{r.payerName}</span>
+                    <td className="py-4 px-4 min-w-[200px]">
+                      <div className="flex items-start gap-1.5">
+                        <span className="font-bold text-slate-800 line-clamp-2 break-words">{r.payerName}</span>
                         {r.payerType === 'company' ? (
                           <span className="shrink-0 text-[10px] px-1.5 py-0.5 bg-blue-50 text-[#0026b3] rounded font-bold border border-blue-200 whitespace-nowrap">
                             นิติบุคคล
@@ -400,13 +400,13 @@ export function ReceiptManagementPanel({
                       )}
                     </td>
 
-                    <td className="py-4 px-4 min-w-[200px]">
+                    <td className="py-4 px-4 min-w-[220px]">
                       <div className="space-y-0.5">
                         {r.items.map((it, idx) => (
                           <div key={idx} className="text-xs text-slate-700">
-                            <span className="font-medium">{it.title}</span>
+                            <span className="font-medium break-words">{it.title}</span>
                             {it.subDetails && it.subDetails[0] && (
-                              <p className="text-[11px] text-slate-500 line-clamp-1">
+                              <p className="text-[11px] text-slate-500 line-clamp-2 break-words">
                                 {it.subDetails[0]}
                               </p>
                             )}

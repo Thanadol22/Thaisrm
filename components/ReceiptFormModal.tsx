@@ -523,7 +523,7 @@ export function ReceiptFormModal({
               {/* Receipt No */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  เลขที่ใบเสร็จรับเงิน (Receipt No.) <span className="text-rose-600 font-bold">*</span>
+                  เลขที่ใบเสร็จรับเงิน <span className="text-rose-600 font-bold">*</span>
                 </label>
                 <input
                   type="text"
@@ -538,7 +538,7 @@ export function ReceiptFormModal({
               {/* Receipt Date */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  วันที่ออกใบเสร็จ (Receipt Date) <span className="text-rose-600 font-bold">*</span>
+                  วันที่ออกใบเสร็จ <span className="text-rose-600 font-bold">*</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <input
@@ -775,7 +775,7 @@ export function ReceiptFormModal({
             {/* Item Title */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                ชื่อรายการหลัก (Item Title) <span className="text-rose-600 font-bold">*</span>
+                ชื่อรายการหลัก <span className="text-rose-600 font-bold">*</span>
               </label>
               <input
                 type="text"

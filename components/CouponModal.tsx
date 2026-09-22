@@ -196,9 +196,9 @@ export function CouponModal({
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200/80 w-full max-w-xl overflow-hidden my-auto animate-scale-up">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200/80 w-full max-w-xl overflow-hidden my-auto animate-scale-up max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white p-5 sm:p-6 flex items-center justify-between relative overflow-hidden">
+        <div className="bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white p-5 sm:p-6 flex items-center justify-between relative overflow-hidden shrink-0">
           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/20 rounded-full blur-2xl pointer-events-none" />
           <div className="flex items-center gap-3 min-w-0 relative z-10">
             <div className="w-11 h-11 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0 backdrop-blur-sm">
@@ -226,7 +226,7 @@ export function CouponModal({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
           {errorMsg && (
             <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200/80 text-red-800 text-xs sm:text-sm font-semibold flex items-center gap-2.5 animate-shake">
               <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
@@ -238,7 +238,7 @@ export function CouponModal({
           <div className="space-y-1.5">
             <label className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1.5">
               <Building2 className="w-4 h-4 text-[#0026b3]" />
-              <span>ชื่อบริษัท / ผู้ให้การสนับสนุน (Sponsor / Company) <span className="text-red-500">*</span></span>
+              <span>ชื่อบริษัท / ผู้ให้การสนับสนุน <span className="text-red-500">*</span></span>
             </label>
             <input
               type="text"
@@ -254,7 +254,7 @@ export function CouponModal({
           <div className="space-y-1.5">
             <label className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-[#0026b3]" />
-              <span>ผูกกับรอบการประชุม (Eligible Meeting) <span className="text-red-500">*</span></span>
+              <span>ผูกกับรอบการประชุม <span className="text-red-500">*</span></span>
             </label>
             <select
               value={meetingId}
@@ -279,7 +279,7 @@ export function CouponModal({
             <div className="flex items-center justify-between">
               <label className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1.5">
                 <Ticket className="w-4 h-4 text-[#0026b3]" />
-                <span>รหัสคูปอง (Coupon Code) <span className="text-red-500">*</span></span>
+                <span>รหัสคูปอง <span className="text-red-500">*</span></span>
               </label>
               {!couponToEdit && (
                 <button
@@ -316,7 +316,7 @@ export function CouponModal({
           <div className="space-y-2 pt-1">
             <label className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1.5">
               <DollarSign className="w-4 h-4 text-[#0026b3]" />
-              <span>รูปแบบสิทธิ์และมูลค่าส่วนลด (Discount Type)</span>
+              <span>รูปแบบสิทธิ์และมูลค่าส่วนลด</span>
             </label>
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -399,7 +399,7 @@ export function CouponModal({
             <div className="space-y-1.5">
               <label className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1.5">
                 <Users className="w-4 h-4 text-[#0026b3]" />
-                <span>จำนวนสิทธิ์ที่ใช้ได้ (Quota) <span className="text-red-500">*</span></span>
+                <span>จำนวนสิทธิ์ที่ใช้ได้ <span className="text-red-500">*</span></span>
               </label>
               <div className="relative">
                 <input
@@ -426,7 +426,7 @@ export function CouponModal({
             <div className="space-y-1.5">
               <label className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-[#0026b3]" />
-                <span>วันหมดอายุ (Optional)</span>
+                <span>วันหมดอายุ (ถ้ามี)</span>
               </label>
               <input
                 type="date"
@@ -440,7 +440,7 @@ export function CouponModal({
           {/* Active Status & Remarks */}
           <div className="space-y-1.5 pt-1">
             <label className="text-xs sm:text-sm font-bold text-slate-700 block">
-              หมายเหตุ / บันทึกช่วยจำ (Remarks)
+              หมายเหตุ / บันทึกช่วยจำ
             </label>
             <input
               type="text"
@@ -462,7 +462,7 @@ export function CouponModal({
               />
               <div className="min-w-0 flex-1">
                 <span className="text-xs sm:text-sm font-bold text-slate-900 block leading-tight">
-                  เปิดใช้งานคูปองนี้ทันที (Active Status)
+                  เปิดใช้งานคูปองนี้ทันที
                 </span>
                 <span className="text-[11px] text-slate-500 block mt-0.5">
                   หากปิดใช้งาน ผู้เข้าร่วมจะไม่สามารถใช้รหัสนี้ในการลงทะเบียนได้

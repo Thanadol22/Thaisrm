@@ -589,7 +589,7 @@ export function LoginView({
         memberName: memberDataFound?.full_name_th || formData.nameTh || 'สมาชิก TSRM',
         memberNo: memberDataFound?.member_no || rawMemberNo,
         expireDate: memberDataFound?.expire_date,
-        statusText: memberDataFound?.membership_status || (lang === 'th' ? 'หมดอายุ (Expired)' : 'Expired'),
+        statusText: memberDataFound?.membership_status || (lang === 'th' ? 'หมดอายุ' : 'Expired'),
       });
       setPendingRegPayload(regPayload);
       setExpiredModalOpen(true);
@@ -860,12 +860,12 @@ export function LoginView({
                         </div>
                       </div>
 
-                      {/* 3. อีเมล (Email) */}
+                      {/* 3. อีเมล */}
                       <div>
                         <SmartEmailInput
                           value={formData.email}
                           onChange={(val) => handleInputChange('email', val)}
-                          label={lang === 'th' ? 'อีเมล (Email)' : 'Email Address'}
+                          label={lang === 'th' ? 'อีเมล' : 'Email Address'}
                           placeholder={lang === 'th' ? 'เช่น yourname@gmail.com' : 'e.g. yourname@gmail.com'}
                           helperText={lang === 'th' ? 'กรุณากรอกอีเมลที่มีอยู่จริง เพื่อรับ QR Code เข้าร่วมงาน' : 'Please provide a valid email to receive your Event QR Code.'}
                           required
@@ -1030,7 +1030,7 @@ export function LoginView({
                       return (
                         <div className="space-y-1 sm:space-y-1.5 pt-0.5 sm:pt-1">
                           <label className="text-[11px] sm:text-xs font-bold text-slate-700 block">
-                            {lang === 'th' ? 'รูปแบบการเข้าร่วม (Attendance Format)' : 'Attendance Format'}
+                            {lang === 'th' ? 'รูปแบบการเข้าร่วม' : 'Attendance Format'}
                           </label>
 
                           <div className="grid grid-cols-2 gap-1.5 sm:gap-3">
@@ -1079,7 +1079,7 @@ export function LoginView({
                               <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                               <span>
                                 {lang === 'th'
-                                  ? `หลักสูตร "${onsiteOnlyActs.map(a => a.name).join(', ')}" บังคับเข้าร่วม ณ สถานที่จัดงานจริง (Onsite)`
+                                  ? `หลักสูตร "${onsiteOnlyActs.map(a => a.name).join(', ')}" บังคับเข้าร่วม ณ สถานที่จัดงานจริง`
                                   : `Course "${onsiteOnlyActs.map(a => a.name).join(', ')}" requires Onsite attendance.`}
                               </span>
                             </div>

@@ -667,7 +667,7 @@ export function MeetingEditModal({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <label className="text-xs sm:text-sm font-extrabold text-slate-800 flex items-center gap-2">
                     <KeyRound className="w-4 h-4 text-amber-600" />
-                    <span>รหัสเจ้าหน้าที่ประจำจุดลงทะเบียน (Staff PIN 6 หลัก)</span>
+                    <span>รหัสเจ้าหน้าที่ประจำจุดลงทะเบียน</span>
                   </label>
                   <span className="text-[11px] text-amber-800 font-medium">สำหรับสตาฟใช้สแกน QR หน้างาน</span>
                 </div>
@@ -790,7 +790,7 @@ export function MeetingEditModal({
                         {/* Format Selection: Onsite / Online / Both */}
                         <div className="space-y-1.5 pt-1">
                           <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                            <span>รูปแบบหลักสูตร (Online / Onsite) *</span>
+                            <span>รูปแบบหลักสูตร *</span>
                             <span className="text-[11px] text-slate-400 font-normal">กำหนดช่องทางการเข้าร่วม</span>
                           </label>
                           <div className="grid grid-cols-3 gap-2">
@@ -830,7 +830,7 @@ export function MeetingEditModal({
                               }`}
                             >
                               <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                              <span className="truncate">ทั้งสองแบบ (Hybrid)</span>
+                              <span className="truncate">ทั้งสองแบบ</span>
                             </button>
                           </div>
                         </div>
@@ -1039,7 +1039,7 @@ export function MeetingEditModal({
                     </div>
                     <div>
                       <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
-                        <span>เงื่อนไขการเปลี่ยนรูปแบบการเข้าร่วม (Online ↔ Onsite Policy)</span>
+                        <span>เงื่อนไขการเปลี่ยนรูปแบบการเข้าร่วม</span>
                         <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
                           เงื่อนไขพิเศษ
                         </span>
@@ -1113,7 +1113,7 @@ export function MeetingEditModal({
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                    <span>ข้อความประกาศเงื่อนไขแบบกำหนดเอง (Custom Policy Text)</span>
+                    <span>ข้อความประกาศเงื่อนไขแบบกำหนดเอง</span>
                     <span className="text-[10px] text-slate-400">ปล่อยว่างหากต้องการให้ระบบสร้างข้อความอัตโนมัติ</span>
                   </label>
                   <input

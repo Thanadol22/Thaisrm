@@ -170,7 +170,7 @@ export function SmartEmailInput({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const defaultLabel = lang === 'th' ? 'อีเมล (Email)' : 'Email Address';
+  const defaultLabel = lang === 'th' ? 'อีเมล' : 'Email Address';
   const defaultPlaceholder = placeholder || (lang === 'th' ? 'เช่น yourname@gmail.com หรือ hotmail' : 'e.g. yourname@gmail.com');
 
   // ตรวจจับชื่อผู้ใช้และโดเมนปัจจุบัน

@@ -286,13 +286,13 @@ export function AdminNavbar({
           </div>
 
           {/* Current Tab Label */}
-          <div className="flex-1 flex justify-center px-2">
+          <div className="flex-1 min-w-0 flex justify-center px-1.5 sm:px-2">
             {(() => {
               const current = navItems.find((n) => n.id === activeTab);
               const Icon = current?.icon ?? LayoutDashboard;
               return (
-                <span className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-white/15 text-white border border-white/20 truncate">
-                  <Icon className="w-4 h-4 shrink-0 text-[#4ade80]" />
+                <span className="flex items-center gap-1.5 text-[11px] sm:text-xs font-bold px-2 sm:px-2.5 py-1 rounded-lg bg-white/15 text-white border border-white/20 truncate max-w-full">
+                  <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-[#4ade80]" />
                   <span className="truncate">{current?.labelTh}</span>
                 </span>
               );

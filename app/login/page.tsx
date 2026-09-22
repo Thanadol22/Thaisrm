@@ -26,13 +26,13 @@ function LoginContent() {
       if (errorParam === 'Configuration') {
         triggerNotification(
           lang === 'th'
-            ? 'เกิดข้อผิดพลาดในการตั้งค่า Google OAuth (Configuration Error) กรุณาตรวจสอบ Authorized Redirect URI ใน Google Cloud Console'
+            ? 'เกิดข้อผิดพลาดในการตั้งค่า Google OAuth กรุณาตรวจสอบ Authorized Redirect URI ใน Google Cloud Console'
             : 'Google OAuth Configuration Error. Please verify Authorized Redirect URI in Google Cloud Console'
         );
       } else if (errorParam === 'AccessDenied') {
         triggerNotification(
           lang === 'th'
-            ? 'การเข้าสู่ระบบถูกปฏิเสธ (Access Denied)'
+            ? 'การเข้าสู่ระบบถูกปฏิเสธ'
             : 'Access was denied during sign in.'
         );
       } else {

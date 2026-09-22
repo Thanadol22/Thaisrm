@@ -301,13 +301,13 @@ export function AdminCouponsPanel({
           </button>
         </form>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full md:w-auto">
           <select
             value={selectedMeeting}
             onChange={(e) => setSelectedMeeting(e.target.value)}
-            className="px-3 py-2.5 rounded-xl border border-slate-200 text-slate-800 font-bold text-xs sm:text-sm bg-white outline-none cursor-pointer focus:border-[#0026b3]"
+            className="flex-1 md:flex-initial min-w-0 px-3 py-2.5 rounded-xl border border-slate-200 text-slate-800 font-bold text-xs sm:text-sm bg-white outline-none cursor-pointer focus:border-[#0026b3] truncate"
           >
-            <option value="all">ทุกรอบการประชุม (All Meetings)</option>
+            <option value="all">ทุกรอบการประชุม</option>
             {meetings.map((m) => {
               const mId = m.meeting_id || m.id || '';
               const mName = m.meeting_name || m.titleTh || mId;
@@ -322,7 +322,7 @@ export function AdminCouponsPanel({
           <button
             type="button"
             onClick={fetchCoupons}
-            className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+            className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 transition cursor-pointer shrink-0"
             title="รีเฟรชข้อมูล"
           >
             <RotateCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#0026b3]' : ''}`} />
@@ -364,7 +364,7 @@ export function AdminCouponsPanel({
                   <th className="py-3.5 px-4 sm:px-6">รหัสคูปอง / บริษัท</th>
                   <th className="py-3.5 px-4">รอบการประชุม</th>
                   <th className="py-3.5 px-4">รูปแบบส่วนลด</th>
-                  <th className="py-3.5 px-4">สิทธิ์การใช้งาน (Quota)</th>
+                  <th className="py-3.5 px-4">สิทธิ์การใช้งาน</th>
                   <th className="py-3.5 px-4">วันหมดอายุ / สถานะ</th>
                   <th className="py-3.5 px-4 sm:px-6 text-right">การจัดการ</th>
                 </tr>
@@ -503,7 +503,7 @@ export function AdminCouponsPanel({
                                 ? 'หมดอายุแล้ว'
                                 : isQuotaFull
                                 ? 'เต็มโควตา'
-                                : 'เปิดใช้งาน (Active)'}
+                                : 'เปิดใช้งาน'}
                             </span>
                           </div>
                           <div className="text-[11px] text-slate-400 flex items-center gap-1">
