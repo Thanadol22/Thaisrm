@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// ฟังก์ชันช่วย normalize ชื่อเพื่อเปรียบเทียบ (ตัดคำนำหน้า, ช่องว่าง, ช่องว่างพิเศษ)
+// ฟังก์ชันช่วย normalize ชื่อเพื่อเปรียบเทียบ (ตัดคำนำหน้าส่วนหัว, ช่องว่าง, อักขระพิเศษ)
 function normalizeName(name: string): string {
   if (!name) return '';
   return name
+    .trim()
     .toLowerCase()
-    .replace(/(นพ\.|พญ\.|ทพ\.|ทญ\.|ดร\.|ศ\.|รศ\.|ผศ\.|นาย|นาง|นางสาว|น\.ส\.|dr\.|prof\.|assoc\.prof\.|asst\.prof\.|mr\.|mrs\.|ms\.)/gi, '')
+    .replace(
+      /^(นายแพทย์|แพทย์หญิง|ทันตแพทย์หญิง|ทันตแพทย์|นพ\.|พญ\.|ทพ\.|ทญ\.|นพ|พญ|ทพ|ทญ|ดร\.|ดร|ศ\.|ศ|รศ\.|รศ|ผศ\.|ผศ|อาจารย์|อ\.|นาย|นางสาว|นาง|น\.ส\.|นส\.|dr\.|dr|prof\.|prof|assoc\.prof\.|asst\.prof\.|mr\.|mr|mrs\.|mrs|ms\.|ms)\s*/gi,
+      ''
+    )
     .replace(/\s+/g, '')
     .trim();
 }
@@ -16,6 +20,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const memberNoInput = (body.memberNo || '').toString().trim();
     const nameInput = (body.name || '').toString().trim();
+    const nameThInput = (body.nameTh || '').toString().trim();
+    const nameEnInput = (body.nameEn || '').toString().trim();
     const meetingId = (body.meetingId || '').toString().trim();
 
     if (!memberNoInput) {
@@ -58,39 +64,56 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: false,
         valid: false,
-        message: `สมาชิกหมายเลข ${member.member_no} (${member.fullNameTh}) สถานะปัจจุบันคือ "${member.membership_status}" ไม่สามารถใช้สิทธิ์ได้ (ต้องเป็นสถานะ Active)`,
+        message: `สมาชิกหมายเลข ${member.member_no} สถานะปัจจุบันคือ "${member.membership_status}" ไม่สามารถใช้สิทธิ์ได้ (ต้องเป็นสถานะ Active)`,
         member: {
           member_no: member.member_no,
-          fullNameTh: member.fullNameTh,
           membership_status: member.membership_status,
         },
       });
     }
 
-    // 3. ตรวจสอบว่าชื่อที่กรอกตรงกับข้อมูลในระบบจริงหรือไม่ (ถ้ามีการระบุชื่อเข้ามา)
-    let isNameMatching = true;
-    if (nameInput) {
-      const normInput = normalizeName(nameInput);
-      const normTh = normalizeName(member.fullNameTh || '');
-      const normEn = normalizeName(member.fullNameEn || '');
+    // 3. ตรวจสอบว่าชื่อที่กรอกตรงกับข้อมูลในระบบจริงหรือไม่ (เปรียบเทียบเต็มชื่อแบบ Exact Match ไม่ใช้ substring)
+    const activeNameInput = nameThInput || nameEnInput || nameInput;
+    if (!activeNameInput) {
+      return NextResponse.json({
+        success: false,
+        valid: false,
+        nameMismatch: true,
+        message: 'กรุณาระบุชื่อ-นามสกุลเพื่อตรวจสอบกับเลขสมาชิก',
+      });
+    }
 
-      const isThMatch = normTh.includes(normInput) || normInput.includes(normTh);
-      const isEnMatch = normEn && (normEn.includes(normInput) || normInput.includes(normEn));
+    const normTh = normalizeName(member.fullNameTh || '');
+    const normEn = normalizeName(member.fullNameEn || '');
 
-      if (!isThMatch && !isEnMatch) {
-        isNameMatching = false;
-        return NextResponse.json({
-          success: false,
-          valid: false,
-          nameMismatch: true,
-          message: `เลขสมาชิก ${member.member_no} ตรงกับ "${member.fullNameTh}" ในระบบ ซึ่งไม่ตรงกับชื่อ "${nameInput}" ที่ระบุ`,
-          member: {
-            member_no: member.member_no,
-            fullNameTh: member.fullNameTh,
-            fullNameEn: member.fullNameEn,
-          },
-        });
+    // ตรวจสอบกับภาษาไทย หรือ ภาษาอังกฤษ แบบตรงกันทั้งหมด
+    let isMatched = false;
+    if (nameThInput) {
+      const normInputTh = normalizeName(nameThInput);
+      if (normInputTh && normTh && normInputTh === normTh) {
+        isMatched = true;
       }
+    }
+    if (nameEnInput && !isMatched) {
+      const normInputEn = normalizeName(nameEnInput);
+      if (normInputEn && normEn && normInputEn === normEn) {
+        isMatched = true;
+      }
+    }
+    if (nameInput && !isMatched) {
+      const normInputGeneral = normalizeName(nameInput);
+      if (normInputGeneral && ((normTh && normInputGeneral === normTh) || (normEn && normInputGeneral === normEn))) {
+        isMatched = true;
+      }
+    }
+
+    if (!isMatched) {
+      return NextResponse.json({
+        success: false,
+        valid: false,
+        nameMismatch: true,
+        message: 'ชื่อไม่ตรงกับเลขสมาชิกในระบบ',
+      });
     }
 
     // 4. ตรวจสอบว่าสมาชิกเคยลงทะเบียนในงานประชุมนี้แล้วหรือยัง (ถ้ามี meetingId)
@@ -109,14 +132,7 @@ export async function POST(req: NextRequest) {
           success: false,
           valid: false,
           alreadyRegistered: true,
-          message: `สมาชิกหมายเลข ${member.member_no} (${member.fullNameTh}) ได้ลงทะเบียนเข้าร่วมงานประชุมนี้แล้ว`,
-          member: {
-            member_no: member.member_no,
-            fullNameTh: member.fullNameTh,
-            email: member.email,
-            workplace: member.workplace,
-            mobile: member.mobile,
-          },
+          message: `สมาชิกหมายเลข ${member.member_no} ได้ลงทะเบียนเข้าร่วมงานประชุมนี้แล้ว`,
         });
       }
     }

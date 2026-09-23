@@ -31,7 +31,7 @@ export interface FieldData {
 
 export interface MemberRecord {
   id: string;
-  memberId: string; // เลขสมาชิก 4 หลัก เช่น 0001
+  memberId: string; // เลขสมาชิก 4 หลัก 
   nameTh: FieldData | string;
   nameEn: FieldData | string;
   email: FieldData | string;

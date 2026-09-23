@@ -53,9 +53,10 @@ const navItems: {
     },
     {
       id: 'sponsors',
-      labelTh: 'บริษัทสปอนเซอร์',
-      labelEn: 'Corporate Sponsors',
-      icon: Building2,
+      labelTh: 'จัดการคูปอง & สิทธิ์ฟรี',
+      labelEn: 'Coupons & Free Quotas',
+      icon: Ticket,
+      badgeKey: 'coupons',
     },
     {
       id: 'members',
@@ -88,13 +89,6 @@ const navItems: {
       labelTh: 'ประวัติการประชุม',
       labelEn: 'Meeting History',
       icon: ClipboardList,
-    },
-    {
-      id: 'coupons',
-      labelTh: 'จัดการคูปอง',
-      labelEn: 'Coupons & Sponsor',
-      icon: Ticket,
-      badgeKey: 'coupons',
     },
     {
       id: 'verify-slip',
@@ -197,7 +191,7 @@ export function AdminNavbar({
           </div>
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.id;
+            const isActive = activeTab === item.id || (item.id === 'sponsors' && activeTab === 'coupons');
             const badge = getBadge(item.badgeKey);
 
             // High-visibility badge color based on badge type
@@ -327,7 +321,7 @@ export function AdminNavbar({
               <div className="space-y-1.5">
                 {navItems.map((item) => {
                   const Icon = item.icon;
-                  const isActive = activeTab === item.id;
+                  const isActive = activeTab === item.id || (item.id === 'sponsors' && activeTab === 'coupons');
                   const badge = getBadge(item.badgeKey);
 
                   const getMobileBadgeClass = () => {

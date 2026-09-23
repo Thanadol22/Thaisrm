@@ -30,15 +30,31 @@ export interface ItemizedActivity {
   rateBadgeEn?: string;
 }
 
+export interface GroupAttendeeActivity {
+  id: string;
+  name: string;
+  type: string;
+  format?: string;
+  originalPrice: number;
+  discount: number;
+  netPrice: number;
+  isDiscounted?: boolean;
+}
+
 export interface GroupAttendeeSummary {
   name: string;
   email?: string;
   position?: string;
   workplace?: string;
+  memberNo?: string;
   price: number;
+  originalTotal?: number;
+  discountTotal?: number;
+  discountAppliedNotice?: string;
   isMember?: boolean;
   attendanceType?: string;
   details?: string;
+  activities?: GroupAttendeeActivity[];
 }
 
 interface PaymentViewProps {
@@ -112,10 +128,8 @@ export function PaymentView({
   const handleBack = () => {
     if (onNavigateBack) {
       onNavigateBack();
-    } else if (typeof window !== 'undefined' && window.history.length > 1) {
-      router.back();
     } else {
-      router.push('/login');
+      router.push('/login?tab=conference&restore=1');
     }
   };
 
@@ -278,46 +292,131 @@ export function PaymentView({
           <div className="space-y-2.5 pt-1">
             {/* Group Attendees Roster Breakdown */}
             {isGroup && groupAttendees.length > 0 ? (
-              <div className="space-y-2 pb-2">
-                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                  {lang === 'th' ? 'รายชื่อและค่าธรรมเนียมของผู้สมัคร/ผู้ลงทะเบียนแต่ละท่าน:' : 'Itemized Attendee / Applicant Roster:'}
-                </span>
+              <div className="space-y-2.5 pb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                    {lang === 'th' ? 'รายชื่อและค่าธรรมเนียมของผู้สมัคร/ผู้ลงทะเบียนแต่ละท่าน:' : 'Itemized Attendee / Applicant Roster:'}
+                  </span>
+                  {/* Edit Form Return Button */}
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    className="text-[11px] font-bold text-[#0026b3] hover:underline flex items-center gap-1 cursor-pointer self-start sm:self-auto"
+                  >
+                    <ArrowLeft className="w-3 h-3" />
+                    <span>{lang === 'th' ? 'ย้อนกลับไปแก้ไขข้อมูล' : 'Edit Attendee Info'}</span>
+                  </button>
+                </div>
+
+                {/* Chronology Notice Box */}
+                <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-2.5 sm:p-3 flex items-start gap-2">
+                  <span className="text-amber-700 text-xs mt-0.5">📌</span>
+                  <p className="text-[10px] sm:text-[11px] text-amber-900 leading-relaxed font-semibold">
+                    {lang === 'th'
+                      ? 'การจัดสรรส่วนลดและการใช้สิทธิ์คูปองจะถูกคำนวณตามลำดับการกรอกข้อมูลผู้ลงทะเบียน (First-Come, First-Served)'
+                      : 'Discounts and coupon allocations are calculated chronologically according to attendee registration order (First-Come, First-Served).'}
+                  </p>
+                </div>
+
                 <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-2xl overflow-hidden bg-slate-50/50">
                   {groupAttendees.map((att, idx) => (
-                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:px-4 gap-2 bg-white hover:bg-slate-50/80 transition">
-                      <div className="space-y-0.5 min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="w-5 h-5 rounded-full bg-[#0026b3] text-white text-[10px] font-black flex items-center justify-center shrink-0">
-                            {idx + 1}
-                          </span>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-900 truncate">
-                            {att.name}
-                          </h4>
-                          {att.position && (
-                            <span className="text-[10px] text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded">
-                              {att.position}
+                    <div key={idx} className="p-3.5 sm:p-4 bg-white hover:bg-slate-50/80 transition space-y-2.5">
+                      {/* Attendee Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="w-5 h-5 rounded-full bg-[#0026b3] text-white text-[10px] font-black flex items-center justify-center shrink-0">
+                              {idx + 1}
                             </span>
-                          )}
-                          {att.isMember !== undefined && (
-                            <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
-                              att.isMember ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-700'
-                            }`}>
-                              {att.isMember ? (lang === 'th' ? 'สมาชิก' : 'Member') : (lang === 'th' ? 'บุคคลทั่วไป' : 'Non-Member')}
+                            <h4 className="font-bold text-xs sm:text-sm text-slate-900 truncate">
+                              {att.name}
+                            </h4>
+                            {att.memberNo && (
+                              <span className="text-[10px] font-mono font-bold bg-blue-50 text-[#0026b3] border border-blue-200 px-1.5 py-0.5 rounded">
+                                #{att.memberNo}
+                              </span>
+                            )}
+                            {att.position && (
+                              <span className="text-[10px] text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded">
+                                {att.position}
+                              </span>
+                            )}
+                            {att.isMember !== undefined && (
+                              <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                att.isMember ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-700'
+                              }`}>
+                                {att.isMember ? (lang === 'th' ? 'สมาชิก' : 'Member') : (lang === 'th' ? 'บุคคลทั่วไป' : 'Non-Member')}
+                              </span>
+                            )}
+                            {att.attendanceType && (
+                              <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                {att.attendanceType === 'online' ? '💻 Online' : '🏢 Onsite'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Attendee Subtotal / Net Price */}
+                        <div className="text-right shrink-0 pl-7 sm:pl-0">
+                          {att.discountTotal && att.discountTotal > 0 ? (
+                            <div className="flex flex-col items-end">
+                              <span className="text-[10px] text-slate-400 line-through font-medium">
+                                {(att.originalTotal || att.price + att.discountTotal).toLocaleString()} {lang === 'th' ? 'บาท' : 'THB'}
+                              </span>
+                              <span className="text-xs sm:text-sm font-black text-[#0026b3]">
+                                {att.price === 0 ? (
+                                  <span className="text-emerald-700 font-black bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block">
+                                    {lang === 'th' ? 'ฟรี (0 บาท)' : 'FREE (0 THB)'}
+                                  </span>
+                                ) : (
+                                  `${att.price.toLocaleString()} ${lang === 'th' ? 'บาท' : 'THB'}`
+                                )}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs sm:text-sm font-black text-[#0026b3]">
+                              {att.price.toLocaleString()} <span className="text-[11px] font-bold text-slate-600">{lang === 'th' ? 'บาท' : 'THB'}</span>
                             </span>
                           )}
                         </div>
-                        {att.details && (
-                          <p className="text-[11px] text-slate-500 font-medium pl-7">
-                            {att.details}
-                          </p>
-                        )}
                       </div>
 
-                      <div className="text-right shrink-0 pl-7 sm:pl-0">
-                        <span className="text-xs sm:text-sm font-black text-[#0026b3]">
-                          {att.price.toLocaleString()} <span className="text-[11px] font-bold text-slate-600">{lang === 'th' ? 'บาท' : 'THB'}</span>
-                        </span>
-                      </div>
+                      {/* Attendee Itemized Activities (if available) */}
+                      {att.activities && att.activities.length > 0 ? (
+                        <div className="pl-7 space-y-1.5 border-t border-slate-100 pt-2">
+                          {att.activities.map((act, actIdx) => (
+                            <div key={actIdx} className="flex items-center justify-between text-[11px] text-slate-600">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className={`w-1.5 h-1.5 rounded-full ${act.type === 'main' ? 'bg-[#0026b3]' : 'bg-indigo-500'}`} />
+                                <span className="truncate">{act.name}</span>
+                                <span className="text-[9px] text-slate-400 font-medium">({act.type === 'main' ? 'Main' : 'Workshop'})</span>
+                              </div>
+                              <div className="text-right shrink-0">
+                                {act.isDiscounted || act.netPrice === 0 ? (
+                                  <span className="text-emerald-700 font-bold">
+                                    <span className="line-through text-slate-400 mr-1">{act.originalPrice.toLocaleString()}</span>
+                                    {act.netPrice === 0 ? (lang === 'th' ? 'ฟรี' : 'Free') : `${act.netPrice.toLocaleString()} ฿`}
+                                  </span>
+                                ) : (
+                                  <span className="font-semibold text-slate-700">{act.originalPrice.toLocaleString()} ฿</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : att.details ? (
+                        <p className="text-[11px] text-slate-500 font-medium pl-7">
+                          {att.details}
+                        </p>
+                      ) : null}
+
+                      {/* Attendee Discount Allocation Banner */}
+                      {att.discountAppliedNotice && (
+                        <div className="ml-7 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1 text-[10px] font-bold text-emerald-800 flex items-center gap-1.5">
+                          <Sparkles className="w-3 h-3 text-emerald-600 shrink-0" />
+                          <span>{att.discountAppliedNotice}</span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

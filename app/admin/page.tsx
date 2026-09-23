@@ -691,12 +691,12 @@ export default function AdminPage() {
           />
         );
       case 'sponsors':
-        return <AdminSponsorsPanel />;
       case 'coupons':
         return (
-          <AdminCouponsPanel
+          <AdminSponsorsPanel
             meetings={meetings}
-            onNotification={(msg) => {
+            initialTab={activeTab === 'coupons' ? 'coupons' : 'sponsors'}
+            onNotification={(msg: string) => {
               setGlobalToastMessage(msg);
               setTimeout(() => setGlobalToastMessage(null), 4000);
             }}

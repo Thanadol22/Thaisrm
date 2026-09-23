@@ -394,7 +394,6 @@ export default function SponsorGroupRegisterPage() {
                   isValidated: false,
                   isError: true,
                   statusMessage: data.message || 'ไม่พบสมาชิก หรือชื่อไม่ตรงกับในระบบ',
-                  fullName: data.member?.fullNameTh || r.fullName,
                 }
               : r
           )

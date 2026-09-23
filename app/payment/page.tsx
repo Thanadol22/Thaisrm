@@ -212,52 +212,159 @@ function PaymentContent() {
       const pricingTiers = regData.pricingTiers;
       const basePrice = regData.basePrice ?? 0;
       const allActivities = regData.selectedActivities || regData.activities || [];
+      const couponData = regData.couponData as any;
 
-      let groupTotal = 0;
-      const groupList = attendees.map((att: any) => {
+      // Initialize coupon quota & pool
+      let remainingFreeSeats = 0;
+      if (couponData && (couponData.isFullFree || couponData.discountType === 'free')) {
+        remainingFreeSeats = typeof couponData.remainingSeats === 'number'
+          ? couponData.remainingSeats
+          : (typeof couponData.totalSeats === 'number' ? couponData.totalSeats : 9999);
+      }
+      let remainingFixedPool = (couponData && couponData.discountType === 'fixed') ? (couponData.discountValue || 0) : 0;
+      const percentVal = (couponData && couponData.discountType === 'percent') ? Math.min(100, Math.max(0, couponData.discountValue || 0)) : 0;
+
+      const groupList = attendees.map((att: any, attIndex: number) => {
         const isMem = Boolean(att.isMember) && !att.isExpiredMember && Boolean(att.memberNo?.trim());
-        const attType = (att.attendanceType === 'online' && isMem) ? 'online' : 'onsite';
-        
-        let personTotal = 0;
-        let mainPrice = 0;
-        if (attType === 'online') {
-          mainPrice = isMem
-            ? (pricingTiers?.participant?.onlineMember ?? basePrice ?? 3500)
-            : (pricingTiers?.participant?.onlineNonMember ?? (basePrice ? basePrice + 1000 : 4500));
+
+        // Determine attendee's selected activities
+        let rawAttendeeActivities: any[] = [];
+        if (att.selectedActivities && Array.isArray(att.selectedActivities) && att.selectedActivities.length > 0) {
+          rawAttendeeActivities = att.selectedActivities;
         } else {
-          mainPrice = isMem
-            ? (pricingTiers?.participant?.onsiteMember ?? basePrice ?? 3500)
-            : (pricingTiers?.participant?.onsiteNonMember ?? (basePrice ? basePrice + 1000 : 4500));
+          const selProgs = att.selectedPrograms || att.selectedProgramIds || [];
+          if (selProgs.length > 0 && allActivities.length > 0) {
+            rawAttendeeActivities = allActivities.filter((a: any) => selProgs.includes(a.id));
+          } else {
+            rawAttendeeActivities = [{ id: 'main', type: 'main', name: regData.meetingName || 'Main Program' }];
+          }
         }
-        personTotal += mainPrice;
 
-        const selWorkshops = (att.selectedWorkshops || []) as string[];
-        if (selWorkshops.length > 0 && allActivities.length > 0) {
-          allActivities.filter((a: any) => selWorkshops.includes(a.id)).forEach((ws: any) => {
-            const mPrice = typeof ws.memberPrice === 'number' ? ws.memberPrice : 0;
-            const nonMPrice = typeof ws.nonMemberPrice === 'number' ? ws.nonMemberPrice : mPrice;
-            personTotal += isMem ? mPrice : nonMPrice;
+        const hasOnsiteOnly = rawAttendeeActivities.some((a: any) => (a.format || (a.type === 'workshop' ? 'onsite' : 'both')) === 'onsite');
+        const isOnlineEligible = !hasOnsiteOnly && isMem;
+        const attType: 'onsite' | 'online' = (att.attendanceType === 'online' && isOnlineEligible) ? 'online' : 'onsite';
+
+        // Calculate each activity's base price
+        let itemizedActs = rawAttendeeActivities.map((act: any) => {
+          let actPrice = 0;
+          if (act.type === 'main') {
+            if (attType === 'online') {
+              actPrice = isMem
+                ? (pricingTiers?.participant?.onlineMember ?? basePrice ?? 3500)
+                : (pricingTiers?.participant?.onlineNonMember ?? (basePrice ? basePrice + 1000 : 4500));
+            } else {
+              actPrice = isMem
+                ? (pricingTiers?.participant?.onsiteMember ?? basePrice ?? 3500)
+                : (pricingTiers?.participant?.onsiteNonMember ?? (basePrice ? basePrice + 1000 : 4500));
+            }
+          } else {
+            // Workshop
+            const mPrice = typeof act.memberPrice === 'number' ? act.memberPrice : 0;
+            const nonMPrice = typeof act.nonMemberPrice === 'number' ? act.nonMemberPrice : mPrice;
+            actPrice = isMem ? mPrice : nonMPrice;
+          }
+
+          return {
+            id: act.id,
+            name: act.name,
+            type: act.type || 'main',
+            format: act.format,
+            originalPrice: actPrice,
+            discount: 0,
+            netPrice: actPrice,
+            isDiscounted: false,
+          };
+        });
+
+        const attendeeOriginalTotal = itemizedActs.reduce((sum, a) => sum + a.originalPrice, 0);
+        let attendeeDiscount = 0;
+        let discountNotice: string | undefined = undefined;
+
+        // Apply chronological coupon discount
+        if (remainingFreeSeats > 0) {
+          attendeeDiscount = attendeeOriginalTotal;
+          discountNotice = lang === 'th'
+            ? '✅ ได้รับสิทธิ์เข้าร่วมฟรีเต็มจำนวนจากคูปองสปอนเซอร์'
+            : '✅ Free Sponsor Pass Granted';
+          itemizedActs = itemizedActs.map(a => ({
+            ...a,
+            discount: a.originalPrice,
+            netPrice: 0,
+            isDiscounted: true,
+          }));
+          remainingFreeSeats -= 1;
+        } else if (remainingFixedPool > 0) {
+          const applied = Math.min(attendeeOriginalTotal, remainingFixedPool);
+          attendeeDiscount = applied;
+          remainingFixedPool -= applied;
+          discountNotice = applied > 0
+            ? (lang === 'th' ? `✅ ได้รับส่วนลดจากคูปอง: -${applied.toLocaleString()} บาท` : `✅ Coupon Discount: -${applied.toLocaleString()} THB`)
+            : undefined;
+
+          // Deduct from activities in order
+          let poolLeft = applied;
+          itemizedActs = itemizedActs.map(a => {
+            if (poolLeft <= 0) return a;
+            const itemDisc = Math.min(a.originalPrice, poolLeft);
+            poolLeft -= itemDisc;
+            return {
+              ...a,
+              discount: itemDisc,
+              netPrice: a.originalPrice - itemDisc,
+              isDiscounted: itemDisc > 0,
+            };
           });
+        } else if (percentVal > 0) {
+          const applied = Math.round((attendeeOriginalTotal * percentVal) / 100);
+          attendeeDiscount = applied;
+          discountNotice = applied > 0
+            ? (lang === 'th' ? `✅ ได้รับส่วนลดคูปอง ${percentVal}% (-${applied.toLocaleString()} บาท)` : `✅ Coupon Discount ${percentVal}% (-${applied.toLocaleString()} THB)`)
+            : undefined;
+
+          itemizedActs = itemizedActs.map(a => {
+            const itemDisc = Math.round((a.originalPrice * percentVal) / 100);
+            return {
+              ...a,
+              discount: itemDisc,
+              netPrice: Math.max(0, a.originalPrice - itemDisc),
+              isDiscounted: itemDisc > 0,
+            };
+          });
+        } else if (couponData && (couponData.discountType === 'free' || couponData.isFullFree)) {
+          discountNotice = lang === 'th'
+            ? '⚠️ เกินโควตาสิทธิ์ฟรีของคูปอง (คิดค่าธรรมเนียมตามปกติ)'
+            : '⚠️ Exceeded Free Pass Quota (Standard Rate)';
         }
 
-        groupTotal += personTotal;
+        const attendeeNetPrice = Math.max(0, attendeeOriginalTotal - attendeeDiscount);
+
         return {
           name: att.nameTh || att.nameEn || 'ผู้ลงทะเบียน',
           email: att.email,
           position: att.position,
           workplace: att.workplace || (regData as any).companyName,
-          price: personTotal,
+          memberNo: att.memberNo,
+          price: attendeeNetPrice,
+          originalTotal: attendeeOriginalTotal,
+          discountTotal: attendeeDiscount,
+          discountAppliedNotice: discountNotice,
           isMember: isMem,
           attendanceType: attType,
-          details: `${attType === 'online' ? '💻 Online' : '🏢 Onsite'}${selWorkshops.length > 0 ? ` + ${selWorkshops.length} เวิร์กช็อป` : ''}`,
+          activities: itemizedActs,
+          details: `${attType === 'online' ? '💻 Online' : '🏢 Onsite'}${itemizedActs.length > 1 ? ` (${itemizedActs.length} รายการ)` : ''}`,
         };
       });
 
+      const groupOriginalTotal = groupList.reduce((sum, g) => sum + (g.originalTotal || g.price), 0);
+      const groupDiscountTotal = groupList.reduce((sum, g) => sum + (g.discountTotal || 0), 0);
+      const groupNetTotal = Math.max(0, groupOriginalTotal - groupDiscountTotal);
+      const isCouponSponsored = groupNetTotal === 0 && groupDiscountTotal > 0;
+
       return {
-        originalAmount: groupTotal,
-        totalAmount: groupTotal,
-        discountAmount: 0,
-        isCouponSponsored: false,
+        originalAmount: groupOriginalTotal,
+        totalAmount: groupNetTotal,
+        discountAmount: groupDiscountTotal,
+        isCouponSponsored,
         items: [] as any[],
         isMemberUser: false,
         attendType: 'onsite' as const,
@@ -421,13 +528,15 @@ function PaymentContent() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               isGroup: true,
-              companyName: (regData as any).companyName,
+              companyName: (regData as any).companyName || regData?.couponData?.companyName,
               groupContact: (regData as any).groupContact,
               attendees: (regData as any).attendees,
               amount: calculationResult.totalAmount,
               originalAmount: calculationResult.originalAmount,
-              bank: systemSettings.bank_name,
-              slipUrl: uploadedSlipData?.fileUrl || '',
+              couponCode: regData?.couponData?.code || undefined,
+              sponsorId: (regData as any)?.sponsorSession?.sponsorId || (regData?.couponData as any)?.sponsorId || undefined,
+              bank: isFreeOrSponsored ? `สิทธิ์สปอนเซอร์: ${regData?.couponData?.companyName || (regData as any).companyName || 'Corporate Pass'}` : systemSettings.bank_name,
+              slipUrl: uploadedSlipData?.fileUrl || (isFreeOrSponsored ? `SPONSORED:${regData?.couponData?.companyName || (regData as any).companyName || 'COUPON'}` : undefined),
             }),
           });
 
@@ -581,6 +690,7 @@ function PaymentContent() {
           couponCode={regData?.couponData?.code}
           discountAmount={calculationResult.discountAmount}
           submitting={submitting}
+          onNavigateBack={() => router.push('/login?tab=conference&restore=1')}
           onOpenUploadModal={() => setUploadModalOpen(true)}
           onCopyBank={handleCopyBank}
           copiedBank={copiedBank}

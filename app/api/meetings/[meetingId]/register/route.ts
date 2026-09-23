@@ -107,30 +107,143 @@ export async function POST(
         },
       });
 
-      // Create attendance records for each attendee
+      // Resolve Sponsor Record if sponsorId / couponCode / companyName is provided
+      let sponsorRecord: any = null;
+      if (body.sponsorId) {
+        sponsorRecord = await (prisma as any).sponsors.findUnique({ where: { id: body.sponsorId } });
+      }
+      if (!sponsorRecord && couponCode) {
+        const coupon = await (prisma as any).coupons.findFirst({ where: { code: couponCode } });
+        if (coupon && coupon.sponsor_id) {
+          sponsorRecord = await (prisma as any).sponsors.findUnique({ where: { id: coupon.sponsor_id } });
+        }
+      }
+      if (!sponsorRecord && companyName) {
+        sponsorRecord = await (prisma as any).sponsors.findFirst({
+          where: { name: { equals: companyName.trim(), mode: 'insensitive' } },
+        });
+      }
+
+      const effectiveSponsorId = sponsorRecord?.id || body.sponsorId || null;
+      const effectiveSponsorName = sponsorRecord?.name || companyName || null;
+
+      // Create attendance records for each attendee & link sponsor data
       for (const att of attendees) {
         const attName = att.nameTh || att.nameEn || 'Attendee';
         const attEmail = att.email?.trim()?.toLowerCase() || '';
         const attWorkplace = att.workplace || companyName || null;
-        const attMemberNo = att.isMember && att.memberNo ? att.memberNo.trim() : null;
+        const attMemberNo = att.memberNo ? att.memberNo.trim() : null;
+        const attDiscount = Number(att.discountTotal || att.discountAmount || 0);
+        const attNet = Number(att.price || att.netPrice || 0);
+
+        let attendanceId: any = null;
 
         if (attMemberNo) {
-          await prisma.$executeRaw`
+          const attResult = await prisma.$queryRaw<Array<{ attendance_id: any }>>`
             INSERT INTO meeting_attendances (
-              meeting_id, member_no, attendance_status
+              meeting_id, member_no, attendance_status, sponsor_id, sponsor_company_name, coupon_code
             ) VALUES (
-              ${meetingId}, ${attMemberNo}, ${isFreeRegistration ? 'Registered' : 'Pending_Payment'}
+              ${meetingId}, ${attMemberNo}, ${isFreeRegistration ? 'Registered' : 'Pending_Payment'},
+              ${effectiveSponsorId}, ${effectiveSponsorName}, ${couponCode || null}
             ) ON CONFLICT (meeting_id, member_no)
-            DO UPDATE SET attendance_status = ${isFreeRegistration ? 'Registered' : 'Pending_Payment'}
+            DO UPDATE SET 
+              attendance_status = ${isFreeRegistration ? 'Registered' : 'Pending_Payment'},
+              sponsor_id = COALESCE(${effectiveSponsorId}, meeting_attendances.sponsor_id),
+              sponsor_company_name = COALESCE(${effectiveSponsorName}, meeting_attendances.sponsor_company_name),
+              coupon_code = COALESCE(${couponCode || null}, meeting_attendances.coupon_code)
+            RETURNING attendance_id
           `;
+          attendanceId = attResult?.[0]?.attendance_id;
+
+          // Update member record with sponsor company linkage (Rule #10)
+          if (effectiveSponsorId || effectiveSponsorName) {
+            await prisma.$executeRaw`
+              UPDATE members 
+              SET 
+                sponsor_id = COALESCE(${effectiveSponsorId}, sponsor_id),
+                sponsored_by_company = COALESCE(${effectiveSponsorName}, sponsored_by_company)
+              WHERE member_no = ${attMemberNo}
+            `;
+          }
+
+          // Insert into sponsor_group_members table for Company Portal roster tab
+          if (effectiveSponsorId) {
+            try {
+              await prisma.$executeRaw`
+                INSERT INTO sponsor_group_members (
+                  sponsor_id, meeting_id, member_no, attendee_name, attendee_email, attendee_phone,
+                  workplace, ticket_code, attendance_id, coupon_code, discount_amount, net_price,
+                  submitted_by_email, status, created_at, updated_at
+                ) VALUES (
+                  ${effectiveSponsorId}, ${meetingId}, ${attMemberNo}, ${attName}, ${attEmail},
+                  ${att.phone || null}, ${attWorkplace}, ${ticketCode}, ${attendanceId || null},
+                  ${couponCode || null}, ${attDiscount}, ${attNet},
+                  ${groupContact?.coordinatorEmail || attendees[0]?.email || null},
+                  ${isFreeRegistration ? 'confirmed' : 'pending'}, NOW(), NOW()
+                ) ON CONFLICT (meeting_id, member_no)
+                DO UPDATE SET
+                  status = ${isFreeRegistration ? 'confirmed' : 'pending'},
+                  attendance_id = COALESCE(${attendanceId || null}, sponsor_group_members.attendance_id),
+                  updated_at = NOW()
+              `;
+            } catch (sgmErr) {
+              console.error('Failed to link sponsor_group_members:', sgmErr);
+            }
+          }
         } else if (attEmail) {
-          await prisma.$executeRaw`
+          const attResult = await prisma.$queryRaw<Array<{ attendance_id: any }>>`
             INSERT INTO meeting_attendances (
-              meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status
+              meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status,
+              sponsor_id, sponsor_company_name, coupon_code
             ) VALUES (
-              ${meetingId}, NULL, ${attName}, ${attEmail}, ${att.phone || null}, ${attWorkplace}, ${isFreeRegistration ? 'Registered' : 'Non-Member-Pending'}
+              ${meetingId}, NULL, ${attName}, ${attEmail}, ${att.phone || null}, ${attWorkplace},
+              ${isFreeRegistration ? 'Registered' : 'Non-Member-Pending'},
+              ${effectiveSponsorId}, ${effectiveSponsorName}, ${couponCode || null}
             )
+            RETURNING attendance_id
           `;
+          attendanceId = attResult?.[0]?.attendance_id;
+        }
+      }
+
+      // Update sponsor quota if assigned
+      if (effectiveSponsorId) {
+        try {
+          await prisma.$executeRaw`
+            UPDATE sponsor_quotas 
+            SET used_seats = used_seats + ${attendees.length}, updated_at = NOW()
+            WHERE sponsor_id = ${effectiveSponsorId} AND meeting_id = ${meetingId}
+          `;
+        } catch (sqErr) {}
+      }
+
+      // Log coupon usages
+      if (couponCode) {
+        try {
+          const couponRec = await (prisma as any).coupons.findFirst({ where: { code: couponCode } });
+          if (couponRec) {
+            await prisma.$executeRaw`
+              UPDATE coupons 
+              SET used_count = used_count + ${attendees.length}, updated_at = NOW()
+              WHERE id = ${couponRec.id}
+            `;
+            for (const att of attendees) {
+              await prisma.$executeRaw`
+                INSERT INTO coupon_usages (
+                  coupon_id, meeting_id, member_no, attendee_name, attendee_email,
+                  attendee_phone, workplace, discount_applied, final_amount,
+                  ticket_code, slip_id, used_at
+                ) VALUES (
+                  ${couponRec.id}, ${meetingId}, ${att.memberNo || null}, ${att.nameTh || att.nameEn || 'Attendee'},
+                  ${att.email?.trim()?.toLowerCase() || ''}, ${att.phone || null}, ${att.workplace || companyName || null},
+                  ${Number(att.discountTotal || att.discountAmount || 0)}, ${Number(att.netPrice || att.price || 0)},
+                  ${ticketCode}, ${slipId}, NOW()
+                )
+              `;
+            }
+          }
+        } catch (cuErr) {
+          console.error('Failed to log coupon usages for group:', cuErr);
         }
       }
 
@@ -142,7 +255,9 @@ export async function POST(
           status: registrationStatus,
           isGroup: true,
           attendeeCount: attendees.length,
-          message: 'ลงทะเบียนแบบกลุ่มเรียบร้อยแล้ว กรุณารอเจ้าหน้าที่ตรวจสอบสลิป',
+          message: isFreeRegistration
+            ? 'ลงทะเบียนแบบกลุ่มด้วยสิทธิ์สปอนเซอร์สำเร็จเรียบร้อยแล้ว'
+            : 'ลงทะเบียนแบบกลุ่มเรียบร้อยแล้ว กรุณารอเจ้าหน้าที่ตรวจสอบสลิป',
         },
       });
     }

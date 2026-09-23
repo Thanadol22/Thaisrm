@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X,
@@ -10,10 +10,18 @@ import {
   Sparkles,
   DollarSign,
   Users,
+  Check,
   CheckCircle2,
   AlertCircle,
   Loader2,
   HelpCircle,
+  Award,
+  Crown,
+  Medal,
+  CheckSquare,
+  Square,
+  FileCheck2,
+  UserCheck,
 } from 'lucide-react';
 
 interface MeetingOption {
@@ -24,6 +32,14 @@ interface MeetingOption {
   meeting_date?: string;
   date?: string;
   status?: string;
+  activities?: Array<{
+    id?: string;
+    code?: string;
+    name?: string;
+    titleTh?: string;
+    nameTh?: string;
+    price?: number;
+  }>;
 }
 
 export interface CouponItem {
@@ -44,6 +60,7 @@ export interface CouponItem {
     meeting_id: string;
     meeting_name: string;
     meeting_date?: string;
+    activities?: any[];
   };
 }
 
@@ -52,6 +69,8 @@ interface CouponModalProps {
   onClose: () => void;
   couponToEdit?: CouponItem | null;
   meetings: MeetingOption[];
+  sponsors?: { id: string; name: string; tier?: string; total_allocated_quota?: number }[];
+  prefilledCompanyName?: string;
   onSaveSuccess: () => void;
 }
 
@@ -60,6 +79,8 @@ export function CouponModal({
   onClose,
   couponToEdit,
   meetings,
+  sponsors = [],
+  prefilledCompanyName = '',
   onSaveSuccess,
 }: CouponModalProps) {
   const [mounted, setMounted] = useState(false);
@@ -67,6 +88,7 @@ export function CouponModal({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Form states
+  const [selectedSponsorId, setSelectedSponsorId] = useState<string>('custom');
   const [companyName, setCompanyName] = useState('');
   const [code, setCode] = useState('');
   const [meetingId, setMeetingId] = useState('');
@@ -77,30 +99,77 @@ export function CouponModal({
   const [isActive, setIsActive] = useState<boolean>(true);
   const [remarks, setRemarks] = useState('');
 
+  // New fields requested by user:
+  // 1. Purpose (สมัครสมาชิก vs ลงทะเบียนงานประชุม vs ทั้งหมด)
+  const [applicableType, setApplicableType] = useState<'registration' | 'membership' | 'all'>('registration');
+  // 2. Selectable Programs / Activities
+  const [allPrograms, setAllPrograms] = useState<boolean>(true);
+  const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Helper to generate concise, readable coupon code
-  const generateRandomCode = () => {
-    const prefixes = ['TSRM', 'VIP', 'PASS', 'SPON'];
-    const randomPrefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-    let suffix = '';
-    for (let i = 0; i < 4; i++) {
-      suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+  // Sort meetings so that the latest upcoming meeting is first
+  const sortedMeetings = useMemo(() => {
+    return [...meetings].sort((a, b) => {
+      const isUpcomingA = a.status === 'upcoming' || (a.meeting_id && a.meeting_id.includes('34'));
+      const isUpcomingB = b.status === 'upcoming' || (b.meeting_id && b.meeting_id.includes('34'));
+      if (isUpcomingA && !isUpcomingB) return -1;
+      if (!isUpcomingA && isUpcomingB) return 1;
+      return 0;
+    });
+  }, [meetings]);
+
+  // Find currently selected meeting object to get its activities
+  const currentMeeting = useMemo(() => {
+    return meetings.find((m) => (m.meeting_id || m.id) === meetingId) || sortedMeetings[0];
+  }, [meetings, sortedMeetings, meetingId]);
+
+  const availableActivities = useMemo(() => {
+    if (!currentMeeting || !currentMeeting.activities) return [];
+    return currentMeeting.activities.map((act: any, idx: number) => ({
+      id: act.id || act.code || `act-${idx}`,
+      name: act.name || act.titleTh || act.nameTh || `โปรแกรม ${idx + 1}`,
+      price: act.price || 0,
+    }));
+  }, [currentMeeting]);
+
+  // Helper to generate secure, hard-to-guess coupon code
+  const generateCodeFromCompany = (comp: string, mId: string) => {
+    const chars = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+    const words = (comp || '').toUpperCase().replace(/[^A-Z0-9\s]/g, '').split(/\s+/).filter(Boolean);
+    let prefix = '';
+    if (words.length >= 2) {
+      prefix = (words[0].slice(0, 2) + words[1].slice(0, 1)).toUpperCase();
+    } else if (words.length === 1) {
+      prefix = words[0].slice(0, 3).toUpperCase();
+    } else {
+      prefix = 'SPN';
     }
-    const year = new Date().getFullYear().toString().slice(-2);
-    setCode(`${randomPrefix}${year}-${suffix}`);
+
+    let token = '';
+    for (let i = 0; i < 6; i++) {
+      token += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `T34-${prefix}-${token}`;
   };
 
   useEffect(() => {
     if (isOpen) {
       setErrorMsg(null);
+      const defaultMeetingId = sortedMeetings[0]?.meeting_id || sortedMeetings[0]?.id || 'TSRM34';
+
       if (couponToEdit) {
         setCompanyName(couponToEdit.company_name || '');
+        // Check if matches an existing sponsor
+        const matchedSponsor = sponsors.find(
+          (s) => s.name.toLowerCase() === (couponToEdit.company_name || '').toLowerCase()
+        );
+        setSelectedSponsorId(matchedSponsor ? matchedSponsor.id : 'custom');
+
         setCode(couponToEdit.code || '');
-        setMeetingId(couponToEdit.meeting_id || (meetings[0]?.meeting_id || meetings[0]?.id || ''));
+        setMeetingId(couponToEdit.meeting_id || defaultMeetingId);
         setDiscountType((couponToEdit.discount_type as any) || 'free');
         setDiscountValue(couponToEdit.discount_value || 0);
         setMaxUses(couponToEdit.max_uses || 1);
@@ -111,28 +180,120 @@ export function CouponModal({
         );
         setIsActive(couponToEdit.is_active !== undefined ? couponToEdit.is_active : true);
         setRemarks(couponToEdit.remarks || '');
+        setApplicableType((couponToEdit.applicable_type as any) || 'registration');
+
+        // Parse selected programs if stored in remarks
+        try {
+          if (couponToEdit.remarks && couponToEdit.remarks.startsWith('{"programs":')) {
+            const parsed = JSON.parse(couponToEdit.remarks);
+            if (Array.isArray(parsed.programs)) {
+              setAllPrograms(false);
+              setSelectedPrograms(parsed.programs);
+              setRemarks(parsed.note || '');
+            }
+          } else {
+            setAllPrograms(true);
+            setSelectedPrograms([]);
+          }
+        } catch {
+          setAllPrograms(true);
+          setSelectedPrograms([]);
+        }
       } else {
-        setCompanyName('');
-        setMeetingId(meetings[0]?.meeting_id || meetings[0]?.id || '');
+        // Creating new coupon
+        const targetMeetingId = defaultMeetingId;
+        setMeetingId(targetMeetingId);
         setDiscountType('free');
         setDiscountValue(0);
-        setMaxUses(1);
         setExpireDate('');
         setIsActive(true);
         setRemarks('');
-        generateRandomCode();
+        setApplicableType('registration');
+        
+        // Default to Main program
+        const targetM = meetings.find((m) => (m.meeting_id || m.id) === targetMeetingId) || sortedMeetings[0];
+        const acts = targetM?.activities || [];
+        const mainAct = acts.find((a: any) => 
+          (a.id || a.code || '').toLowerCase().includes('main') || 
+          (a.name || a.titleTh || a.nameTh || '').toLowerCase().includes('main') ||
+          (a.name || a.titleTh || a.nameTh || '').includes('หลัก')
+        ) || acts[0];
+        
+        const defaultProgName = mainAct ? (mainAct.name || mainAct.titleTh || mainAct.nameTh || 'การประชุมหลัก (Main Congress)') : 'การประชุมหลัก (Main Congress)';
+        setAllPrograms(false);
+        setSelectedPrograms([defaultProgName]);
+
+        if (prefilledCompanyName) {
+          setCompanyName(prefilledCompanyName);
+          const matched = sponsors.find(
+            (s) => s.name.toLowerCase() === prefilledCompanyName.toLowerCase()
+          );
+          if (matched) {
+            setSelectedSponsorId(matched.id);
+            let quota = 8;
+            if (matched.tier === 'Platinum') quota = 20;
+            else if (matched.tier === 'Silver') quota = 2;
+            setMaxUses(matched.total_allocated_quota || quota);
+          } else {
+            setSelectedSponsorId('custom');
+            setMaxUses(1);
+          }
+          setCode(generateCodeFromCompany(prefilledCompanyName, targetMeetingId));
+        } else if (sponsors.length > 0) {
+          // Default to first sponsor (e.g. LG Chem)
+          const firstSp = sponsors[0];
+          setSelectedSponsorId(firstSp.id);
+          setCompanyName(firstSp.name);
+          let quota = 8;
+          if (firstSp.tier === 'Platinum') quota = 20;
+          else if (firstSp.tier === 'Silver') quota = 2;
+          setMaxUses(firstSp.total_allocated_quota || quota);
+          setCode(generateCodeFromCompany(firstSp.name, targetMeetingId));
+        } else {
+          setSelectedSponsorId('custom');
+          setCompanyName('');
+          setMaxUses(1);
+          setCode(generateCodeFromCompany('TSRM', targetMeetingId));
+        }
       }
     }
-  }, [isOpen, couponToEdit, meetings]);
+  }, [isOpen, couponToEdit, sortedMeetings, sponsors, prefilledCompanyName]);
 
   if (!isOpen || !mounted) return null;
+
+  // Handle Sponsor Dropdown Change
+  const handleSponsorSelectChange = (spId: string) => {
+    setSelectedSponsorId(spId);
+    if (spId === 'custom') {
+      setCompanyName('');
+      setMaxUses(1);
+      setCode(generateCodeFromCompany('CUSTOM', meetingId));
+    } else {
+      const found = sponsors.find((s) => s.id === spId);
+      if (found) {
+        setCompanyName(found.name);
+        let quota = 8;
+        if (found.tier === 'Platinum') quota = 20;
+        else if (found.tier === 'Silver') quota = 2;
+        setMaxUses(found.total_allocated_quota || quota);
+        setCode(generateCodeFromCompany(found.name, meetingId));
+      }
+    }
+  };
+
+  const handleToggleProgram = (progName: string) => {
+    setAllPrograms(false);
+    setSelectedPrograms((prev) =>
+      prev.includes(progName) ? prev.filter((p) => p !== progName) : [...prev, progName]
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
     if (!companyName.trim()) {
-      setErrorMsg('กรุณาระบุชื่อบริษัท / สปอนเซอร์');
+      setErrorMsg('กรุณาระบุหรือเลือกชื่อบริษัท / สปอนเซอร์');
       return;
     }
 
@@ -158,16 +319,26 @@ export function CouponModal({
 
     setSaving(true);
     try {
+      // Package selected programs into remarks if specified
+      let finalRemarks = remarks.trim();
+      if (!allPrograms && selectedPrograms.length > 0) {
+        finalRemarks = JSON.stringify({
+          programs: selectedPrograms,
+          note: remarks.trim() || undefined,
+        });
+      }
+
       const payload = {
         company_name: companyName.trim(),
         code: code.trim().toUpperCase(),
         meeting_id: meetingId,
         discount_type: discountType,
         discount_value: discountType === 'free' ? 0 : Number(discountValue),
+        applicable_type: applicableType,
         max_uses: Number(maxUses),
         expire_date: expireDate ? expireDate : null,
         is_active: isActive,
-        remarks: remarks.trim() || null,
+        remarks: finalRemarks || null,
       };
 
       const url = couponToEdit ? `/api/coupons/${couponToEdit.id}` : '/api/coupons';
@@ -196,22 +367,19 @@ export function CouponModal({
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200/80 w-full max-w-xl overflow-hidden my-auto animate-scale-up max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200/80 w-full max-w-xl overflow-hidden my-auto max-h-[92vh] flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white p-5 sm:p-6 flex items-center justify-between relative overflow-hidden shrink-0">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/20 rounded-full blur-2xl pointer-events-none" />
-          <div className="flex items-center gap-3 min-w-0 relative z-10">
-            <div className="w-11 h-11 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0 backdrop-blur-sm">
+        <div className="bg-gradient-to-r from-[#0026b3] via-[#002094] to-[#001768] text-white p-5 sm:p-6 flex items-center justify-between relative overflow-hidden shrink-0">
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="w-11 h-11 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0 backdrop-blur-sm shadow-sm">
               <Ticket className="w-6 h-6 text-white" />
             </div>
-            <div className="min-w-0">
-              <h3 className="text-lg sm:text-xl font-extrabold text-white tracking-tight truncate">
-                {couponToEdit ? 'แก้ไขข้อมูลคูปองสปอนเซอร์' : 'สร้างคูปองสิทธิ์สปอนเซอร์ใหม่'}
+            <div>
+              <h3 className="text-lg font-black text-white tracking-tight">
+                {couponToEdit ? 'แก้ไขข้อมูลคูปองสิทธิ์สปอนเซอร์' : 'สร้างคูปองโควต้าสิทธิ์สปอนเซอร์'}
               </h3>
-              <p className="text-xs text-blue-200/90 truncate">
-                {couponToEdit
-                  ? `แก้ไขคูปองรหัส: ${couponToEdit.code}`
-                  : 'กำหนดสิทธิ์โควตาและรอบการประชุมสำหรับบริษัทพันธมิตร'}
+              <p className="text-xs text-blue-200/90 mt-0.5">
+                กำหนดรหัสคูปองฟรี / ส่วนลด ผูกกับบริษัทสปอนเซอร์ และโปรแกรมที่เข้าร่วมได้
               </p>
             </div>
           </div>
@@ -225,277 +393,368 @@ export function CouponModal({
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
+        {/* Modal Form */}
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1 bg-white">
           {errorMsg && (
-            <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200/80 text-red-800 text-xs sm:text-sm font-semibold flex items-center gap-2.5 animate-shake">
+            <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-xs font-semibold flex items-center gap-2.5">
               <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          {/* Company Name */}
+          {/* 1. Dropdown Select Sponsor Company */}
           <div className="space-y-1.5">
-            <label className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1.5">
-              <Building2 className="w-4 h-4 text-[#0026b3]" />
-              <span>ชื่อบริษัท / ผู้ให้การสนับสนุน <span className="text-red-500">*</span></span>
+            <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-[#0026b3]" />
+                <span>เลือกบริษัทสปอนเซอร์ (Sponsor Company) <span className="text-red-500">*</span></span>
+              </span>
+              {selectedSponsorId !== 'custom' && (
+                <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+                  เชื่อมกับฐานข้อมูลสปอนเซอร์
+                </span>
+              )}
             </label>
-            <input
-              type="text"
-              required
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              placeholder="เช่น บจก. ดีเคเอสเอช (ประเทศไทย) / บริษัท ไบเออร์ไทย จำกัด"
-              className="w-full px-4 py-2.5 sm:py-3 rounded-xl border border-slate-200 text-slate-800 font-medium text-xs sm:text-sm focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/15 transition outline-none bg-slate-50/50 focus:bg-white"
-            />
+
+            <select
+              value={selectedSponsorId}
+              onChange={(e) => handleSponsorSelectChange(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 font-bold text-xs focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/15 transition outline-none bg-slate-50 focus:bg-white cursor-pointer"
+            >
+              <optgroup label="🏢 รายชื่อบริษัทสปอนเซอร์ในระบบ">
+                {sponsors.map((sp) => (
+                  <option key={sp.id} value={sp.id}>
+                    {sp.name} {sp.tier ? `(💎 ${sp.tier})` : ''} - โควต้า {sp.total_allocated_quota || 0} สิทธิ์
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="✏️ กำหนดเอง">
+                <option value="custom">✍️ ระบุชื่อบริษัท/หน่วยงานอื่นด้วยตนเอง</option>
+              </optgroup>
+            </select>
+
+            {selectedSponsorId === 'custom' && (
+              <input
+                type="text"
+                required
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="พิมพ์ชื่อบริษัท เช่น บจก. ตัวอย่าง (ประเทศไทย)"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:border-[#0026b3] focus:bg-white transition outline-none bg-slate-50 mt-1.5"
+              />
+            )}
           </div>
 
-          {/* Meeting Selection */}
+          {/* 2. Meeting Selection (Defaults to latest upcoming) */}
           <div className="space-y-1.5">
-            <label className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1.5">
+            <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-[#0026b3]" />
-              <span>ผูกกับรอบการประชุม <span className="text-red-500">*</span></span>
+              <span>เลือกรอบการประชุม (ค่าเริ่มต้น: รอบล่าสุด) <span className="text-red-500">*</span></span>
             </label>
             <select
               value={meetingId}
-              onChange={(e) => setMeetingId(e.target.value)}
+              onChange={(e) => {
+                const newMId = e.target.value;
+                setMeetingId(newMId);
+                if (companyName) {
+                  setCode(generateCodeFromCompany(companyName, newMId));
+                }
+              }}
               required
-              className="w-full px-4 py-2.5 sm:py-3 rounded-xl border border-slate-200 text-slate-800 font-bold text-xs sm:text-sm focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/15 transition outline-none bg-white cursor-pointer"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 font-bold text-xs focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/15 transition outline-none bg-white cursor-pointer"
             >
-              {meetings.map((m) => {
+              {sortedMeetings.map((m) => {
                 const mId = m.meeting_id || m.id || '';
                 const mName = m.meeting_name || m.titleTh || mId;
+                const isUpcoming = m.status === 'upcoming' || mId.includes('34');
                 return (
                   <option key={mId} value={mId}>
-                    {mName} ({mId})
+                    {isUpcoming ? '🔥 [รอบล่าสุด] ' : ''}{mName} ({mId})
                   </option>
                 );
               })}
             </select>
           </div>
 
-          {/* Coupon Code Input + Random Generator */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1.5">
-                <Ticket className="w-4 h-4 text-[#0026b3]" />
-                <span>รหัสคูปอง <span className="text-red-500">*</span></span>
+          {/* 3. Purpose: สมัครสมาชิก vs ลงทะเบียนงานประชุม vs ทั้งหมด */}
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+            <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <UserCheck className="w-4 h-4 text-blue-600" />
+              <span>วัตถุประสงค์การใช้สิทธิ์ (Applicable Scope) <span className="text-red-500">*</span></span>
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <label
+                className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+                  applicableType === 'registration'
+                    ? 'bg-blue-50 text-blue-900 border-blue-300 shadow-xs'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="applicableType"
+                  value="registration"
+                  checked={applicableType === 'registration'}
+                  onChange={() => setApplicableType('registration')}
+                  className="accent-[#0026b3]"
+                />
+                <span>🎟️ ลงทะเบียนงานประชุม</span>
               </label>
-              {!couponToEdit && (
+
+              <label
+                className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+                  applicableType === 'membership'
+                    ? 'bg-blue-50 text-blue-900 border-blue-300 shadow-xs'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="applicableType"
+                  value="membership"
+                  checked={applicableType === 'membership'}
+                  onChange={() => setApplicableType('membership')}
+                  className="accent-[#0026b3]"
+                />
+                <span>🪪 สมัคร/ต่ออายุสมาชิก</span>
+              </label>
+
+              <label
+                className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+                  applicableType === 'all'
+                    ? 'bg-blue-50 text-blue-900 border-blue-300 shadow-xs'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="applicableType"
+                  value="all"
+                  checked={applicableType === 'all'}
+                  onChange={() => setApplicableType('all')}
+                  className="accent-[#0026b3]"
+                />
+                <span>🌐 ใช้ได้ทุกประเภท</span>
+              </label>
+            </div>
+            {applicableType === 'membership' && (
+              <p className="text-[11px] text-blue-700 bg-blue-50/80 p-2 rounded-xl border border-blue-100 font-medium">
+                ℹ️ สำหรับการสมัครหรือต่ออายุสมาชิก จะไม่มีการระบุโปรแกรมการประชุม
+              </p>
+            )}
+          </div>
+
+          {/* 4. Selectable Programs / Activities (Hide if membership only) */}
+          {applicableType !== 'membership' && (
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <FileCheck2 className="w-4 h-4 text-purple-600" />
+                  <span>โปรแกรม / กิจกรรมที่ร่วมรายการได้ (เริ่มต้น: การประชุมหลัก Main)</span>
+                </label>
                 <button
                   type="button"
-                  onClick={generateRandomCode}
-                  className="text-xs font-bold text-[#0026b3] hover:text-blue-800 flex items-center gap-1 transition cursor-pointer"
+                  onClick={() => {
+                    const nextAll = !allPrograms;
+                    setAllPrograms(nextAll);
+                    if (nextAll) {
+                      setSelectedPrograms([]);
+                    } else {
+                      const defaultProg = availableActivities[0]?.name || 'การประชุมหลัก (Main Congress)';
+                      setSelectedPrograms([defaultProg]);
+                    }
+                  }}
+                  className={`text-[11px] font-bold px-2 py-0.5 rounded-md transition cursor-pointer ${
+                    allPrograms
+                      ? 'bg-purple-100 text-purple-800 font-black'
+                      : 'bg-slate-200 text-slate-700'
+                  }`}
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>สุ่มรหัสใหม่</span>
+                  {allPrograms ? '✅ ครอบคลุมทุกโปรแกรม (All)' : 'เลือกเฉพาะโปรแกรม'}
                 </button>
-              )}
-            </div>
-            <div className="relative">
-              <input
-                type="text"
-                required
-                disabled={Boolean(couponToEdit)}
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9\-_]/g, ''))}
-                placeholder="เช่น TSRM26-BAYER, VIP-FERRING"
-                className={`w-full px-4 py-2.5 sm:py-3 rounded-xl border font-black text-sm sm:text-base tracking-wider transition outline-none uppercase ${
-                  couponToEdit
-                    ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
-                    : 'border-slate-200 text-[#0026b3] focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/15 bg-blue-50/30 focus:bg-white'
-                }`}
-              />
-            </div>
-            <p className="text-[11px] text-slate-500">
-              รหัสภาษาอังกฤษตัวพิมพ์ใหญ่และตัวเลข ไม่ยาวเกินไปเพื่อให้ผู้เข้าร่วมกรอกได้ง่าย
-            </p>
-          </div>
-
-          {/* Discount Type Selection */}
-          <div className="space-y-2 pt-1">
-            <label className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1.5">
-              <DollarSign className="w-4 h-4 text-[#0026b3]" />
-              <span>รูปแบบสิทธิ์และมูลค่าส่วนลด</span>
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setDiscountType('free');
-                  setDiscountValue(0);
-                }}
-                className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 cursor-pointer ${
-                  discountType === 'free'
-                    ? 'bg-emerald-50 border-emerald-500 text-emerald-900 shadow-2xs ring-2 ring-emerald-500/20 font-black'
-                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300 font-medium'
-                }`}
-              >
-                <span className="text-xs sm:text-sm">ฟรี 100%</span>
-                <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100/80 px-2 py-0.5 rounded-full">
-                  Free Pass
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setDiscountType('fixed')}
-                className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 cursor-pointer ${
-                  discountType === 'fixed'
-                    ? 'bg-blue-50 border-[#0026b3] text-[#0026b3] shadow-2xs ring-2 ring-[#0026b3]/20 font-black'
-                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300 font-medium'
-                }`}
-              >
-                <span className="text-xs sm:text-sm">ลดตามจำนวนเงิน</span>
-                <span className="text-[10px] text-blue-700 font-bold bg-blue-100/80 px-2 py-0.5 rounded-full">
-                  ระบุเป็นบาท
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setDiscountType('percent')}
-                className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 cursor-pointer ${
-                  discountType === 'percent'
-                    ? 'bg-purple-50 border-purple-600 text-purple-900 shadow-2xs ring-2 ring-purple-600/20 font-black'
-                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300 font-medium'
-                }`}
-              >
-                <span className="text-xs sm:text-sm">ลดเป็นเปอร์เซ็นต์</span>
-                <span className="text-[10px] text-purple-700 font-bold bg-purple-100/80 px-2 py-0.5 rounded-full">
-                  ระบุเป็น %
-                </span>
-              </button>
-            </div>
-          </div>
-
-          {/* Discount Value input (Only if not full free) */}
-          {discountType !== 'free' && (
-            <div className="space-y-1.5 p-3.5 rounded-2xl bg-blue-50/50 border border-blue-100 animate-fade-in">
-              <label className="text-xs sm:text-sm font-bold text-slate-700 block">
-                {discountType === 'fixed' ? 'มูลค่าส่วนลด (บาท)' : 'เปอร์เซ็นต์ส่วนลด (%)'}
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  min="1"
-                  max={discountType === 'percent' ? 100 : 999999}
-                  required
-                  value={discountValue || ''}
-                  onChange={(e) => setDiscountValue(Number(e.target.value))}
-                  placeholder={discountType === 'fixed' ? 'เช่น 1000' : 'เช่น 20, 50'}
-                  className="w-full px-4 py-2.5 rounded-xl border border-blue-200 text-slate-900 font-black text-base focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/15 outline-none bg-white"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-extrabold text-slate-500">
-                  {discountType === 'fixed' ? 'THB' : '%'}
-                </span>
               </div>
+
+              {allPrograms ? (
+                <p className="text-[11px] text-slate-500 font-medium">
+                  * คูปองนี้สามารถใช้ได้กับทุกประเภทบัตรและทุกกิจกรรมของการประชุมนี้
+                </p>
+              ) : availableActivities.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  {availableActivities.map((act) => {
+                    const isChecked = selectedPrograms.includes(act.name);
+                    return (
+                      <button
+                        key={act.id}
+                        type="button"
+                        onClick={() => handleToggleProgram(act.name)}
+                        className={`p-2 rounded-xl border text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                          isChecked
+                            ? 'bg-purple-50 text-purple-900 border-purple-300'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {isChecked ? (
+                          <CheckSquare className="w-4 h-4 text-purple-700 shrink-0" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-400 shrink-0" />
+                        )}
+                        <span className="truncate text-left">{act.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="space-y-1.5 pt-1">
+                  {['การประชุมหลัก (Main Congress)', 'Pre-Congress Workshop', 'Dinner Symposium'].map((prog) => {
+                    const isChecked = selectedPrograms.includes(prog);
+                    return (
+                      <button
+                        key={prog}
+                        type="button"
+                        onClick={() => handleToggleProgram(prog)}
+                        className={`w-full p-2 rounded-xl border text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                          isChecked
+                            ? 'bg-purple-50 text-purple-900 border-purple-300'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {isChecked ? (
+                          <CheckSquare className="w-4 h-4 text-purple-700 shrink-0" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-400 shrink-0" />
+                        )}
+                        <span>{prog}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
-          {/* Quota & Expire Date Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            {/* Max Uses / Quota */}
-            <div className="space-y-1.5">
-              <label className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-[#0026b3]" />
-                <span>จำนวนสิทธิ์ที่ใช้ได้ <span className="text-red-500">*</span></span>
+          {/* 5. Coupon Code & Generator */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <Ticket className="w-4 h-4 text-[#0026b3]" />
+                <span>รหัสคูปอง (Coupon Code) <span className="text-red-500">*</span></span>
               </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  min={couponToEdit ? couponToEdit.used_count || 1 : 1}
-                  max="10000"
-                  required
-                  value={maxUses}
-                  onChange={(e) => setMaxUses(Math.max(1, Number(e.target.value)))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 font-black text-sm focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/15 outline-none bg-white"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">
-                  สิทธิ์ / คน
-                </span>
-              </div>
-              {couponToEdit && (
-                <p className="text-[11px] text-slate-500">
-                  ใช้ไปแล้ว: <strong className="text-[#0026b3]">{couponToEdit.used_count}</strong> สิทธิ์
-                </p>
-              )}
+              <button
+                type="button"
+                onClick={() => setCode(generateCodeFromCompany(companyName || 'TSRM', meetingId))}
+                className="text-xs font-bold text-[#0026b3] hover:text-blue-800 flex items-center gap-1 transition cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>สุ่มรหัสตามชื่อบริษัท</span>
+              </button>
             </div>
-
-            {/* Expiration Date */}
-            <div className="space-y-1.5">
-              <label className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-[#0026b3]" />
-                <span>วันหมดอายุ (ถ้ามี)</span>
-              </label>
-              <input
-                type="date"
-                value={expireDate}
-                onChange={(e) => setExpireDate(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-800 font-bold text-xs sm:text-sm focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/15 outline-none bg-white cursor-pointer"
-              />
-            </div>
-          </div>
-
-          {/* Active Status & Remarks */}
-          <div className="space-y-1.5 pt-1">
-            <label className="text-xs sm:text-sm font-bold text-slate-700 block">
-              หมายเหตุ / บันทึกช่วยจำ
-            </label>
             <input
               type="text"
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-              placeholder="เช่น บูธ Diamond Package 5 สิทธิ์, ติดต่อ คุณสมศรี 081-xxx-xxxx"
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-800 text-xs sm:text-sm focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/15 outline-none bg-slate-50/50 focus:bg-white"
+              required
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder="เช่น LGCHEM-TSRM34, MERCK-2026"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 font-mono font-black text-sm tracking-wider focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/15 transition outline-none bg-slate-50 focus:bg-white uppercase"
             />
           </div>
 
-          {/* Toggle Active Status */}
-          <div className="pt-2">
-            <label className="flex items-center gap-3 p-3 rounded-2xl border border-slate-200 bg-slate-50/60 cursor-pointer hover:bg-slate-50 transition">
+          {/* 6. Discount Type & Max Uses */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                ประเภทสิทธิ์ส่วนลด <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={discountType}
+                onChange={(e) => setDiscountType(e.target.value as any)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 font-bold text-xs focus:border-[#0026b3] focus:outline-none bg-white cursor-pointer"
+              >
+                <option value="free">🎁 ฟรี 100% (โควต้าสปอนเซอร์ฟรี)</option>
+                <option value="fixed">💵 ลดระบุจำนวนเงิน (บาท)</option>
+                <option value="percent">📊 ลดเป็นเปอร์เซ็นต์ (%)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                จำนวนสิทธิ์ใช้งาน (ที่นั่ง/สิทธิ์) <span className="text-red-500">*</span>
+              </label>
               <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-                className="w-4 h-4 text-[#0026b3] rounded border-slate-300 focus:ring-[#0026b3] cursor-pointer"
+                type="number"
+                min="1"
+                required
+                value={maxUses}
+                onChange={(e) => setMaxUses(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 font-bold text-xs focus:border-[#0026b3] focus:outline-none bg-white"
               />
-              <div className="min-w-0 flex-1">
-                <span className="text-xs sm:text-sm font-bold text-slate-900 block leading-tight">
-                  เปิดใช้งานคูปองนี้ทันที
-                </span>
-                <span className="text-[11px] text-slate-500 block mt-0.5">
-                  หากปิดใช้งาน ผู้เข้าร่วมจะไม่สามารถใช้รหัสนี้ในการลงทะเบียนได้
-                </span>
-              </div>
-            </label>
+            </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+          {discountType !== 'free' && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                {discountType === 'percent' ? 'ส่วนลด (เปอร์เซ็นต์ %)' : 'ส่วนลด (บาท ฿)'}{' '}
+                <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                max={discountType === 'percent' ? 100 : 999999}
+                required
+                value={discountValue}
+                onChange={(e) => setDiscountValue(Number(e.target.value))}
+                placeholder={discountType === 'percent' ? 'เช่น 50 (ลด 50%)' : 'เช่น 1500 (ลด 1,500 บาท)'}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 font-bold text-xs focus:border-[#0026b3] focus:outline-none bg-white"
+              />
+            </div>
+          )}
+
+          {/* 7. Active Status & Remarks (Expiry date omitted as requested) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                สถานะการใช้งาน
+              </label>
+              <select
+                value={isActive ? 'true' : 'false'}
+                onChange={(e) => setIsActive(e.target.value === 'true')}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs font-bold focus:border-[#0026b3] focus:outline-none bg-white cursor-pointer"
+              >
+                <option value="true">✅ เปิดใช้งาน (Active)</option>
+                <option value="false">🚫 ปิดใช้งานชั่วคราว (Inactive)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                หมายเหตุเพิ่มเติม (Optional)
+              </label>
+              <input
+                type="text"
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="เช่น สำหรับตัวแทนฝ่ายขาย / โควต้าสิทธิ์"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:border-[#0026b3] focus:outline-none bg-white"
+              />
+            </div>
+          </div>
+
+          {/* Submit Actions */}
+          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 sm:px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs sm:text-sm hover:bg-slate-100 transition cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold cursor-pointer transition-colors"
             >
               ยกเลิก
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2.5 rounded-xl bg-[#0026b3] hover:bg-[#001f94] text-white font-extrabold text-xs sm:text-sm shadow-md transition flex items-center gap-2 cursor-pointer disabled:opacity-60"
+              className="px-6 py-2.5 rounded-xl bg-[#0026b3] hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-900/20 transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
             >
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>กำลังบันทึก...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
-                  <span>{couponToEdit ? 'บันทึกการแก้ไข' : 'ยืนยันสร้างคูปอง'}</span>
-                </>
-              )}
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              <span>{saving ? 'กำลังบันทึก...' : couponToEdit ? 'บันทึกการแก้ไข' : 'สร้างรหัสคูปอง'}</span>
             </button>
           </div>
         </form>
