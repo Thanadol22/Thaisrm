@@ -20,10 +20,11 @@ import {
   Users,
   Settings,
   Mail,
-  Ticket
+  Ticket,
+  Building2
 } from 'lucide-react';
 
-export type AdminTab = 'dashboard' | 'revenue-report' | 'members' | 'add-meeting' | 'meeting-history' | 'coupons' | 'verify-slip' | 'verify-attendees' | 'receipts' | 'emails' | 'settings';
+export type AdminTab = 'dashboard' | 'revenue-report' | 'members' | 'add-meeting' | 'meeting-history' | 'sponsors' | 'coupons' | 'verify-slip' | 'verify-attendees' | 'receipts' | 'emails' | 'settings';
 
 interface AdminNavbarProps {
   activeTab: AdminTab;
@@ -49,6 +50,12 @@ const navItems: {
       labelTh: 'ภาพรวมแดชบอร์ด',
       labelEn: 'Overview Dashboard',
       icon: LayoutDashboard,
+    },
+    {
+      id: 'sponsors',
+      labelTh: 'บริษัทสปอนเซอร์',
+      labelEn: 'Corporate Sponsors',
+      icon: Building2,
     },
     {
       id: 'members',

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   User,
   Users,
@@ -8,6 +9,7 @@ import {
   Phone,
   Calendar,
   Building,
+  Building2,
   Award,
   GraduationCap,
   QrCode,
@@ -35,6 +37,7 @@ import {
 } from 'lucide-react';
 import { PositionSelect } from '@/components/PositionSelect';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
+import { SponsorAuthModal, SponsorSessionData } from '@/components/SponsorAuthModal';
 import { useLanguage } from '@/context/LanguageContext';
 import { uploadImageToStorage } from '@/lib/blobUpload';
 import { CreateMemberInput } from '@/types/member';
@@ -111,12 +114,15 @@ export function SignupView({
   initialUserData,
   isEmbedded = false
 }: SignupViewProps) {
+  const router = useRouter();
   const [consentChecked, setConsentChecked] = useState(false);
   const { lang, toggleLang, t } = useLanguage();
 
   // Mode: Individual vs Group / Corporate
   const [regMode, setRegMode] = useState<'individual' | 'group'>('individual');
   const [activeApplicantIdx, setActiveApplicantIdx] = useState(0);
+  const [sponsorAuthModalOpen, setSponsorAuthModalOpen] = useState(false);
+  const [sponsorSession, setSponsorSession] = useState<SponsorSessionData | null>(null);
 
   // Fast person switch animation state
   const [isSwitchingPerson, setIsSwitchingPerson] = useState(false);
@@ -483,14 +489,27 @@ export function SignupView({
 
             <button
               type="button"
-              onClick={() => setRegMode('group')}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${regMode === 'group'
-                ? 'bg-[#0026b3] text-white shadow-sm'
-                : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-                }`}
+              onClick={() => {
+                if (!sponsorSession) {
+                  setSponsorAuthModalOpen(true);
+                } else {
+                  setRegMode('group');
+                }
+              }}
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                regMode === 'group'
+                  ? 'bg-[#0026b3] text-white shadow-sm'
+                  : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+              }`}
             >
-              <Users className="w-4 h-4 text-[#4ade80]" />
-              <span>{lang === 'th' ? 'สมัครแบบกลุ่มสำหรับบริษัท' : 'Corporate / Group'}</span>
+              <Building2 className="w-4 h-4 text-blue-600" />
+              <span>
+                {sponsorSession
+                  ? `${sponsorSession.sponsorName} (${sponsorSession.tier})`
+                  : lang === 'th'
+                  ? 'สมัครแบบกลุ่มสำหรับบริษัท (OTP)'
+                  : 'Corporate Sponsor (OTP)'}
+              </span>
             </button>
           </div>
 
@@ -1146,6 +1165,16 @@ export function SignupView({
           </div>
         )}
       </div>
+
+      {/* Corporate Sponsor Auth Modal */}
+      <SponsorAuthModal
+        isOpen={sponsorAuthModalOpen}
+        onClose={() => setSponsorAuthModalOpen(false)}
+        onSuccess={(sessionData) => {
+          setSponsorSession(sessionData);
+          setRegMode('group');
+        }}
+      />
     </div>
   );
 }

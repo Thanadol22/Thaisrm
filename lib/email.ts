@@ -22,6 +22,10 @@ import {
   renderCustomBroadcastEmail,
   CustomBroadcastEmailOptions,
 } from './emailTemplates/customTemplate';
+import {
+  renderSponsorOtpEmail,
+  SponsorOtpEmailOptions,
+} from './emailTemplates/sponsorOtpTemplate';
 
 export interface SmtpConfig {
   host?: string;
@@ -405,3 +409,23 @@ export async function testSmtpConnection(config?: SmtpConfig): Promise<{ success
     };
   }
 }
+
+/**
+ * Send OTP Email to Corporate Sponsor Representative
+ */
+export async function sendSponsorOtpEmail(
+  to: string,
+  options: SponsorOtpEmailOptions,
+  customConfig?: SmtpConfig
+) {
+  const subject = `[TSRM] รหัสชั่วคราว (OTP) สำหรับเข้าสู่ระบบลงทะเบียนบริษัท: ${options.otpCode}`;
+  const html = renderSponsorOtpEmail(options);
+
+  return dispatchEmail({
+    to,
+    subject,
+    html,
+    customConfig,
+  });
+}
+

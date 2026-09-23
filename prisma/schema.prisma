@@ -38,34 +38,45 @@ model Member {
   special_expire_date  DateTime?             @db.Date
   qr_code_data         Json?
   qr_code_image_url    String?                  @db.VarChar(500)
+  sponsor_id           String?                  @db.VarChar(50)
+  sponsored_by_company String?                  @db.VarChar(255)
+  sponsor              sponsors?                @relation(fields: [sponsor_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   meeting_attendances  meeting_attendances[]
   member_educations    member_educations[]
   payment_slips        payment_slips[]
   daily_checkins       meeting_daily_checkins[]
   coupon_usages        coupon_usages[]
+  sponsor_group_members sponsor_group_members[]
 
   @@index([email], map: "idx_members_email")
   @@index([fullNameTh], map: "idx_members_name_th")
+  @@index([sponsor_id], map: "idx_members_sponsor_id")
   @@map("members")
 }
 
 model meeting_attendances {
-  attendance_id       BigInt                   @id @default(autoincrement())
-  meeting_id          String                   @db.VarChar(50)
-  member_no           String?                  @db.VarChar(20)
-  attendee_name       String?                  @db.VarChar(255)
-  attendee_email      String?                  @db.VarChar(255)
-  attendee_phone      String?                  @db.VarChar(50)
-  workplace           String?                  @db.VarChar(255)
-  attendance_status   String                   @default("Registered") @db.VarChar(50)
-  checkin_time        DateTime?                @db.Timestamptz(6)
-  meetings            meetings                 @relation(fields: [meeting_id], references: [meeting_id], onUpdate: NoAction)
-  members             Member?                  @relation(fields: [member_no], references: [member_no], onDelete: Cascade, onUpdate: NoAction)
-  daily_checkins      meeting_daily_checkins[]
+  attendance_id         BigInt                   @id @default(autoincrement())
+  meeting_id            String                   @db.VarChar(50)
+  member_no             String?                  @db.VarChar(20)
+  attendee_name         String?                  @db.VarChar(255)
+  attendee_email        String?                  @db.VarChar(255)
+  attendee_phone        String?                  @db.VarChar(50)
+  workplace             String?                  @db.VarChar(255)
+  attendance_status     String                   @default("Registered") @db.VarChar(50)
+  checkin_time          DateTime?                @db.Timestamptz(6)
+  sponsor_id            String?                  @db.VarChar(50)
+  sponsor_company_name  String?                  @db.VarChar(255)
+  coupon_code           String?                  @db.VarChar(50)
+  meetings              meetings                 @relation(fields: [meeting_id], references: [meeting_id], onUpdate: NoAction)
+  members               Member?                  @relation(fields: [member_no], references: [member_no], onDelete: Cascade, onUpdate: NoAction)
+  sponsor               sponsors?                @relation(fields: [sponsor_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  daily_checkins        meeting_daily_checkins[]
+  sponsor_group_members sponsor_group_members[]
 
   @@unique([meeting_id, member_no], map: "uq_member_meeting")
   @@index([meeting_id], map: "idx_attendance_meeting")
   @@index([member_no], map: "idx_attendance_member")
+  @@index([sponsor_id], map: "idx_attendance_sponsor")
 }
 
 model meetings {
@@ -93,6 +104,8 @@ model meetings {
   daily_checkins       meeting_daily_checkins[]
   coupons              coupons[]
   coupon_usages        coupon_usages[]
+  sponsor_quotas       sponsor_quotas[]
+  sponsor_group_members sponsor_group_members[]
 }
 
 model meeting_daily_checkins {
@@ -260,5 +273,91 @@ model coupon_usages {
   @@index([meeting_id], map: "idx_coupon_usages_meeting")
   @@index([member_no], map: "idx_coupon_usages_member")
 }
+
+model sponsors {
+  id            String                  @id @default(uuid()) @db.VarChar(50)
+  name          String                  @db.VarChar(255)
+  tier          String                  @default("Silver") @db.VarChar(50)
+  contact_name  String?                 @db.VarChar(255)
+  contact_email String                  @db.VarChar(255)
+  is_active     Boolean                 @default(true)
+  created_at    DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime                @default(now()) @updatedAt @db.Timestamptz(6)
+
+  quotas        sponsor_quotas[]
+  group_members sponsor_group_members[]
+  attendances   meeting_attendances[]
+  members       Member[]
+
+  @@index([name], map: "idx_sponsors_name")
+  @@index([tier], map: "idx_sponsors_tier")
+  @@index([contact_email], map: "idx_sponsors_contact_email")
+  @@map("sponsors")
+}
+
+model sponsor_otp_codes {
+  id         String   @id @default(uuid()) @db.VarChar(50)
+  email      String   @db.VarChar(255)
+  otp_code   String   @db.VarChar(10)
+  expires_at DateTime @db.Timestamptz(6)
+  is_used    Boolean  @default(false)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([email, otp_code], map: "idx_sponsor_otp_verify")
+  @@index([expires_at], map: "idx_sponsor_otp_expires")
+  @@map("sponsor_otp_codes")
+}
+
+model sponsor_quotas {
+  id           String    @id @default(uuid()) @db.VarChar(50)
+  sponsor_id   String    @db.VarChar(50)
+  meeting_id   String    @db.VarChar(50)
+  quota_seats  Int       @default(0)
+  used_seats   Int       @default(0)
+  members_only Boolean   @default(true)
+  expire_date  DateTime? @db.Date
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+
+  sponsor      sponsors  @relation(fields: [sponsor_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  meeting      meetings  @relation(fields: [meeting_id], references: [meeting_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([sponsor_id, meeting_id], map: "uq_sponsor_meeting_quota")
+  @@index([sponsor_id], map: "idx_sponsor_quotas_sponsor")
+  @@index([meeting_id], map: "idx_sponsor_quotas_meeting")
+  @@map("sponsor_quotas")
+}
+
+model sponsor_group_members {
+  id                 BigInt               @id @default(autoincrement())
+  sponsor_id         String               @db.VarChar(50)
+  meeting_id         String               @db.VarChar(50)
+  member_no          String               @db.VarChar(20)
+  attendee_name      String               @db.VarChar(255)
+  attendee_email     String               @db.VarChar(255)
+  attendee_phone     String?              @db.VarChar(50)
+  workplace          String?              @db.VarChar(255)
+  ticket_code        String?              @db.VarChar(50)
+  attendance_id      BigInt?
+  coupon_code        String?              @db.VarChar(50)
+  discount_amount    Int                  @default(0)
+  net_price          Int                  @default(0)
+  submitted_by_email String?              @db.VarChar(255)
+  status             String               @default("confirmed") @db.VarChar(50)
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime             @default(now()) @updatedAt @db.Timestamptz(6)
+
+  sponsor            sponsors             @relation(fields: [sponsor_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  meeting            meetings             @relation(fields: [meeting_id], references: [meeting_id], onDelete: Cascade, onUpdate: NoAction)
+  member             Member               @relation(fields: [member_no], references: [member_no], onDelete: Cascade, onUpdate: NoAction)
+  attendance         meeting_attendances? @relation(fields: [attendance_id], references: [attendance_id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@unique([meeting_id, member_no], map: "uq_sponsor_group_meeting_member")
+  @@index([sponsor_id], map: "idx_sponsor_group_members_sponsor")
+  @@index([meeting_id], map: "idx_sponsor_group_members_meeting")
+  @@index([member_no], map: "idx_sponsor_group_members_member")
+  @@map("sponsor_group_members")
+}
+
 
 

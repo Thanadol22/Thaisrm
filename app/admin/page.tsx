@@ -78,6 +78,7 @@ import { AdminLoginView } from '@/components/views/AdminLoginView';
 import { AdminCouponsPanel } from '@/components/AdminCouponsPanel';
 import { AdminSettingsPanel } from '@/components/AdminSettingsPanel';
 import { AdminEmailCenterPanel } from '@/components/AdminEmailCenterPanel';
+import AdminSponsorsPanel from '@/components/AdminSponsorsPanel';
 import { PaginationControls } from '@/components/PaginationControls';
 import { TsrmLogo } from '@/components/TsrmLogo';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
@@ -6455,6 +6456,8 @@ export default function AdminPage() {
             onUpdatePaymentStatus={handleUpdatePaymentStatus}
           />
         );
+      case 'sponsors':
+        return <AdminSponsorsPanel />;
       case 'coupons':
         return (
           <AdminCouponsPanel

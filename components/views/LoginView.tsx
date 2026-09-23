@@ -39,6 +39,7 @@ import { ParticipantSearchModal } from '@/components/ParticipantSearchModal';
 import { ExpiredMemberModal } from '@/components/ExpiredMemberModal';
 import { ChangeFormatModal } from '@/components/ChangeFormatModal';
 import { SignupView } from '@/components/views/SignupView';
+import { SponsorAuthModal, SponsorSessionData } from '@/components/SponsorAuthModal';
 import { PositionSelect } from '@/components/PositionSelect';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
 import { useLanguage } from '@/context/LanguageContext';
@@ -414,6 +415,42 @@ export function LoginView({
 
   // Change Format Modal state
   const [isChangeFormatOpen, setIsChangeFormatOpen] = useState(false);
+
+  // Corporate Sponsor Auth Modal state & Inactivity Tracker (5 Mins)
+  const [sponsorAuthModalOpen, setSponsorAuthModalOpen] = useState(false);
+  const [sponsorSession, setSponsorSession] = useState<SponsorSessionData | null>(null);
+  const [sponsorSecondsRemaining, setSponsorSecondsRemaining] = useState<number>(300);
+  const lastSponsorActivityRef = useRef<number>(Date.now());
+
+  // Inactivity tracking when sponsor session is active
+  useEffect(() => {
+    if (!sponsorSession) return;
+
+    const resetActivity = () => {
+      lastSponsorActivityRef.current = Date.now();
+      setSponsorSecondsRemaining(300);
+    };
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
+    events.forEach((evt) => window.addEventListener(evt, resetActivity));
+
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - lastSponsorActivityRef.current) / 1000);
+      const remaining = Math.max(0, 300 - elapsed);
+      setSponsorSecondsRemaining(remaining);
+
+      if (remaining <= 0) {
+        setSponsorSession(null);
+        setRegMode('individual');
+        alert('เซสชันของบริษัทหมดอายุเนื่องจากไม่มีการเคลื่อนไหวนานเกิน 5 นาที กรุณาขอรหัสชั่วคราวใหม่อีกครั้ง');
+      }
+    }, 1000);
+
+    return () => {
+      events.forEach((evt) => window.removeEventListener(evt, resetActivity));
+      clearInterval(interval);
+    };
+  }, [sponsorSession]);
 
   // Submit conference registration (Individual or Group)
   const handleSubmitRegistration = async (e: React.FormEvent) => {
@@ -926,19 +963,37 @@ export function LoginView({
 
                       <button
                         type="button"
-                        onClick={() => setRegMode('group')}
-                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${regMode === 'group'
-                          ? 'bg-[#0026b3] text-white shadow-sm'
-                          : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-                          }`}
+                        onClick={() => {
+                          if (!sponsorSession) {
+                            setSponsorAuthModalOpen(true);
+                          } else {
+                            setRegMode('group');
+                          }
+                        }}
+                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                          regMode === 'group'
+                            ? 'bg-[#0026b3] text-white shadow-sm'
+                            : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+                        }`}
                       >
-                        <Users className="w-4 h-4 text-[#4ade80]" />
-                        <span>{lang === 'th' ? 'ลงทะเบียนแบบกลุ่มสำหรับบริษัท' : 'Corporate / Group'}</span>
+                        <Building2 className="w-4 h-4 text-blue-600" />
+                        <span>
+                          {sponsorSession
+                            ? `${sponsorSession.sponsorName} (${sponsorSession.tier})`
+                            : lang === 'th'
+                            ? 'ลงทะเบียนแบบกลุ่มสำหรับบริษัท (OTP)'
+                            : 'Corporate Sponsor (OTP)'}
+                        </span>
                       </button>
                     </div>
 
                     {regMode === 'group' && (
                       <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                        {sponsorSession && (
+                          <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg flex items-center gap-1">
+                            ⏱️ {Math.floor(sponsorSecondsRemaining / 60)}:{(sponsorSecondsRemaining % 60).toString().padStart(2, '0')}
+                          </span>
+                        )}
                         <button
                           type="button"
                           onClick={handleCopyWorkplaceToAll}
@@ -951,6 +1006,35 @@ export function LoginView({
                       </div>
                     )}
                   </div>
+
+                  {/* Corporate Sponsor Active Banner */}
+                  {regMode === 'group' && sponsorSession && (
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between gap-3 animate-fade-in">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                          🏢
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-800">
+                            เข้าสู่ระบบในนาม: <span className="text-blue-700">{sponsorSession.sponsorName}</span> ({sponsorSession.tier} Sponsor)
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            ผู้ประสานงาน: {sponsorSession.contactEmail} (โควต้าคูปองฟรี)
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSponsorSession(null);
+                          setRegMode('individual');
+                        }}
+                        className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold px-2.5 py-1 bg-white hover:bg-rose-50 rounded-lg border border-rose-200 transition-colors"
+                      >
+                        ออกจากระบบบริษัท
+                      </button>
+                    </div>
+                  )}
 
                   {/* Multi-Attendee Pagination Header Tabs (When in Group Mode) */}
                   {regMode === 'group' && (
@@ -1406,6 +1490,16 @@ export function LoginView({
         meetingId={activeMeeting?.meeting_id}
         meetingName={activeMeeting?.meeting_name}
         defaultMemberNo={currentAttendee?.memberNo || ''}
+      />
+
+      {/* Corporate Sponsor Auth Modal */}
+      <SponsorAuthModal
+        isOpen={sponsorAuthModalOpen}
+        onClose={() => setSponsorAuthModalOpen(false)}
+        onSuccess={(sessionData) => {
+          setSponsorSession(sessionData);
+          setRegMode('group');
+        }}
       />
     </div>
   );
