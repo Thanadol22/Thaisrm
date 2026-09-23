@@ -77,6 +77,8 @@ export function toMemberDto(member: any): Member {
     membership_type: member.membership_type ?? 'Regular',
     expire_date: member.expire_date ? new Date(member.expire_date).toISOString().split('T')[0] : null,
     photo_path: member.photo_url ?? null,
+    degree_cert_doc: member.degree_cert_doc ?? null,
+    work_cert_doc: member.work_cert_doc ?? null,
     qr_code_path: member.qr_code_image_url ?? null,
     created_at: member.applied_at ? new Date(member.applied_at).toISOString() : new Date().toISOString(),
     updated_at: member.applied_at ? new Date(member.applied_at).toISOString() : new Date().toISOString(),
@@ -259,8 +261,8 @@ export async function createMember(rawInput: CreateMemberInput): Promise<Member>
       referees: null,
       photo_url: input.photo_path || null,
       id_card_doc: null,
-      degree_cert_doc: null,
-      work_cert_doc: null,
+      degree_cert_doc: input.degree_cert_doc || null,
+      work_cert_doc: input.work_cert_doc || null,
       membership_status: input.membership_status || 'Active',
       membership_type: input.membership_type || 'Regular',
       applied_at: new Date(),
@@ -568,6 +570,8 @@ export async function updateMember(id: string | number | bigint, rawInput: Updat
     if (input.membership_status !== undefined) updateData.membership_status = input.membership_status;
     if (input.scientist_reg_no !== undefined) updateData.scientist_license_no = input.scientist_reg_no;
     if (input.photo_path !== undefined) updateData.photo_url = input.photo_path;
+    if (input.degree_cert_doc !== undefined) updateData.degree_cert_doc = input.degree_cert_doc;
+    if (input.work_cert_doc !== undefined) updateData.work_cert_doc = input.work_cert_doc;
 
     return await tx.member.update({
       where: { member_no },

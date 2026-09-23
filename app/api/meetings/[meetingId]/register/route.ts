@@ -10,6 +10,10 @@ export async function POST(
     const body = await request.json();
 
     const {
+      isGroup,
+      companyName,
+      groupContact,
+      attendees,
       isMember,
       memberNo,
       guestName,
@@ -54,6 +58,93 @@ export async function POST(
         { success: false, error: 'Meeting not found' },
         { status: 404 }
       );
+    }
+
+    // Handle Corporate / Group Registration
+    if (isGroup) {
+      if (!Array.isArray(attendees) || attendees.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'กรุณาระบุรายชื่อผู้ลงทะเบียนอย่างน้อย 1 ท่าน' },
+          { status: 400 }
+        );
+      }
+
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      const ticketCode = `GRP-${new Date().getFullYear()}-${randomSuffix}`;
+      const slipId = `SLIP-GRP-${Date.now().toString(36).toUpperCase()}`;
+      const registrationStatus = isFreeRegistration ? 'approved' : 'pending';
+
+      const groupPayload = {
+        isGroup: true,
+        companyName: companyName || 'Corporate Group',
+        groupContact: groupContact || null,
+        attendees: attendees,
+        submittedAt: new Date().toISOString(),
+      };
+
+      // Create single group payment slip
+      const slip = await (prisma as any).payment_slips.create({
+        data: {
+          slip_id: slipId,
+          meeting_id: meetingId,
+          member_no: null,
+          guest_name: `${companyName || 'Corporate Group'} (${attendees.length} ท่าน)`,
+          guest_email: groupContact?.coordinatorEmail || attendees[0]?.email || null,
+          guest_phone: groupContact?.coordinatorPhone || null,
+          guest_workplace: companyName || null,
+          is_member: false,
+          ticket_code: ticketCode,
+          amount: numericAmount,
+          bank: bank || 'Kasikorn (KBANK)',
+          transfer_date: transferDate || null,
+          transfer_time: transferTime || null,
+          ref_no: refNo || null,
+          slip_url: slipUrl || 'GROUP_REGISTRATION',
+          status: registrationStatus,
+          selected_activities: groupPayload as any,
+          reviewed_by: isFreeRegistration ? 'SYSTEM:AUTO' : null,
+          reviewed_at: isFreeRegistration ? new Date() : null,
+        },
+      });
+
+      // Create attendance records for each attendee
+      for (const att of attendees) {
+        const attName = att.nameTh || att.nameEn || 'Attendee';
+        const attEmail = att.email?.trim()?.toLowerCase() || '';
+        const attWorkplace = att.workplace || companyName || null;
+        const attMemberNo = att.isMember && att.memberNo ? att.memberNo.trim() : null;
+
+        if (attMemberNo) {
+          await prisma.$executeRaw`
+            INSERT INTO meeting_attendances (
+              meeting_id, member_no, attendance_status
+            ) VALUES (
+              ${meetingId}, ${attMemberNo}, ${isFreeRegistration ? 'Registered' : 'Pending_Payment'}
+            ) ON CONFLICT (meeting_id, member_no)
+            DO UPDATE SET attendance_status = ${isFreeRegistration ? 'Registered' : 'Pending_Payment'}
+          `;
+        } else if (attEmail) {
+          await prisma.$executeRaw`
+            INSERT INTO meeting_attendances (
+              meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status
+            ) VALUES (
+              ${meetingId}, NULL, ${attName}, ${attEmail}, ${att.phone || null}, ${attWorkplace}, ${isFreeRegistration ? 'Registered' : 'Non-Member-Pending'}
+            )
+          `;
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          slipId: slip.slip_id,
+          ticketCode: ticketCode,
+          status: registrationStatus,
+          isGroup: true,
+          attendeeCount: attendees.length,
+          message: 'ลงทะเบียนแบบกลุ่มเรียบร้อยแล้ว กรุณารอเจ้าหน้าที่ตรวจสอบสลิป',
+        },
+      });
     }
 
     let validMemberNo: string | null = null;

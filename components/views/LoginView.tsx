@@ -9,15 +9,16 @@ import {
   Ticket,
   UserPlus,
   User,
+  Users,
   Mail,
   ArrowRight,
+  ArrowLeft,
   Sparkles,
   MapPin,
   Monitor,
   CheckCircle2,
   Building2,
   Hash,
-  Tag,
   Award,
   ChevronDown,
   Calendar,
@@ -27,6 +28,10 @@ import {
   Loader2,
   Check,
   ExternalLink,
+  Plus,
+  Trash2,
+  Copy,
+  Layers,
 } from 'lucide-react';
 import { TsrmLogo } from '@/components/TsrmLogo';
 import { GoogleIcon } from '@/components/GoogleIcon';
@@ -39,7 +44,7 @@ import { SmartEmailInput } from '@/components/SmartEmailInput';
 import { useLanguage } from '@/context/LanguageContext';
 import { parseGoogleName } from '@/lib/utils';
 
-interface MeetingActivity {
+export interface MeetingActivity {
   id: string;
   type: 'main' | 'workshop';
   name: string;
@@ -49,6 +54,19 @@ interface MeetingActivity {
   maxSeats?: number;
   memberPrice?: number;
   nonMemberPrice?: number;
+}
+
+export interface ConferenceAttendee {
+  id: string;
+  nameTh: string;
+  nameEn: string;
+  email: string;
+  workplace: string;
+  position: string;
+  positionOther: string;
+  memberNo: string;
+  selectedPrograms: string[];
+  attendanceType: 'onsite' | 'online';
 }
 
 interface LoginViewProps {
@@ -81,7 +99,6 @@ function formatMeetingDateDisplay(meetingOrDate?: any, lang: 'th' | 'en' = 'th')
     return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
   }
 
-  // If object has formatted date range in pricing_tiers
   if (lang === 'th' && meetingOrDate.pricing_tiers?.dateRange?.formatted) {
     return meetingOrDate.pricing_tiers.dateRange.formatted;
   }
@@ -158,9 +175,38 @@ export function LoginView({
   const [activeMeeting, setActiveMeeting] = useState<any | null>(null);
   const [loadingMeeting, setLoadingMeeting] = useState(true);
 
-  // Conference Program Selection & Attendance Type
-  const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
-  const [attendanceType, setAttendanceType] = useState<'onsite' | 'online'>('onsite');
+  // Registration Mode: Individual vs Group
+  const [regMode, setRegMode] = useState<'individual' | 'group'>('individual');
+  const [activeAttendeeIdx, setActiveAttendeeIdx] = useState(0);
+
+  // Fast attendee switch animation state
+  const [isSwitchingPerson, setIsSwitchingPerson] = useState(false);
+  const [switchingLabel, setSwitchingLabel] = useState('');
+
+  // Multi-Attendee State
+  const [attendees, setAttendees] = useState<ConferenceAttendee[]>([
+    {
+      id: '1',
+      nameTh: '',
+      nameEn: '',
+      email: '',
+      workplace: '',
+      position: '',
+      positionOther: '',
+      memberNo: '',
+      selectedPrograms: ['main'],
+      attendanceType: 'onsite',
+    },
+  ]);
+
+  const triggerPersonSwitch = (newIdx: number) => {
+    setSwitchingLabel(lang === 'th' ? `ผู้ลงทะเบียนคนที่ ${newIdx + 1}` : `Attendee #${newIdx + 1}`);
+    setIsSwitchingPerson(true);
+    setActiveAttendeeIdx(newIdx);
+    setTimeout(() => {
+      setIsSwitchingPerson(false);
+    }, 200);
+  };
 
   // Fetch Latest Active Meeting on mount
   useEffect(() => {
@@ -173,12 +219,11 @@ export function LoginView({
           if (data.success && data.data) {
             setActiveMeeting(data.data);
             const acts = Array.isArray(data.data.activities) ? data.data.activities : [];
-            if (acts.length > 0) {
-              const mainAct = acts.find((a: any) => a.type === 'main') || acts[0];
-              setSelectedPrograms([mainAct.id]);
-            } else {
-              setSelectedPrograms(['main']);
-            }
+            const defaultProgId = acts.length > 0 ? (acts.find((a: any) => a.type === 'main')?.id || acts[0].id) : 'main';
+            setAttendees(prev => prev.map(a => ({
+              ...a,
+              selectedPrograms: [defaultProgId]
+            })));
           } else {
             setActiveMeeting(null);
           }
@@ -216,33 +261,96 @@ export function LoginView({
     ];
   }, [activeMeeting, lang]);
 
-  // Check if any selected program is a workshop
-  const hasWorkshopSelected = useMemo(() => {
-    return effectiveActivities.some(a => selectedPrograms.includes(a.id) && a.type === 'workshop');
-  }, [effectiveActivities, selectedPrograms]);
+  const currentAttendee = attendees[activeAttendeeIdx] || attendees[0];
 
-  const toggleProgram = (key: string) => {
-    setSelectedPrograms(prev => {
-      let next: string[];
-      if (prev.includes(key)) {
-        if (prev.length === 1) return prev; // keep at least 1 selected
-        next = prev.filter(k => k !== key);
-      } else {
-        next = [...prev, key];
+  const updateCurrentAttendee = (field: keyof ConferenceAttendee, value: any) => {
+    setAttendees(prev => prev.map((att, idx) => {
+      if (idx !== activeAttendeeIdx) return att;
+      let sanitized = value;
+      if (field === 'nameTh') {
+        sanitized = value.replace(/[^\u0E00-\u0E7F\s\.\-]/g, '');
+      } else if (field === 'nameEn') {
+        sanitized = value.replace(/[^a-zA-Z\s\.\-']/g, '');
+      } else if (field === 'memberNo') {
+        sanitized = value.replace(/\D/g, '').slice(0, 4);
       }
+      return { ...att, [field]: sanitized };
+    }));
+  };
 
-      // Check if newly selected programs contain format restrictions
-      const selectedActs = effectiveActivities.filter(a => next.includes(a.id));
-      const hasOnsiteOnly = selectedActs.some(a => (a.format || (a.type === 'workshop' ? 'onsite' : 'both')) === 'onsite');
-      const hasOnlineOnly = selectedActs.some(a => a.format === 'online');
-      if (hasOnsiteOnly) {
-        setAttendanceType('onsite');
-      } else if (hasOnlineOnly) {
-        setAttendanceType('online');
+  const handleAddAttendee = () => {
+    const defaultWorkplace = attendees[0]?.workplace || '';
+    const newId = Date.now().toString();
+    const defaultProgId = effectiveActivities.length > 0 ? (effectiveActivities.find(a => a.type === 'main')?.id || effectiveActivities[0].id) : 'main';
+    const newIdx = attendees.length;
+    setAttendees(prev => [
+      ...prev,
+      {
+        id: newId,
+        nameTh: '',
+        nameEn: '',
+        email: '',
+        workplace: defaultWorkplace,
+        position: '',
+        positionOther: '',
+        memberNo: '',
+        selectedPrograms: [defaultProgId],
+        attendanceType: 'onsite',
       }
+    ]);
+    triggerPersonSwitch(newIdx);
+  };
 
-      return next;
-    });
+  const handleRemoveAttendee = (idxToRemove: number) => {
+    if (attendees.length <= 1) return;
+    setAttendees(prev => prev.filter((_, idx) => idx !== idxToRemove));
+    if (activeAttendeeIdx >= idxToRemove) {
+      const nextIdx = Math.max(0, activeAttendeeIdx - 1);
+      triggerPersonSwitch(nextIdx);
+    }
+  };
+
+  const handleCopyWorkplaceToAll = () => {
+    const wp = currentAttendee?.workplace?.trim() || '';
+    if (!wp) {
+      alert(lang === 'th' ? 'กรุณาระบุหน่วยงาน/สถานที่ทำงานของท่านปัจจุบันก่อนคัดลอก' : 'Please enter workplace first');
+      return;
+    }
+    setAttendees(prev => prev.map(att => ({ ...att, workplace: wp })));
+    alert(lang === 'th' ? `คัดลอก "${wp}" ไปยังผู้ลงทะเบียนทั้งหมดแล้ว` : `Copied "${wp}" to all attendees`);
+  };
+
+  const toggleProgramForCurrentAttendee = (key: string) => {
+    const currentProgs = currentAttendee?.selectedPrograms || [];
+    let nextProgs: string[];
+    if (currentProgs.includes(key)) {
+      if (currentProgs.length === 1) return; // keep at least 1
+      nextProgs = currentProgs.filter(k => k !== key);
+    } else {
+      nextProgs = [...currentProgs, key];
+    }
+
+    const selectedActs = effectiveActivities.filter(a => nextProgs.includes(a.id));
+    const hasOnsiteOnly = selectedActs.some(a => (a.format || (a.type === 'workshop' ? 'onsite' : 'both')) === 'onsite');
+    const hasOnlineOnly = selectedActs.some(a => a.format === 'online');
+    let nextAttendType = currentAttendee.attendanceType;
+    if (hasOnsiteOnly) {
+      nextAttendType = 'onsite';
+    } else if (hasOnlineOnly) {
+      nextAttendType = 'online';
+    }
+
+    setAttendees(prev => prev.map((att, idx) => {
+      if (idx !== activeAttendeeIdx) return att;
+      return { ...att, selectedPrograms: nextProgs, attendanceType: nextAttendType };
+    }));
+  };
+
+  const setAttendanceTypeForCurrent = (type: 'onsite' | 'online') => {
+    setAttendees(prev => prev.map((att, idx) => {
+      if (idx !== activeAttendeeIdx) return att;
+      return { ...att, attendanceType: type };
+    }));
   };
 
   useEffect(() => {
@@ -250,18 +358,6 @@ export function LoginView({
       setActiveTab(defaultTab);
     }
   }, [defaultTab]);
-
-  // Form State for Conference Registration
-  const [formData, setFormData] = useState({
-    memberNo: '',
-    nameTh: '',
-    nameEn: '',
-    workplace: '',
-    position: '',
-    positionOther: '',
-    specialCode: '',
-    email: '',
-  });
 
   // Autofill only when explicitly targeted for conference registration
   useEffect(() => {
@@ -271,56 +367,38 @@ export function LoginView({
         initialGoogleUser.given_name,
         initialGoogleUser.family_name
       );
-      setFormData(prev => ({
-        ...prev,
-        nameTh: nameTh || '',
-        nameEn: nameEn || '',
-        email: initialGoogleUser.email || '',
-      }));
+      updateCurrentAttendee('nameTh', nameTh || '');
+      updateCurrentAttendee('nameEn', nameEn || '');
+      updateCurrentAttendee('email', initialGoogleUser.email || '');
       setAutofillSuccess(true);
       const timer = setTimeout(() => setAutofillSuccess(false), 4000);
       return () => clearTimeout(timer);
     }
   }, [initialGoogleUser, autofillTarget]);
 
-  // Tab switching clears fetched data & form fields across tabs
+  // Tab switching clears form fields across tabs
   const handleTabChange = (tab: 'conference' | 'membership') => {
     setActiveTab(tab);
-    setFormData({
-      memberNo: '',
-      nameTh: '',
-      nameEn: '',
-      workplace: '',
-      position: '',
-      positionOther: '',
-      specialCode: '',
-      email: '',
-    });
+    setAttendees([
+      {
+        id: '1',
+        nameTh: '',
+        nameEn: '',
+        email: '',
+        workplace: '',
+        position: '',
+        positionOther: '',
+        memberNo: '',
+        selectedPrograms: effectiveActivities.length > 0 ? [effectiveActivities[0].id] : ['main'],
+        attendanceType: 'onsite',
+      }
+    ]);
+    setActiveAttendeeIdx(0);
+    setRegMode('individual');
     setAutofillSuccess(false);
     if (typeof window !== 'undefined' && window.location.search) {
       window.history.replaceState({}, '', window.location.pathname);
     }
-  };
-
-  // Handle Google Autofill Button - triggers Google OAuth with account picker
-  const handleGoogleAutofill = () => {
-    if (onGoogleAutofill) {
-      onGoogleAutofill(activeTab);
-    } else {
-      onGoogleSignIn();
-    }
-  };
-
-  const handleInputChange = (field: keyof typeof formData, value: string) => {
-    let sanitizedValue = value;
-    if (field === 'nameTh') {
-      sanitizedValue = value.replace(/[^\u0E00-\u0E7F\s\.\-]/g, '');
-    } else if (field === 'nameEn') {
-      sanitizedValue = value.replace(/[^a-zA-Z\s\.\-']/g, '');
-    } else if (field === 'memberNo') {
-      sanitizedValue = value.replace(/\D/g, '').slice(0, 4);
-    }
-    setFormData(prev => ({ ...prev, [field]: sanitizedValue }));
   };
 
   // Expired Member Modal state
@@ -337,7 +415,7 @@ export function LoginView({
   // Change Format Modal state
   const [isChangeFormatOpen, setIsChangeFormatOpen] = useState(false);
 
-  // Submit conference registration
+  // Submit conference registration (Individual or Group)
   const handleSubmitRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -346,264 +424,281 @@ export function LoginView({
       return;
     }
 
-    const selectedActivityObjects = effectiveActivities
-      .filter(a => selectedPrograms.includes(a.id))
-      .map(a => ({
-        id: a.id,
-        name: a.name,
-        type: a.type,
-        date: a.date,
-        format: a.format || (a.type === 'workshop' ? 'onsite' : 'both'),
-        memberPrice: a.memberPrice,
-        nonMemberPrice: a.nonMemberPrice,
-      }));
+    const attendeesToSubmit = regMode === 'individual' ? [attendees[0]] : attendees;
 
-    const onsiteOnlyActs = selectedActivityObjects.filter(a => a.format === 'onsite');
-    const hasOnsiteOnlySelected = onsiteOnlyActs.length > 0;
+    // ── 1. Validation across all attendees ──────────────────────────────────────
+    for (let i = 0; i < attendeesToSubmit.length; i++) {
+      const att = attendeesToSubmit[i];
+      const personLabel = regMode === 'group' ? (lang === 'th' ? `(ผู้ลงทะเบียนคนที่ ${i + 1})` : `(Attendee #${i + 1})`) : '';
 
-    const programLabel = selectedActivityObjects.map(a => a.name).join(' + ');
-    const finalPosition = (formData.position === 'อื่นๆ' || formData.position === '0 อื่นๆ')
-      ? (formData.positionOther || (lang === 'th' ? 'อื่นๆ' : 'Other'))
-      : (formData.position || '');
+      if (!att.nameTh.trim()) {
+        alert(lang === 'th' ? `กรุณากรอกชื่อ-นามสกุล (ภาษาไทย) ${personLabel}` : `Please enter Full Name (Thai) ${personLabel}`);
+        setActiveAttendeeIdx(i);
+        return;
+      }
 
-    const rawMemberNo = formData.memberNo.trim();
+      if (!att.nameEn.trim()) {
+        alert(lang === 'th' ? `กรุณากรอกชื่อ-นามสกุล (ภาษาอังกฤษ) ${personLabel}` : `Please enter Full Name (English) ${personLabel}`);
+        setActiveAttendeeIdx(i);
+        return;
+      }
 
-    // ── Form Validation ──────────────────────────────────────────────────────────
-    // บังคับกรอก: ชื่อ-นามสกุล (ภาษาไทย), ชื่อ-นามสกุล (ภาษาอังกฤษ), อีเมล, หน่วยงาน, และ ตำแหน่ง
-    if (!formData.nameTh.trim()) {
-      alert(lang === 'th' ? 'กรุณากรอกชื่อ-นามสกุล (ภาษาไทย)' : 'Please enter your Full Name (Thai)');
-      return;
+      const emailTrimmed = att.email.trim();
+      if (!emailTrimmed) {
+        alert(lang === 'th' ? `กรุณากรอกอีเมล ${personLabel}` : `Please enter Email ${personLabel}`);
+        setActiveAttendeeIdx(i);
+        return;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailTrimmed)) {
+        alert(lang === 'th' ? `รูปแบบอีเมลไม่ถูกต้อง ${personLabel}` : `Please enter a valid email address ${personLabel}`);
+        setActiveAttendeeIdx(i);
+        return;
+      }
+
+      if (!att.workplace.trim()) {
+        alert(lang === 'th' ? `กรุณากรอกหน่วยงาน/สถานที่ทำงาน ${personLabel}` : `Please enter Workplace / Organization ${personLabel}`);
+        setActiveAttendeeIdx(i);
+        return;
+      }
+
+      if (!att.position.trim()) {
+        alert(lang === 'th' ? `กรุณาเลือกตำแหน่ง ${personLabel}` : `Please select Position ${personLabel}`);
+        setActiveAttendeeIdx(i);
+        return;
+      }
+
+      if ((att.position === 'อื่นๆ' || att.position === '0 อื่นๆ') && !att.positionOther.trim()) {
+        alert(lang === 'th' ? `กรุณาระบุตำแหน่งอื่นๆ ${personLabel}` : `Please specify other position ${personLabel}`);
+        setActiveAttendeeIdx(i);
+        return;
+      }
+
+      if (!att.selectedPrograms || att.selectedPrograms.length === 0) {
+        alert(lang === 'th' ? `กรุณาเลือกอย่างน้อย 1 หลักสูตร ${personLabel}` : `Please select at least 1 program ${personLabel}`);
+        setActiveAttendeeIdx(i);
+        return;
+      }
     }
 
-    if (!formData.nameEn.trim()) {
-      alert(lang === 'th' ? 'กรุณากรอกชื่อ-นามสกุล (ภาษาอังกฤษ)' : 'Please enter your Full Name (English)');
-      return;
-    }
+    setVerifyingMember(true);
 
-    const emailTrimmed = formData.email.trim();
-    if (!emailTrimmed) {
-      alert(lang === 'th' ? 'กรุณากรอกอีเมล' : 'Please enter your Email');
-      return;
-    }
+    try {
+      // ── 2. Process each attendee (Verify memberNo & Calculate item pricing) ───
+      const processedAttendees: any[] = [];
+      let groupTotalAmount = 0;
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailTrimmed)) {
-      alert(lang === 'th' ? 'รูปแบบอีเมลไม่ถูกต้อง' : 'Please enter a valid email address');
-      return;
-    }
+      for (let i = 0; i < attendeesToSubmit.length; i++) {
+        const att = attendeesToSubmit[i];
+        const rawMemberNo = att.memberNo.trim();
+        let isMemberCalculated = false;
+        let isExpiredMember = false;
+        let memberDataFound: any = null;
 
-    if (!formData.workplace.trim()) {
-      alert(lang === 'th' ? 'กรุณากรอกสถานที่ทำงาน/หน่วยงาน' : 'Please enter your Workplace / Organization');
-      return;
-    }
+        if (rawMemberNo) {
+          try {
+            const res = await fetch(`/api/members/verify/${encodeURIComponent(rawMemberNo)}`);
+            const result = await res.json();
 
-    if (!formData.position.trim()) {
-      alert(lang === 'th' ? 'กรุณาเลือกตำแหน่ง' : 'Please select your Position');
-      return;
-    }
+            if (result.success && result.data) {
+              memberDataFound = result.data;
+              const status = (memberDataFound.membership_status || '').toLowerCase().trim();
+              let active = status === 'active' || status === '';
 
-    if ((formData.position === 'อื่นๆ' || formData.position === '0 อื่นๆ') && !formData.positionOther.trim()) {
-      alert(lang === 'th' ? 'กรุณาระบุตำแหน่งอื่นๆ' : 'Please specify other position');
-      return;
-    }
-
-    let isMemberCalculated = false;
-    let isExpiredMember = false;
-    let memberDataFound: any = null;
-
-    if (rawMemberNo) {
-      setVerifyingMember(true);
-      try {
-        const res = await fetch(`/api/members/verify/${encodeURIComponent(rawMemberNo)}`);
-        const result = await res.json();
-
-        if (result.success && result.data) {
-          memberDataFound = result.data;
-          const status = (memberDataFound.membership_status || '').toLowerCase().trim();
-          let active = status === 'active' || status === '';
-
-          if (status === 'inactive' || status === 'expired' || status === 'cancelled') {
-            active = false;
-          }
-
-          // ตรวจสอบการประเมินการเข้าประชุม 4 ครั้งล่าสุด (4 Consecutive Missed Meetings Rule)
-          if (result.attendanceEvaluation) {
-            if (result.attendanceEvaluation.calculated_status === 'Inactive') {
-              active = false;
-              memberDataFound.membership_status = result.attendanceEvaluation.reason || 'หมดอายุ (ขาดประชุม 4 ครั้ง)';
-            }
-          }
-
-          if (memberDataFound.expire_date) {
-            const expDate = new Date(memberDataFound.expire_date);
-            if (!isNaN(expDate.getTime())) {
-              const now = new Date();
-              now.setHours(0, 0, 0, 0);
-              if (expDate.getTime() < now.getTime()) {
+              if (status === 'inactive' || status === 'expired' || status === 'cancelled') {
                 active = false;
               }
+
+              if (result.attendanceEvaluation?.calculated_status === 'Inactive') {
+                active = false;
+                memberDataFound.membership_status = result.attendanceEvaluation.reason || 'หมดอายุ (ขาดประชุม 4 ครั้ง)';
+              }
+
+              if (memberDataFound.expire_date) {
+                const expDate = new Date(memberDataFound.expire_date);
+                if (!isNaN(expDate.getTime())) {
+                  const now = new Date();
+                  now.setHours(0, 0, 0, 0);
+                  if (expDate.getTime() < now.getTime()) {
+                    active = false;
+                  }
+                }
+              }
+
+              if (!active) {
+                isExpiredMember = true;
+                isMemberCalculated = false;
+              } else {
+                isMemberCalculated = true;
+              }
+            } else {
+              isMemberCalculated = false;
             }
+          } catch (err) {
+            console.error('Member verification error for attendee', i, err);
           }
-
-          if (!active) {
-            isExpiredMember = true;
-            isMemberCalculated = false;
-          } else {
-            isMemberCalculated = true;
-          }
-        } else {
-          // Member not found in database -> Treat as non-member
-          isMemberCalculated = false;
         }
-      } catch (err) {
-        console.error('Member verification error:', err);
-      } finally {
-        setVerifyingMember(false);
-      }
-    }
 
-    // Validation: Main program online attendance is strictly reserved for active members
-    if (attendanceType === 'online') {
-      if (hasOnsiteOnlySelected) {
-        alert(
-          lang === 'th'
-            ? `หลักสูตร "${onsiteOnlyActs.map(a => a.name).join(', ')}" กำหนดให้เข้าร่วมแบบ Onsite (ที่งาน) เท่านั้น`
-            : `Course "${onsiteOnlyActs.map(a => a.name).join(', ')}" requires Onsite attendance only.`
-        );
-        return;
-      }
+        // Selected activities calculation
+        const selectedActivityObjects = effectiveActivities
+          .filter(a => att.selectedPrograms.includes(a.id))
+          .map(a => {
+            const isMain = a.type === 'main';
+            let price = 0;
+            const isMemberUser = isMemberCalculated && !isExpiredMember;
+            const pricingTiers = activeMeeting.pricing_tiers;
+            const basePrice = activeMeeting.base_price ?? 0;
 
-      if (!rawMemberNo) {
-        alert(lang === 'th' ? 'การเข้าร่วมแบบ Online สงวนสิทธิ์เฉพาะสมาชิกสมาคมฯ เท่านั้น กรุณากรอกเลขสมาชิก หรือเลือกรูปแบบ Onsite' : 'Online attendance is reserved for TSRM members only. Please enter your Member No. or select Onsite.');
-        return;
-      }
+            if (isMain) {
+              if (att.attendanceType === 'online') {
+                price = isMemberUser
+                  ? (pricingTiers?.participant?.onlineMember ?? basePrice ?? 3500)
+                  : (pricingTiers?.participant?.onlineNonMember ?? (basePrice ? basePrice + 1000 : 4500));
+              } else {
+                price = isMemberUser
+                  ? (pricingTiers?.participant?.onsiteMember ?? basePrice ?? 3500)
+                  : (pricingTiers?.participant?.onsiteNonMember ?? (basePrice ? basePrice + 1000 : 4500));
+              }
+            } else {
+              const mPrice = typeof a.memberPrice === 'number' ? a.memberPrice : 0;
+              const nonMPrice = typeof a.nonMemberPrice === 'number' ? a.nonMemberPrice : mPrice;
+              price = isMemberUser ? mPrice : nonMPrice;
+            }
 
-      if (!isMemberCalculated && !isExpiredMember) {
-        alert(lang === 'th' ? 'ไม่พบข้อมูลสมาชิกในระบบ TSRM การเข้าร่วมแบบ Online สงวนสิทธิ์เฉพาะสมาชิกเท่านั้น' : 'Member record not found. Online attendance is reserved for TSRM members only.');
-        return;
-      }
-    }
+            return {
+              id: a.id,
+              name: a.name,
+              type: a.type,
+              date: a.date,
+              format: a.format || (a.type === 'workshop' ? 'onsite' : 'both'),
+              price,
+              memberPrice: a.memberPrice,
+              nonMemberPrice: a.nonMemberPrice,
+            };
+          });
 
-    // 4. If specialCode/couponCode is provided, validate with backend coupon system
-    let validatedCouponData: any = null;
-    const cleanCouponCode = formData.specialCode.trim();
+        const attendeeSubtotal = selectedActivityObjects.reduce((sum, item) => sum + item.price, 0);
+        groupTotalAmount += attendeeSubtotal;
 
-    if (cleanCouponCode) {
-      try {
-        setVerifyingMember(true);
-        const emailToCheck = formData.email.trim() || memberDataFound?.email || '';
-        const validateRes = await fetch('/api/coupons/validate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            code: cleanCouponCode,
-            meetingId: activeMeeting.meeting_id,
-            memberNo: rawMemberNo || undefined,
-            email: emailToCheck || undefined,
-          }),
+        const finalPosition = (att.position === 'อื่นๆ' || att.position === '0 อื่นๆ')
+          ? (att.positionOther || (lang === 'th' ? 'อื่นๆ' : 'Other'))
+          : (att.position || '');
+
+        const programLabel = selectedActivityObjects.map(a => a.name).join(' + ');
+
+        processedAttendees.push({
+          id: att.id,
+          nameTh: att.nameTh.trim(),
+          nameEn: att.nameEn.trim(),
+          email: att.email.trim(),
+          workplace: att.workplace.trim(),
+          position: finalPosition,
+          positionCode: att.position,
+          memberNo: rawMemberNo,
+          isMember: isMemberCalculated,
+          isExpiredMember: isExpiredMember,
+          memberStatus: isExpiredMember ? 'expired' : (isMemberCalculated ? 'active' : 'non_member'),
+          attendanceType: att.attendanceType,
+          selectedProgramIds: att.selectedPrograms,
+          selectedActivities: selectedActivityObjects,
+          programKey: att.selectedPrograms.join(','),
+          programNameTh: programLabel || activeMeeting.meeting_name,
+          programNameEn: programLabel || activeMeeting.meeting_name,
+          subtotal: attendeeSubtotal,
         });
+      }
 
-        const validateData = await validateRes.json();
-        if (!validateRes.ok || !validateData.success || !validateData.valid) {
-          alert(
-            validateData.error ||
-            (lang === 'th'
-              ? `รหัสคูปอง "${cleanCouponCode}" ไม่ถูกต้อง หรือไม่สามารถใช้งานได้`
-              : `Coupon code "${cleanCouponCode}" is invalid.`)
+      // If single individual registration, keep backward compatible structure
+      if (regMode === 'individual' && processedAttendees.length === 1) {
+        const single = processedAttendees[0];
+
+        // Check duplicate
+        try {
+          const checkRes = await fetch(
+            `/api/meetings/${encodeURIComponent(activeMeeting.meeting_id)}/check-registration?memberNo=${encodeURIComponent(single.memberNo)}&email=${encodeURIComponent(single.email)}`
           );
-          setVerifyingMember(false);
+          const checkData = await checkRes.json();
+          if (checkData.success && checkData.isRegistered) {
+            alert(
+              checkData.message ||
+              (lang === 'th'
+                ? 'ท่านได้ลงทะเบียนเข้าร่วมงานประชุมนี้ในระบบเรียบร้อยแล้ว ไม่สามารถลงทะเบียนซ้ำได้'
+                : 'You have already registered for this conference.')
+            );
+            return;
+          }
+        } catch (checkErr) {
+          console.error('Error checking duplicate:', checkErr);
+        }
+
+        const singlePayload = {
+          category: 'conference',
+          meetingId: activeMeeting.meeting_id,
+          meetingName: activeMeeting.meeting_name,
+          meetingDate: activeMeeting.meeting_date,
+          meetingLocation: activeMeeting.location,
+          pricingTiers: activeMeeting.pricing_tiers,
+          basePrice: activeMeeting.base_price,
+          selectedProgramIds: single.selectedProgramIds,
+          selectedActivities: single.selectedActivities,
+          programKey: single.programKey,
+          programNameTh: single.programNameTh,
+          programNameEn: single.programNameEn,
+          attendanceType: single.attendanceType,
+          memberNo: single.memberNo,
+          isMember: single.isMember,
+          isExpiredMember: single.isExpiredMember,
+          memberStatus: single.memberStatus,
+          nameTh: single.nameTh,
+          nameEn: single.nameEn,
+          workplace: single.workplace,
+          position: single.position,
+          positionCode: single.positionCode,
+          email: single.email,
+          totalAmount: single.subtotal,
+          registeredAt: new Date().toISOString(),
+        };
+
+        if (single.isExpiredMember) {
+          setExpiredMemberInfo({
+            memberName: single.nameTh,
+            memberNo: single.memberNo,
+            statusText: lang === 'th' ? 'หมดอายุ' : 'Expired',
+          });
+          setPendingRegPayload(singlePayload);
+          setExpiredModalOpen(true);
           return;
         }
 
-        validatedCouponData = {
-          code: validateData.coupon.code,
-          companyName: validateData.coupon.company_name,
-          discountType: validateData.coupon.discount_type,
-          discountValue: validateData.coupon.discount_value,
-          isFullFree: validateData.calculation.isFullFree,
-          discountAmount: validateData.calculation.discountAmount,
+        localStorage.setItem('conference_registration', JSON.stringify(singlePayload));
+      } else {
+        // Corporate / Group Registration Payload
+        const groupPayload = {
+          category: 'conference',
+          isGroup: true,
+          meetingId: activeMeeting.meeting_id,
+          meetingName: activeMeeting.meeting_name,
+          meetingDate: activeMeeting.meeting_date,
+          meetingLocation: activeMeeting.location,
+          pricingTiers: activeMeeting.pricing_tiers,
+          basePrice: activeMeeting.base_price,
+          companyName: processedAttendees[0]?.workplace || 'Corporate Registration',
+          attendees: processedAttendees,
+          totalAmount: groupTotalAmount,
+          registeredAt: new Date().toISOString(),
         };
-      } catch (couponErr: any) {
-        console.error('Error validating coupon:', couponErr);
-        alert(lang === 'th' ? 'เกิดข้อผิดพลาดในการตรวจสอบรหัสคูปอง กรุณาลองใหม่อีกครั้ง' : 'Failed to validate coupon code.');
-        setVerifyingMember(false);
-        return;
-      } finally {
-        setVerifyingMember(false);
+
+        localStorage.setItem('conference_registration', JSON.stringify(groupPayload));
       }
+
+      router.push('/payment?type=registration');
+    } catch (err) {
+      console.error('Submit conference error:', err);
+      alert(lang === 'th' ? 'เกิดข้อผิดพลาดในการตรวจสอบข้อมูล กรุณาลองใหม่อีกครั้ง' : 'Registration error. Please try again.');
+    } finally {
+      setVerifyingMember(false);
     }
-
-    const regPayload = {
-      category: 'conference',
-      meetingId: activeMeeting.meeting_id,
-      meetingName: activeMeeting.meeting_name,
-      meetingDate: activeMeeting.meeting_date,
-      meetingLocation: activeMeeting.location,
-      pricingTiers: activeMeeting.pricing_tiers,
-      basePrice: activeMeeting.base_price,
-      selectedProgramIds: selectedPrograms,
-      selectedActivities: selectedActivityObjects,
-      programKey: selectedPrograms.join(','),
-      programNameTh: programLabel || activeMeeting.meeting_name,
-      programNameEn: programLabel || activeMeeting.meeting_name,
-      attendanceType: attendanceType,
-      memberNo: rawMemberNo,
-      isMember: isMemberCalculated,
-      isExpiredMember: isExpiredMember,
-      memberStatus: isExpiredMember ? 'expired' : (isMemberCalculated ? 'active' : 'non_member'),
-      expireDate: memberDataFound?.expire_date || null,
-      nameTh: formData.nameTh.trim() || memberDataFound?.full_name_th || (lang === 'th' ? 'ผู้เข้าร่วมงานประชุม' : 'Conference Attendee'),
-      nameEn: formData.nameEn.trim() || memberDataFound?.full_name_en || 'Conference Attendee',
-      workplace: formData.workplace.trim() || memberDataFound?.workplace || '',
-      position: finalPosition,
-      positionCode: formData.position,
-      specialCode: cleanCouponCode,
-      couponData: validatedCouponData,
-      email: formData.email.trim() || memberDataFound?.email || 'attendee@tsrm.org',
-      registeredAt: new Date().toISOString(),
-    };
-
-    // Check for duplicate registration for this meeting
-    try {
-      const emailToCheck = formData.email.trim() || memberDataFound?.email || '';
-      const checkRes = await fetch(
-        `/api/meetings/${encodeURIComponent(activeMeeting.meeting_id)}/check-registration?memberNo=${encodeURIComponent(rawMemberNo)}&email=${encodeURIComponent(emailToCheck)}`
-      );
-      const checkData = await checkRes.json();
-      if (checkData.success && checkData.isRegistered) {
-        alert(
-          checkData.message ||
-          (lang === 'th'
-            ? 'ท่านได้ลงทะเบียนเข้าร่วมงานประชุมนี้ในระบบเรียบร้อยแล้ว ไม่สามารถลงทะเบียนซ้ำได้'
-            : 'You have already registered for this conference.')
-        );
-        return;
-      }
-    } catch (checkErr) {
-      console.error('Error checking duplicate registration:', checkErr);
-    }
-
-    // If member status is expired, prompt with ExpiredMemberModal before proceeding to payment
-    if (isExpiredMember) {
-      setExpiredMemberInfo({
-        memberName: memberDataFound?.full_name_th || formData.nameTh || 'สมาชิก TSRM',
-        memberNo: memberDataFound?.member_no || rawMemberNo,
-        expireDate: memberDataFound?.expire_date,
-        statusText: memberDataFound?.membership_status || (lang === 'th' ? 'หมดอายุ' : 'Expired'),
-      });
-      setPendingRegPayload(regPayload);
-      setExpiredModalOpen(true);
-      return;
-    }
-
-    try {
-      localStorage.setItem('conference_registration', JSON.stringify(regPayload));
-    } catch (e) {
-      console.error('Failed to save registration to localStorage', e);
-    }
-
-    // Directly navigate to payment page with registration type
-    router.push('/payment?type=registration');
   };
 
   const handleProceedExpiredNonMember = () => {
@@ -627,12 +722,10 @@ export function LoginView({
     router.push('/payment?type=membership');
   };
 
-
   return (
     <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[640px]">
       {/* Header Blue Card Section */}
       <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-3.5 xs:px-4 sm:px-8 lg:px-12 pt-4 sm:pt-8 pb-6 sm:pb-9 rounded-b-[24px] sm:rounded-b-[36px] shadow-xl relative overflow-hidden">
-        {/* Subtle Background Glow */}
         <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute bottom-0 -left-12 w-40 h-40 bg-[#4ade80]/15 rounded-full blur-2xl pointer-events-none" />
 
@@ -648,9 +741,7 @@ export function LoginView({
               </div>
             </div>
 
-            {/* Top Right Actions: Search Member + Language Switcher */}
             <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 shrink-0">
-              {/* Member Search Button */}
               <button
                 type="button"
                 onClick={() => setIsSearchOpen(true)}
@@ -662,7 +753,6 @@ export function LoginView({
                 <span className="font-semibold whitespace-nowrap">{lang === 'th' ? 'ค้นหาข้อมูลสมาชิก' : 'Search Members'}</span>
               </button>
 
-              {/* Language Switcher Pill */}
               <button
                 onClick={toggleLang}
                 className="flex items-center gap-0.5 xs:gap-1 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-1.5 xs:px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shrink-0 shadow-2xs"
@@ -685,7 +775,6 @@ export function LoginView({
               : 'Register for Conference Summit or apply for TSRM membership'}
           </p>
 
-          {/* System Testing and Development Notice Banner */}
           <div className="mt-3.5 px-3.5 sm:px-4 py-2.5 sm:py-3 bg-amber-500/20 border border-amber-400/40 rounded-xl sm:rounded-2xl backdrop-blur-md flex items-center gap-2.5 sm:gap-3 shadow-sm">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-amber-400/25 flex items-center justify-center shrink-0 border border-amber-300/40 shadow-2xs">
               <AlertTriangle className="w-4 h-4 text-amber-300 animate-pulse" />
@@ -708,16 +797,14 @@ export function LoginView({
       <div className="px-4 sm:px-8 lg:px-12 py-5 sm:py-8 flex-1 flex flex-col justify-between max-w-5xl xl:max-w-6xl mx-auto w-full">
         <div className="space-y-4 sm:space-y-6">
 
-          {/* Main Action Segmented Buttons (Call to Action Tabs) */}
+          {/* Main Action Segmented Buttons (Conference vs Membership) */}
           <div className="relative grid grid-cols-2 p-1.5 bg-slate-200/80 rounded-2xl border border-slate-200/90 shadow-inner select-none max-w-xl mx-auto w-full">
-            {/* Sliding Active Indicator Pill */}
             <div
               aria-hidden="true"
               className={`absolute top-1.5 bottom-1.5 left-1.5 w-[calc(50%-6px)] rounded-xl bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] shadow-md shadow-blue-950/25 ring-2 ring-[#4ade80]/50 transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none will-change-transform ${activeTab === 'membership' ? 'translate-x-full' : 'translate-x-0'
                 }`}
             />
 
-            {/* Tab 1: ลงทะเบียนเข้าร่วมงานประชุม (Left) */}
             <button
               type="button"
               onClick={() => handleTabChange('conference')}
@@ -733,7 +820,6 @@ export function LoginView({
               <span className="truncate">{lang === 'th' ? 'ลงทะเบียนเข้าร่วมงานประชุม' : 'Register Conference'}</span>
             </button>
 
-            {/* Tab 2: สมัครสมาชิก TSRM (Right) */}
             <button
               type="button"
               onClick={() => handleTabChange('membership')}
@@ -754,7 +840,6 @@ export function LoginView({
           {activeTab === 'conference' ? (
             <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-7 lg:p-8 border border-slate-200/90 shadow-sm space-y-4 sm:space-y-5 animate-fade-in">
               {loadingMeeting ? (
-                /* Loading Skeleton / State */
                 <div className="flex flex-col items-center justify-center py-10 sm:py-14 space-y-3">
                   <div className="w-8 h-8 sm:w-10 sm:h-10 border-4 border-[#0026b3] border-t-transparent rounded-full animate-spin" />
                   <p className="text-xs sm:text-sm font-bold text-slate-500">
@@ -762,7 +847,6 @@ export function LoginView({
                   </p>
                 </div>
               ) : !activeMeeting ? (
-                /* No Active Meeting State (Disabled registration) */
                 <div className="bg-gradient-to-b from-amber-50/90 to-orange-50/40 border border-amber-200/80 rounded-2xl sm:rounded-3xl p-4 sm:p-8 text-center space-y-3 sm:space-y-4">
                   <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto shadow-xs">
                     <CalendarX className="w-5 h-5 sm:w-7 sm:h-7" />
@@ -789,7 +873,6 @@ export function LoginView({
                   </div>
                 </div>
               ) : (
-                /* Active Meeting Found: Dynamic Registration Form */
                 <>
                   {/* Latest Meeting Banner */}
                   <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-blue-50/90 border border-blue-100/90 rounded-xl sm:rounded-2xl p-3 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 shadow-2xs">
@@ -823,8 +906,137 @@ export function LoginView({
                     </div>
                   </div>
 
-                  {/* Registration Form with 7 Specified Fields */}
-                  <form onSubmit={handleSubmitRegistration} className="space-y-3 sm:space-y-4">
+                  {/* Mode Selector: Individual vs Group */}
+                  <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-2 sm:p-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRegMode('individual');
+                          setActiveAttendeeIdx(0);
+                        }}
+                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${regMode === 'individual'
+                          ? 'bg-[#0026b3] text-white shadow-sm'
+                          : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                          }`}
+                      >
+                        <User className="w-4 h-4" />
+                        <span>{lang === 'th' ? 'ลงทะเบียนรายบุคคล' : 'Individual'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setRegMode('group')}
+                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${regMode === 'group'
+                          ? 'bg-[#0026b3] text-white shadow-sm'
+                          : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                          }`}
+                      >
+                        <Users className="w-4 h-4 text-[#4ade80]" />
+                        <span>{lang === 'th' ? 'ลงทะเบียนแบบกลุ่มสำหรับบริษัท' : 'Corporate / Group'}</span>
+                      </button>
+                    </div>
+
+                    {regMode === 'group' && (
+                      <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                        <button
+                          type="button"
+                          onClick={handleCopyWorkplaceToAll}
+                          className="text-[11px] sm:text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer active:scale-95"
+                          title="คัดลอกสถานที่ทำงานไปยังทุกคน"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>{lang === 'th' ? 'คัดลอกหน่วยงานให้ทุกคน' : 'Copy Workplace to All'}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Multi-Attendee Pagination Header Tabs (When in Group Mode) */}
+                  {regMode === 'group' && (
+                    <div className="space-y-2 pt-1 border-b border-slate-200/80 pb-3">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-[#0026b3]" />
+                          <span>{lang === 'th' ? 'รายชื่อผู้ลงทะเบียน (แบ่งหน้าละฟอร์ม):' : 'Attendee Forms (Paginated):'}</span>
+                        </span>
+
+                        {attendees.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAttendee(activeAttendeeIdx)}
+                            className="text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>{lang === 'th' ? `ลบผู้ลงทะเบียนคนที่ ${activeAttendeeIdx + 1}` : `Remove Attendee #${activeAttendeeIdx + 1}`}</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Pagination Pills */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
+                        {attendees.map((att, idx) => {
+                          const isActive = idx === activeAttendeeIdx;
+                          const isComplete = Boolean(att.nameTh.trim() && att.nameEn.trim() && att.email.trim() && att.workplace.trim() && att.position.trim());
+                          const displayName = att.nameTh.trim() ? (att.nameTh.length > 12 ? att.nameTh.slice(0, 12) + '...' : att.nameTh) : `${lang === 'th' ? 'คนที่' : 'Person'} ${idx + 1}`;
+
+                          return (
+                            <button
+                              key={att.id}
+                              type="button"
+                              onClick={() => triggerPersonSwitch(idx)}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 border ${isActive
+                                ? 'bg-gradient-to-r from-[#0026b3] to-[#001c8c] text-white border-blue-900 shadow-md ring-2 ring-blue-400/40 scale-105'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                                }`}
+                            >
+                              <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black ${isActive ? 'bg-white text-[#0026b3]' : 'bg-slate-300 text-slate-700'}`}>
+                                {idx + 1}
+                              </span>
+                              <span className="truncate">{displayName}</span>
+                              {isComplete && (
+                                <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#4ade80]' : 'text-emerald-600'}`} />
+                              )}
+                            </button>
+                          );
+                        })}
+
+                        {/* + Add Attendee Tab Button */}
+                        <button
+                          type="button"
+                          onClick={handleAddAttendee}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 border-dashed transition cursor-pointer shrink-0 active:scale-95 shadow-2xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{lang === 'th' ? 'เพิ่มผู้ลงทะเบียน' : 'Add Person'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Active Attendee Form Container with Fast Flash Overlay */}
+                  <div className="relative">
+                    {/* Fast Switch Pulse & Flash Overlay */}
+                    {isSwitchingPerson && (
+                      <div className="absolute inset-0 z-40 bg-white/75 backdrop-blur-[2px] rounded-3xl flex items-center justify-center animate-fade-in pointer-events-none transition-all">
+                        <div className="bg-[#0026b3] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm font-black ring-4 ring-blue-300/50 scale-105 transition-transform animate-pulse">
+                          <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-[#4ade80] animate-spin" />
+                          <span>{lang === 'th' ? `สลับข้อมูลไปยัง ${switchingLabel}...` : `Switching to ${switchingLabel}...`}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <form onSubmit={handleSubmitRegistration} key={`attendee-form-${currentAttendee.id}`} className="space-y-3 sm:space-y-4 animate-fade-in">
+                      {regMode === 'group' && (
+                        <div className="flex items-center justify-between bg-blue-50/70 border border-blue-100 rounded-2xl px-4 py-2.5 text-xs text-blue-900 font-bold shadow-2xs">
+                          <span className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-[#0026b3] animate-pulse" />
+                            {lang === 'th' ? `ข้อมูลผู้ลงทะเบียนคนที่ ${activeAttendeeIdx + 1} จากทั้งหมด ${attendees.length} ท่าน` : `Form for Attendee #${activeAttendeeIdx + 1} of ${attendees.length}`}
+                          </span>
+                          <span className="text-[11px] text-blue-700 font-medium">({currentAttendee.nameTh || (lang === 'th' ? 'ยังไม่ได้ระบุชื่อ' : 'No name specified')})</span>
+                        </div>
+                      )}
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5">
                       {/* 1. ชื่อ-นามสกุล(ไทย) */}
                       <div>
@@ -835,8 +1047,8 @@ export function LoginView({
                           <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                           <input
                             type="text"
-                            value={formData.nameTh}
-                            onChange={(e) => handleInputChange('nameTh', e.target.value)}
+                            value={currentAttendee.nameTh}
+                            onChange={(e) => updateCurrentAttendee('nameTh', e.target.value)}
                             placeholder={lang === 'th' ? 'ชื่อ-นามสกุล (ไม่ต้องมีคำนำหน้า)' : 'Full Name (Without prefix)'}
                             className="w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition"
                           />
@@ -852,8 +1064,8 @@ export function LoginView({
                           <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                           <input
                             type="text"
-                            value={formData.nameEn}
-                            onChange={(e) => handleInputChange('nameEn', e.target.value)}
+                            value={currentAttendee.nameEn}
+                            onChange={(e) => updateCurrentAttendee('nameEn', e.target.value)}
                             placeholder="Full Name (Without prefix)"
                             className="w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition"
                           />
@@ -863,8 +1075,8 @@ export function LoginView({
                       {/* 3. อีเมล */}
                       <div>
                         <SmartEmailInput
-                          value={formData.email}
-                          onChange={(val) => handleInputChange('email', val)}
+                          value={currentAttendee.email}
+                          onChange={(val) => updateCurrentAttendee('email', val)}
                           label={lang === 'th' ? 'อีเมล' : 'Email Address'}
                           placeholder={lang === 'th' ? 'เช่น yourname@gmail.com' : 'e.g. yourname@gmail.com'}
                           helperText={lang === 'th' ? 'กรุณากรอกอีเมลที่มีอยู่จริง เพื่อรับ QR Code เข้าร่วมงาน' : 'Please provide a valid email to receive your Event QR Code.'}
@@ -875,14 +1087,14 @@ export function LoginView({
                       {/* 4. หน่วยงาน */}
                       <div>
                         <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
-                          {lang === 'th' ? 'หน่วยงาน' : 'Organization / Workplace'} <span className="text-rose-500 font-bold">*</span>
+                          {lang === 'th' ? 'หน่วยงาน / บริษัท' : 'Organization / Workplace'} <span className="text-rose-500 font-bold">*</span>
                         </label>
                         <div className="relative">
                           <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                           <input
                             type="text"
-                            value={formData.workplace}
-                            onChange={(e) => handleInputChange('workplace', e.target.value)}
+                            value={currentAttendee.workplace}
+                            onChange={(e) => updateCurrentAttendee('workplace', e.target.value)}
                             placeholder={lang === 'th' ? 'เช่น โรงพยาบาล / คลินิก / บริษัท' : 'e.g. Hospital / Clinic / Company'}
                             className="w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition"
                           />
@@ -892,10 +1104,10 @@ export function LoginView({
                       {/* 5. ตำแหน่ง (Select + Other input) */}
                       <div>
                         <PositionSelect
-                          value={formData.position}
-                          onChange={(val) => handleInputChange('position', val)}
-                          otherValue={formData.positionOther}
-                          onOtherChange={(val) => handleInputChange('positionOther', val)}
+                          value={currentAttendee.position}
+                          onChange={(val) => updateCurrentAttendee('position', val)}
+                          otherValue={currentAttendee.positionOther}
+                          onOtherChange={(val) => updateCurrentAttendee('positionOther', val)}
                           required
                           label={lang === 'th' ? 'ตำแหน่ง' : 'Position'}
                         />
@@ -915,38 +1127,16 @@ export function LoginView({
                           <Hash className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                           <input
                             type="text"
-                            value={formData.memberNo}
-                            onChange={(e) => handleInputChange('memberNo', e.target.value)}
+                            value={currentAttendee.memberNo}
+                            onChange={(e) => updateCurrentAttendee('memberNo', e.target.value)}
                             placeholder={lang === 'th' ? 'เช่น 0001 (เว้นว่างได้ถ้าไม่ใช่สมาชิก)' : 'e.g. 0001 (Leave blank if non-member)'}
                             className="w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition"
                           />
                         </div>
                       </div>
-
-                      {/* 7. รหัสพิเศษ (Special Code) */}
-                      <div className="sm:col-span-2">
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block text-[11px] sm:text-xs font-bold text-slate-700">
-                            {lang === 'th' ? 'รหัสพิเศษ (ถ้ามี)' : 'Special Code (Optional)'}
-                          </label>
-                          <span className="text-[9.5px] xs:text-[10px] text-slate-500 font-medium">
-                            {lang === 'th' ? 'สำหรับผู้ได้รับสิทธิ์พิเศษหรือส่วนลด' : 'For sponsor / discount codes'}
-                          </span>
-                        </div>
-                        <div className="relative">
-                          <Tag className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                          <input
-                            type="text"
-                            value={formData.specialCode}
-                            onChange={(e) => handleInputChange('specialCode', e.target.value)}
-                            placeholder={lang === 'th' ? 'กรอกรหัสโปรโมชั่น / Sponsor Code' : 'Enter Special / Promo Code'}
-                            className="w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition uppercase tracking-wider"
-                          />
-                        </div>
-                      </div>
                     </div>
 
-                    {/* Program Selection Cards (Activities dynamically from DB) */}
+                    {/* Program Selection Cards for Active Attendee */}
                     <div className="space-y-1.5 sm:space-y-2 pt-1 sm:pt-2">
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] sm:text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -955,19 +1145,19 @@ export function LoginView({
                           <span className="text-rose-500 font-bold">*</span>
                         </label>
                         <span className="text-[10px] xs:text-[11px] font-semibold text-slate-500">
-                          {lang === 'th' ? `เลือกแล้ว ${selectedPrograms.length} รายการ` : `${selectedPrograms.length} selected`}
+                          {lang === 'th' ? `เลือกแล้ว ${currentAttendee.selectedPrograms.length} รายการ` : `${currentAttendee.selectedPrograms.length} selected`}
                         </span>
                       </div>
 
                       <div className="grid grid-cols-1 gap-2">
                         {effectiveActivities.map((act) => {
-                          const isSelected = selectedPrograms.includes(act.id);
+                          const isSelected = currentAttendee.selectedPrograms.includes(act.id);
 
                           return (
                             <button
                               key={act.id}
                               type="button"
-                              onClick={() => toggleProgram(act.id)}
+                              onClick={() => toggleProgramForCurrentAttendee(act.id)}
                               className={`p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 active:scale-[0.99] relative overflow-hidden ${isSelected
                                 ? 'bg-blue-50/90 border-[#0026b3] text-slate-900 shadow-2xs ring-1.5 ring-[#0026b3]/30 font-bold'
                                 : 'bg-slate-50/80 border-slate-200 hover:border-slate-300 text-slate-700 font-medium'
@@ -982,7 +1172,6 @@ export function LoginView({
                                     {act.type === 'main' ? (lang === 'th' ? 'หลักสูตรหลัก' : 'Main') : (lang === 'th' ? 'เวิร์กช็อป' : 'Workshop')}
                                   </span>
 
-                                  {/* Format Badge */}
                                   {(() => {
                                     const fmt = act.format || (act.type === 'workshop' ? 'onsite' : 'both');
                                     return (
@@ -1021,7 +1210,7 @@ export function LoginView({
 
                     {/* Attendance Format: Onsite vs Online */}
                     {(() => {
-                      const selectedActs = effectiveActivities.filter(a => selectedPrograms.includes(a.id));
+                      const selectedActs = effectiveActivities.filter(a => currentAttendee.selectedPrograms.includes(a.id));
                       const onsiteOnlyActs = selectedActs.filter(a => (a.format || (a.type === 'workshop' ? 'onsite' : 'both')) === 'onsite');
                       const onlineOnlyActs = selectedActs.filter(a => a.format === 'online');
                       const hasOnsiteOnly = onsiteOnlyActs.length > 0;
@@ -1034,46 +1223,41 @@ export function LoginView({
                           </label>
 
                           <div className="grid grid-cols-2 gap-1.5 sm:gap-3">
-                            {/* Onsite */}
                             <button
                               type="button"
                               disabled={hasOnlineOnly}
                               onClick={() => {
-                                if (!hasOnlineOnly) setAttendanceType('onsite');
+                                if (!hasOnlineOnly) setAttendanceTypeForCurrent('onsite');
                               }}
                               className={`py-2.5 px-3 sm:px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${hasOnlineOnly
                                 ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                                : attendanceType === 'onsite'
+                                : currentAttendee.attendanceType === 'onsite'
                                   ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30 cursor-pointer active:scale-95'
                                   : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-600 font-medium cursor-pointer active:scale-95'
                                 }`}
-                              title={hasOnlineOnly ? (lang === 'th' ? 'มีหลักสูตรที่เปิดรับเฉพาะ Online เท่านั้น' : 'Includes Online-only courses') : ''}
                             >
                               <MapPin className="w-4 h-4 shrink-0" />
                               <span className="truncate">{lang === 'th' ? 'Onsite (ที่งาน)' : 'Onsite'}</span>
                             </button>
 
-                            {/* Online */}
                             <button
                               type="button"
                               disabled={hasOnsiteOnly}
                               onClick={() => {
-                                if (!hasOnsiteOnly) setAttendanceType('online');
+                                if (!hasOnsiteOnly) setAttendanceTypeForCurrent('online');
                               }}
                               className={`py-2.5 px-3 sm:px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${hasOnsiteOnly
                                 ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                                : attendanceType === 'online'
+                                : currentAttendee.attendanceType === 'online'
                                   ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30 cursor-pointer active:scale-95'
                                   : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-600 font-medium cursor-pointer active:scale-95'
                                 }`}
-                              title={hasOnsiteOnly ? (lang === 'th' ? 'มีหลักสูตรที่เปิดรับเฉพาะ Onsite เท่านั้น' : 'Includes Onsite-only courses') : ''}
                             >
                               <Monitor className="w-4 h-4 shrink-0" />
                               <span className="truncate">{lang === 'th' ? 'Online (ออนไลน์)' : 'Online'}</span>
                             </button>
                           </div>
 
-                          {/* Onsite only notice */}
                           {hasOnsiteOnly && (
                             <div className="flex items-start gap-1.5 p-2 rounded-lg bg-amber-50/90 border border-amber-200/70 text-amber-800 text-[10.5px] xs:text-[11px] leading-relaxed">
                               <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
@@ -1085,7 +1269,6 @@ export function LoginView({
                             </div>
                           )}
 
-                          {/* Online only notice */}
                           {hasOnlineOnly && (
                             <div className="flex items-start gap-1.5 p-2 rounded-lg bg-blue-50/90 border border-blue-200/70 text-blue-800 text-[10.5px] xs:text-[11px] leading-relaxed">
                               <AlertCircle className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
@@ -1096,71 +1279,73 @@ export function LoginView({
                               </span>
                             </div>
                           )}
-
-                          {/* Format Change Fee Notice */}
-                          {(() => {
-                            const changeFeeConfig = activeMeeting?.pricing_tiers?.changeFee;
-                            const feeAmount = (activeMeeting as any)?.change_format_fee || changeFeeConfig?.onsiteMember || 1000;
-                            const conditionDate = changeFeeConfig?.conditionDate || '';
-                            const customPolicy = (activeMeeting as any)?.change_format_policy || changeFeeConfig?.policyText;
-
-                            let noticeText = '';
-                            if (customPolicy && customPolicy.trim()) {
-                              noticeText = customPolicy.trim();
-                            } else if (lang === 'th') {
-                              noticeText = `หมายเหตุ: เปลี่ยนรูปแบบการเข้าร่วม${
-                                conditionDate ? ' (หลัง ' + conditionDate + ')' : ''
-                              } มีค่าธรรมเนียม ${feeAmount.toLocaleString()} บาท`;
-                            } else {
-                              noticeText = `Note: Changing attendance format${
-                                conditionDate ? ' (after ' + conditionDate + ')' : ''
-                              } fee is ${feeAmount.toLocaleString()} THB`;
-                            }
-
-                            return (
-                              <div className="flex items-center gap-1.5 p-2 sm:p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-amber-900 text-[10.5px] xs:text-[11px] leading-normal">
-                                <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                                <div className="flex-1 truncate sm:text-clip">
-                                  <span>{noticeText}</span>{' '}
-                                  <button
-                                    type="button"
-                                    onClick={() => setIsChangeFormatOpen(true)}
-                                    className="inline-flex items-center gap-0.5 font-black text-amber-950 hover:text-blue-700 underline underline-offset-2 ml-1 cursor-pointer transition-colors shrink-0 whitespace-nowrap"
-                                  >
-                                    <span>{lang === 'th' ? '[แจ้งเปลี่ยนรูปแบบ]' : '[Change format]'}</span>
-                                    <ExternalLink className="w-3 h-3 inline shrink-0" />
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })()}
                         </div>
                       );
                     })()}
 
+                    {/* Pagination Navigation Footer (Previous Person / Next Person) */}
+                    {regMode === 'group' && attendees.length > 1 && (
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
+                        <button
+                          type="button"
+                          disabled={activeAttendeeIdx === 0}
+                          onClick={() => setActiveAttendeeIdx(Math.max(0, activeAttendeeIdx - 1))}
+                          className="px-3 py-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1 transition cursor-pointer"
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" />
+                          <span>{lang === 'th' ? 'คนก่อนหน้า' : 'Previous Person'}</span>
+                        </button>
+
+                        <span className="text-xs font-bold text-slate-500">
+                          {activeAttendeeIdx + 1} / {attendees.length}
+                        </span>
+
+                        {activeAttendeeIdx < attendees.length - 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => setActiveAttendeeIdx(activeAttendeeIdx + 1)}
+                            className="px-3 py-2 bg-[#0026b3] hover:bg-[#001f94] text-white text-xs font-bold rounded-xl flex items-center gap-1 transition cursor-pointer shadow-xs"
+                          >
+                            <span>{lang === 'th' ? 'คนถัดไป' : 'Next Person'}</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleAddAttendee}
+                            className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1 transition cursor-pointer shadow-xs"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>{lang === 'th' ? 'เพิ่มคนถัดไป' : 'Add Next'}</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
                     {/* High-Impact Call to Action Button to Payment Page */}
                     <button
                       type="submit"
-                      disabled={selectedPrograms.length === 0 || verifyingMember}
-                      className={`w-full font-black py-2.5 sm:py-3.5 px-4 sm:px-6 rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl transition-all flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-base border border-blue-400/20 relative overflow-hidden mt-2 sm:mt-3 ${selectedPrograms.length === 0 || verifyingMember
+                      disabled={verifyingMember}
+                      className={`w-full font-black py-2.5 sm:py-3.5 px-4 sm:px-6 rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl transition-all flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-base border border-blue-400/20 relative overflow-hidden mt-2 sm:mt-3 ${verifyingMember
                         ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
                         : 'bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] hover:brightness-110 text-white shadow-blue-900/30 hover:shadow-blue-900/40 cursor-pointer active:scale-[0.99] group'
                         }`}
                     >
-                      {/* Top glowing accent green line */}
                       <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#4ade80] to-transparent opacity-90" />
 
                       {verifyingMember ? (
                         <>
                           <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-white" />
                           <span className="tracking-wide">
-                            {lang === 'th' ? 'กำลังตรวจสอบสถานะสมาชิก...' : 'Verifying membership...'}
+                            {lang === 'th' ? 'กำลังตรวจสอบข้อมูลผู้ลงทะเบียน...' : 'Verifying registration data...'}
                           </span>
                         </>
                       ) : (
                         <>
                           <span className="tracking-wide">
-                            {lang === 'th' ? 'ดำเนินการต่อไปยังขั้นตอนชำระเงิน' : 'Proceed to Payment'}
+                            {regMode === 'group'
+                              ? (lang === 'th' ? `ดำเนินการชำระเงินสำหรับ ${attendees.length} ท่าน` : `Proceed to Payment (${attendees.length} Attendees)`)
+                              : (lang === 'th' ? 'ดำเนินการต่อไปยังขั้นตอนชำระเงิน' : 'Proceed to Payment')}
                           </span>
                           <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-[#4ade80] text-[#061d08] flex items-center justify-center shadow-xs group-hover:translate-x-1 transition-transform shrink-0">
                             <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
@@ -1169,11 +1354,11 @@ export function LoginView({
                       )}
                     </button>
                   </form>
+                  </div>
                 </>
               )}
             </div>
           ) : (
-
             /* View 2: TSRM Membership Application Form (Embedded cleanly) */
             <div className="w-full animate-fade-in">
               <SignupView
@@ -1220,7 +1405,7 @@ export function LoginView({
         onClose={() => setIsChangeFormatOpen(false)}
         meetingId={activeMeeting?.meeting_id}
         meetingName={activeMeeting?.meeting_name}
-        defaultMemberNo={formData.memberNo}
+        defaultMemberNo={currentAttendee?.memberNo || ''}
       />
     </div>
   );

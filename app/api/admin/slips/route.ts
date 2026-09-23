@@ -34,6 +34,25 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && (parsed.type === 'membership_group_registration' || (parsed.isGroup && parsed.applicants))) {
+        return {
+          activities: [{
+            id: 'membership_group_registration',
+            name: `ค่าบำรุงสมาชิกรายปีแบบกลุ่ม (${parsed.companyName || 'Corporate'} - ${parsed.applicants?.length || 0} ท่าน)`,
+            type: 'membership_group_registration',
+            price: parsed.amount || ((parsed.applicants?.length || 1) * 1000),
+            rateBadgeTh: `กลุ่ม ${parsed.applicants?.length || 0} ท่าน`,
+            rateBadgeEn: `Group (${parsed.applicants?.length || 0})`,
+          }],
+          isMembership: true,
+          isGroupMembership: true,
+          isFormatChange: false,
+          formatChangePayload: null,
+          memberPayload: null,
+          groupPayload: parsed,
+        };
+      }
+
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.type === 'membership_registration') {
         return {
           activities: [{
@@ -45,9 +64,11 @@ export async function GET(request: NextRequest) {
             rateBadgeEn: 'New Member',
           }],
           isMembership: true,
+          isGroupMembership: false,
           isFormatChange: false,
           formatChangePayload: null,
           memberPayload: parsed.memberPayload || null,
+          groupPayload: null,
         };
       }
 
@@ -338,8 +359,11 @@ export async function POST(request: NextRequest) {
 
     // Check if this slip is a membership registration or format change request
     let isMembershipRegistration = false;
+    let isGroupMembership = false;
+    let isGroupConference = false;
     let isFormatChange = false;
     let memberPayload: any = null;
+    let groupPayload: any = null;
     let formatChangePayload: any = null;
 
     if (slip.selected_activities) {
@@ -348,9 +372,16 @@ export async function POST(request: NextRequest) {
         try { actObj = JSON.parse(actObj); } catch {}
       }
       if (actObj && typeof actObj === 'object') {
-        if (actObj.type === 'membership_registration') {
+        if (actObj.type === 'membership_group_registration' || (actObj.isGroup && actObj.applicants)) {
+          isMembershipRegistration = true;
+          isGroupMembership = true;
+          groupPayload = actObj;
+        } else if (actObj.type === 'membership_registration') {
           isMembershipRegistration = true;
           memberPayload = actObj.memberPayload;
+        } else if (actObj.isGroup && actObj.attendees) {
+          isGroupConference = true;
+          groupPayload = actObj;
         } else if (actObj.isFormatChange) {
           isFormatChange = true;
           formatChangePayload = actObj;
@@ -361,8 +392,34 @@ export async function POST(request: NextRequest) {
     if (action === 'approve') {
       let assignedMemberNo = slip.member_no;
 
-      // 1. If this is a membership registration slip and member_no is not yet created, create Member now!
-      if (isMembershipRegistration && memberPayload && !assignedMemberNo) {
+      // 1. If this is a group membership registration slip, create members for all applicants!
+      if (isGroupMembership && groupPayload?.applicants && Array.isArray(groupPayload.applicants)) {
+        try {
+          for (const applicant of groupPayload.applicants) {
+            const cleanEmail = applicant.email?.trim()?.toLowerCase();
+            const existing = cleanEmail ? await prisma.member.findFirst({
+              where: { email: { equals: cleanEmail, mode: 'insensitive' } },
+            }) : null;
+
+            if (!existing) {
+              const created = await createMember(applicant);
+              if (applicant.email) {
+                try {
+                  await sendMembershipApprovedEmail({
+                    to: applicant.email,
+                    recipientName: applicant.full_name_th || applicant.full_name_en || 'สมาชิก',
+                    memberNo: created.member_no || '',
+                    amountPaid: 1000,
+                  });
+                } catch (e) {}
+              }
+            }
+          }
+        } catch (grpCreateErr: any) {
+          console.error('Failed to create group members on slip approval:', grpCreateErr);
+        }
+      } else if (isMembershipRegistration && memberPayload && !assignedMemberNo) {
+        // Individual membership registration
         try {
           const newMember = await createMember(memberPayload);
           assignedMemberNo = newMember.member_no;
@@ -463,7 +520,23 @@ export async function POST(request: NextRequest) {
 
       // 4. If conference meeting attendance exists, update meeting_attendances
       if (!isMembershipRegistration) {
-        if (assignedMemberNo) {
+        if (isGroupConference && groupPayload?.attendees && Array.isArray(groupPayload.attendees)) {
+          for (const att of groupPayload.attendees) {
+            if (att.isMember && att.memberNo) {
+              await prisma.$executeRaw`
+                UPDATE meeting_attendances
+                SET attendance_status = 'Registered'
+                WHERE meeting_id = ${slip.meeting_id} AND member_no = ${att.memberNo.trim()}
+              `;
+            } else if (att.email) {
+              await prisma.$executeRaw`
+                UPDATE meeting_attendances
+                SET attendance_status = 'Non-Member'
+                WHERE meeting_id = ${slip.meeting_id} AND attendee_email = ${att.email.trim().toLowerCase()}
+              `;
+            }
+          }
+        } else if (assignedMemberNo) {
           await prisma.$executeRaw`
             UPDATE meeting_attendances
             SET attendance_status = 'Registered'
@@ -478,7 +551,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 4. Send approval confirmation email
+      // 5. Send approval confirmation email
       const recipientEmail = slip.members?.email || slip.guest_email || memberPayload?.email || '';
       const recipientName = slip.members?.fullNameTh || slip.guest_name || memberPayload?.full_name_th || 'ผู้สมัครสมาชิก';
 

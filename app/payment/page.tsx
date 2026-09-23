@@ -26,6 +26,15 @@ function PaymentContent() {
 
 // Load conference registration payload if available
   const [regData, setRegData] = useState<{
+    isGroup?: boolean;
+    companyName?: string;
+    groupContact?: {
+      coordinatorName: string;
+      coordinatorEmail: string;
+      coordinatorPhone: string;
+      coordinatorTaxId?: string;
+    };
+    attendees?: any[];
     category?: string;
     meetingId?: string;
     meetingName?: string;
@@ -65,7 +74,6 @@ function PaymentContent() {
     workplace?: string;
     position?: string;
     positionCode?: string;
-    specialCode?: string;
     couponData?: {
       code: string;
       companyName: string;
@@ -135,6 +143,40 @@ function PaymentContent() {
   // Dynamic Pricing Calculation (Main Program uses Participant pricing + Workshops + Coupon deduction)
   const calculationResult = React.useMemo(() => {
     if (paymentType !== 'registration' || !regData) {
+      if (membershipRegData?.isGroup) {
+        const applicants = membershipRegData.applicants || [];
+        const feePerPerson = systemSettings.annual_membership_fee;
+        const total = applicants.length * feePerPerson;
+        const groupList = applicants.map((app: any) => ({
+          name: app.full_name_th || app.full_name_en || 'ผู้สมัคร',
+          email: app.email,
+          position: app.position || app.job_category,
+          workplace: app.workplace || membershipRegData.companyName,
+          price: feePerPerson,
+          isMember: false,
+          details: `ค่าบำรุงสมาชิกรายปี (${app.email || ''})`,
+        }));
+        return {
+          originalAmount: total,
+          totalAmount: total,
+          discountAmount: 0,
+          isCouponSponsored: false,
+          items: [] as Array<{
+            id: string;
+            name: string;
+            type: string;
+            format?: string;
+            date?: string;
+            price: number;
+            rateBadgeTh: string;
+            rateBadgeEn: string;
+          }>,
+          isMemberUser: false,
+          attendType: 'onsite' as const,
+          groupSummary: groupList,
+        };
+      }
+
       return {
         originalAmount: systemSettings.annual_membership_fee,
         totalAmount: systemSettings.annual_membership_fee,
@@ -152,6 +194,74 @@ function PaymentContent() {
         }>,
         isMemberUser: true,
         attendType: 'onsite' as const,
+        groupSummary: [] as Array<{
+          name: string;
+          email?: string;
+          position?: string;
+          workplace?: string;
+          price: number;
+          isMember?: boolean;
+          details?: string;
+        }>,
+      };
+    }
+
+    // Check if Corporate / Group Conference Registration
+    if (regData.isGroup && (regData as any).attendees) {
+      const attendees = (regData as any).attendees as any[];
+      const pricingTiers = regData.pricingTiers;
+      const basePrice = regData.basePrice ?? 0;
+      const allActivities = regData.selectedActivities || regData.activities || [];
+
+      let groupTotal = 0;
+      const groupList = attendees.map((att: any) => {
+        const isMem = Boolean(att.isMember) && !att.isExpiredMember && Boolean(att.memberNo?.trim());
+        const attType = (att.attendanceType === 'online' && isMem) ? 'online' : 'onsite';
+        
+        let personTotal = 0;
+        let mainPrice = 0;
+        if (attType === 'online') {
+          mainPrice = isMem
+            ? (pricingTiers?.participant?.onlineMember ?? basePrice ?? 3500)
+            : (pricingTiers?.participant?.onlineNonMember ?? (basePrice ? basePrice + 1000 : 4500));
+        } else {
+          mainPrice = isMem
+            ? (pricingTiers?.participant?.onsiteMember ?? basePrice ?? 3500)
+            : (pricingTiers?.participant?.onsiteNonMember ?? (basePrice ? basePrice + 1000 : 4500));
+        }
+        personTotal += mainPrice;
+
+        const selWorkshops = (att.selectedWorkshops || []) as string[];
+        if (selWorkshops.length > 0 && allActivities.length > 0) {
+          allActivities.filter((a: any) => selWorkshops.includes(a.id)).forEach((ws: any) => {
+            const mPrice = typeof ws.memberPrice === 'number' ? ws.memberPrice : 0;
+            const nonMPrice = typeof ws.nonMemberPrice === 'number' ? ws.nonMemberPrice : mPrice;
+            personTotal += isMem ? mPrice : nonMPrice;
+          });
+        }
+
+        groupTotal += personTotal;
+        return {
+          name: att.nameTh || att.nameEn || 'ผู้ลงทะเบียน',
+          email: att.email,
+          position: att.position,
+          workplace: att.workplace || (regData as any).companyName,
+          price: personTotal,
+          isMember: isMem,
+          attendanceType: attType,
+          details: `${attType === 'online' ? '💻 Online' : '🏢 Onsite'}${selWorkshops.length > 0 ? ` + ${selWorkshops.length} เวิร์กช็อป` : ''}`,
+        };
+      });
+
+      return {
+        originalAmount: groupTotal,
+        totalAmount: groupTotal,
+        discountAmount: 0,
+        isCouponSponsored: false,
+        items: [] as any[],
+        isMemberUser: false,
+        attendType: 'onsite' as const,
+        groupSummary: groupList,
       };
     }
 
@@ -251,8 +361,17 @@ function PaymentContent() {
       items,
       isMemberUser,
       attendType,
+      groupSummary: [] as Array<{
+        name: string;
+        email?: string;
+        position?: string;
+        workplace?: string;
+        price: number;
+        isMember?: boolean;
+        details?: string;
+      }>,
     };
-  }, [paymentType, regData, systemSettings]);
+  }, [paymentType, regData, membershipRegData, systemSettings]);
 
   const bankAccountNumber = systemSettings.bank_account_no;
 
@@ -295,37 +414,61 @@ function PaymentContent() {
 
       setSubmitting(true);
       try {
-        const isMember = calculationResult.isMemberUser;
-        const selectedActivitiesPayload = calculationResult.items.map(item => ({
-          id: item.id,
-          name: item.name,
-          type: item.type,
-          price: item.price,
-          date: item.date,
-        }));
+        if ((regData as any)?.isGroup) {
+          // Group Conference Registration Submission
+          const res = await fetch(`/api/meetings/${meetingId}/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              isGroup: true,
+              companyName: (regData as any).companyName,
+              groupContact: (regData as any).groupContact,
+              attendees: (regData as any).attendees,
+              amount: calculationResult.totalAmount,
+              originalAmount: calculationResult.originalAmount,
+              bank: systemSettings.bank_name,
+              slipUrl: uploadedSlipData?.fileUrl || '',
+            }),
+          });
 
-        const res = await fetch(`/api/meetings/${meetingId}/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            isMember: isMember,
-            memberNo: isMember ? regData?.memberNo : undefined,
-            guestName: !isMember ? (regData?.nameTh || regData?.nameEn || 'Guest Attendee') : undefined,
-            guestEmail: !isMember ? (regData?.email || 'guest@tsrm.org') : undefined,
-            guestPhone: undefined,
-            guestWorkplace: !isMember ? (regData?.workplace || null) : undefined,
-            amount: calculationResult.totalAmount,
-            originalAmount: calculationResult.originalAmount,
-            couponCode: regData?.couponData?.code || regData?.specialCode || undefined,
-            bank: isFreeOrSponsored ? `สิทธิ์สปอนเซอร์: ${regData?.couponData?.companyName || 'Corporate Pass'}` : systemSettings.bank_name,
-            slipUrl: uploadedSlipData?.fileUrl || (isFreeOrSponsored ? `SPONSORED:${regData?.couponData?.companyName || 'COUPON'}` : undefined),
-            selectedActivities: selectedActivitiesPayload,
-          }),
-        });
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.error || 'Failed to submit group conference registration');
+          }
+        } else {
+          // Individual Conference Registration Submission
+          const isMember = calculationResult.isMemberUser;
+          const selectedActivitiesPayload = calculationResult.items.map(item => ({
+            id: item.id,
+            name: item.name,
+            type: item.type,
+            price: item.price,
+            date: item.date,
+          }));
 
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || 'Failed to submit conference registration');
+          const res = await fetch(`/api/meetings/${meetingId}/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              isMember: isMember,
+              memberNo: isMember ? regData?.memberNo : undefined,
+              guestName: !isMember ? (regData?.nameTh || regData?.nameEn || 'Guest Attendee') : undefined,
+              guestEmail: !isMember ? (regData?.email || 'guest@tsrm.org') : undefined,
+              guestPhone: undefined,
+              guestWorkplace: !isMember ? (regData?.workplace || null) : undefined,
+              amount: calculationResult.totalAmount,
+              originalAmount: calculationResult.originalAmount,
+              couponCode: regData?.couponData?.code || undefined,
+              bank: isFreeOrSponsored ? `สิทธิ์สปอนเซอร์: ${regData?.couponData?.companyName || 'Corporate Pass'}` : systemSettings.bank_name,
+              slipUrl: uploadedSlipData?.fileUrl || (isFreeOrSponsored ? `SPONSORED:${regData?.couponData?.companyName || 'COUPON'}` : undefined),
+              selectedActivities: selectedActivitiesPayload,
+            }),
+          });
+
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.error || 'Failed to submit conference registration');
+          }
         }
 
         // Successfully registered
@@ -350,12 +493,17 @@ function PaymentContent() {
 
       setSubmitting(true);
       try {
+        const isGroupMembership = Boolean(membershipRegData.isGroup);
         const res = await fetch('/api/members/register-slip', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            memberPayload: membershipRegData,
-            amount: systemSettings.annual_membership_fee,
+            isGroup: isGroupMembership,
+            companyName: membershipRegData.companyName,
+            groupContact: membershipRegData.groupContact,
+            applicants: membershipRegData.applicants,
+            memberPayload: isGroupMembership ? undefined : membershipRegData,
+            amount: calculationResult.totalAmount,
             bank: systemSettings.bank_name,
             slipUrl: uploadedSlipData?.fileUrl || '',
           }),
@@ -416,7 +564,10 @@ function PaymentContent() {
       <main className="w-full min-h-screen bg-[#f6f8fc] shadow-2xl flex flex-col justify-between relative border-x border-slate-200/80 overflow-hidden transition-all duration-300">
         <PaymentView
           paymentType={paymentType}
-          customAmount={paymentType === 'registration' ? calculationResult.totalAmount : undefined}
+          customAmount={calculationResult.totalAmount}
+          isGroup={Boolean(paymentType === 'registration' ? regData?.isGroup : membershipRegData?.isGroup)}
+          companyName={paymentType === 'registration' ? regData?.companyName : membershipRegData?.companyName}
+          groupAttendees={calculationResult.groupSummary}
           isMember={paymentType === 'registration' ? calculationResult.isMemberUser : true}
           attendeeName={paymentType === 'registration' ? (regData?.nameTh || regData?.nameEn) : (membershipRegData?.full_name_th || membershipRegData?.full_name_en)}
           attendeePosition={paymentType === 'registration' ? regData?.position : (membershipRegData?.position || membershipRegData?.job_category)}
@@ -427,7 +578,7 @@ function PaymentContent() {
           itemizedActivities={calculationResult.items}
           isCouponSponsored={calculationResult.isCouponSponsored}
           sponsorCompanyName={regData?.couponData?.companyName}
-          couponCode={regData?.couponData?.code || regData?.specialCode}
+          couponCode={regData?.couponData?.code}
           discountAmount={calculationResult.discountAmount}
           submitting={submitting}
           onOpenUploadModal={() => setUploadModalOpen(true)}

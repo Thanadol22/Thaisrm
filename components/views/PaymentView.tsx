@@ -30,9 +30,23 @@ export interface ItemizedActivity {
   rateBadgeEn?: string;
 }
 
+export interface GroupAttendeeSummary {
+  name: string;
+  email?: string;
+  position?: string;
+  workplace?: string;
+  price: number;
+  isMember?: boolean;
+  attendanceType?: string;
+  details?: string;
+}
+
 interface PaymentViewProps {
   paymentType?: 'registration' | 'membership';
   customAmount?: number;
+  isGroup?: boolean;
+  companyName?: string;
+  groupAttendees?: GroupAttendeeSummary[];
   isMember?: boolean;
   isExpiredMember?: boolean;
   expireDate?: string | null;
@@ -62,6 +76,9 @@ interface PaymentViewProps {
 export function PaymentView({
   paymentType = 'membership',
   customAmount,
+  isGroup = false,
+  companyName,
+  groupAttendees = [],
   isMember = true,
   isExpiredMember = false,
   expireDate,
@@ -204,7 +221,7 @@ export function PaymentView({
 
 
         {/* Expired Member Notification Banner */}
-        {isRegistration && isExpiredMember && (
+        {isRegistration && isExpiredMember && !isGroup && (
           <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-3.5 sm:p-4 flex items-start gap-3 shadow-2xs animate-fade-in">
             <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0 mt-0.5 border border-amber-200">
               <AlertTriangle className="w-4 h-4 stroke-[2.5]" />
@@ -222,6 +239,30 @@ export function PaymentView({
           </div>
         )}
 
+        {/* Corporate / Group Registration Summary Banner */}
+        {isGroup && (
+          <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-3.5 sm:p-4 flex items-start gap-3 shadow-2xs animate-fade-in">
+            <div className="w-8 h-8 rounded-xl bg-[#0026b3] text-white flex items-center justify-center shrink-0 mt-0.5">
+              <Sparkles className="w-4 h-4 stroke-[2.5]" />
+            </div>
+            <div className="space-y-0.5 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-black uppercase tracking-wider bg-[#0026b3] text-white px-2 py-0.5 rounded">
+                  {lang === 'th' ? 'แบบกลุ่มสำหรับบริษัท' : 'Corporate / Group'}
+                </span>
+                <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-tight truncate">
+                  {companyName || (lang === 'th' ? 'แบบกลุ่มสำหรับบริษัท' : 'Corporate Group')}
+                </h4>
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed font-medium">
+                {lang === 'th'
+                  ? `รวมผู้ลงทะเบียน/สมัครทั้งหมด ${groupAttendees.length} ท่าน (ชำระรวมในใบเสร็จ/สลิปเดียว)`
+                  : `Total ${groupAttendees.length} attendees/applicants (Combined single invoice payment)`}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Pass Details White Card & Invoice Breakdown */}
         <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-sm space-y-4">
           <div className="flex items-center justify-between gap-2">
@@ -229,13 +270,59 @@ export function PaymentView({
               {displayProgramName}
             </h3>
             <span className="bg-[#eff4ff] text-[#0026b3] text-[9px] sm:text-[10px] font-black tracking-widest px-2.5 sm:px-3 py-1 rounded-full border border-[#d6e4ff] shrink-0 whitespace-nowrap uppercase">
-              {displayBadge}
+              {isGroup ? (lang === 'th' ? `กลุ่ม ${groupAttendees.length} ท่าน` : `Group (${groupAttendees.length})`) : displayBadge}
             </span>
           </div>
 
           {/* Itemized Price Breakdown Table */}
           <div className="space-y-2.5 pt-1">
-            {isRegistration ? (
+            {/* Group Attendees Roster Breakdown */}
+            {isGroup && groupAttendees.length > 0 ? (
+              <div className="space-y-2 pb-2">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                  {lang === 'th' ? 'รายชื่อและค่าธรรมเนียมของผู้สมัคร/ผู้ลงทะเบียนแต่ละท่าน:' : 'Itemized Attendee / Applicant Roster:'}
+                </span>
+                <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-2xl overflow-hidden bg-slate-50/50">
+                  {groupAttendees.map((att, idx) => (
+                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:px-4 gap-2 bg-white hover:bg-slate-50/80 transition">
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="w-5 h-5 rounded-full bg-[#0026b3] text-white text-[10px] font-black flex items-center justify-center shrink-0">
+                            {idx + 1}
+                          </span>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-900 truncate">
+                            {att.name}
+                          </h4>
+                          {att.position && (
+                            <span className="text-[10px] text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded">
+                              {att.position}
+                            </span>
+                          )}
+                          {att.isMember !== undefined && (
+                            <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                              att.isMember ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-700'
+                            }`}>
+                              {att.isMember ? (lang === 'th' ? 'สมาชิก' : 'Member') : (lang === 'th' ? 'บุคคลทั่วไป' : 'Non-Member')}
+                            </span>
+                          )}
+                        </div>
+                        {att.details && (
+                          <p className="text-[11px] text-slate-500 font-medium pl-7">
+                            {att.details}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="text-right shrink-0 pl-7 sm:pl-0">
+                        <span className="text-xs sm:text-sm font-black text-[#0026b3]">
+                          {att.price.toLocaleString()} <span className="text-[11px] font-bold text-slate-600">{lang === 'th' ? 'บาท' : 'THB'}</span>
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : isRegistration ? (
               <>
                 {displayItems.length > 0 ? (
                   <div className="space-y-2 pb-2">

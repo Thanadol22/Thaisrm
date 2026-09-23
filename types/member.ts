@@ -75,6 +75,8 @@ export interface Member {
   membership_type?: string | null; // ประเภทสมาชิก เช่น Regular (สามัญ), Lifelong (ตลอดชีพ)
   expire_date?: string | null; // วันหมดอายุ
   photo_path?: string | null; // รูปถ่าย (path/URL)
+  degree_cert_doc?: string | null; // เอกสารปริญญาบัตร (path/URL)
+  work_cert_doc?: string | null; // เอกสารใบรับรองงาน (path/URL)
   qr_code_path?: string | null; // QR code (path/URL หรือ Base64 Data URL)
   created_at: string;
   updated_at: string;
@@ -116,6 +118,8 @@ export interface CreateMemberInput {
   scientist_reg_no?: string | null;
   scientist_reg_nw?: string | null;
   photo_path?: string | null;
+  degree_cert_doc?: string | null;
+  work_cert_doc?: string | null;
   educations?: Omit<MemberEducation, 'education_id' | 'member_id'>[];
 }
 
@@ -142,6 +146,8 @@ export interface UpdateMemberInput {
   scientist_reg_no?: string | null;
   scientist_reg_nw?: string | null;
   photo_path?: string | null;
+  degree_cert_doc?: string | null;
+  work_cert_doc?: string | null;
   educations?: Omit<MemberEducation, 'member_id'>[];
 }
 

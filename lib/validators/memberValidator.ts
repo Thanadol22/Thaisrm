@@ -126,6 +126,14 @@ export function sanitizeMemberInput<T extends CreateMemberInput | UpdateMemberIn
     const cleaned = sanitizeString(sanitized.photo_path);
     sanitized.photo_path = cleaned !== '' ? cleaned : null;
   }
+  if (sanitized.degree_cert_doc !== undefined) {
+    const cleaned = sanitizeString(sanitized.degree_cert_doc);
+    sanitized.degree_cert_doc = cleaned !== '' ? cleaned : null;
+  }
+  if (sanitized.work_cert_doc !== undefined) {
+    const cleaned = sanitizeString(sanitized.work_cert_doc);
+    sanitized.work_cert_doc = cleaned !== '' ? cleaned : null;
+  }
 
   if (sanitized.educations && Array.isArray(sanitized.educations)) {
     sanitized.educations = sanitized.educations

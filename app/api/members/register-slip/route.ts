@@ -6,6 +6,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
+      isGroup,
+      companyName,
+      groupContact,
+      applicants,
       memberPayload,
       amount,
       bank,
@@ -15,16 +19,114 @@ export async function POST(request: NextRequest) {
       slipUrl,
     } = body;
 
-    if (!memberPayload || !memberPayload.full_name_th || !memberPayload.full_name_th.trim()) {
+    if (!slipUrl) {
       return NextResponse.json(
-        { success: false, error: 'กรุณากรอกชื่อ-นามสกุล (ภาษาไทย)' },
+        { success: false, error: 'กรุณาแนบรูปภาพสลิปหลักฐานการโอนเงิน' },
         { status: 400 }
       );
     }
 
-    if (!slipUrl) {
+    // Find active meeting ID for Foreign Key
+    let meetingId = 'TSRM34';
+    const activeMeeting = await prisma.meetings.findFirst({
+      orderBy: { meeting_date: 'desc' },
+      select: { meeting_id: true },
+    });
+
+    if (activeMeeting) {
+      meetingId = activeMeeting.meeting_id;
+    } else {
+      const anyMeeting = await prisma.meetings.findFirst({
+        select: { meeting_id: true },
+      });
+      if (anyMeeting) {
+        meetingId = anyMeeting.meeting_id;
+      }
+    }
+
+    // Handle Corporate / Group Membership Application
+    if (isGroup) {
+      if (!Array.isArray(applicants) || applicants.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'กรุณาระบุรายชื่อผู้สมัครสมาชิกอย่างน้อย 1 ท่าน' },
+          { status: 400 }
+        );
+      }
+
+      // Check duplicates for each applicant's email
+      for (const app of applicants) {
+        const appEmail = app.email?.trim()?.toLowerCase();
+        if (appEmail) {
+          const existing = await prisma.member.findFirst({
+            where: { email: { equals: appEmail, mode: 'insensitive' } },
+            select: { member_no: true, fullNameTh: true },
+          });
+          if (existing) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `อีเมล ${appEmail} (${app.full_name_th || ''}) เป็นสมาชิกในระบบแล้ว (รหัส: ${existing.member_no})`,
+                code: 'DUPLICATE_MEMBER_EMAIL',
+              },
+              { status: 400 }
+            );
+          }
+        }
+      }
+
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      const ticketCode = `MEMGRP-${new Date().getFullYear()}-${randomSuffix}`;
+      const slipId = `SLIP-MEMGRP-${Date.now().toString(36).toUpperCase()}`;
+
+      const groupPayload = {
+        isGroup: true,
+        type: 'membership_group_registration',
+        companyName: companyName || 'Corporate Group',
+        groupContact: groupContact || null,
+        applicants: applicants,
+        submittedAt: new Date().toISOString(),
+        amount: Number(amount) || applicants.length * 1000,
+      };
+
+      const slip = await prisma.payment_slips.create({
+        data: {
+          slip_id: slipId,
+          meeting_id: meetingId,
+          member_no: null,
+          guest_name: `${companyName || 'Corporate Group'} (${applicants.length} ท่าน)`,
+          guest_email: groupContact?.coordinatorEmail || applicants[0]?.email || null,
+          guest_phone: groupContact?.coordinatorPhone || applicants[0]?.mobile || null,
+          guest_workplace: companyName || null,
+          is_member: false,
+          ticket_code: ticketCode,
+          amount: Number(amount) || applicants.length * 1000,
+          bank: bank || 'Kasikorn (KBANK)',
+          transfer_date: transferDate || null,
+          transfer_time: transferTime || null,
+          ref_no: refNo || null,
+          slip_url: slipUrl,
+          status: 'pending',
+          selected_activities: groupPayload as any,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          slipId: slip.slip_id,
+          ticketCode,
+          status: 'pending',
+          isGroup: true,
+          applicantCount: applicants.length,
+          message: 'ส่งใบสมัครสมาชิกแบบกลุ่มและหลักฐานการชำระเงินเรียบร้อยแล้ว กรุณารอเจ้าหน้าที่ตรวจสอบและอนุมัติ',
+        },
+      }, { status: 201 });
+    }
+
+    // Individual Membership Application
+    if (!memberPayload || !memberPayload.full_name_th || !memberPayload.full_name_th.trim()) {
       return NextResponse.json(
-        { success: false, error: 'กรุณาแนบรูปภาพสลิปหลักฐานการโอนเงิน' },
+        { success: false, error: 'กรุณากรอกชื่อ-นามสกุล (ภาษาไทย)' },
         { status: 400 }
       );
     }
@@ -66,25 +168,6 @@ export async function POST(request: NextRequest) {
           },
           { status: 400 }
         );
-      }
-    }
-
-    // 3. หา meeting_id ที่มีอยู่ในตาราง meetings สำหรับผูก Foreign Key
-    let meetingId = 'TSRM34';
-    const activeMeeting = await prisma.meetings.findFirst({
-      orderBy: { meeting_date: 'desc' },
-      select: { meeting_id: true },
-    });
-
-    if (activeMeeting) {
-      meetingId = activeMeeting.meeting_id;
-    } else {
-      // Fallback: ดึง meeting id ใดๆ ที่มี
-      const anyMeeting = await prisma.meetings.findFirst({
-        select: { meeting_id: true },
-      });
-      if (anyMeeting) {
-        meetingId = anyMeeting.meeting_id;
       }
     }
 

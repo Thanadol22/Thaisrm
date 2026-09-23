@@ -29,12 +29,6 @@ const COMMON_DOMAINS = [
   'outlook.com',
   'yahoo.com',
   'icloud.com',
-  'chula.ac.th',
-  'mahidol.ac.th',
-  'kku.ac.th',
-  'cmu.ac.th',
-  'psu.ac.th',
-  'moph.mail.go.th',
 ];
 
 // ตารางคำผิดยอดนิยมที่ระบุไว้ชัดเจน
@@ -80,8 +74,6 @@ const EXPLICIT_DOMAIN_TYPOS: Record<string, string> = {
   'icoud.com': 'icloud.com',
   'iclod.com': 'icloud.com',
   'icloud.con': 'icloud.com',
-  'chula.com': 'chula.ac.th',
-  'mahidol.com': 'mahidol.ac.th',
 };
 
 /**
@@ -275,7 +267,7 @@ export function SmartEmailInput({
             {required && <span className="text-rose-500 font-bold">*</span>}
           </span>
           <span className="text-[10px] text-slate-400 font-normal">
-            {lang === 'th' ? 'รองรับทุกโดเมน (Gmail, Hotmail, องค์กร)' : 'Supports all domains'}
+            {lang === 'th' ? 'รองรับทุกโดเมน (Gmail, Hotmail, Outlook ฯลฯ)' : 'Supports all email providers'}
           </span>
         </label>
       )}
