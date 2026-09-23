@@ -89,8 +89,8 @@ export function StaffScannerView() {
         if (json.stats) {
           setStats(json.stats);
         }
-        if (json.meeting && !activeMeeting) {
-          setActiveMeeting(json.meeting);
+        if (json.meeting) {
+          setActiveMeeting(prev => prev || json.meeting);
         }
       }
     } catch (err) {
@@ -98,7 +98,7 @@ export function StaffScannerView() {
     } finally {
       setIsRefreshingStats(false);
     }
-  }, [activeMeeting]);
+  }, []);
 
   // Check saved staff session on mount
   useEffect(() => {
@@ -347,14 +347,27 @@ export function StaffScannerView() {
     }
   }, [activeMeeting?.id, savedPin, t.staff.unidentified]);
 
+  // Refs to avoid restarting camera when scan processing state changes
+  const isProcessingRef = useRef(isProcessing);
+  useEffect(() => {
+    isProcessingRef.current = isProcessing;
+  }, [isProcessing]);
+
+  const handleProcessScanRef = useRef(handleProcessScan);
+  useEffect(() => {
+    handleProcessScanRef.current = handleProcessScan;
+  }, [handleProcessScan]);
+
   // Initialize html5-qrcode real camera scanner (strictly Back Camera)
   useEffect(() => {
     let html5QrcodeScanner: Html5Qrcode | null = null;
+    let isMounted = true;
 
     const startScanner = async () => {
       try {
         setCameraPermissionError(null);
         const { Html5Qrcode: Html5QrcodeClass } = await import('html5-qrcode');
+        if (!isMounted) return;
         html5QrcodeScanner = new Html5QrcodeClass(readerId);
         scannerRef.current = html5QrcodeScanner;
 
@@ -369,15 +382,17 @@ export function StaffScannerView() {
           { facingMode: 'environment' },
           config,
           (decodedText: string) => {
-            if (!isProcessing) {
-              handleProcessScan(decodedText);
+            if (!isProcessingRef.current) {
+              handleProcessScanRef.current(decodedText);
             }
           },
           undefined
         );
       } catch (err: unknown) {
-        console.error("Camera Scanner Error:", err);
-        setCameraPermissionError(cameraPermErrorRef.current);
+        if (isMounted) {
+          console.error("Camera Scanner Error:", err);
+          setCameraPermissionError(cameraPermErrorRef.current);
+        }
       }
     };
 
@@ -386,6 +401,7 @@ export function StaffScannerView() {
     }
 
     return () => {
+      isMounted = false;
       if (scannerRef.current && scannerRef.current.isScanning) {
         scannerRef.current
           .stop()
@@ -393,7 +409,7 @@ export function StaffScannerView() {
           .catch((err: unknown) => console.error("Error stopping scanner:", err));
       }
     };
-  }, [isCameraOn, isAuthenticated, isProcessing, handleProcessScan]);
+  }, [isCameraOn, isAuthenticated]);
 
   const handleManualCheckIn = (e?: React.FormEvent) => {
     if (e) e.preventDefault();

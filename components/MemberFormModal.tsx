@@ -649,8 +649,7 @@ export function MemberFormModal({
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-medium bg-white focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent"
                   >
                     <option value="Regular">สามัญ</option>
-                    <option value="Associate">วิสามัญ</option>
-                    <option value="Honorary">กิตติมศักดิ์</option>
+                    <option value="Lifelong">ตลอดชีพ (ไม่มีวันหมดอายุ)</option>
                   </select>
                 </div>
 

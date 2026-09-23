@@ -220,20 +220,66 @@ export async function getMeetings(params: GetMeetingsParams = {}) {
     where.meeting_type = meeting_type;
   }
 
-  const [meetings, total] = await Promise.all([
-    prisma.meetings.findMany({
-      where,
-      orderBy: { [sort_by]: order },
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        _count: {
-          select: { meeting_attendances: true },
+  let meetings: any[] = [];
+  let total = 0;
+
+  try {
+    const [mList, mTotal] = await Promise.all([
+      prisma.meetings.findMany({
+        where,
+        orderBy: { [sort_by]: order },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          _count: {
+            select: { meeting_attendances: true },
+          },
         },
-      },
-    }),
-    prisma.meetings.count({ where }),
-  ]);
+      }),
+      prisma.meetings.count({ where }),
+    ]);
+    meetings = mList;
+    total = mTotal;
+  } catch (findErr: any) {
+    console.error('getMeetings findMany error (attempting safe raw query fallback):', findErr?.message);
+    try {
+      const rawList: any[] = await prisma.$queryRaw`
+        SELECT 
+          meeting_id,
+          meeting_name,
+          meeting_date,
+          start_date,
+          end_date,
+          counts_toward_active,
+          meeting_time,
+          location,
+          meeting_type,
+          staff_code,
+          description,
+          base_price,
+          pricing_tiers,
+          activities,
+          max_seats,
+          status
+        FROM meetings
+        ORDER BY meeting_date DESC
+      `;
+      const attCounts: any[] = await prisma.$queryRaw`
+        SELECT meeting_id, COUNT(*)::int as count FROM meeting_attendances GROUP BY meeting_id
+      `;
+      const attCountMap = new Map<string, number>();
+      attCounts.forEach((ac: any) => attCountMap.set(ac.meeting_id, Number(ac.count) || 0));
+
+      meetings = rawList.map((m: any) => ({
+        ...m,
+        _count: { meeting_attendances: attCountMap.get(m.meeting_id) || 0 },
+      }));
+      total = meetings.length;
+    } catch (rawErr) {
+      console.error('Safe raw query fallback failed:', rawErr);
+      throw findErr;
+    }
+  }
 
   // Aggregate attended count and approved revenue from DB
   const meetingIds = meetings.map((m) => m.meeting_id);
@@ -337,16 +383,35 @@ export async function getMeetings(params: GetMeetingsParams = {}) {
 /* ─── READ (Single by ID) ──────────────────────────────────────────── */
 
 export async function getMeetingById(meetingId: string) {
-  const meeting = await prisma.meetings.findUnique({
-    where: { meeting_id: meetingId },
-    include: {
-      _count: {
-        select: { meeting_attendances: true },
+  try {
+    const meeting = await prisma.meetings.findUnique({
+      where: { meeting_id: meetingId },
+      include: {
+        _count: {
+          select: { meeting_attendances: true },
+        },
       },
-    },
-  });
-
-  return meeting;
+    });
+    return meeting;
+  } catch (err: any) {
+    console.error('getMeetingById findUnique error (safe fallback):', err?.message);
+    try {
+      const raw: any[] = await prisma.$queryRaw`
+        SELECT * FROM meetings WHERE meeting_id = ${meetingId} LIMIT 1
+      `;
+      const meeting = raw[0] || null;
+      if (meeting) {
+        const attCount: any[] = await prisma.$queryRaw`
+          SELECT COUNT(*)::int as count FROM meeting_attendances WHERE meeting_id = ${meetingId}
+        `;
+        meeting._count = { meeting_attendances: Number(attCount[0]?.count) || 0 };
+      }
+      return meeting;
+    } catch (rawErr) {
+      console.error('getMeetingById safe fallback failed:', rawErr);
+      return null;
+    }
+  }
 }
 
 /* ─── READ (Latest Active/Open Meeting) ────────────────────────────── */
@@ -357,18 +422,40 @@ export async function getLatestActiveMeeting(forceFresh = false) {
     return latestMeetingCache.data;
   }
 
-  // Find latest meeting that is 'upcoming' or 'ongoing' ordered by meeting_date desc
-  const meeting = await prisma.meetings.findFirst({
-    where: {
-      status: { in: ['upcoming', 'ongoing'] },
-    },
-    orderBy: { meeting_date: 'desc' },
-    include: {
-      _count: {
-        select: { meeting_attendances: true },
+  let meeting: any = null;
+  try {
+    meeting = await prisma.meetings.findFirst({
+      where: {
+        status: { in: ['upcoming', 'ongoing'] },
       },
-    },
-  });
+      orderBy: { meeting_date: 'desc' },
+      include: {
+        _count: {
+          select: { meeting_attendances: true },
+        },
+      },
+    });
+  } catch (err: any) {
+    console.error('getLatestActiveMeeting findFirst error (safe fallback):', err?.message);
+    try {
+      const raw: any[] = await prisma.$queryRaw`
+        SELECT * FROM meetings 
+        WHERE status IN ('upcoming', 'ongoing') 
+        ORDER BY meeting_date DESC 
+        LIMIT 1
+      `;
+      meeting = raw[0] || null;
+      if (meeting) {
+        const attCount: any[] = await prisma.$queryRaw`
+          SELECT COUNT(*)::int as count FROM meeting_attendances WHERE meeting_id = ${meeting.meeting_id}
+        `;
+        meeting._count = { meeting_attendances: Number(attCount[0]?.count) || 0 };
+      }
+    } catch (rawErr) {
+      console.error('getLatestActiveMeeting safe fallback failed:', rawErr);
+      meeting = null;
+    }
+  }
 
   latestMeetingCache = { data: meeting, timestamp: now };
   return meeting;
