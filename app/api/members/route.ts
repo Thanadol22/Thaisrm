@@ -72,10 +72,15 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/members
- * บันทึกใบสมัครสมาชิกใหม่
+ * บันทึกข้อมูลสมาชิกใหม่โดยตรง (Admin Only)
+ * หากต้องการสมัครสมาชิกแบบ Public ให้ใช้ POST /api/members/register-slip แทน
  * Body: CreateMemberInput
  */
 export async function POST(req: NextRequest) {
+  const session = getAdminSessionFromRequest(req);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const body: CreateMemberInput = await req.json();
 

@@ -5,7 +5,7 @@ import {
   ADMIN_COOKIE_NAME,
   ADMIN_SESSION_MAX_AGE,
 } from '@/lib/security/adminAuth';
-import { getClientIp, checkRateLimit } from '@/lib/security/rateLimiter';
+import { getClientIp, checkRateLimitAsync } from '@/lib/security/rateLimiter';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const ip = getClientIp(req);
 
     // Rate Limiting: Max 5 attempts per minute, ban for 15 minutes if exceeded
-    const rateLimitResult = checkRateLimit(`admin-login:${ip}`, {
+    const rateLimitResult = await checkRateLimitAsync(`admin-login:${ip}`, {
       maxRequests: 5,
       windowSeconds: 60,
       banDurationSeconds: 900, // 15 minutes
@@ -45,8 +45,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify credentials
-    const isValid = verifyAdminCredentials(username, password);
+    // Verify credentials (async เพราะใช้ bcrypt)
+    const isValid = await verifyAdminCredentials(username, password);
 
     if (!isValid) {
       return NextResponse.json(

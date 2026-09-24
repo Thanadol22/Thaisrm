@@ -288,6 +288,20 @@ export default function AdminPage() {
     }
   }, [activeTab, fetchAttendees, fetchMeetings, fetchSlips, fetchReceipts]);
 
+  // Auto-refresh Dashboard data every 30 seconds when activeTab === 'dashboard'
+  useEffect(() => {
+    if (activeTab !== 'dashboard' || !isAuthenticated) return;
+
+    const interval = setInterval(() => {
+      fetchMeetings();
+      fetchSlips();
+      fetchAttendees();
+      fetchMembersCount();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [activeTab, isAuthenticated, fetchMeetings, fetchSlips, fetchAttendees, fetchMembersCount]);
+
   // Global Receipt Modal for quick print from attendees/slips
   const [globalReceipt, setGlobalReceipt] = useState<ReceiptData | null>(null);
   const [isGlobalReceiptOpen, setIsGlobalReceiptOpen] = useState(false);

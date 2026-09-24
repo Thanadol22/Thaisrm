@@ -9,7 +9,12 @@ export const revalidate = 0;
  * GET /api/admin/settings
  * Read current system settings
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const session = getAdminSessionFromRequest(req);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const settings = await getSystemSettings();
     return NextResponse.json({

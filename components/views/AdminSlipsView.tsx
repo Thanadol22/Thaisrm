@@ -717,7 +717,7 @@ export function AdminSlipsView() {
                   className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 cursor-pointer hover:border-[#0026b3] transition shadow-2xs relative group"
                   title="คลิกเพื่อดูรูปสลิปขนาดใหญ่"
                 >
-                  {slip.slipUrl ? (
+                  {slip.slipUrl && slip.slipUrl !== 'PAY_LATER' && slip.slipUrl !== 'pay_later_pending' && slip.slipUrl !== '/placeholder-slip.png' ? (
                     <img
                       src={slip.slipUrl}
                       alt="Slip Thumbnail"
@@ -726,6 +726,11 @@ export function AdminSlipsView() {
                         (e.currentTarget as HTMLElement).style.display = 'none';
                       }}
                     />
+                  ) : slip.slipUrl === 'PAY_LATER' || slip.slipUrl === 'pay_later_pending' ? (
+                    <div className="flex flex-col items-center justify-center p-1 text-center bg-amber-50 text-amber-700 w-full h-full">
+                      <Clock className="w-4 h-4 text-amber-500 mb-0.5" />
+                      <span className="text-[8px] font-bold leading-tight">ชำระภายหลัง</span>
+                    </div>
                   ) : (
                     <Receipt className="w-5 h-5 text-slate-400" />
                   )}
@@ -1020,7 +1025,7 @@ export function AdminSlipsView() {
               {/* Modal Body */}
               <div className="p-4 sm:p-5 space-y-3.5">
                 {/* Slip Viewport - Compact Display */}
-                {selectedSlip.slipUrl ? (
+                {selectedSlip.slipUrl && selectedSlip.slipUrl !== 'PAY_LATER' && selectedSlip.slipUrl !== 'pay_later_pending' && selectedSlip.slipUrl !== '/placeholder-slip.png' ? (
                   <div className="bg-slate-950 rounded-2xl p-2.5 flex flex-col items-center justify-center border border-slate-800/80">
                     <img
                       src={selectedSlip.slipUrl}
@@ -1037,6 +1042,23 @@ export function AdminSlipsView() {
                         <ExternalLink className="w-3 h-3 text-[#4ade80]" />
                         <span>เปิดดูภาพขนาดเต็ม</span>
                       </a>
+                    </div>
+                  </div>
+                ) : selectedSlip.slipUrl === 'PAY_LATER' || selectedSlip.slipUrl === 'pay_later_pending' ? (
+                  <div className="bg-amber-950/60 rounded-2xl p-4 flex flex-col items-center justify-center text-center text-amber-200 space-y-2 border border-amber-600/40">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center border border-amber-500/30">
+                      <Clock className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider block">
+                        PAY LATER / ชำระเงินภายหลัง
+                      </span>
+                      <p className="text-sm font-bold text-amber-100 mt-1">
+                        ผู้สมัครเลือกชำระเงินภายหลัง (ยังไม่มีไฟล์สลิป)
+                      </p>
+                      <p className="text-xs text-amber-300/80 mt-0.5">
+                        ยอดที่ต้องชำระ: ฿{selectedSlip.amount.toLocaleString()} THB
+                      </p>
                     </div>
                   </div>
                 ) : (

@@ -85,44 +85,19 @@ export async function POST(
         submittedAt: new Date().toISOString(),
       };
 
-      // Create single group payment slip
-      const slip = await (prisma as any).payment_slips.create({
-        data: {
-          slip_id: slipId,
-          meeting_id: meetingId,
-          member_no: null,
-          guest_name: `${companyName || 'Corporate Group'} (${attendees.length} ท่าน)`,
-          guest_email: groupContact?.coordinatorEmail || attendees[0]?.email || null,
-          guest_phone: groupContact?.coordinatorPhone || null,
-          guest_workplace: companyName || null,
-          is_member: false,
-          ticket_code: ticketCode,
-          amount: numericAmount,
-          bank: bank || 'Kasikorn (KBANK)',
-          transfer_date: transferDate || null,
-          transfer_time: transferTime || null,
-          ref_no: refNo || null,
-          slip_url: slipUrl || 'GROUP_REGISTRATION',
-          status: registrationStatus,
-          selected_activities: groupPayload as any,
-          reviewed_by: isFreeRegistration ? 'SYSTEM:AUTO' : null,
-          reviewed_at: isFreeRegistration ? new Date() : null,
-        },
-      });
-
-      // Resolve Sponsor Record if sponsorId / couponCode / companyName is provided
+      // Resolve Sponsor Record ก่อนเริ่ม Transaction (read-only, ไม่ต้องอยู่ใน tx)
       let sponsorRecord: any = null;
       if (body.sponsorId) {
-        sponsorRecord = await (prisma as any).sponsors.findUnique({ where: { id: body.sponsorId } });
+        sponsorRecord = await prisma.sponsors.findUnique({ where: { id: body.sponsorId } });
       }
       if (!sponsorRecord && couponCode) {
-        const coupon = await (prisma as any).coupons.findFirst({ where: { code: couponCode } });
-        if (coupon && coupon.sponsor_id) {
-          sponsorRecord = await (prisma as any).sponsors.findUnique({ where: { id: coupon.sponsor_id } });
+        const coupon = await prisma.coupons.findFirst({ where: { code: couponCode } });
+        if (coupon && (coupon as any).sponsor_id) {
+          sponsorRecord = await prisma.sponsors.findUnique({ where: { id: (coupon as any).sponsor_id } });
         }
       }
       if (!sponsorRecord && companyName) {
-        sponsorRecord = await (prisma as any).sponsors.findFirst({
+        sponsorRecord = await prisma.sponsors.findFirst({
           where: { name: { equals: companyName.trim(), mode: 'insensitive' } },
         });
       }
@@ -130,49 +105,76 @@ export async function POST(
       const effectiveSponsorId = sponsorRecord?.id || body.sponsorId || null;
       const effectiveSponsorName = sponsorRecord?.name || companyName || null;
 
-      // Create attendance records for each attendee & link sponsor data
-      for (const att of attendees) {
-        const attName = att.nameTh || att.nameEn || 'Attendee';
-        const attEmail = att.email?.trim()?.toLowerCase() || '';
-        const attWorkplace = att.workplace || companyName || null;
-        const attMemberNo = att.memberNo ? att.memberNo.trim() : null;
-        const attDiscount = Number(att.discountTotal || att.discountAmount || 0);
-        const attNet = Number(att.price || att.netPrice || 0);
+      // ห่อทุก DB write ด้วย Transaction เพื่อความ Atomic
+      let slip: any;
+      await prisma.$transaction(async (tx) => {
+        // Create single group payment slip
+        slip = await tx.payment_slips.create({
+          data: {
+            slip_id: slipId,
+            meeting_id: meetingId,
+            member_no: null,
+            guest_name: `${companyName || 'Corporate Group'} (${attendees.length} ท่าน)`,
+            guest_email: groupContact?.coordinatorEmail || attendees[0]?.email || null,
+            guest_phone: groupContact?.coordinatorPhone || null,
+            guest_workplace: companyName || null,
+            is_member: false,
+            ticket_code: ticketCode,
+            amount: numericAmount,
+            bank: bank || 'Kasikorn (KBANK)',
+            transfer_date: transferDate || null,
+            transfer_time: transferTime || null,
+            ref_no: refNo || null,
+            slip_url: slipUrl || 'GROUP_REGISTRATION',
+            status: registrationStatus,
+            selected_activities: groupPayload as any,
+            reviewed_by: isFreeRegistration ? 'SYSTEM:AUTO' : null,
+            reviewed_at: isFreeRegistration ? new Date() : null,
+          },
+        });
 
-        let attendanceId: any = null;
+        // Create attendance records for each attendee & link sponsor data
+        for (const att of attendees) {
+          const attName = att.nameTh || att.nameEn || 'Attendee';
+          const attEmail = att.email?.trim()?.toLowerCase() || '';
+          const attWorkplace = att.workplace || companyName || null;
+          const attMemberNo = att.memberNo ? att.memberNo.trim() : null;
+          const attDiscount = Number(att.discountTotal || att.discountAmount || 0);
+          const attNet = Number(att.price || att.netPrice || 0);
 
-        if (attMemberNo) {
-          const attResult = await prisma.$queryRaw<Array<{ attendance_id: any }>>`
-            INSERT INTO meeting_attendances (
-              meeting_id, member_no, attendance_status, sponsor_id, sponsor_company_name, coupon_code
-            ) VALUES (
-              ${meetingId}, ${attMemberNo}, ${isFreeRegistration ? 'Registered' : 'Pending_Payment'},
-              ${effectiveSponsorId}, ${effectiveSponsorName}, ${couponCode || null}
-            ) ON CONFLICT (meeting_id, member_no)
-            DO UPDATE SET 
-              attendance_status = ${isFreeRegistration ? 'Registered' : 'Pending_Payment'},
-              sponsor_id = COALESCE(${effectiveSponsorId}, meeting_attendances.sponsor_id),
-              sponsor_company_name = COALESCE(${effectiveSponsorName}, meeting_attendances.sponsor_company_name),
-              coupon_code = COALESCE(${couponCode || null}, meeting_attendances.coupon_code)
-            RETURNING attendance_id
-          `;
-          attendanceId = attResult?.[0]?.attendance_id;
+          let attendanceId: any = null;
 
-          // Update member record with sponsor company linkage (Rule #10)
-          if (effectiveSponsorId || effectiveSponsorName) {
-            await prisma.$executeRaw`
-              UPDATE members 
-              SET 
-                sponsor_id = COALESCE(${effectiveSponsorId}, sponsor_id),
-                sponsored_by_company = COALESCE(${effectiveSponsorName}, sponsored_by_company)
-              WHERE member_no = ${attMemberNo}
+          if (attMemberNo) {
+            const attResult = await tx.$queryRaw<Array<{ attendance_id: any }>>`
+              INSERT INTO meeting_attendances (
+                meeting_id, member_no, attendance_status, sponsor_id, sponsor_company_name, coupon_code
+              ) VALUES (
+                ${meetingId}, ${attMemberNo}, ${isFreeRegistration ? 'Registered' : 'Pending_Payment'},
+                ${effectiveSponsorId}, ${effectiveSponsorName}, ${couponCode || null}
+              ) ON CONFLICT (meeting_id, member_no)
+              DO UPDATE SET 
+                attendance_status = ${isFreeRegistration ? 'Registered' : 'Pending_Payment'},
+                sponsor_id = COALESCE(${effectiveSponsorId}, meeting_attendances.sponsor_id),
+                sponsor_company_name = COALESCE(${effectiveSponsorName}, meeting_attendances.sponsor_company_name),
+                coupon_code = COALESCE(${couponCode || null}, meeting_attendances.coupon_code)
+              RETURNING attendance_id
             `;
-          }
+            attendanceId = attResult?.[0]?.attendance_id;
 
-          // Insert into sponsor_group_members table for Company Portal roster tab
-          if (effectiveSponsorId) {
-            try {
-              await prisma.$executeRaw`
+            // Update member record with sponsor company linkage (Rule #10)
+            if (effectiveSponsorId || effectiveSponsorName) {
+              await tx.$executeRaw`
+                UPDATE members 
+                SET 
+                  sponsor_id = COALESCE(${effectiveSponsorId}, sponsor_id),
+                  sponsored_by_company = COALESCE(${effectiveSponsorName}, sponsored_by_company)
+                WHERE member_no = ${attMemberNo}
+              `;
+            }
+
+            // Insert into sponsor_group_members table for Company Portal roster tab
+            if (effectiveSponsorId) {
+              await tx.$executeRaw`
                 INSERT INTO sponsor_group_members (
                   sponsor_id, meeting_id, member_no, attendee_name, attendee_email, attendee_phone,
                   workplace, ticket_code, attendance_id, coupon_code, discount_amount, net_price,
@@ -189,49 +191,43 @@ export async function POST(
                   attendance_id = COALESCE(${attendanceId || null}, sponsor_group_members.attendance_id),
                   updated_at = NOW()
               `;
-            } catch (sgmErr) {
-              console.error('Failed to link sponsor_group_members:', sgmErr);
             }
+          } else if (attEmail) {
+            const attResult = await tx.$queryRaw<Array<{ attendance_id: any }>>`
+              INSERT INTO meeting_attendances (
+                meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status,
+                sponsor_id, sponsor_company_name, coupon_code
+              ) VALUES (
+                ${meetingId}, NULL, ${attName}, ${attEmail}, ${att.phone || null}, ${attWorkplace},
+                ${isFreeRegistration ? 'Registered' : 'Non-Member-Pending'},
+                ${effectiveSponsorId}, ${effectiveSponsorName}, ${couponCode || null}
+              )
+              RETURNING attendance_id
+            `;
+            attendanceId = attResult?.[0]?.attendance_id;
           }
-        } else if (attEmail) {
-          const attResult = await prisma.$queryRaw<Array<{ attendance_id: any }>>`
-            INSERT INTO meeting_attendances (
-              meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status,
-              sponsor_id, sponsor_company_name, coupon_code
-            ) VALUES (
-              ${meetingId}, NULL, ${attName}, ${attEmail}, ${att.phone || null}, ${attWorkplace},
-              ${isFreeRegistration ? 'Registered' : 'Non-Member-Pending'},
-              ${effectiveSponsorId}, ${effectiveSponsorName}, ${couponCode || null}
-            )
-            RETURNING attendance_id
-          `;
-          attendanceId = attResult?.[0]?.attendance_id;
         }
-      }
 
-      // Update sponsor quota if assigned
-      if (effectiveSponsorId) {
-        try {
-          await prisma.$executeRaw`
+        // Update sponsor quota if assigned
+        if (effectiveSponsorId) {
+          await tx.$executeRaw`
             UPDATE sponsor_quotas 
             SET used_seats = used_seats + ${attendees.length}, updated_at = NOW()
             WHERE sponsor_id = ${effectiveSponsorId} AND meeting_id = ${meetingId}
           `;
-        } catch (sqErr) {}
-      }
+        }
 
-      // Log coupon usages
-      if (couponCode) {
-        try {
-          const couponRec = await (prisma as any).coupons.findFirst({ where: { code: couponCode } });
+        // Log coupon usages
+        if (couponCode) {
+          const couponRec = await tx.coupons.findFirst({ where: { code: couponCode } });
           if (couponRec) {
-            await prisma.$executeRaw`
+            await tx.$executeRaw`
               UPDATE coupons 
               SET used_count = used_count + ${attendees.length}, updated_at = NOW()
               WHERE id = ${couponRec.id}
             `;
             for (const att of attendees) {
-              await prisma.$executeRaw`
+              await tx.$executeRaw`
                 INSERT INTO coupon_usages (
                   coupon_id, meeting_id, member_no, attendee_name, attendee_email,
                   attendee_phone, workplace, discount_applied, final_amount,
@@ -245,10 +241,8 @@ export async function POST(
               `;
             }
           }
-        } catch (cuErr) {
-          console.error('Failed to log coupon usages for group:', cuErr);
         }
-      }
+      }, { timeout: 30000 }); // timeout 30s สำหรับกลุ่มใหญ่
 
       return NextResponse.json({
         success: true,
@@ -264,6 +258,7 @@ export async function POST(
         },
       });
     }
+
 
     let validMemberNo: string | null = null;
     let effectiveAttendeeName = guestName || '';
@@ -389,9 +384,28 @@ export async function POST(
       });
 
       if (couponRecord) {
-        if (!couponRecord.is_active || couponRecord.used_count >= couponRecord.max_uses || (couponRecord.meeting_id && couponRecord.meeting_id !== meetingId)) {
+        // ตรวจสอบวันหมดอายุของคูปอง
+        if (couponRecord.expire_date && new Date(couponRecord.expire_date) < new Date()) {
           return NextResponse.json(
-            { success: false, error: 'รหัสคูปองไม่ถูกต้อง ไม่ตรงรอบการประชุม หรือโควตาสิทธิ์เต็มแล้ว' },
+            { success: false, error: 'รหัสคูปองนี้หมดอายุแล้ว ไม่สามารถใช้งานได้' },
+            { status: 400 }
+          );
+        }
+        if (!couponRecord.is_active) {
+          return NextResponse.json(
+            { success: false, error: 'รหัสคูปองนี้ถูกปิดใช้งานแล้ว' },
+            { status: 400 }
+          );
+        }
+        if (couponRecord.used_count >= couponRecord.max_uses) {
+          return NextResponse.json(
+            { success: false, error: 'โควตาสิทธิ์คูปองนี้ถูกใช้งานครบแล้ว' },
+            { status: 400 }
+          );
+        }
+        if (couponRecord.meeting_id && couponRecord.meeting_id !== meetingId) {
+          return NextResponse.json(
+            { success: false, error: 'รหัสคูปองนี้ไม่ตรงกับรอบการประชุมที่เลือก' },
             { status: 400 }
           );
         }

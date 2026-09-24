@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 
 // GET /api/sponsors - ดึงรายชื่อบริษัททั้งหมด พร้อมข้อมูลโควต้าและสถิติการลงทะเบียน
 export async function GET(req: NextRequest) {
@@ -165,6 +166,11 @@ function generateSponsorCouponCode(meetingId: string, companyName: string): stri
 
 // POST /api/sponsors - เพิ่มบริษัทใหม่
 export async function POST(req: NextRequest) {
+  const session = getAdminSessionFromRequest(req);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const name = (body.name || '').trim();

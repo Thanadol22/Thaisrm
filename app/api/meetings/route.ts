@@ -24,8 +24,17 @@ export const revalidate = 0;
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-
     const action = searchParams.get('action');
+
+    // Public endpoints: latest, active meeting info for public forms
+    const isPublicAction = action === 'latest' || action === 'active' || action === 'next_id';
+
+    if (!isPublicAction) {
+      const session = getAdminSessionFromRequest(req);
+      if (!session) {
+        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      }
+    }
     if (action === 'next_id') {
       const { getNextMeetingId } = await import('@/lib/services/meetingService');
       const nextId = await getNextMeetingId();

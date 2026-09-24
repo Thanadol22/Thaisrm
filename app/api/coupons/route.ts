@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 
 // GET /api/coupons - ดึงรายการคูปองทั้งหมด
 export async function GET(request: NextRequest) {
+  const session = getAdminSessionFromRequest(request);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const meetingId = searchParams.get('meetingId');
@@ -75,6 +81,11 @@ export async function GET(request: NextRequest) {
 
 // POST /api/coupons - สร้างคูปองใหม่
 export async function POST(request: NextRequest) {
+  const session = getAdminSessionFromRequest(request);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const {

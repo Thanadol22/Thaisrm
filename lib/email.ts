@@ -63,7 +63,7 @@ export function getMailTransporter(customConfig?: SmtpConfig) {
       pass,
     },
     tls: {
-      rejectUnauthorized: false,
+      rejectUnauthorized: process.env.NODE_ENV === 'production',
     },
   });
 }

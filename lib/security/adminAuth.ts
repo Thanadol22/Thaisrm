@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { cookies } from 'next/headers';
+import bcrypt from 'bcryptjs';
 import { NextRequest } from 'next/server';
 
 export const ADMIN_COOKIE_NAME = 'tsrm_admin_session';
@@ -42,19 +42,22 @@ export function timingSafeCompare(a: string, b: string): boolean {
 }
 
 /**
- * Hash a password using SHA-256 with a salt
+ * Hash a password using bcrypt (cost factor 12)
+ * ใช้แทน SHA-256 + hardcoded salt เพื่อความปลอดภัยที่สูงขึ้น
  */
-export function hashAdminPassword(password: string, salt: string = 'tsrm_salt_2026'): string {
-  return crypto
-    .createHmac('sha256', salt)
-    .update(password)
-    .digest('hex');
+export async function hashAdminPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 12);
 }
 
 /**
  * Verify admin credentials against environment variables
+ * รองรับทั้ง bcrypt hash (ADMIN_PASSWORD_HASH) และ plaintext (ADMIN_PASSWORD)
+ * Production ควรใช้ ADMIN_PASSWORD_HASH เท่านั้น
  */
-export function verifyAdminCredentials(usernameInput: string, passwordInput: string): boolean {
+export async function verifyAdminCredentials(
+  usernameInput: string,
+  passwordInput: string
+): Promise<boolean> {
   const configuredUsername = (process.env.ADMIN_USERNAME || 'admin').trim();
   const configuredPassword = process.env.ADMIN_PASSWORD;
   const configuredPasswordHash = process.env.ADMIN_PASSWORD_HASH;
@@ -65,21 +68,30 @@ export function verifyAdminCredentials(usernameInput: string, passwordInput: str
     return false;
   }
 
+  // ใน production บังคับใช้ hash เท่านั้น
+  if (process.env.NODE_ENV === 'production' && !configuredPasswordHash) {
+    console.error('ADMIN_PASSWORD_HASH is required in production. Please set it in your environment variables.');
+    return false;
+  }
+
   const cleanUser = usernameInput.trim();
   const cleanPass = passwordInput.trim();
 
-  // 1. Verify username
+  // 1. Verify username (timing-safe)
   if (!timingSafeCompare(cleanUser.toLowerCase(), configuredUsername.toLowerCase())) {
     return false;
   }
 
-  // 2. Verify password: check hash first if configured
+  // 2. Verify password using bcrypt hash if available (preferred)
   if (configuredPasswordHash) {
-    const inputHash = hashAdminPassword(cleanPass);
-    return timingSafeCompare(inputHash, configuredPasswordHash);
+    try {
+      return await bcrypt.compare(cleanPass, configuredPasswordHash);
+    } catch {
+      return false;
+    }
   }
 
-  // Fallback: direct timing-safe comparison with configured password
+  // 3. Fallback: direct timing-safe comparison with plaintext (dev only)
   return timingSafeCompare(cleanPass, configuredPassword!);
 }
 

@@ -28,23 +28,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find active meeting ID for Foreign Key
-    let meetingId = 'TSRM34';
-    const activeMeeting = await prisma.meetings.findFirst({
+    // การสมัครสมาชิกสมาคม (Membership Application) เป็นของสมาคมโดยตรง ไม่ได้ผูกกับรอบการประชุมใดๆ
+    // การดึง meeting_id มาใช้เพื่อตอบสนอง Foreign Key constraint ของตาราง payment_slips ในฐานข้อมูลเท่านั้น
+    let meetingId: string | null = null;
+    const refMeeting = await prisma.meetings.findFirst({
       orderBy: { meeting_date: 'desc' },
       select: { meeting_id: true },
     });
 
-    if (activeMeeting) {
-      meetingId = activeMeeting.meeting_id;
+    if (refMeeting) {
+      meetingId = refMeeting.meeting_id;
     } else {
       const anyMeeting = await prisma.meetings.findFirst({
         select: { meeting_id: true },
       });
-      if (anyMeeting) {
-        meetingId = anyMeeting.meeting_id;
-      }
+      meetingId = anyMeeting?.meeting_id || null;
     }
+
+    if (!meetingId) {
+      return NextResponse.json(
+        { success: false, error: 'ระบบยังไม่พร้อมรับข้อมูล กรุณาติดต่อเจ้าหน้าที่สมาคม' },
+        { status: 500 }
+      );
+    }
+    // Type narrowed: meetingId is string from here
+    const safeMeetingId: string = meetingId;
 
     // Handle Corporate / Group Membership Application
     if (isGroup) {
@@ -93,7 +101,7 @@ export async function POST(request: NextRequest) {
       const slip = await prisma.payment_slips.create({
         data: {
           slip_id: slipId,
-          meeting_id: meetingId,
+          meeting_id: safeMeetingId,
           member_no: null,
           guest_name: `${companyName || 'Corporate Group'} (${applicants.length} ท่าน)`,
           guest_email: groupContact?.coordinatorEmail || applicants[0]?.email || null,
@@ -189,7 +197,7 @@ export async function POST(request: NextRequest) {
     const slip = await prisma.payment_slips.create({
       data: {
         slip_id: slipId,
-        meeting_id: meetingId,
+        meeting_id: safeMeetingId,
         member_no: null,
         guest_name: memberPayload.full_name_th.trim(),
         guest_email: email || null,
@@ -228,3 +236,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

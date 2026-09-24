@@ -50,7 +50,15 @@ export function middleware(req: NextRequest) {
         banDurationSeconds: 60,
         maxViolationsBeforeBan: 5,
       };
-      identifier = `staff-portal:${ip}`;
+    } else if (pathname.startsWith('/api/payment/resubmit')) {
+      // ป้องกันการ spam อัปโหลดสลิปใหม่ซ้ำๆ
+      profile = {
+        maxRequests: 5,
+        windowSeconds: 60,
+        banDurationSeconds: 300,
+        maxViolationsBeforeBan: 2,
+      };
+      identifier = `resubmit:${ip}`;
     }
 
     const result = checkRateLimit(identifier, profile);

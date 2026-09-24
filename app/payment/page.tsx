@@ -101,7 +101,7 @@ function PaymentContent() {
 
   // Fetch dynamic system settings
   React.useEffect(() => {
-    fetch('/api/admin/settings')
+    fetch('/api/settings/public')
       .then((res) => res.json())
       .then((json) => {
         if (json.success && json.data) {

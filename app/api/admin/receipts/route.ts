@@ -11,6 +11,14 @@ export const revalidate = 0;
  * Retrieve all receipts stored in the database
  */
 export async function GET(req: NextRequest) {
+  const session = getAdminSessionFromRequest(req);
+  if (!session) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized: เข้าถึงได้เฉพาะผู้ดูแลระบบ' },
+      { status: 401 }
+    );
+  }
+
   try {
     const receipts = await getAllReceipts();
     return NextResponse.json({

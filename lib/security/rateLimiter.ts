@@ -17,7 +17,18 @@ interface RateLimitConfig {
   maxViolationsBeforeBan?: number;
 }
 
+export interface RateLimitResult {
+  success: boolean;
+  limit: number;
+  remaining: number;
+  resetSeconds: number;
+  isBanned: boolean;
+  retryAfterSeconds: number;
+}
+
 // In-Memory IP Store
+// เหมาะสำหรับระบบขนาดเล็ก-กลาง (< 1,000 users concurrent)
+// ระบบนี้รองรับ ~300-500 คน/การประชุม จึงเพียงพอ
 const ipStore = new Map<string, RateLimitRecord>();
 
 // ตั้งเวลากวาดล้าง IP เก่าที่หมดอายุทุกๆ 5 นาที เพื่อไม่ให้กิน Memory
@@ -26,7 +37,6 @@ if (typeof setInterval !== 'undefined') {
     const now = Date.now();
     for (const [key, record] of ipStore.entries()) {
       if (record.bannedUntil && record.bannedUntil > now) continue;
-      // ลบ timestamps ที่เก่าเกิน 10 นาที
       record.timestamps = record.timestamps.filter((ts) => now - ts < 600000);
       if (record.timestamps.length === 0 && (!record.bannedUntil || record.bannedUntil <= now)) {
         ipStore.delete(key);
@@ -57,15 +67,6 @@ export function getClientIp(req: NextRequest): string {
   return '127.0.0.1'; // Fallback for local development
 }
 
-export interface RateLimitResult {
-  success: boolean;
-  limit: number;
-  remaining: number;
-  resetSeconds: number;
-  isBanned: boolean;
-  retryAfterSeconds: number;
-}
-
 /**
  * ตรวจสอบ Rate Limit (Sliding Window Algorithm พร้อม Temporary IP Banning)
  */
@@ -79,12 +80,8 @@ export function checkRateLimit(
   const maxViolations = config.maxViolationsBeforeBan || 3;
 
   let record = ipStore.get(identifier);
-
   if (!record) {
-    record = {
-      timestamps: [],
-      violationCount: 0,
-    };
+    record = { timestamps: [], violationCount: 0 };
     ipStore.set(identifier, record);
   }
 
@@ -124,7 +121,6 @@ export function checkRateLimit(
 
     const oldest = record.timestamps[0];
     const resetTime = Math.max(1, Math.ceil((oldest + windowMs - now) / 1000));
-
     return {
       success: false,
       limit: config.maxRequests,
@@ -151,18 +147,24 @@ export function checkRateLimit(
   };
 }
 
+/** Alias สำหรับ backward compatibility */
+export const checkRateLimitAsync = async (
+  identifier: string,
+  config: RateLimitConfig
+): Promise<RateLimitResult> => checkRateLimit(identifier, config);
+
 /**
  * ค่าคอนฟิกเริ่มต้นสำหรับแต่ละระดับความเข้มงวด
  */
 export const RATE_LIMIT_PROFILES = {
-  // สำหรับการลงทะเบียนสมาชิก (POST /api/members): จำกัด 10 requests / นาที ป้องกัน Spam/Flood bot
+  // สำหรับการลงทะเบียนสมาชิก (POST /api/members): จำกัด 10 requests / นาที
   REGISTRATION: {
     maxRequests: 10,
     windowSeconds: 60,
-    banDurationSeconds: 600, // แบน 10 นาทีหากยิงซ้ำรัวๆ
+    banDurationSeconds: 600,
     maxViolationsBeforeBan: 3,
   },
-  // สำหรับการสแกน QR / ตรวจสอบรหัส (GET /api/members/verify/*): จำกัด 60 requests / นาที
+  // สำหรับการสแกน QR / ตรวจสอบรหัส: จำกัด 60 requests / นาที
   VERIFY_QR: {
     maxRequests: 60,
     windowSeconds: 60,
