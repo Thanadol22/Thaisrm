@@ -8,11 +8,7 @@ const targetUrl = process.argv[2] || process.env.NEON_DATABASE_URL || process.en
 if (!targetUrl) {
   console.log(`
 ❌ กรุณาระบุ Connection URL ของ Neon:
-   node scripts/sync-to-neon.js "postgresql://<USER>:<PASSWORD>@<NEON_HOST>/tsrm?sslmode=require"
-
-หรือคัดลอกคำสั่งในไฟล์:
-   db/neon_full_sync.sql
-ไปวางและรันใน Neon Console -> SQL Editor ได้ทันที
+   node scripts/sync-to-neon.js "postgresql://<USER>:<PASSWORD>@<NEON_HOST>/neondb?sslmode=require"
 `);
   process.exit(1);
 }
@@ -48,11 +44,73 @@ async function main() {
     `ALTER TABLE meetings ADD COLUMN IF NOT EXISTS activities JSONB`,
     `ALTER TABLE meetings ADD COLUMN IF NOT EXISTS max_seats INTEGER DEFAULT 0`,
     `ALTER TABLE meetings ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'upcoming'`,
+
+    `CREATE TABLE IF NOT EXISTS sponsors (
+        id            VARCHAR(50) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        name          VARCHAR(255) NOT NULL,
+        tier          VARCHAR(50) DEFAULT 'Silver',
+        contact_name  VARCHAR(255),
+        contact_email VARCHAR(255) NOT NULL,
+        is_active     BOOLEAN DEFAULT true,
+        created_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS sponsor_otp_codes (
+        id         VARCHAR(50) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        email      VARCHAR(255) NOT NULL,
+        otp_code   VARCHAR(10) NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        is_used    BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS sponsor_quotas (
+        id           VARCHAR(50) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        sponsor_id   VARCHAR(50) REFERENCES sponsors(id) ON DELETE CASCADE,
+        meeting_id   VARCHAR(50) REFERENCES meetings(meeting_id) ON DELETE CASCADE,
+        quota_seats  INTEGER DEFAULT 0,
+        used_seats   INTEGER DEFAULT 0,
+        members_only BOOLEAN DEFAULT true,
+        expire_date  DATE,
+        created_at   TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at   TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_sponsor_meeting_quota UNIQUE (sponsor_id, meeting_id)
+    )`,
+
+    `ALTER TABLE members ADD COLUMN IF NOT EXISTS sponsor_id VARCHAR(50) REFERENCES sponsors(id) ON DELETE SET NULL`,
+    `ALTER TABLE members ADD COLUMN IF NOT EXISTS sponsored_by_company VARCHAR(255)`,
+
     `ALTER TABLE meeting_attendances ADD COLUMN IF NOT EXISTS attendee_name VARCHAR(255)`,
     `ALTER TABLE meeting_attendances ADD COLUMN IF NOT EXISTS attendee_email VARCHAR(255)`,
     `ALTER TABLE meeting_attendances ADD COLUMN IF NOT EXISTS attendee_phone VARCHAR(50)`,
     `ALTER TABLE meeting_attendances ADD COLUMN IF NOT EXISTS workplace VARCHAR(255)`,
+    `ALTER TABLE meeting_attendances ADD COLUMN IF NOT EXISTS sponsor_id VARCHAR(50) REFERENCES sponsors(id) ON DELETE SET NULL`,
+    `ALTER TABLE meeting_attendances ADD COLUMN IF NOT EXISTS sponsor_company_name VARCHAR(255)`,
+    `ALTER TABLE meeting_attendances ADD COLUMN IF NOT EXISTS coupon_code VARCHAR(50)`,
     `ALTER TABLE meeting_attendances ALTER COLUMN member_no DROP NOT NULL`,
+
+    `CREATE TABLE IF NOT EXISTS sponsor_group_members (
+        id                 BIGSERIAL PRIMARY KEY,
+        sponsor_id         VARCHAR(50) REFERENCES sponsors(id) ON DELETE CASCADE,
+        meeting_id         VARCHAR(50) REFERENCES meetings(meeting_id) ON DELETE CASCADE,
+        member_no          VARCHAR(20) REFERENCES members(member_no) ON DELETE CASCADE,
+        attendee_name      VARCHAR(255) NOT NULL,
+        attendee_email     VARCHAR(255) NOT NULL,
+        attendee_phone     VARCHAR(50),
+        workplace          VARCHAR(255),
+        ticket_code        VARCHAR(50),
+        attendance_id      BIGINT REFERENCES meeting_attendances(attendance_id) ON DELETE SET NULL,
+        coupon_code        VARCHAR(50),
+        discount_amount    INTEGER DEFAULT 0,
+        net_price          INTEGER DEFAULT 0,
+        submitted_by_email VARCHAR(255),
+        status             VARCHAR(50) DEFAULT 'confirmed',
+        created_at         TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at         TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_sponsor_group_meeting_member UNIQUE (meeting_id, member_no)
+    )`,
+
     `CREATE TABLE IF NOT EXISTS payment_slips (
         id                  BIGSERIAL PRIMARY KEY,
         slip_id             VARCHAR(50) UNIQUE DEFAULT gen_random_uuid()::text,
@@ -180,27 +238,73 @@ async function main() {
 
   // STEP 1: Fetch local data
   console.log('📥 1. อ่านข้อมูลจาก Local PostgreSQL...');
-  const [localMembers, localEducations, localMeetings, localAttendances, localSlips, localSettings, localReceipts, localCoupons, localCouponUsages] = await Promise.all([
+  const [
+    localSponsors,
+    localMeetings,
+    localMembers,
+    localEducations,
+    localQuotas,
+    localAttendances,
+    localGroupMembers,
+    localSlips,
+    localSettings,
+    localReceipts,
+    localCoupons,
+    localCouponUsages,
+  ] = await Promise.all([
+    localPrisma.sponsors.findMany(),
+    localPrisma.meetings.findMany(),
     localPrisma.member.findMany(),
     localPrisma.member_educations.findMany(),
-    localPrisma.meetings.findMany(),
+    localPrisma.sponsor_quotas.findMany(),
     localPrisma.meeting_attendances.findMany(),
+    localPrisma.sponsor_group_members.findMany(),
     localPrisma.payment_slips.findMany(),
     localPrisma.system_settings.findMany(),
     localPrisma.receipts.findMany(),
-    (localPrisma.coupons ? localPrisma.coupons.findMany() : []),
-    (localPrisma.coupon_usages ? localPrisma.coupon_usages.findMany() : []),
+    localPrisma.coupons.findMany(),
+    localPrisma.coupon_usages.findMany(),
   ]);
 
+  console.log(`   - Sponsors: ${localSponsors.length}`);
+  console.log(`   - Meetings: ${localMeetings.length}`);
   console.log(`   - Members: ${localMembers.length}`);
   console.log(`   - Educations: ${localEducations.length}`);
-  console.log(`   - Meetings: ${localMeetings.length}`);
+  console.log(`   - Quotas: ${localQuotas.length}`);
   console.log(`   - Attendances: ${localAttendances.length}`);
+  console.log(`   - Group Members: ${localGroupMembers.length}`);
   console.log(`   - Slips: ${localSlips.length}`);
   console.log(`   - System Settings: ${localSettings.length}`);
   console.log(`   - Receipts: ${localReceipts.length}`);
   console.log(`   - Coupons: ${localCoupons.length}`);
   console.log(`   - Coupon Usages: ${localCouponUsages.length}\n`);
+
+  // STEP 1.5: Sync Sponsors
+  console.log('📤 1. Syncing Sponsors...');
+  for (const sp of localSponsors) {
+    await neonPrisma.sponsors.upsert({
+      where: { id: sp.id },
+      update: {
+        name: sp.name,
+        tier: sp.tier,
+        contact_name: sp.contact_name,
+        contact_email: sp.contact_email,
+        is_active: sp.is_active,
+        updated_at: sp.updated_at,
+      },
+      create: {
+        id: sp.id,
+        name: sp.name,
+        tier: sp.tier,
+        contact_name: sp.contact_name,
+        contact_email: sp.contact_email,
+        is_active: sp.is_active,
+        created_at: sp.created_at,
+        updated_at: sp.updated_at,
+      },
+    });
+  }
+  console.log('   ✅ Sponsors sync completed.');
 
   // STEP 2: Meetings Sync
   console.log('📤 2. Syncing Meetings (ทุกคอลัมน์)...');
@@ -219,6 +323,9 @@ async function main() {
         staff_code: m.staff_code,
         description: m.description,
         base_price: m.base_price,
+        change_format_fee: m.change_format_fee,
+        change_format_deadline: m.change_format_deadline,
+        change_format_policy: m.change_format_policy,
         pricing_tiers: m.pricing_tiers,
         activities: m.activities,
         max_seats: m.max_seats,
@@ -237,6 +344,9 @@ async function main() {
         staff_code: m.staff_code,
         description: m.description,
         base_price: m.base_price,
+        change_format_fee: m.change_format_fee,
+        change_format_deadline: m.change_format_deadline,
+        change_format_policy: m.change_format_policy,
         pricing_tiers: m.pricing_tiers,
         activities: m.activities,
         max_seats: m.max_seats,
@@ -246,8 +356,42 @@ async function main() {
   }
   console.log('   ✅ Meetings sync completed.');
 
+  // STEP 2.5: Sponsor Quotas Sync
+  if (localQuotas.length > 0) {
+    console.log('📤 Syncing Sponsor Quotas...');
+    for (const q of localQuotas) {
+      await neonPrisma.sponsor_quotas.upsert({
+        where: {
+          sponsor_id_meeting_id: {
+            sponsor_id: q.sponsor_id,
+            meeting_id: q.meeting_id,
+          },
+        },
+        update: {
+          quota_seats: q.quota_seats,
+          used_seats: q.used_seats,
+          members_only: q.members_only,
+          expire_date: q.expire_date,
+          updated_at: q.updated_at,
+        },
+        create: {
+          id: q.id,
+          sponsor_id: q.sponsor_id,
+          meeting_id: q.meeting_id,
+          quota_seats: q.quota_seats,
+          used_seats: q.used_seats,
+          members_only: q.members_only,
+          expire_date: q.expire_date,
+          created_at: q.created_at,
+          updated_at: q.updated_at,
+        },
+      });
+    }
+    console.log('   ✅ Sponsor Quotas sync completed.');
+  }
+
   // STEP 3: Members Sync
-  console.log('   Syncing Members...');
+  console.log('📤 3. Syncing Members...');
   const BATCH_SIZE = 100;
   for (let i = 0; i < localMembers.length; i += BATCH_SIZE) {
     const chunk = localMembers.slice(i, i + BATCH_SIZE);
@@ -284,6 +428,8 @@ async function main() {
             special_expire_date: m.special_expire_date,
             qr_code_data: m.qr_code_data ?? undefined,
             qr_code_image_url: m.qr_code_image_url,
+            sponsor_id: m.sponsor_id,
+            sponsored_by_company: m.sponsored_by_company,
           },
           create: {
             id: m.id,
@@ -316,6 +462,8 @@ async function main() {
             special_expire_date: m.special_expire_date,
             qr_code_data: m.qr_code_data ?? undefined,
             qr_code_image_url: m.qr_code_image_url,
+            sponsor_id: m.sponsor_id,
+            sponsored_by_company: m.sponsored_by_company,
           },
         })
       )
@@ -325,7 +473,7 @@ async function main() {
   console.log('\n   ✅ Members sync completed.');
 
   // STEP 4: Educations Sync
-  console.log('   Syncing Member Educations...');
+  console.log('📤 4. Syncing Member Educations...');
   for (let i = 0; i < localEducations.length; i += BATCH_SIZE) {
     const chunk = localEducations.slice(i, i + BATCH_SIZE);
     await Promise.all(
@@ -352,7 +500,7 @@ async function main() {
   console.log('   ✅ Member educations sync completed.');
 
   // STEP 5: Attendances Sync
-  console.log('   Syncing Meeting Attendances...');
+  console.log('📤 5. Syncing Meeting Attendances...');
   for (let i = 0; i < localAttendances.length; i += BATCH_SIZE) {
     const chunk = localAttendances.slice(i, i + BATCH_SIZE);
     await Promise.all(
@@ -366,6 +514,9 @@ async function main() {
             workplace: a.workplace,
             attendance_status: a.attendance_status,
             checkin_time: a.checkin_time,
+            sponsor_id: a.sponsor_id,
+            sponsor_company_name: a.sponsor_company_name,
+            coupon_code: a.coupon_code,
           },
           create: {
             attendance_id: a.attendance_id,
@@ -377,6 +528,9 @@ async function main() {
             workplace: a.workplace,
             attendance_status: a.attendance_status,
             checkin_time: a.checkin_time,
+            sponsor_id: a.sponsor_id,
+            sponsor_company_name: a.sponsor_company_name,
+            coupon_code: a.coupon_code,
           },
         })
       )
@@ -385,8 +539,58 @@ async function main() {
   }
   console.log('\n   ✅ Meeting attendances sync completed.');
 
+  // STEP 5.5: Sponsor Group Members Sync
+  if (localGroupMembers.length > 0) {
+    console.log('📤 Syncing Sponsor Group Members...');
+    for (const gm of localGroupMembers) {
+      await neonPrisma.sponsor_group_members.upsert({
+        where: {
+          meeting_id_member_no: {
+            meeting_id: gm.meeting_id,
+            member_no: gm.member_no,
+          },
+        },
+        update: {
+          sponsor_id: gm.sponsor_id,
+          attendee_name: gm.attendee_name,
+          attendee_email: gm.attendee_email,
+          attendee_phone: gm.attendee_phone,
+          workplace: gm.workplace,
+          ticket_code: gm.ticket_code,
+          attendance_id: gm.attendance_id,
+          coupon_code: gm.coupon_code,
+          discount_amount: gm.discount_amount,
+          net_price: gm.net_price,
+          submitted_by_email: gm.submitted_by_email,
+          status: gm.status,
+          updated_at: gm.updated_at,
+        },
+        create: {
+          id: gm.id,
+          sponsor_id: gm.sponsor_id,
+          meeting_id: gm.meeting_id,
+          member_no: gm.member_no,
+          attendee_name: gm.attendee_name,
+          attendee_email: gm.attendee_email,
+          attendee_phone: gm.attendee_phone,
+          workplace: gm.workplace,
+          ticket_code: gm.ticket_code,
+          attendance_id: gm.attendance_id,
+          coupon_code: gm.coupon_code,
+          discount_amount: gm.discount_amount,
+          net_price: gm.net_price,
+          submitted_by_email: gm.submitted_by_email,
+          status: gm.status,
+          created_at: gm.created_at,
+          updated_at: gm.updated_at,
+        },
+      });
+    }
+    console.log('   ✅ Sponsor Group Members sync completed.');
+  }
+
   // STEP 6: System Settings Sync
-  console.log('   Syncing System Settings...');
+  console.log('📤 6. Syncing System Settings...');
   for (const s of localSettings) {
     await neonPrisma.system_settings.upsert({
       where: { key: s.key },
@@ -407,7 +611,7 @@ async function main() {
 
   // STEP 7: Payment Slips Sync
   if (localSlips.length > 0) {
-    console.log('   Syncing Payment Slips...');
+    console.log('📤 7. Syncing Payment Slips...');
     for (const p of localSlips) {
       await neonPrisma.payment_slips.upsert({
         where: { slip_id: p.slip_id },
@@ -451,7 +655,7 @@ async function main() {
   }
 
   // STEP 7.5: Receipts Sync
-  console.log('   Syncing Receipts...');
+  console.log('📤 7.5 Syncing Receipts...');
   await neonPrisma.receipts.deleteMany();
   for (const r of localReceipts) {
     await neonPrisma.receipts.create({
@@ -493,10 +697,12 @@ async function main() {
       },
     });
   }
+  console.log('   ✅ Receipts sync completed.');
+
   // STEP 7.8: Daily Checkins Sync
   const localDailyCheckins = await localPrisma.meeting_daily_checkins.findMany();
   if (localDailyCheckins.length > 0) {
-    console.log('   Syncing Daily Checkins...');
+    console.log('📤 7.8 Syncing Daily Checkins...');
     for (const d of localDailyCheckins) {
       await neonPrisma.meeting_daily_checkins.upsert({
         where: {
@@ -536,7 +742,7 @@ async function main() {
 
   // STEP 7.9: Coupons & Coupon Usages Sync
   if (localCoupons.length > 0) {
-    console.log('   Syncing Coupons...');
+    console.log('📤 7.9 Syncing Coupons...');
     for (const c of localCoupons) {
       await neonPrisma.coupons.upsert({
         where: { id: c.id },
@@ -576,7 +782,7 @@ async function main() {
   }
 
   if (localCouponUsages.length > 0) {
-    console.log('   Syncing Coupon Usages...');
+    console.log('📤 Syncing Coupon Usages...');
     for (const u of localCouponUsages) {
       await neonPrisma.coupon_usages.upsert({
         where: { id: u.id },
@@ -615,6 +821,7 @@ async function main() {
   }
 
   // STEP 8: Reset Sequences on Neon
+  console.log('📤 8. อัปเดต Sequence บน Neon...');
   const seqQueries = [
     `SELECT setval('member_no_seq', GREATEST(COALESCE((SELECT MAX(NULLIF(regexp_replace(member_no, '\\D', '', 'g'), '')::bigint) FROM members), 0) + 1, 1281), false)`,
     `SELECT setval('members_id_seq', COALESCE((SELECT MAX(id) FROM members), 1), true)`,
@@ -623,6 +830,7 @@ async function main() {
     `SELECT setval('payment_slips_id_seq', COALESCE((SELECT MAX(id) FROM payment_slips), 1), true)`,
     `SELECT setval('meeting_daily_checkins_id_seq', COALESCE((SELECT MAX(id) FROM meeting_daily_checkins), 1), true)`,
     `SELECT setval('coupon_usages_id_seq', COALESCE((SELECT MAX(id) FROM coupon_usages), 1), true)`,
+    `SELECT setval('sponsor_group_members_id_seq', COALESCE((SELECT MAX(id) FROM sponsor_group_members), 1), true)`,
   ];
   for (const q of seqQueries) {
     try {
@@ -634,12 +842,28 @@ async function main() {
   console.log('   ✅ Sequences updated successfully.');
 
   // STEP 9: Summary
-  console.log('\n🔍 5. ตรวจสอบจำนวนข้อมูลบน Neon Cloud DB...');
-  const [neonMembers, neonEducations, neonMeetings, neonAttendances, neonSettings, neonReceipts, neonDailyCheckins, neonCoupons, neonCouponUsages] = await Promise.all([
+  console.log('\n🔍 9. ตรวจสอบจำนวนข้อมูลบน Neon Cloud DB...');
+  const [
+    neonSponsors,
+    neonMeetings,
+    neonMembers,
+    neonEducations,
+    neonQuotas,
+    neonAttendances,
+    neonGroupMembers,
+    neonSettings,
+    neonReceipts,
+    neonDailyCheckins,
+    neonCoupons,
+    neonCouponUsages,
+  ] = await Promise.all([
+    neonPrisma.sponsors.count(),
+    neonPrisma.meetings.count(),
     neonPrisma.member.count(),
     neonPrisma.member_educations.count(),
-    neonPrisma.meetings.count(),
+    neonPrisma.sponsor_quotas.count(),
     neonPrisma.meeting_attendances.count(),
+    neonPrisma.sponsor_group_members.count(),
     neonPrisma.system_settings.count(),
     neonPrisma.receipts.count(),
     neonPrisma.meeting_daily_checkins.count(),
@@ -651,15 +875,18 @@ async function main() {
 ======================================================
 🎉 ซิงค์ข้อมูลเข้าสู่ NEON เสร็จสมบูรณ์ทุกตารางแล้ว!
 ======================================================
-  - สมาชิก (Members):             ${neonMembers} รายการ (Local: ${localMembers.length})
-  - ประวัติการศึกษา (Educations):  ${neonEducations} รายการ (Local: ${localEducations.length})
-  - การประชุม (Meetings):         ${neonMeetings} รายการ (Local: ${localMeetings.length})
-  - ผู้เข้าร่วม (Attendances):     ${neonAttendances} รายการ (Local: ${localAttendances.length})
-  - การตั้งค่าระบบ (Settings):     ${neonSettings} รายการ (Local: ${localSettings.length})
-  - ใบเสร็จรับเงิน (Receipts):     ${neonReceipts} รายการ (Local: ${localReceipts.length})
-  - เช็คอินรายวัน (Daily):        ${neonDailyCheckins} รายการ (Local: ${localDailyCheckins.length})
-  - คูปองสปอนเซอร์ (Coupons):     ${neonCoupons} รายการ (Local: ${localCoupons.length})
-  - ประวัติใช้คูปอง (Coupon Uses): ${neonCouponUsages} รายการ (Local: ${localCouponUsages.length})
+  - บริษัทสปอนเซอร์ (Sponsors):      ${neonSponsors} รายการ (Local: ${localSponsors.length})
+  - โควตาสปอนเซอร์ (Quotas):        ${neonQuotas} รายการ (Local: ${localQuotas.length})
+  - การประชุม (Meetings):           ${neonMeetings} รายการ (Local: ${localMeetings.length})
+  - สมาชิก (Members):               ${neonMembers} รายการ (Local: ${localMembers.length})
+  - ประวัติการศึกษา (Educations):    ${neonEducations} รายการ (Local: ${localEducations.length})
+  - ผู้เข้าร่วม (Attendances):       ${neonAttendances} รายการ (Local: ${localAttendances.length})
+  - สมาชิกกลุ่มสปอนเซอร์ (Group Reg): ${neonGroupMembers} รายการ (Local: ${localGroupMembers.length})
+  - การตั้งค่าระบบ (Settings):       ${neonSettings} รายการ (Local: ${localSettings.length})
+  - ใบเสร็จรับเงิน (Receipts):       ${neonReceipts} รายการ (Local: ${localReceipts.length})
+  - เช็คอินรายวัน (Daily Checkins):  ${neonDailyCheckins} รายการ (Local: ${localDailyCheckins.length})
+  - คูปองสปอนเซอร์ (Coupons):       ${neonCoupons} รายการ (Local: ${localCoupons.length})
+  - ประวัติใช้คูปอง (Coupon Uses):   ${neonCouponUsages} รายการ (Local: ${localCouponUsages.length})
 ======================================================
 `);
 }
