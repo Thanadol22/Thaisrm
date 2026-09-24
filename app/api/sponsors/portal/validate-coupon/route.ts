@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     if (discountType === 'free') {
       discountAmount = basePrice > 0 ? basePrice : 0;
       netPrice = 0;
-      discountDescription = 'ฟรีค่าลงทะเบียน 100%';
+      discountDescription = 'ฟรีค่าลงทะเบียนหลัก (Main Program) 100%';
     } else if (discountType === 'fixed') {
       discountAmount = Math.min(basePrice, discountValue);
       netPrice = Math.max(0, basePrice - discountValue);

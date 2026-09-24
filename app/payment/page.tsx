@@ -282,16 +282,35 @@ function PaymentContent() {
 
         // Apply chronological coupon discount
         if (remainingFreeSeats > 0) {
-          attendeeDiscount = attendeeOriginalTotal;
+          // Free sponsor coupon covers ONLY the Main Program
+          let attDisc = 0;
+          itemizedActs = itemizedActs.map(a => {
+            if (a.type === 'main' || a.id === 'main') {
+              attDisc += a.originalPrice;
+              return {
+                ...a,
+                discount: a.originalPrice,
+                netPrice: 0,
+                isDiscounted: true,
+              };
+            }
+            return {
+              ...a,
+              discount: 0,
+              netPrice: a.originalPrice,
+              isDiscounted: false,
+            };
+          });
+
+          attendeeDiscount = attDisc;
+          const hasNonMain = itemizedActs.some(a => a.type !== 'main' && a.id !== 'main');
           discountNotice = lang === 'th'
-            ? '✅ ได้รับสิทธิ์เข้าร่วมฟรีเต็มจำนวนจากคูปองสปอนเซอร์'
-            : '✅ Free Sponsor Pass Granted';
-          itemizedActs = itemizedActs.map(a => ({
-            ...a,
-            discount: a.originalPrice,
-            netPrice: 0,
-            isDiscounted: true,
-          }));
+            ? (hasNonMain
+                ? '✅ ได้รับสิทธิ์ฟรีค่าลงทะเบียนหลัก (Main Program) จากคูปองสปอนเซอร์ (ชำระเฉพาะเวิร์กช็อปเพิ่มเติม)'
+                : '✅ ได้รับสิทธิ์เข้าร่วมฟรีเฉพาะการประชุมหลัก (Main Program) จากคูปองสปอนเซอร์')
+            : (hasNonMain
+                ? '✅ Free Main Program Pass Granted (Workshops billed separately)'
+                : '✅ Free Main Program Pass Granted');
           remainingFreeSeats -= 1;
         } else if (remainingFixedPool > 0) {
           const applied = Math.min(attendeeOriginalTotal, remainingFixedPool);
@@ -397,7 +416,7 @@ function PaymentContent() {
     const attendType: 'onsite' | 'online' = (regData.attendanceType === 'online' && isOnlineEligible) ? 'online' : 'onsite';
 
     // Calculate each item
-    const items = activitiesToCalculate.map((act) => {
+    let calculatedItems = activitiesToCalculate.map((act) => {
       let price = 0;
       let rateBadgeTh = '';
       let rateBadgeEn = '';
@@ -432,29 +451,69 @@ function PaymentContent() {
         type: act.type || 'main',
         format: act.format,
         date: act.date,
+        originalPrice: price,
+        discount: 0,
+        netPrice: price,
         price,
         rateBadgeTh,
         rateBadgeEn,
       };
     });
 
-    const originalAmount = items.reduce((sum, item) => sum + item.price, 0);
+    const originalAmount = calculatedItems.reduce((sum, item) => sum + item.originalPrice, 0);
 
-    // Coupon Calculation
+    // Coupon Calculation: Free coupon waives ONLY the Main Program
     let discountAmount = 0;
     let isCouponSponsored = false;
 
     if (regData.couponData) {
-      if (regData.couponData.isFullFree || regData.couponData.discountType === 'free') {
-        discountAmount = originalAmount;
-        isCouponSponsored = true;
+      const isFree = regData.couponData.isFullFree || regData.couponData.discountType === 'free';
+      if (isFree) {
+        // Free coupon waives ONLY the Main Program
+        let freeMainDiscount = 0;
+        calculatedItems = calculatedItems.map(item => {
+          if (item.type === 'main' || item.id === 'main') {
+            freeMainDiscount += item.originalPrice;
+            return {
+              ...item,
+              discount: item.originalPrice,
+              netPrice: 0,
+              price: 0,
+            };
+          }
+          return item;
+        });
+        discountAmount = freeMainDiscount;
+        isCouponSponsored = (originalAmount - discountAmount) === 0 && originalAmount > 0;
       } else if (regData.couponData.discountType === 'fixed') {
-        discountAmount = Math.min(originalAmount, regData.couponData.discountValue || 0);
-        isCouponSponsored = discountAmount >= originalAmount;
+        const pool = Math.min(originalAmount, regData.couponData.discountValue || 0);
+        discountAmount = pool;
+        let poolLeft = pool;
+        calculatedItems = calculatedItems.map(item => {
+          if (poolLeft <= 0) return item;
+          const disc = Math.min(item.originalPrice, poolLeft);
+          poolLeft -= disc;
+          return {
+            ...item,
+            discount: disc,
+            netPrice: item.originalPrice - disc,
+            price: item.originalPrice - disc,
+          };
+        });
+        isCouponSponsored = discountAmount >= originalAmount && originalAmount > 0;
       } else if (regData.couponData.discountType === 'percent') {
         const pct = Math.min(100, Math.max(0, regData.couponData.discountValue || 0));
         discountAmount = Math.round((originalAmount * pct) / 100);
-        isCouponSponsored = pct === 100 || discountAmount >= originalAmount;
+        calculatedItems = calculatedItems.map(item => {
+          const disc = Math.round((item.originalPrice * pct) / 100);
+          return {
+            ...item,
+            discount: disc,
+            netPrice: Math.max(0, item.originalPrice - disc),
+            price: Math.max(0, item.originalPrice - disc),
+          };
+        });
+        isCouponSponsored = (pct === 100 || discountAmount >= originalAmount) && originalAmount > 0;
       }
     }
 
@@ -465,7 +524,7 @@ function PaymentContent() {
       totalAmount,
       discountAmount,
       isCouponSponsored,
-      items,
+      items: calculatedItems,
       isMemberUser,
       attendType,
       groupSummary: [] as Array<{

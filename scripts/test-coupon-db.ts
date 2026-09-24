@@ -1,8 +1,8 @@
 import prisma from '../lib/prisma';
 
 async function main() {
-  const count = await (prisma as any).coupons.count();
-  console.log('Coupons count:', count);
+  const coupons = await (prisma as any).coupons.findMany();
+  console.log(JSON.stringify(coupons, null, 2));
 }
 
-main().catch(console.error).finally(() => prisma.$disconnect());
+main().catch(console.error);

@@ -25,6 +25,9 @@ export interface ItemizedActivity {
   type: string;
   date?: string;
   format?: string;
+  originalPrice?: number;
+  discount?: number;
+  netPrice?: number;
   price: number;
   rateBadgeTh?: string;
   rateBadgeEn?: string;
@@ -463,7 +466,22 @@ export function PaymentView({
                           </div>
 
                           <div className="text-right shrink-0">
-                            {act.price === 0 ? (
+                            {act.discount && act.discount > 0 ? (
+                              <div className="flex flex-col items-end">
+                                <span className="text-[10px] text-slate-400 line-through font-medium">
+                                  {(act.originalPrice || (act.price + act.discount)).toLocaleString()} {lang === 'th' ? 'บาท' : 'THB'}
+                                </span>
+                                <span className="text-xs sm:text-sm font-black text-[#0026b3]">
+                                  {(act.netPrice === 0 || act.price === 0) ? (
+                                    <span className="text-emerald-700 font-black bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block">
+                                      {lang === 'th' ? 'ฟรี (0 บาท)' : 'FREE (0 THB)'}
+                                    </span>
+                                  ) : (
+                                    `${(act.netPrice ?? act.price).toLocaleString()} ${lang === 'th' ? 'บาท' : 'THB'}`
+                                  )}
+                                </span>
+                              </div>
+                            ) : act.price === 0 ? (
                               <span className="inline-flex items-center text-xs sm:text-sm font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
                                 {lang === 'th' ? 'ฟรี (0 บาท)' : 'FREE (0 THB)'}
                               </span>
@@ -478,6 +496,25 @@ export function PaymentView({
                     </div>
                   </div>
                 ) : null}
+
+                {/* Individual Partial Coupon Discount Banner */}
+                {discountAmount > 0 && !isCouponSponsored && (
+                  <div className="bg-emerald-50/90 border border-emerald-200 rounded-2xl p-3 sm:p-3.5 flex items-start gap-2.5">
+                    <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <div className="text-xs text-emerald-900 leading-tight space-y-1 min-w-0 flex-1">
+                      <div className="font-bold flex items-center gap-1.5 flex-wrap">
+                        <span>{lang === 'th' ? 'ได้รับสิทธิ์ฟรีค่าลงทะเบียนหลัก (Main Program) โดย:' : 'Free Main Program Pass Sponsored by:'}</span>
+                        <span className="font-black text-[#0026b3]">{sponsorCompanyName || 'Sponsor Partner'}</span>
+                        {couponCode && <span className="font-mono font-bold text-slate-700 bg-white px-1.5 py-0.5 rounded border border-slate-200 text-[10px]">Code: {couponCode}</span>}
+                      </div>
+                      <div className="text-[11px] text-emerald-800 font-semibold">
+                        {lang === 'th'
+                          ? `หักส่วนลดค่าลงทะเบียนหลัก -${discountAmount.toLocaleString()} บาท (ชำระเฉพาะค่าลงทะเบียนเวิร์กช็อปเพิ่มเติม ${totalAmount} บาท)`
+                          : `Main program fee waived -${discountAmount.toLocaleString()} THB (Remaining balance for workshops: ${totalAmount} THB)`}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700">
                   <Check className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#0026b3] flex-shrink-0 mt-0.5 stroke-[2.5]" />

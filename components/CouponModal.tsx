@@ -56,6 +56,7 @@ export interface CouponItem {
   is_active: boolean;
   remarks: string | null;
   created_at?: string;
+  updated_at?: string;
   meetings?: {
     meeting_id: string;
     meeting_name: string;
@@ -102,9 +103,9 @@ export function CouponModal({
   // New fields requested by user:
   // 1. Purpose (สมัครสมาชิก vs ลงทะเบียนงานประชุม vs ทั้งหมด)
   const [applicableType, setApplicableType] = useState<'registration' | 'membership' | 'all'>('registration');
-  // 2. Selectable Programs / Activities
-  const [allPrograms, setAllPrograms] = useState<boolean>(true);
-  const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
+  // 2. Selectable Programs / Activities (Default to Main Program only)
+  const [allPrograms, setAllPrograms] = useState<boolean>(false);
+  const [selectedPrograms, setSelectedPrograms] = useState<string[]>(['การประชุมหลัก (Main Congress)']);
 
   useEffect(() => {
     setMounted(true);
@@ -182,22 +183,43 @@ export function CouponModal({
         setRemarks(couponToEdit.remarks || '');
         setApplicableType((couponToEdit.applicable_type as any) || 'registration');
 
+        // Find default/main program name for the meeting
+        const editMeeting = meetings.find((m) => (m.meeting_id || m.id) === (couponToEdit.meeting_id || defaultMeetingId)) || sortedMeetings[0];
+        const editActs = editMeeting?.activities || [];
+        const editMainAct = editActs.find((a: any) => 
+          (a.id || a.code || '').toLowerCase().includes('main') || 
+          (a.name || a.titleTh || a.nameTh || '').toLowerCase().includes('main') ||
+          (a.name || a.titleTh || a.nameTh || '').includes('หลัก')
+        ) || editActs[0];
+        const defaultProgName = editMainAct ? (editMainAct.name || editMainAct.titleTh || editMainAct.nameTh || 'การประชุมหลัก (Main Congress)') : 'การประชุมหลัก (Main Congress)';
+
         // Parse selected programs if stored in remarks
         try {
-          if (couponToEdit.remarks && couponToEdit.remarks.startsWith('{"programs":')) {
+          if (couponToEdit.remarks && (couponToEdit.remarks.startsWith('{"programs":') || couponToEdit.remarks.startsWith('{'))) {
             const parsed = JSON.parse(couponToEdit.remarks);
-            if (Array.isArray(parsed.programs)) {
+            if (parsed.allPrograms === true) {
+              setAllPrograms(true);
+              setSelectedPrograms([]);
+              setRemarks(parsed.note || '');
+            } else if (Array.isArray(parsed.programs) && parsed.programs.length > 0) {
               setAllPrograms(false);
               setSelectedPrograms(parsed.programs);
               setRemarks(parsed.note || '');
+            } else {
+              setAllPrograms(false);
+              setSelectedPrograms([defaultProgName]);
+              setRemarks(parsed.note || '');
             }
           } else {
-            setAllPrograms(true);
-            setSelectedPrograms([]);
+            // Default when not explicitly specified is Main Program only (ฟรีเฉพาะการประชุมหลัก Main)
+            setAllPrograms(false);
+            setSelectedPrograms([defaultProgName]);
+            setRemarks(couponToEdit.remarks || '');
           }
         } catch {
-          setAllPrograms(true);
-          setSelectedPrograms([]);
+          setAllPrograms(false);
+          setSelectedPrograms([defaultProgName]);
+          setRemarks(couponToEdit.remarks || '');
         }
       } else {
         // Creating new coupon
@@ -319,11 +341,17 @@ export function CouponModal({
 
     setSaving(true);
     try {
-      // Package selected programs into remarks if specified
+      // Package selected programs into remarks
       let finalRemarks = remarks.trim();
-      if (!allPrograms && selectedPrograms.length > 0) {
+      if (!allPrograms) {
         finalRemarks = JSON.stringify({
-          programs: selectedPrograms,
+          programs: selectedPrograms.length > 0 ? selectedPrograms : ['การประชุมหลัก (Main Congress)'],
+          note: remarks.trim() || undefined,
+        });
+      } else {
+        finalRemarks = JSON.stringify({
+          programs: [],
+          allPrograms: true,
           note: remarks.trim() || undefined,
         });
       }

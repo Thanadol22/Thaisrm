@@ -43,6 +43,7 @@ import {
 import { createPortal } from 'react-dom';
 import { CouponModal, CouponItem } from '@/components/CouponModal';
 import { CouponUsagesModal } from '@/components/CouponUsagesModal';
+import { SponsorCouponHistoryModal } from '@/components/SponsorCouponHistoryModal';
 import { PaginationControls } from '@/components/PaginationControls';
 
 interface SponsorQuota {
@@ -156,6 +157,14 @@ export default function AdminSponsorsPanel({
   const [deleteSponsorOpen, setDeleteSponsorOpen] = useState(false);
   const [sponsorToDelete, setSponsorToDelete] = useState<SponsorItem | null>(null);
   const [deletingSponsor, setDeletingSponsor] = useState(false);
+
+  // ─── Sponsor Coupon History Modal ───
+  const [sponsorCouponHistoryOpen, setSponsorCouponHistoryOpen] = useState(false);
+  const [selectedSponsorForCoupons, setSelectedSponsorForCoupons] = useState<{
+    name: string;
+    tier?: string;
+    coupons: CouponItem[];
+  } | null>(null);
 
   // ─── Global Usage History ───
   const [globalHistory, setGlobalHistory] = useState<any[]>([]);
@@ -293,15 +302,42 @@ export default function AdminSponsorsPanel({
     }
   }, [activeSubTab, selectedCouponMeeting]);
 
-  // Sponsors Map for fast coupon lookup
+  // Sponsors Map for fast coupon lookup (sorted newest first)
   const couponsByCompany = useMemo(() => {
     const map = new Map<string, CouponItem[]>();
-    for (const c of coupons) {
+    const sorted = [...coupons].sort((a, b) => {
+      const timeA = new Date(a.created_at || a.updated_at || 0).getTime();
+      const timeB = new Date(b.created_at || b.updated_at || 0).getTime();
+      return timeB - timeA;
+    });
+
+    for (const c of sorted) {
       const key = (c.company_name || '').toLowerCase().trim();
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(c);
     }
     return map;
+  }, [coupons]);
+
+  // Group coupons to show ONLY the latest coupon per company and meeting
+  const latestCoupons = useMemo(() => {
+    const latestMap = new Map<string, CouponItem>();
+    
+    // Sort all coupons by created_at / updated_at desc first
+    const sortedByDate = [...coupons].sort((a, b) => {
+      const timeA = new Date(a.created_at || a.updated_at || 0).getTime();
+      const timeB = new Date(b.created_at || b.updated_at || 0).getTime();
+      return timeB - timeA;
+    });
+
+    for (const c of sortedByDate) {
+      const key = `${(c.company_name || '').toLowerCase().trim()}_${c.meeting_id || ''}`;
+      if (!latestMap.has(key)) {
+        latestMap.set(key, c);
+      }
+    }
+
+    return Array.from(latestMap.values());
   }, [coupons]);
 
   // Filtered Sponsors
@@ -328,16 +364,16 @@ export default function AdminSponsorsPanel({
     return { total, platinum, gold, silver, totalQuota, totalUsed };
   }, [sponsors]);
 
-  // Coupon Stats
+  // Coupon Stats (based on latest coupons)
   const couponStats = useMemo(() => {
-    const total = coupons.length;
-    const active = coupons.filter((c) => c.is_active).length;
-    const totalUses = coupons.reduce((sum, c) => sum + (c.used_count || 0), 0);
-    const maxUses = coupons.reduce((sum, c) => sum + (c.max_uses || 0), 0);
+    const total = latestCoupons.length;
+    const active = latestCoupons.filter((c) => c.is_active).length;
+    const totalUses = latestCoupons.reduce((sum, c) => sum + (c.used_count || 0), 0);
+    const maxUses = latestCoupons.reduce((sum, c) => sum + (c.max_uses || 0), 0);
     return { total, active, totalUses, maxUses };
-  }, [coupons]);
+  }, [latestCoupons]);
 
-  // Sort coupons by sponsor tier and company order to match the sponsor page exactly
+  // Sort latest coupons by sponsor tier and company order to match the sponsor page exactly
   const sortedCoupons = useMemo(() => {
     const sponsorMap = new Map<string, { tier: string; index: number }>();
     sponsors.forEach((sp, idx) => {
@@ -351,7 +387,7 @@ export default function AdminSponsorsPanel({
       return 4;
     };
 
-    return [...coupons].sort((a, b) => {
+    return [...latestCoupons].sort((a, b) => {
       const nameA = (a.company_name || '').toLowerCase().trim();
       const nameB = (b.company_name || '').toLowerCase().trim();
 
@@ -369,7 +405,7 @@ export default function AdminSponsorsPanel({
 
       return (a.company_name || '').localeCompare(b.company_name || '', 'th');
     });
-  }, [coupons, sponsors]);
+  }, [latestCoupons, sponsors]);
 
   // Paginated Coupons
   const paginatedCoupons = useMemo(() => {
@@ -550,7 +586,12 @@ export default function AdminSponsorsPanel({
         return;
       }
       setAddSponsorOpen(false);
-      showToast(`เพิ่มบริษัท ${newSponsorForm.name} เรียบร้อยแล้ว`);
+      const quotaNum = parseInt(newSponsorForm.initialQuota || '0', 10);
+      showToast(
+        quotaNum > 0
+          ? `เพิ่มบริษัท ${newSponsorForm.name} และสร้างรหัสคูปองฟรี Main Program (${quotaNum} สิทธิ์) สำเร็จ`
+          : `เพิ่มบริษัท ${newSponsorForm.name} เรียบร้อยแล้ว`
+      );
       setNewSponsorForm({
         name: '',
         tier: 'Silver',
@@ -859,7 +900,18 @@ export default function AdminSponsorsPanel({
                                 )}
                               </div>
                               {coupon.remarks && (
-                                <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{coupon.remarks}</div>
+                                <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                                  {(() => {
+                                    try {
+                                      if (coupon.remarks.startsWith('{')) {
+                                        const parsed = JSON.parse(coupon.remarks);
+                                        const progText = parsed.allPrograms ? '🌐 ทุกโปรแกรม (All)' : (parsed.programs?.join(', ') || '🎯 การประชุมหลัก (Main)');
+                                        return `${progText}${parsed.note ? ` • ${parsed.note}` : ''}`;
+                                      }
+                                    } catch (e) {}
+                                    return coupon.remarks;
+                                  })()}
+                                </div>
                               )}
                             </td>
 
@@ -938,24 +990,45 @@ export default function AdminSponsorsPanel({
                             {/* Actions */}
                             <td className="py-3.5 px-4 text-right whitespace-nowrap">
                               <div className="inline-flex items-center gap-1.5 justify-end">
+                                {/* History Button (Opens Coupon Generation History Modal) */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const compCoupons = couponsByCompany.get((coupon.company_name || '').toLowerCase().trim()) || [coupon];
+                                    setSelectedSponsorForCoupons({
+                                      name: coupon.company_name,
+                                      tier: matchingSponsor?.tier,
+                                      coupons: compCoupons,
+                                    });
+                                    setSponsorCouponHistoryOpen(true);
+                                  }}
+                                  className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#0026b3] border border-blue-200/80 transition-colors cursor-pointer shadow-2xs"
+                                  title="ดูประวัติรหัสคูปองที่เคยสร้างของบริษัทนี้"
+                                >
+                                  <History className="w-4 h-4 text-[#0026b3]" />
+                                </button>
+
+                                {/* Edit Button */}
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setCouponToEdit(coupon);
                                     setCouponModalOpen(true);
                                   }}
-                                  className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition cursor-pointer"
+                                  className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200/80 transition-colors cursor-pointer shadow-2xs"
                                   title="แก้ไขคูปอง"
                                 >
-                                  <Pencil className="w-3.5 h-3.5 text-amber-600" />
+                                  <Pencil className="w-4 h-4 text-amber-600" />
                                 </button>
+
+                                {/* Delete Button */}
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteCoupon(coupon.id, coupon.code)}
-                                  className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition cursor-pointer"
+                                  className="p-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200/80 transition-colors cursor-pointer shadow-2xs"
                                   title="ลบคูปอง"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                                  <Trash2 className="w-4 h-4 text-red-600" />
                                 </button>
                               </div>
                             </td>
@@ -1149,23 +1222,19 @@ export default function AdminSponsorsPanel({
                             )}
                           </td>
 
-                          {/* Matching Coupon Codes */}
+                          {/* Matching Latest Coupon Code */}
                           <td className="py-3.5 px-4">
                             {matchingCoupons.length > 0 ? (
-                              <div className="flex flex-wrap gap-1.5">
-                                {matchingCoupons.map((c) => (
-                                  <button
-                                    key={c.id}
-                                    type="button"
-                                    onClick={() => handleCopyCode(c.code)}
-                                    className="font-mono font-bold text-xs bg-blue-50 hover:bg-blue-100 text-[#0026b3] px-2 py-0.5 rounded border border-blue-200 flex items-center gap-1 transition cursor-pointer whitespace-nowrap shrink-0"
-                                    title="คลิกเพื่อคัดลอกรหัสคูปองนี้"
-                                  >
-                                    <span>{c.code}</span>
-                                    <Copy className="w-3 h-3 text-blue-400" />
-                                  </button>
-                                ))}
-                              </div>
+                              <button
+                                key={matchingCoupons[0].id}
+                                type="button"
+                                onClick={() => handleCopyCode(matchingCoupons[0].code)}
+                                className="font-mono font-bold text-xs bg-blue-50 hover:bg-blue-100 text-[#0026b3] px-2.5 py-1 rounded-lg border border-blue-200 flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0 shadow-2xs"
+                                title="คลิกเพื่อคัดลอกรหัสคูปองล่าสุดนี้"
+                              >
+                                <span>{matchingCoupons[0].code}</span>
+                                <Copy className="w-3 h-3 text-blue-500" />
+                              </button>
                             ) : (
                               <button
                                 onClick={() => {
@@ -1207,23 +1276,41 @@ export default function AdminSponsorsPanel({
 
                           <td className="py-3.5 px-4 text-right whitespace-nowrap">
                             <div className="inline-flex items-center gap-1.5 justify-end">
+                              {/* History Button (Opens Coupon Generation History Modal) */}
                               <button
-                                onClick={() => handleOpenEditSponsor(sp)}
-                                className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200/80 transition-colors cursor-pointer"
-                                title="แก้ไขข้อมูลบริษัทและโควต้า"
+                                onClick={() => {
+                                  setSelectedSponsorForCoupons({
+                                    name: sp.name,
+                                    tier: sp.tier,
+                                    coupons: matchingCoupons,
+                                  });
+                                  setSponsorCouponHistoryOpen(true);
+                                }}
+                                className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#0026b3] border border-blue-200/80 transition-colors cursor-pointer shadow-2xs"
+                                title="ดูประวัติรหัสคูปองที่เคยสร้างทั้งหมดของบริษัทนี้"
                               >
-                                <Pencil className="w-3.5 h-3.5 text-amber-600" />
+                                <History className="w-4 h-4 text-[#0026b3]" />
                               </button>
 
+                              {/* Edit Button */}
+                              <button
+                                onClick={() => handleOpenEditSponsor(sp)}
+                                className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200/80 transition-colors cursor-pointer shadow-2xs"
+                                title="แก้ไขข้อมูลบริษัทและโควต้า"
+                              >
+                                <Pencil className="w-4 h-4 text-amber-600" />
+                              </button>
+
+                              {/* Delete Button */}
                               <button
                                 onClick={() => {
                                   setSponsorToDelete(sp);
                                   setDeleteSponsorOpen(true);
                                 }}
-                                className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200/80 transition-colors cursor-pointer"
+                                className="p-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200/80 transition-colors cursor-pointer shadow-2xs"
                                 title="ลบข้อมูลบริษัทสปอนเซอร์"
                               >
-                                <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                                <Trash2 className="w-4 h-4 text-red-600" />
                               </button>
                             </div>
                           </td>
@@ -1502,13 +1589,14 @@ export default function AdminSponsorsPanel({
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      โควต้าเริ่มต้น (ที่นั่ง)
+                      จำนวนโควต้าสิทธิ์ฟรี (ที่นั่ง)
                     </label>
                     <input
                       type="number"
                       min="0"
                       value={newSponsorForm.initialQuota}
                       onChange={(e) => setNewSponsorForm({ ...newSponsorForm, initialQuota: e.target.value })}
+                      placeholder="0"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:bg-white focus:outline-none focus:border-blue-500 transition-colors"
                     />
                   </div>
@@ -1836,15 +1924,26 @@ export default function AdminSponsorsPanel({
       />
 
       {/* ======================================================= */}
-      {/* MODAL: COUPON USAGES */}
+      {/* MODAL: SPONSOR COUPON GENERATION HISTORY */}
       {/* ======================================================= */}
-      <CouponUsagesModal
-        isOpen={couponUsagesModalOpen}
-        onClose={() => setCouponUsagesModalOpen(false)}
-        coupon={selectedCouponForUsages}
-        onQuotaRefunded={() => {
-          fetchCoupons();
-          showToast('คืนโควต้าสิทธิ์คูปองเรียบร้อยแล้ว');
+      <SponsorCouponHistoryModal
+        isOpen={sponsorCouponHistoryOpen}
+        onClose={() => setSponsorCouponHistoryOpen(false)}
+        sponsorName={selectedSponsorForCoupons?.name || ''}
+        sponsorTier={selectedSponsorForCoupons?.tier}
+        coupons={selectedSponsorForCoupons?.coupons || []}
+        onSelectCouponForUsages={(coupon) => {
+          setSelectedCouponForUsages(coupon);
+          setCouponUsagesModalOpen(true);
+        }}
+        onEditCoupon={(coupon) => {
+          setSponsorCouponHistoryOpen(false);
+          setCouponToEdit(coupon);
+          setCouponModalOpen(true);
+        }}
+        onDeleteCoupon={(couponId, couponCode) => {
+          handleDeleteCoupon(couponId, couponCode);
+          setSponsorCouponHistoryOpen(false);
         }}
       />
     </div>

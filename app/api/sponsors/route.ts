@@ -152,6 +152,17 @@ export async function GET(req: NextRequest) {
   }
 }
 
+function generateSponsorCouponCode(meetingId: string, companyName: string): string {
+  const numMatch = meetingId.match(/\d+/);
+  const mPrefix = numMatch ? `T${numMatch[0].slice(-2)}` : 'TSRM';
+  const cleanComp = companyName
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toUpperCase()
+    .slice(0, 6) || 'SPON';
+  const randomDigits = Math.floor(1000 + Math.random() * 9000);
+  return `${mPrefix}-${cleanComp}-${randomDigits}`;
+}
+
 // POST /api/sponsors - เพิ่มบริษัทใหม่
 export async function POST(req: NextRequest) {
   try {
@@ -211,7 +222,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // หากระบุโควต้าและงานประชุม ให้สร้าง sponsor_quotas
+      // หากระบุโควต้าและงานประชุม ให้สร้าง sponsor_quotas และสร้างคูปองฟรี Main Program อัตโนมัติ
       if (meetingId && initialQuota > 0) {
         await prismaAny.sponsor_quotas.create({
           data: {
@@ -220,6 +231,41 @@ export async function POST(req: NextRequest) {
             quota_seats: initialQuota,
             used_seats: 0,
             members_only: true,
+          },
+        });
+
+        // สร้างรหัสคูปองฟรี Main Program ให้อัตโนมัติ
+        let couponCode = '';
+        for (let i = 0; i < 10; i++) {
+          const candidate = generateSponsorCouponCode(meetingId, name);
+          const existingCoupon = await prismaAny.coupons.findUnique({ where: { code: candidate } });
+          if (!existingCoupon) {
+            couponCode = candidate;
+            break;
+          }
+        }
+        if (!couponCode) {
+          couponCode = `T34-${Date.now().toString().slice(-6)}`;
+        }
+
+        const defaultRemarks = JSON.stringify({
+          programs: ['การประชุมหลัก (Main Congress)'],
+          allPrograms: false,
+          note: 'คูปองโควต้าสิทธิ์ฟรีเริ่มต้นสำหรับบริษัท',
+        });
+
+        await prismaAny.coupons.create({
+          data: {
+            code: couponCode,
+            company_name: name,
+            meeting_id: meetingId,
+            discount_type: 'free',
+            discount_value: 0,
+            applicable_type: 'event',
+            max_uses: initialQuota,
+            used_count: 0,
+            is_active: true,
+            remarks: defaultRemarks,
           },
         });
       }
@@ -235,6 +281,30 @@ export async function POST(req: NextRequest) {
         await prisma.$executeRaw`
           INSERT INTO sponsor_quotas (id, sponsor_id, meeting_id, quota_seats, used_seats, members_only, created_at, updated_at)
           VALUES (gen_random_uuid()::text, ${sponsor.id}, ${meetingId}, ${initialQuota}, 0, true, NOW(), NOW())
+        `;
+
+        let couponCode = '';
+        for (let i = 0; i < 10; i++) {
+          const candidate = generateSponsorCouponCode(meetingId, name);
+          const dup: any[] = await prisma.$queryRaw`SELECT id FROM coupons WHERE code = ${candidate} LIMIT 1`;
+          if (!dup || dup.length === 0) {
+            couponCode = candidate;
+            break;
+          }
+        }
+        if (!couponCode) {
+          couponCode = `T34-${Date.now().toString().slice(-6)}`;
+        }
+
+        const defaultRemarks = JSON.stringify({
+          programs: ['การประชุมหลัก (Main Congress)'],
+          allPrograms: false,
+          note: 'คูปองโควต้าสิทธิ์ฟรีเริ่มต้นสำหรับบริษัท',
+        });
+
+        await prisma.$executeRaw`
+          INSERT INTO coupons (id, code, company_name, meeting_id, discount_type, discount_value, applicable_type, max_uses, used_count, is_active, remarks, created_at, updated_at)
+          VALUES (gen_random_uuid()::text, ${couponCode}, ${name}, ${meetingId}, 'free', 0, 'event', ${initialQuota}, 0, true, ${defaultRemarks}, NOW(), NOW())
         `;
       }
     }
