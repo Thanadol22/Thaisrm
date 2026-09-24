@@ -73,6 +73,7 @@ export function toMemberDto(member: any): Member {
     member_type_other: member.job_category_other ?? (memberType === MemberType.OTHER ? rawJobCategory : null),
     scientist_reg_no: member.scientist_license_no ?? null,
     scientist_reg_nw: null,
+    referees: member.referees ?? null,
     membership_status: member.membership_status ?? 'Active',
     membership_type: member.membership_type ?? 'Regular',
     expire_date: member.expire_date ? new Date(member.expire_date).toISOString().split('T')[0] : null,
@@ -276,7 +277,7 @@ export async function createMember(rawInput: CreateMemberInput): Promise<Member>
       scientist_license_no: input.scientist_reg_no || null,
       username: input.email || member_no,
       password_hash: null,
-      referees: null,
+      referees: input.referees || null,
       photo_url: input.photo_path || null,
       id_card_doc: null,
       degree_cert_doc: input.degree_cert_doc || null,
@@ -625,6 +626,7 @@ export async function updateMember(id: string | number | bigint, rawInput: Updat
     if (input.membership_type !== undefined) updateData.membership_type = input.membership_type;
     if (input.membership_status !== undefined) updateData.membership_status = input.membership_status;
     if (input.scientist_reg_no !== undefined) updateData.scientist_license_no = input.scientist_reg_no;
+    if (input.referees !== undefined) updateData.referees = input.referees;
     if (input.photo_path !== undefined) updateData.photo_url = input.photo_path;
     if (input.degree_cert_doc !== undefined) updateData.degree_cert_doc = input.degree_cert_doc;
     if (input.work_cert_doc !== undefined) updateData.work_cert_doc = input.work_cert_doc;

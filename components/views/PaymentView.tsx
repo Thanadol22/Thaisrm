@@ -14,7 +14,12 @@ import {
   Trash2, 
   RotateCw,
   AlertTriangle,
-  Sparkles
+  Sparkles,
+  Clock,
+  Lock,
+  Building2,
+  CreditCard,
+  Info
 } from 'lucide-react';
 import { TsrmLogo } from '@/components/TsrmLogo';
 import { useLanguage } from '@/context/LanguageContext';
@@ -89,7 +94,7 @@ interface PaymentViewProps {
   bankAccount: string;
   uploadedSlipData?: { fileName: string; fileUrl: string } | null;
   onRemoveSlip?: () => void;
-  onConfirmPayment: () => void;
+  onConfirmPayment: (isPayLater?: boolean) => void;
 }
 
 export function PaymentView({
@@ -127,6 +132,8 @@ export function PaymentView({
   const router = useRouter();
   const { lang, toggleLang, t } = useLanguage();
   const isRegistration = paymentType === 'registration';
+  const [paymentMode, setPaymentMode] = React.useState<'transfer' | 'pay_later'>('transfer');
+  const isPayLaterMode = isGroup && !isCouponSponsored && paymentMode === 'pay_later';
 
   const handleBack = () => {
     if (onNavigateBack) {
@@ -594,6 +601,104 @@ export function PaymentView({
           )}
         </div>
 
+        {/* Corporate / Group Payment Method Switcher */}
+        {isGroup && !isCouponSponsored && (
+          <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-[#0026b3]" />
+                {lang === 'th' ? 'เลือกวิธีการชำระเงินสำหรับบริษัท / หน่วยงาน' : 'Select Payment Method for Corporate / Group'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* Option 1: Transfer Now */}
+              <button
+                type="button"
+                onClick={() => setPaymentMode('transfer')}
+                className={`p-3 sm:p-3.5 rounded-2xl border-2 text-left transition flex items-start gap-3 cursor-pointer ${
+                  paymentMode === 'transfer'
+                    ? 'border-[#0026b3] bg-blue-50/50 text-slate-900 ring-2 ring-[#0026b3]/20'
+                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                  paymentMode === 'transfer' ? 'bg-[#0026b3] text-white' : 'bg-slate-100 text-slate-500'
+                }`}>
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs sm:text-sm font-black block">
+                      {lang === 'th' ? 'โอนชำระเงินทันที' : 'Pay Now (Transfer)'}
+                    </span>
+                    {paymentMode === 'transfer' && (
+                      <span className="w-2 h-2 rounded-full bg-[#0026b3]" />
+                    )}
+                  </div>
+                  <span className="text-[11px] text-slate-500 block mt-0.5">
+                    {lang === 'th' ? 'โอนเงินและแนบสลิปหลักฐานทันที' : 'Transfer & attach slip now'}
+                  </span>
+                </div>
+              </button>
+
+              {/* Option 2: Pay Later */}
+              <button
+                type="button"
+                onClick={() => setPaymentMode('pay_later')}
+                className={`p-3 sm:p-3.5 rounded-2xl border-2 text-left transition flex items-start gap-3 cursor-pointer ${
+                  paymentMode === 'pay_later'
+                    ? 'border-amber-500 bg-amber-50/60 text-slate-900 ring-2 ring-amber-500/25'
+                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                  paymentMode === 'pay_later' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500'
+                }`}>
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-1 flex-wrap">
+                    <span className="text-xs sm:text-sm font-black block">
+                      {lang === 'th' ? 'ชำระเงินภายหลัง' : 'Pay Later (Corporate)'}
+                    </span>
+                    <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.2 rounded">
+                      {lang === 'th' ? 'รอชำระ' : 'Pending'}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 block mt-0.5">
+                    {lang === 'th' ? 'ลงทะเบียนไว้ก่อน ชำระเงินตามรอบบิล' : 'Submit now, settle payment later'}
+                  </span>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Pay Later Information Banner */}
+        {isPayLaterMode && (
+          <div className="bg-amber-50/90 border border-amber-300/80 rounded-2xl p-4 flex items-start gap-3.5 shadow-2xs animate-fade-in">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5 border border-amber-200">
+              <Clock className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div className="space-y-1 min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-xs sm:text-sm font-black text-amber-900 leading-tight">
+                  {lang === 'th' ? 'โหมดชำระเงินภายหลังสำหรับบริษัท / หน่วยงาน' : 'Corporate Pay Later Mode'}
+                </h4>
+                <span className="bg-amber-200/90 text-amber-900 border border-amber-300 font-extrabold text-[10px] px-2 py-0.5 rounded-md">
+                  {lang === 'th' ? 'สถานะ: รอชำระเงิน' : 'Status: Pending Payment'}
+                </span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-amber-800 leading-relaxed font-medium">
+                {lang === 'th'
+                  ? 'ระบบจะบันทึกข้อมูลการลงทะเบียนให้เรียบร้อยโดยมีสถานะ "รอชำระเงิน" โดยไม่ต้องแนบสลิปในขั้นตอนนี้ เพื่อให้ท่านสามารถนำเอกสารไปดำเนินการเบิกจ่ายตามระเบียบบริษัทได้'
+                  : 'Registration will be recorded with "Pending Payment" status. No slip upload is required at this stage so your company can process the payment.'}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Bank Account Info Card (Only shown if payment is required) */}
         {!isCouponSponsored && (
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 flex items-center justify-between gap-3 shadow-2xs">
@@ -616,8 +721,8 @@ export function PaymentView({
           </div>
         )}
 
-        {/* Uploaded Slip Card (When slip is attached and required) */}
-        {!isCouponSponsored && uploadedSlipData && (
+        {/* Uploaded Slip Card (When slip is attached and in transfer mode) */}
+        {!isCouponSponsored && !isPayLaterMode && uploadedSlipData && (
           <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-[#4ade80]/60 bg-gradient-to-b from-white to-emerald-50/30 shadow-2xs space-y-3 animate-fade-in">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -682,6 +787,25 @@ export function PaymentView({
           </div>
         )}
 
+        {/* Blocked Slip Card when in Pay Later mode (To prevent confusion) */}
+        {isPayLaterMode && (
+          <div className="w-full bg-slate-100/90 border-2 border-dashed border-slate-300 text-slate-600 rounded-2xl p-4 sm:p-4.5 flex items-center gap-3.5 select-none shadow-2xs animate-fade-in">
+            <div className="w-9 h-9 rounded-xl bg-slate-200/80 text-slate-500 flex items-center justify-center shrink-0 border border-slate-300/60">
+              <Lock className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="text-xs sm:text-sm font-black text-slate-800 leading-tight">
+                {lang === 'th' ? '🔒 ปิดการแนบสลิปสำหรับโหมดชำระเงินภายหลัง' : '🔒 Slip upload is disabled for Pay Later mode'}
+              </p>
+              <p className="text-[11px] text-slate-500 mt-0.5 font-medium leading-relaxed">
+                {lang === 'th'
+                  ? 'ไม่ต้องแนบสลิปในขั้นตอนนี้ เพื่อป้องกันความเข้าใจผิด ท่านสามารถกดยืนยันด้านล่างได้ทันที'
+                  : 'No slip is required right now. You can confirm registration directly below.'}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Security Encrypted Checkout Badge */}
         <div className="w-full bg-[#eff4ff] text-[#0026b3] font-bold text-[10px] sm:text-[11px] uppercase tracking-wider py-2.5 sm:py-3 px-3 sm:px-4 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 border border-[#d6e4ff] text-center">
           <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0026b3] shrink-0" />
@@ -690,7 +814,8 @@ export function PaymentView({
 
         {/* Action Buttons Section */}
         <div className="space-y-2.5 pt-2">
-          {!isCouponSponsored && !uploadedSlipData ? (
+          {/* Normal Upload Button (Only when not sponsored, not pay-later, and no slip uploaded yet) */}
+          {!isCouponSponsored && !isPayLaterMode && !uploadedSlipData ? (
             <button
               onClick={onOpenUploadModal}
               className="w-full bg-white hover:bg-blue-50/50 text-[#0026b3] border-2 border-dashed border-[#0026b3]/40 font-bold text-sm sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-2xs transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
@@ -700,25 +825,43 @@ export function PaymentView({
             </button>
           ) : null}
 
-          {/* Confirm Payment / Confirm Sponsor Pass Button */}
-          <button
-            onClick={onConfirmPayment}
-            disabled={submitting}
-            className={`w-full font-black text-sm sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-md transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2 ${
-              isCouponSponsored
-                ? 'bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] ring-4 ring-[#4ade80]/25 shadow-emerald-950/20'
-                : uploadedSlipData
-                ? 'bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] ring-4 ring-[#4ade80]/20'
-                : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-blue-900/10'
-            }`}
-          >
-            <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
-            <span>
-              {isCouponSponsored
-                ? (lang === 'th' ? 'ยืนยันการลงทะเบียน (ใช้สิทธิ์คูปอง)' : 'Confirm Registration (Use Sponsor Pass)')
-                : t.payment.confirmPaymentButton}
-            </span>
-          </button>
+          {/* Confirm Button */}
+          {isPayLaterMode ? (
+            <button
+              type="button"
+              onClick={() => onConfirmPayment(true)}
+              disabled={submitting}
+              className="w-full bg-gradient-to-r from-[#0026b3] via-[#002ec7] to-[#003be0] hover:from-[#001f94] hover:to-[#002fad] text-white font-black text-sm sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-md ring-4 ring-blue-500/20 transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Clock className="w-5 h-5 stroke-[2.5]" />
+              <span>
+                {lang === 'th' ? 'ยืนยันและชำระเงินภายหลัง (Pay Later)' : 'Confirm & Pay Later'}
+              </span>
+              <span className="ml-1 text-[11px] bg-white/20 text-white px-2 py-0.5 rounded-full font-bold">
+                {lang === 'th' ? 'รอชำระ' : 'Pending'}
+              </span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onConfirmPayment(false)}
+              disabled={submitting}
+              className={`w-full font-black text-sm sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-md transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2 ${
+                isCouponSponsored
+                  ? 'bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] ring-4 ring-[#4ade80]/25 shadow-emerald-950/20'
+                  : uploadedSlipData
+                  ? 'bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] ring-4 ring-[#4ade80]/20'
+                  : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-blue-900/10'
+              }`}
+            >
+              <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
+              <span>
+                {isCouponSponsored
+                  ? (lang === 'th' ? 'ยืนยันการลงทะเบียน (ใช้สิทธิ์คูปอง)' : 'Confirm Registration (Use Sponsor Pass)')
+                  : t.payment.confirmPaymentButton}
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Footer Terms Disclaimer */}

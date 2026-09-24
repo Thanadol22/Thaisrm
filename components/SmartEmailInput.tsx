@@ -163,7 +163,7 @@ export function SmartEmailInput({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const defaultLabel = lang === 'th' ? 'อีเมล' : 'Email Address';
-  const defaultPlaceholder = placeholder || (lang === 'th' ? 'เช่น yourname@gmail.com หรือ hotmail' : 'e.g. yourname@gmail.com');
+  const defaultPlaceholder = placeholder || 'youremail@gmail.com';
 
   // ตรวจจับชื่อผู้ใช้และโดเมนปัจจุบัน
   const { prefix, domainQuery, hasAt } = useMemo(() => {

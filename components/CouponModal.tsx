@@ -467,7 +467,7 @@ export function CouponModal({
                 required
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="พิมพ์ชื่อบริษัท เช่น บจก. ตัวอย่าง (ประเทศไทย)"
+                placeholder="พิมพ์ชื่อบริษัท หรือหน่วยงาน"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:border-[#0026b3] focus:bg-white transition outline-none bg-slate-50 mt-1.5"
               />
             )}
@@ -681,7 +681,7 @@ export function CouponModal({
               required
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="เช่น LGCHEM-TSRM34, MERCK-2026"
+              placeholder="SPONSOR-2026"
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 font-mono font-black text-sm tracking-wider focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/15 transition outline-none bg-slate-50 focus:bg-white uppercase"
             />
           </div>
@@ -731,7 +731,7 @@ export function CouponModal({
                 required
                 value={discountValue}
                 onChange={(e) => setDiscountValue(Number(e.target.value))}
-                placeholder={discountType === 'percent' ? 'เช่น 50 (ลด 50%)' : 'เช่น 1500 (ลด 1,500 บาท)'}
+                placeholder={discountType === 'percent' ? '50 (ลด 50%)' : '1500 (1,500 บาท)'}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 font-bold text-xs focus:border-[#0026b3] focus:outline-none bg-white"
               />
             </div>
@@ -761,7 +761,7 @@ export function CouponModal({
                 type="text"
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
-                placeholder="เช่น สำหรับตัวแทนฝ่ายขาย / โควต้าสิทธิ์"
+                placeholder="สำหรับตัวแทนฝ่ายขาย / โควต้าสิทธิ์"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:border-[#0026b3] focus:outline-none bg-white"
               />
             </div>

@@ -688,7 +688,7 @@ export default function SponsorGroupRegisterPage() {
                   <SmartEmailInput
                     value={emailInput}
                     onChange={(val: string) => setEmailInput(val)}
-                    placeholder="เช่น natsuree@lgchem.com, pornpun.mongkonsawat@merckgroup.com"
+                    placeholder="youremail@example.com"
                     required
                   />
                   <p className="text-[11px] text-slate-500 mt-1">
@@ -1040,7 +1040,7 @@ export default function SponsorGroupRegisterPage() {
                         type="text"
                         value={couponCodeInput}
                         onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
-                        placeholder="กรอกรหัสคูปอง (เช่น LG-VIP2026)"
+                        placeholder="กรอกรหัสคูปอง (Coupon Code)"
                         className="flex-1 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono uppercase text-xs focus:outline-none focus:border-indigo-500"
                       />
                       <button
@@ -1126,7 +1126,7 @@ export default function SponsorGroupRegisterPage() {
                             type="text"
                             value={row.memberNo}
                             onChange={(e) => handleRowChange(row.id, 'memberNo', e.target.value)}
-                            placeholder="เช่น 0001, 0015"
+                            placeholder="0001"
                             className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-blue-500"
                             required
                           />
@@ -1175,7 +1175,7 @@ export default function SponsorGroupRegisterPage() {
                           type="email"
                           value={row.email}
                           onChange={(e) => handleRowChange(row.id, 'email', e.target.value)}
-                          placeholder="doctor@hospital.com"
+                          placeholder="youremail@example.com"
                           className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500"
                           required
                         />
@@ -1190,7 +1190,7 @@ export default function SponsorGroupRegisterPage() {
                           type="text"
                           value={row.workplace}
                           onChange={(e) => handleRowChange(row.id, 'workplace', e.target.value)}
-                          placeholder="เช่น รพ.จุฬาลงกรณ์"
+                          placeholder="ระบุชื่อหน่วยงาน / โรงพยาบาล"
                           className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500"
                         />
                       </div>

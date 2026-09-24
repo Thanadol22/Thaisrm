@@ -21,6 +21,8 @@ import {
   BookOpen,
   Layers,
   Sparkles,
+  User,
+  Users,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { PaginationControls } from '@/components/PaginationControls';
@@ -43,6 +45,9 @@ export interface SlipRecord {
   memberNo?: string | null;
   isMember: boolean;
   isMembershipRegistration?: boolean;
+  isGroupMembership?: boolean;
+  groupPayload?: any;
+  companyName?: string;
   isFormatChange?: boolean;
   formatChangePayload?: any;
   memberPayload?: any;
@@ -87,6 +92,7 @@ export function AdminSlipsView() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'individual' | 'corporate'>('all');
   const [selectedSlip, setSelectedSlip] = useState<SlipRecord | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -115,7 +121,7 @@ export function AdminSlipsView() {
   // Reset to page 1 on filter or search change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery, statusFilter, categoryFilter]);
 
   const fetchSlips = async () => {
     try {
@@ -175,10 +181,13 @@ export function AdminSlipsView() {
               : null
           );
         }
+        const isPayLaterSlip = selectedSlip?.bank?.includes('ชำระเงินภายหลัง') || selectedSlip?.bank?.toLowerCase().includes('pay later');
         showToast(
           approvedMemberNo
-            ? (lang === 'th' ? `อนุมัติสลิปและสร้างบัญชีสมาชิกเรียบร้อยแล้ว (รหัส: ${approvedMemberNo})` : `Slip approved and member created (No: ${approvedMemberNo})`)
-            : (lang === 'th' ? 'อนุมัติหลักฐานสลิปเรียบร้อยแล้ว' : 'Slip approved successfully')
+            ? (lang === 'th' ? `อนุมัติสิทธิ์และสร้างบัญชีสมาชิกเรียบร้อยแล้ว (รหัส: ${approvedMemberNo})` : `Access approved and member created (No: ${approvedMemberNo})`)
+            : isPayLaterSlip
+            ? (lang === 'th' ? 'อนุมัติสิทธิ์เข้างาน/สมาชิกเรียบร้อยแล้ว (สถานะ: รอชำระเงิน/รอสลิป)' : 'Access approved (Awaiting Payment)')
+            : (lang === 'th' ? 'อนุมัติรายการเรียบร้อยแล้ว' : 'Approved successfully')
         );
       } else {
         showToast(json.error || 'เกิดข้อผิดพลาดในการอนุมัติ');
@@ -237,6 +246,10 @@ export function AdminSlipsView() {
   const filteredSlips = React.useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     return slips.filter((s) => {
+      const isCorporate = Boolean(s.isGroupMembership || s.groupPayload || s.ticketCode?.startsWith('MEMGRP'));
+      if (categoryFilter === 'individual' && isCorporate) return false;
+      if (categoryFilter === 'corporate' && !isCorporate) return false;
+
       const acts = parseSlipActivities(s.selectedActivities);
       const matchesActivities = acts.some((a) => a.name && a.name.toLowerCase().includes(q));
 
@@ -244,6 +257,7 @@ export function AdminSlipsView() {
         !q ||
         (s.nameTh && s.nameTh.toLowerCase().includes(q)) ||
         (s.nameEn && s.nameEn.toLowerCase().includes(q)) ||
+        (s.companyName && s.companyName.toLowerCase().includes(q)) ||
         (s.ticketCode && s.ticketCode.toLowerCase().includes(q)) ||
         (s.refNo && s.refNo.toLowerCase().includes(q)) ||
         (s.workplace && s.workplace.toLowerCase().includes(q)) ||
@@ -253,7 +267,7 @@ export function AdminSlipsView() {
       const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [slips, searchQuery, statusFilter]);
+  }, [slips, searchQuery, statusFilter, categoryFilter]);
 
   // Paginated slips (5 items per page)
   const paginatedSlips = React.useMemo(() => {
@@ -264,6 +278,15 @@ export function AdminSlipsView() {
   }, [filteredSlips, currentPage, pageSize]);
 
   const totalCount = slips.length;
+  const individualSlips = React.useMemo(
+    () => slips.filter((s) => !s.isGroupMembership && !s.groupPayload && !s.ticketCode?.startsWith('MEMGRP')),
+    [slips]
+  );
+  const corporateSlips = React.useMemo(
+    () => slips.filter((s) => Boolean(s.isGroupMembership || s.groupPayload || s.ticketCode?.startsWith('MEMGRP'))),
+    [slips]
+  );
+
   const pendingCount = React.useMemo(() => slips.filter((s) => s.status === 'pending').length, [slips]);
   const approvedCount = React.useMemo(() => slips.filter((s) => s.status === 'approved').length, [slips]);
   const rejectedCount = React.useMemo(() => slips.filter((s) => s.status === 'rejected').length, [slips]);
@@ -291,7 +314,7 @@ export function AdminSlipsView() {
                 <Receipt className="w-5 h-5" />
               </div>
               <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-                {lang === 'th' ? 'ตรวจสอบสลิปการโอนเงิน' : 'Slip Verification & Review'}
+                {lang === 'th' ? 'ตรวจสอบการชำระเงิน' : 'Payment Verification & Review'}
               </h1>
             </div>
             <p className="text-xs text-blue-100/90 font-normal">
@@ -328,6 +351,66 @@ export function AdminSlipsView() {
         </div>
       </div>
 
+      {/* ─── Mode / Module Switcher: Individual vs Corporate Group ─── */}
+      <div className="flex items-center p-1.5 bg-slate-100 rounded-2xl w-full border border-slate-200 shadow-2xs gap-1.5 overflow-x-auto">
+        <button
+          onClick={() => setCategoryFilter('all')}
+          className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
+            categoryFilter === 'all'
+              ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+          }`}
+        >
+          <Layers className="w-4 h-4 text-blue-600" />
+          <span>{lang === 'th' ? 'ทุกประเภท' : 'All Types'}</span>
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+              categoryFilter === 'all' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-600'
+            }`}
+          >
+            {totalCount}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setCategoryFilter('individual')}
+          className={`flex-1 min-w-[170px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
+            categoryFilter === 'individual'
+              ? 'bg-white text-slate-900 shadow-sm border border-purple-200 ring-1 ring-purple-400/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+          }`}
+        >
+          <User className="w-4 h-4 text-purple-600" />
+          <span>{lang === 'th' ? 'บุคคลทั่วไป / สมาชิกเดี่ยว' : 'Individual & Member'}</span>
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+              categoryFilter === 'individual' ? 'bg-purple-100 text-purple-800' : 'bg-slate-200 text-slate-600'
+            }`}
+          >
+            {individualSlips.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setCategoryFilter('corporate')}
+          className={`flex-1 min-w-[170px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
+            categoryFilter === 'corporate'
+              ? 'bg-white text-slate-900 shadow-sm border border-indigo-200 ring-1 ring-indigo-400/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+          }`}
+        >
+          <Building2 className="w-4 h-4 text-indigo-600" />
+          <span>{lang === 'th' ? 'องค์กร / สมัครแบบกลุ่มบริษัท' : 'Corporate Group'}</span>
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+              categoryFilter === 'corporate' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-600'
+            }`}
+          >
+            {corporateSlips.length}
+          </span>
+        </button>
+      </div>
+
       {/* Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
         <div
@@ -339,7 +422,7 @@ export function AdminSlipsView() {
           }`}
         >
           <p className="text-[11px] font-bold text-slate-500">{lang === 'th' ? 'ทั้งหมด' : 'All Slips'}</p>
-          <p className="text-xl font-black text-slate-900 mt-0.5">{totalCount}</p>
+          <p className="text-xl font-black text-slate-900 mt-0.5">{filteredSlips.length}</p>
         </div>
 
         <div
@@ -488,7 +571,9 @@ export function AdminSlipsView() {
                 <div className="space-y-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-extrabold text-sm sm:text-base text-slate-900 leading-tight">
-                      {lang === 'th' ? slip.nameTh : slip.nameEn || slip.nameTh}
+                      {slip.isGroupMembership || slip.groupPayload || slip.ticketCode?.startsWith('MEMGRP')
+                        ? (slip.companyName || slip.workplace || (lang === 'th' ? slip.nameTh : slip.nameEn || slip.nameTh))
+                        : (lang === 'th' ? slip.nameTh : slip.nameEn || slip.nameTh)}
                     </h3>
 
                     {/* Member vs Non-Member vs New Membership Badge */}
@@ -525,29 +610,48 @@ export function AdminSlipsView() {
                       {slip.ticketCode}
                     </span>
 
-                    <span
-                      className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                        slip.status === 'approved'
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                          : slip.status === 'pending'
-                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                          : 'bg-rose-100 text-rose-800 border border-rose-300'
-                      }`}
-                    >
-                      {slip.status === 'approved' && (lang === 'th' ? '✓ อนุมัติแล้ว' : 'Approved')}
-                      {slip.status === 'pending' && (lang === 'th' ? '⏳ รอตรวจสอบ' : 'Pending')}
-                      {slip.status === 'rejected' && (lang === 'th' ? '✕ ปฏิเสธ' : 'Rejected')}
-                    </span>
+                    {(() => {
+                      const isPayLater = slip.bank?.includes('ชำระเงินภายหลัง') || slip.bank?.toLowerCase().includes('pay later') || slip.slipUrl === 'PAY_LATER' || slip.slipUrl === '/placeholder-slip.png' || !slip.slipUrl;
+                      return (
+                        <span
+                          className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
+                            slip.status === 'approved'
+                              ? isPayLater
+                                ? 'bg-sky-100 text-sky-900 border border-sky-300 shadow-2xs'
+                                : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : slip.status === 'pending'
+                              ? isPayLater
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                : 'bg-amber-100 text-amber-800 border border-amber-300'
+                              : 'bg-rose-100 text-rose-800 border border-rose-300'
+                          }`}
+                        >
+                          {slip.status === 'approved' && (
+                            isPayLater
+                              ? (lang === 'th' ? '✓ อนุมัติสิทธิ์แล้ว (รอชำระเงิน/รอสลิป)' : '✓ Access Approved (Awaiting Payment)')
+                              : (lang === 'th' ? '✓ อนุมัติแล้ว (ชำระเงินเรียบร้อย)' : '✓ Approved & Paid')
+                          )}
+                          {slip.status === 'pending' && (
+                            isPayLater
+                              ? (lang === 'th' ? '⏳ รออนุมัติสิทธิ์ (รอชำระเงิน)' : '⏳ Awaiting Access Approval')
+                              : (lang === 'th' ? '⏳ รอตรวจสอบ' : '⏳ Pending')
+                          )}
+                          {slip.status === 'rejected' && (lang === 'th' ? '✕ ปฏิเสธ' : '✕ Rejected')}
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   <div className="flex items-center gap-3 text-xs text-slate-600 flex-wrap">
-                    {slip.workplace && (
-                      <span className="flex items-center gap-1 font-medium">
-                        <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                        {slip.workplace}
-                      </span>
+                    {slip.workplace && (!slip.isGroupMembership && slip.workplace !== slip.nameTh) && (
+                      <>
+                        <span className="flex items-center gap-1 font-medium">
+                          <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                          {slip.workplace}
+                        </span>
+                        <span className="text-slate-300">•</span>
+                      </>
                     )}
-                    {slip.workplace && <span className="text-slate-300">•</span>}
                     <span className="flex items-center gap-1 font-medium">
                       <CreditCard className="w-3.5 h-3.5 text-slate-400" />
                       {slip.bank}
@@ -572,7 +676,7 @@ export function AdminSlipsView() {
                               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold shadow-2xs ${
                                 act.type === 'format_change' || slip.isFormatChange
                                   ? 'bg-amber-50 text-amber-950 border border-amber-300 ring-1 ring-amber-400/30'
-                                  : act.type === 'membership_registration'
+                                  : act.type === 'membership_registration' || act.type === 'membership_group_registration'
                                   ? 'bg-purple-50 text-purple-900 border border-purple-200'
                                   : 'bg-indigo-50 text-indigo-900 border border-indigo-200'
                               }`}
@@ -580,7 +684,7 @@ export function AdminSlipsView() {
                               <BookOpen className={`w-3 h-3 shrink-0 ${
                                 act.type === 'format_change' || slip.isFormatChange
                                   ? 'text-amber-600'
-                                  : act.type === 'membership_registration'
+                                  : act.type === 'membership_registration' || act.type === 'membership_group_registration'
                                   ? 'text-purple-600'
                                   : 'text-indigo-600'
                               }`} />
@@ -589,7 +693,7 @@ export function AdminSlipsView() {
                                 <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border font-mono ${
                                   act.type === 'format_change' || slip.isFormatChange
                                     ? 'text-amber-800 bg-white border-amber-200'
-                                    : act.type === 'membership_registration'
+                                    : act.type === 'membership_registration' || act.type === 'membership_group_registration'
                                     ? 'text-purple-700 bg-white border-purple-100'
                                     : 'text-indigo-700 bg-white border-indigo-100'
                                 }`}>
@@ -623,17 +727,47 @@ export function AdminSlipsView() {
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedSlip(slip);
-                    }}
-                    className="p-2 sm:px-3 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-                    title={lang === 'th' ? 'ดูหลักฐานสลิป' : 'View Slip'}
-                  >
-                    <Eye className="w-4 h-4 text-[#0026b3]" />
-                    <span className="hidden sm:inline">{lang === 'th' ? 'ดูสลิป' : 'View'}</span>
-                  </button>
+                  {slip.isGroupMembership || slip.groupPayload || slip.ticketCode?.startsWith('MEMGRP') ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedSlip(slip);
+                      }}
+                      className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+                      title={lang === 'th' ? 'ดูรายชื่อผู้สมัครในกลุ่ม' : 'View Applicants List'}
+                    >
+                      <Users className="w-4 h-4 text-indigo-600" />
+                      <span>
+                        {lang === 'th'
+                          ? `ดูรายชื่อ (${slip.groupPayload?.applicants?.length || 1} ท่าน)`
+                          : `View List (${slip.groupPayload?.applicants?.length || 1})`}
+                      </span>
+                    </button>
+                  ) : !(slip.bank?.includes('ชำระเงินภายหลัง') || slip.bank?.toLowerCase().includes('pay later') || !slip.slipUrl || slip.slipUrl === '/placeholder-slip.png' || slip.slipUrl === 'PAY_LATER') ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedSlip(slip);
+                      }}
+                      className="p-2 sm:px-3 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                      title={lang === 'th' ? 'ดูหลักฐานสลิป' : 'View Slip'}
+                    >
+                      <Eye className="w-4 h-4 text-[#0026b3]" />
+                      <span className="hidden sm:inline">{lang === 'th' ? 'ดูสลิป' : 'View'}</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedSlip(slip);
+                      }}
+                      className="p-2 sm:px-3 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                      title={lang === 'th' ? 'ดูรายละเอียด' : 'View Details'}
+                    >
+                      <Eye className="w-4 h-4 text-slate-600" />
+                      <span className="hidden sm:inline">{lang === 'th' ? 'ดูรายละเอียด' : 'Details'}</span>
+                    </button>
+                  )}
 
                   {slip.status === 'pending' && (
                     <>
@@ -813,14 +947,73 @@ export function AdminSlipsView() {
                   </div>
                 ) : null}
 
+                {/* Corporate / Group Membership Detailed List (If Corporate Group Application) */}
+                {(selectedSlip.isGroupMembership || selectedSlip.groupPayload) && selectedSlip.groupPayload?.applicants && (
+                  <div className="bg-indigo-50/70 border border-indigo-200 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-indigo-200/80 pb-2">
+                      <div className="flex items-center gap-2 text-indigo-950 font-extrabold text-xs sm:text-sm">
+                        <Building2 className="w-4 h-4 text-indigo-600" />
+                        <span>รายชื่อผู้สมัครสมาชิกในกลุ่ม ({selectedSlip.groupPayload.applicants.length} ท่าน)</span>
+                      </div>
+                      {selectedSlip.companyName && (
+                        <span className="text-[11px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-md border border-indigo-200">
+                          {selectedSlip.companyName}
+                        </span>
+                      )}
+                    </div>
+
+                    {selectedSlip.groupPayload.groupContact && (
+                      <div className="text-[11px] text-slate-600 bg-white/90 p-2.5 rounded-xl border border-indigo-100 flex flex-wrap gap-x-4 gap-y-1">
+                        <span><strong>ผู้ประสานงาน:</strong> {selectedSlip.groupPayload.groupContact.coordinatorName || '-'}</span>
+                        <span><strong>อีเมล:</strong> {selectedSlip.groupPayload.groupContact.coordinatorEmail || '-'}</span>
+                        <span><strong>เบอร์โทร:</strong> {selectedSlip.groupPayload.groupContact.coordinatorPhone || '-'}</span>
+                      </div>
+                    )}
+
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                      {selectedSlip.groupPayload.applicants.map((app: any, idx: number) => (
+                        <div key={idx} className="bg-white border border-indigo-100/90 rounded-xl p-3 text-xs text-slate-800 space-y-1 shadow-2xs">
+                          <div className="flex items-center justify-between font-bold text-slate-900">
+                            <span className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-black shrink-0">
+                                {idx + 1}
+                              </span>
+                              <span>{app.full_name_th || app.full_name_en}</span>
+                              {app.full_name_en && app.full_name_th && (
+                                <span className="text-slate-400 font-normal">({app.full_name_en})</span>
+                              )}
+                            </span>
+                            <span className="text-[11px] text-indigo-600 font-mono">
+                              {app.mobile || app.email}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-500 pl-7 flex flex-wrap gap-x-3 gap-y-0.5">
+                            <span>ตำแหน่ง: {app.position || app.job_category || '-'}</span>
+                            {app.scientist_reg_no && <span>เลขใบอนุญาต: {app.scientist_reg_no}</span>}
+                            {app.id_last4 && <span>เลขท้ายบัตร: {app.id_last4}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {selectedSlip.status === 'pending' && (
+                      <p className="text-[11px] text-indigo-900 bg-indigo-100/80 p-3 rounded-xl font-medium leading-relaxed border border-indigo-200">
+                        🏢 เมื่อกด <strong>&ldquo;อนุมัติ&rdquo;</strong> ระบบจะทำการอนุมัติสิทธิ์เข้างานและสร้างบัญชีสมาชิกให้กับผู้สมัครทุกคนในกลุ่ม พร้อมออกเลขที่สมาชิกอัตโนมัติเพื่อให้สามารถนำไปลงทะเบียนเข้างานได้ทันที โดยสถานะการชำระเงินจะยังคงเป็น <strong>&ldquo;รอชำระเงิน / รอแนบสลิป&rdquo;</strong> เพื่อให้บริษัทแนบสลิปเข้ามาในภายหลัง
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Participant & Ticket Info */}
                 <div className="bg-slate-50/90 rounded-2xl p-4 sm:p-5 space-y-3 border border-slate-200 text-sm">
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
                     <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
-                      {lang === 'th' ? 'ชื่อผู้เข้าร่วม' : 'Attendee Name'}
+                      {selectedSlip.isGroupMembership || selectedSlip.groupPayload || selectedSlip.ticketCode?.startsWith('MEMGRP')
+                        ? (lang === 'th' ? 'ชื่อบริษัท / หน่วยงาน' : 'Company / Organization')
+                        : (lang === 'th' ? 'ชื่อผู้เข้าร่วม' : 'Attendee Name')}
                     </span>
                     <span className="font-black text-sm sm:text-base text-slate-900 text-right">
-                      {selectedSlip.nameTh}
+                      {selectedSlip.companyName || selectedSlip.nameTh}
                     </span>
                   </div>
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
@@ -1001,7 +1194,7 @@ export function AdminSlipsView() {
                   onChange={(e) => setRejectReason(e.target.value)}
                   rows={3}
                   className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-3 text-xs text-slate-800 outline-none focus:border-rose-500 focus:bg-white transition"
-                  placeholder="ระบุเหตุผล เช่น ยอดเงินไม่ตรง, สลิปไม่ชัดเจน..."
+                  placeholder="ระบุเหตุผลการปฏิเสธ หรือคำแนะนำเพิ่มเติม..."
                 />
               </div>
 

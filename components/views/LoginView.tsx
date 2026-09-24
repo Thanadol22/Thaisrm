@@ -1540,7 +1540,7 @@ export function LoginView({
                             value={currentAttendee.email}
                             onChange={(val) => updateCurrentAttendee('email', val)}
                             label={lang === 'th' ? 'อีเมล' : 'Email Address'}
-                            placeholder={lang === 'th' ? 'เช่น yourname@gmail.com' : 'e.g. yourname@gmail.com'}
+                            placeholder="youremail@example.com"
                             helperText={lang === 'th' ? 'กรุณากรอกอีเมลที่มีอยู่จริง เพื่อรับ QR Code เข้าร่วมงาน' : 'Please provide a valid email to receive your Event QR Code.'}
                             required
                           />
@@ -1557,7 +1557,7 @@ export function LoginView({
                               type="text"
                               value={currentAttendee.workplace}
                               onChange={(e) => updateCurrentAttendee('workplace', e.target.value)}
-                              placeholder={lang === 'th' ? 'เช่น โรงพยาบาล / คลินิก / บริษัท' : 'e.g. Hospital / Clinic / Company'}
+                              placeholder={lang === 'th' ? 'โรงพยาบาล / คลินิก / บริษัท' : 'Hospital / Clinic / Company'}
                               className="w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition"
                             />
                           </div>

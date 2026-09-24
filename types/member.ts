@@ -22,13 +22,13 @@ export const MEMBER_TYPE_LABELS: Record<MemberType, string> = {
 };
 
 export const JOB_CATEGORIES = [
-  'RM',
-  'Fellow RM',
-  'Embryologist',
-  'Technologist for Andrology',
-  'Molecular Geneticist',
-  'Nurse',
-  'อื่นๆ',
+  '1 RM',
+  '2 Fellow RM',
+  '3 Embryologist',
+  '4 Technologist for Andrology',
+  '5 Molecular Geneticist',
+  '6 Nurse',
+  '0 อื่นๆ',
 ] as const;
 
 /**
@@ -71,6 +71,7 @@ export interface Member {
   member_type_other?: string | null; // ระบุกรณีเลือก 0 อื่นๆ
   scientist_reg_no?: string | null; // เลขทะเบียนนักวิทย์
   scientist_reg_nw?: string | null; // นว.
+  referees?: string | null; // ผู้รับรอง (สูติแพทย์ผู้รับผิดชอบฯ และ/หรือ หัวหน้านักวิทย์ฯ)
   membership_status?: string | null; // สถานะสมาชิก เช่น Active, Inactive
   membership_type?: string | null; // ประเภทสมาชิก เช่น Regular (สามัญ), Lifelong (ตลอดชีพ)
   expire_date?: string | null; // วันหมดอายุ
@@ -117,6 +118,7 @@ export interface CreateMemberInput {
   membership_status?: string | null; // Active | Inactive
   scientist_reg_no?: string | null;
   scientist_reg_nw?: string | null;
+  referees?: string | null;
   photo_path?: string | null;
   degree_cert_doc?: string | null;
   work_cert_doc?: string | null;
@@ -145,6 +147,7 @@ export interface UpdateMemberInput {
   membership_status?: string | null; // Active | Inactive
   scientist_reg_no?: string | null;
   scientist_reg_nw?: string | null;
+  referees?: string | null;
   photo_path?: string | null;
   degree_cert_doc?: string | null;
   work_cert_doc?: string | null;

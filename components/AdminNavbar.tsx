@@ -92,8 +92,8 @@ const navItems: {
     },
     {
       id: 'verify-slip',
-      labelTh: 'ตรวจสอบสลิป',
-      labelEn: 'Verify Slips',
+      labelTh: 'ตรวจสอบการชำระเงิน',
+      labelEn: 'Payment Verification',
       icon: Receipt,
       badgeKey: 'slips',
     },

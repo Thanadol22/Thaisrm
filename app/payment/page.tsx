@@ -154,7 +154,7 @@ function PaymentContent() {
           workplace: app.workplace || membershipRegData.companyName,
           price: feePerPerson,
           isMember: false,
-          details: `ค่าบำรุงสมาชิกรายปี (${app.email || ''})`,
+          details: `ค่าสมัครสมาชิก (${app.email || ''})`,
         }));
         return {
           originalAmount: total,
@@ -562,14 +562,18 @@ function PaymentContent() {
     setUploadedSlipData(null);
   };
 
-  const handleConfirmPayment = async () => {
+  const [isPayLaterSubmitted, setIsPayLaterSubmitted] = useState(false);
+
+  const handleConfirmPayment = async (isPayLater: boolean = false) => {
     const isFreeOrSponsored = calculationResult.isCouponSponsored || calculationResult.totalAmount === 0;
 
-    if (!isFreeOrSponsored && !uploadedSlipData) {
+    if (!isPayLater && !isFreeOrSponsored && !uploadedSlipData) {
       triggerNotification(t.payment.noSlipWarning);
       setUploadModalOpen(true);
       return;
     }
+
+    setIsPayLaterSubmitted(Boolean(isPayLater));
 
     if (paymentType === 'registration') {
       const meetingId = regData?.meetingId;
@@ -587,6 +591,7 @@ function PaymentContent() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               isGroup: true,
+              isPayLater: Boolean(isPayLater),
               companyName: (regData as any).companyName || regData?.couponData?.companyName,
               groupContact: (regData as any).groupContact,
               attendees: (regData as any).attendees,
@@ -594,8 +599,12 @@ function PaymentContent() {
               originalAmount: calculationResult.originalAmount,
               couponCode: regData?.couponData?.code || undefined,
               sponsorId: (regData as any)?.sponsorSession?.sponsorId || (regData?.couponData as any)?.sponsorId || undefined,
-              bank: isFreeOrSponsored ? `สิทธิ์สปอนเซอร์: ${regData?.couponData?.companyName || (regData as any).companyName || 'Corporate Pass'}` : systemSettings.bank_name,
-              slipUrl: uploadedSlipData?.fileUrl || (isFreeOrSponsored ? `SPONSORED:${regData?.couponData?.companyName || (regData as any).companyName || 'COUPON'}` : undefined),
+              bank: isFreeOrSponsored
+                ? `สิทธิ์สปอนเซอร์: ${regData?.couponData?.companyName || (regData as any).companyName || 'Corporate Pass'}`
+                : (isPayLater ? 'ชำระเงินภายหลัง (Pay Later)' : systemSettings.bank_name),
+              slipUrl: uploadedSlipData?.fileUrl || (isFreeOrSponsored
+                ? `SPONSORED:${regData?.couponData?.companyName || (regData as any).companyName || 'COUPON'}`
+                : (isPayLater ? 'PAY_LATER' : undefined)),
             }),
           });
 
@@ -667,19 +676,20 @@ function PaymentContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             isGroup: isGroupMembership,
+            isPayLater: Boolean(isPayLater),
             companyName: membershipRegData.companyName,
             groupContact: membershipRegData.groupContact,
             applicants: membershipRegData.applicants,
             memberPayload: isGroupMembership ? undefined : membershipRegData,
             amount: calculationResult.totalAmount,
-            bank: systemSettings.bank_name,
-            slipUrl: uploadedSlipData?.fileUrl || '',
+            bank: isPayLater ? 'ชำระเงินภายหลัง (Pay Later)' : systemSettings.bank_name,
+            slipUrl: uploadedSlipData?.fileUrl || (isPayLater ? 'PAY_LATER' : ''),
           }),
         });
 
         const data = await res.json();
         if (!res.ok || !data.success) {
-          throw new Error(data.error || (lang === 'th' ? 'ไม่สามารถส่งใบสมัครและหลักฐานได้ กรุณาลองใหม่อีกครั้ง' : 'Failed to submit application and slip.'));
+          throw new Error(data.error || (lang === 'th' ? 'ไม่สามารถส่งใบสมัครได้ กรุณาลองใหม่อีกครั้ง' : 'Failed to submit application.'));
         }
 
         // Clean up draft localStorage
@@ -691,8 +701,8 @@ function PaymentContent() {
 
         setShowSuccessModal(true);
       } catch (err: any) {
-        console.error('Membership slip submission error:', err);
-        triggerNotification(err.message || (lang === 'th' ? 'เกิดข้อผิดพลาดในการส่งใบสมัครและหลักฐาน' : 'Submission failed. Please try again.'));
+        console.error('Membership submission error:', err);
+        triggerNotification(err.message || (lang === 'th' ? 'เกิดข้อผิดพลาดในการส่งใบสมัคร' : 'Submission failed. Please try again.'));
       } finally {
         setSubmitting(false);
       }
@@ -712,12 +722,23 @@ function PaymentContent() {
     ? `จำนวน ${totalAmountValue.toLocaleString()} บาท`
     : `Amount: ${totalAmountValue.toLocaleString()} THB`;
 
-  const successModalTitle = paymentType === 'registration'
-    ? (calculationResult.isCouponSponsored
-        ? (lang === 'th' ? 'ลงทะเบียนด้วยสิทธิ์คูปองสปอนเซอร์สำเร็จ' : 'Sponsor Registration Confirmed')
-        : (t.successModal as any).paymentSuccessTitle || (lang === 'th' ? 'ลงทะเบียนเข้าร่วมงานประชุมสำเร็จ' : 'Conference Registration Submitted'))
-    : (lang === 'th' ? 'ส่งใบสมัครและหลักฐานการชำระเงินเรียบร้อยแล้ว' : 'Membership Application & Slip Submitted');
+  const successModalTitle = isPayLaterSubmitted
+    ? (lang === 'th' ? 'บันทึกการลงทะเบียนสำหรับบริษัทเรียบร้อยแล้ว' : 'Corporate Registration Submitted')
+    : (paymentType === 'registration'
+        ? (calculationResult.isCouponSponsored
+            ? (lang === 'th' ? 'ลงทะเบียนด้วยสิทธิ์คูปองสปอนเซอร์สำเร็จ' : 'Sponsor Registration Confirmed')
+            : (t.successModal as any).paymentSuccessTitle || (lang === 'th' ? 'ลงทะเบียนเข้าร่วมงานประชุมสำเร็จ' : 'Conference Registration Submitted'))
+        : (lang === 'th' ? 'ส่งใบสมัครและหลักฐานการชำระเงินเรียบร้อยแล้ว' : 'Membership Application & Slip Submitted'));
 
+  const successModalMessage = isPayLaterSubmitted
+    ? (lang === 'th'
+        ? 'ระบบได้บันทึกข้อมูลเรียบร้อยแล้วในสถานะ "รอชำระเงิน" ท่านสามารถชำระเงินและแจ้งหลักฐานการโอนในภายหลังได้'
+        : 'Registration has been recorded with "Pending Payment" status. You may settle the payment and upload proof later.')
+    : undefined;
+
+  const successStatusBadge = isPayLaterSubmitted
+    ? (lang === 'th' ? 'สถานะ: รอชำระเงิน (Pending Payment)' : 'Status: Pending Payment')
+    : undefined;
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col items-center justify-start selection:bg-[#4ade80] selection:text-slate-900 font-sans">
@@ -727,6 +748,8 @@ function PaymentContent() {
         isOpen={showSuccessModal}
         onClose={handleCloseSuccessModal}
         title={successModalTitle}
+        message={successModalMessage}
+        statusBadge={successStatusBadge}
       />
 
       <main className="w-full min-h-screen bg-[#f6f8fc] shadow-2xl flex flex-col justify-between relative border-x border-slate-200/80 overflow-hidden transition-all duration-300">

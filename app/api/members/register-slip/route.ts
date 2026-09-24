@@ -19,7 +19,8 @@ export async function POST(request: NextRequest) {
       slipUrl,
     } = body;
 
-    if (!slipUrl) {
+    const isPayLater = Boolean(body.isPayLater || isGroup && !slipUrl);
+    if (!slipUrl && !isGroup && !isPayLater) {
       return NextResponse.json(
         { success: false, error: 'กรุณาแนบรูปภาพสลิปหลักฐานการโอนเงิน' },
         { status: 400 }
@@ -100,11 +101,11 @@ export async function POST(request: NextRequest) {
           is_member: false,
           ticket_code: ticketCode,
           amount: Number(amount) || applicants.length * 1000,
-          bank: bank || 'Kasikorn (KBANK)',
+          bank: bank || (isPayLater ? 'ชำระเงินภายหลัง (Pay Later)' : 'Kasikorn (KBANK)'),
           transfer_date: transferDate || null,
           transfer_time: transferTime || null,
           ref_no: refNo || null,
-          slip_url: slipUrl,
+          slip_url: slipUrl || (isPayLater ? 'PAY_LATER' : 'GROUP_MEMBERSHIP'),
           status: 'pending',
           selected_activities: groupPayload as any,
         },

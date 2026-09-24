@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         return {
           activities: [{
             id: 'membership_group_registration',
-            name: `ค่าบำรุงสมาชิกรายปีแบบกลุ่ม (${parsed.companyName || 'Corporate'} - ${parsed.applicants?.length || 0} ท่าน)`,
+            name: `ค่าสมัครสมาชิกแบบกลุ่ม (${parsed.companyName || 'Corporate'} - ${parsed.applicants?.length || 0} ท่าน)`,
             type: 'membership_group_registration',
             price: parsed.amount || ((parsed.applicants?.length || 1) * 1000),
             rateBadgeTh: `กลุ่ม ${parsed.applicants?.length || 0} ท่าน`,
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
         return {
           activities: [{
             id: 'membership_registration',
-            name: 'ค่าบำรุงสมาชิกรายปี (Membership Fee)',
+            name: 'ค่าสมัครสมาชิก (Membership Fee)',
             type: 'membership_registration',
             price: parsed.amount || 1000,
             rateBadgeTh: 'สมัครสมาชิกใหม่',
@@ -132,10 +132,15 @@ export async function GET(request: NextRequest) {
       formattedSlips = slips.map((s: any) => {
         const parsedAct = parseActivitiesData(s.selected_activities);
         const isMember = s.is_member && s.members;
-        const nameTh = isMember
+        const companyName = parsedAct.groupPayload?.companyName || s.guest_workplace || s.members?.workplace || '';
+        const nameTh = parsedAct.isGroupMembership && companyName
+          ? companyName
+          : isMember
           ? s.members?.fullNameTh || 'สมาชิก'
           : s.guest_name || parsedAct.memberPayload?.full_name_th || 'ผู้สมัครทั่วไป';
-        const nameEn = isMember
+        const nameEn = parsedAct.isGroupMembership && companyName
+          ? companyName
+          : isMember
           ? s.members?.fullNameEn || ''
           : parsedAct.memberPayload?.full_name_en || '';
         const email = isMember
@@ -168,6 +173,9 @@ export async function GET(request: NextRequest) {
           memberNo: s.member_no,
           isMember: s.is_member,
           isMembershipRegistration: parsedAct.isMembership,
+          isGroupMembership: parsedAct.isGroupMembership,
+          groupPayload: parsedAct.groupPayload,
+          companyName,
           isFormatChange: parsedAct.isFormatChange,
           formatChangePayload: parsedAct.formatChangePayload,
           memberPayload: parsedAct.memberPayload,
@@ -227,10 +235,15 @@ export async function GET(request: NextRequest) {
       formattedSlips = slips.map((s: any) => {
         const parsedAct = parseActivitiesData(s.selected_activities);
         const isMember = s.is_member && s.member_full_name_th;
-        const nameTh = isMember
+        const companyName = parsedAct.groupPayload?.companyName || s.guest_workplace || s.member_workplace || '';
+        const nameTh = parsedAct.isGroupMembership && companyName
+          ? companyName
+          : isMember
           ? s.member_full_name_th
           : s.guest_name || parsedAct.memberPayload?.full_name_th || 'ผู้สมัครทั่วไป';
-        const nameEn = isMember
+        const nameEn = parsedAct.isGroupMembership && companyName
+          ? companyName
+          : isMember
           ? s.member_full_name_en || ''
           : parsedAct.memberPayload?.full_name_en || '';
         const email = isMember
@@ -257,6 +270,9 @@ export async function GET(request: NextRequest) {
           memberNo: s.member_no,
           isMember: s.is_member,
           isMembershipRegistration: parsedAct.isMembership,
+          isGroupMembership: parsedAct.isGroupMembership,
+          groupPayload: parsedAct.groupPayload,
+          companyName,
           memberPayload: parsedAct.memberPayload,
           nameTh,
           nameEn,
@@ -365,6 +381,13 @@ export async function POST(request: NextRequest) {
     let memberPayload: any = null;
     let groupPayload: any = null;
     let formatChangePayload: any = null;
+
+    if (slip.ticket_code?.startsWith('MEMGRP') || slip.ticket_code?.startsWith('MEM-') || slip.meeting_id === 'membership') {
+      isMembershipRegistration = true;
+      if (slip.ticket_code?.startsWith('MEMGRP')) {
+        isGroupMembership = true;
+      }
+    }
 
     if (slip.selected_activities) {
       let actObj = slip.selected_activities;
@@ -552,19 +575,32 @@ export async function POST(request: NextRequest) {
       }
 
       // 5. Send approval confirmation email
-      const recipientEmail = slip.members?.email || slip.guest_email || memberPayload?.email || '';
-      const recipientName = slip.members?.fullNameTh || slip.guest_name || memberPayload?.full_name_th || 'ผู้สมัครสมาชิก';
+      if (isMembershipRegistration) {
+        // Individual membership registration
+        if (!isGroupMembership) {
+          const recipientEmail = slip.members?.email || slip.guest_email || memberPayload?.email || '';
+          const recipientName = slip.members?.fullNameTh || slip.guest_name || memberPayload?.full_name_th || 'ผู้สมัครสมาชิก';
+          if (recipientEmail) {
+            try {
+              await sendMembershipApprovedEmail({
+                to: recipientEmail,
+                recipientName,
+                memberNo: assignedMemberNo || '',
+                amountPaid: slip.amount,
+              });
+            } catch (mailErr) {
+              console.error('Failed to send membership approval email:', mailErr);
+            }
+          }
+        }
+        // (For group membership, individual sendMembershipApprovedEmail was already sent to each applicant in the group creation loop above)
+      } else {
+        // ONLY for conference/meeting registrations
+        const recipientEmail = slip.members?.email || slip.guest_email || '';
+        const recipientName = slip.members?.fullNameTh || slip.guest_name || 'ผู้ลงทะเบียน';
 
-      if (recipientEmail) {
-        try {
-          if (isMembershipRegistration && assignedMemberNo) {
-            await sendMembershipApprovedEmail({
-              to: recipientEmail,
-              recipientName,
-              memberNo: assignedMemberNo,
-              amountPaid: slip.amount,
-            });
-          } else {
+        if (recipientEmail) {
+          try {
             await sendRegistrationApprovedEmail({
               to: recipientEmail,
               recipientName,
@@ -573,9 +609,9 @@ export async function POST(request: NextRequest) {
               amountPaid: slip.amount,
               isMember: slip.is_member,
             });
+          } catch (mailErr) {
+            console.error('Failed to send conference registration approval email:', mailErr);
           }
-        } catch (mailErr) {
-          console.error('Failed to send approval email:', mailErr);
         }
       }
 
@@ -585,7 +621,7 @@ export async function POST(request: NextRequest) {
           status: 'approved',
           memberNo: assignedMemberNo,
           message: isMembershipRegistration
-            ? `อนุมัติสลิปและบันทึกข้อมูลสมาชิกสำเร็จ (รหัสสมาชิก: ${assignedMemberNo})`
+            ? `อนุมัติสิทธิ์และบันทึกข้อมูลสมาชิกสำเร็จ (รหัสสมาชิก: ${assignedMemberNo || 'Group'})`
             : 'Slip approved and attendee confirmed successfully.',
         },
       });

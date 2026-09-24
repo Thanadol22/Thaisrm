@@ -34,8 +34,9 @@ import {
   Copy,
   Layers,
   FileCheck,
+  UserCheck,
 } from 'lucide-react';
-import { PositionSelect } from '@/components/PositionSelect';
+import { PositionSelect, isScientistPosition } from '@/components/PositionSelect';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
 import { SponsorAuthModal, SponsorSessionData } from '@/components/SponsorAuthModal';
 import { useLanguage } from '@/context/LanguageContext';
@@ -76,6 +77,7 @@ export interface ApplicantFormData {
   position: string;
   positionOther: string;
   scientistNo: string;
+  referees: string;
   educations: EducationRow[];
   photoPreview: string | null;
   selectedPhotoFile: File | null;
@@ -97,6 +99,7 @@ const createInitialApplicant = (id: string, workplace = ''): ApplicantFormData =
   position: '',
   positionOther: '',
   scientistNo: '',
+  referees: '',
   educations: [{ id: '1', degree: '', institution: '', year: '' }],
   photoPreview: null,
   selectedPhotoFile: null,
@@ -476,6 +479,7 @@ export function SignupView({
             ? (app.positionOther.trim() || null)
             : null,
           scientist_reg_no: app.scientistNo.trim() || null,
+          referees: app.referees.trim() || null,
           photo_path: finalPhotoUrl,
           degree_cert_doc: finalDegreeCertUrl,
           work_cert_doc: finalWorkCertUrl,

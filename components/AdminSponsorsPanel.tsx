@@ -1089,7 +1089,7 @@ export default function AdminSponsorsPanel({
                 <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 text-[10px] font-bold">20 ที่นั่ง/งาน</span>
               </div>
               <div className="text-3xl font-black text-purple-900 mt-2">{sponsorStats.platinum}</div>
-              <div className="text-[11px] text-purple-700/80 mt-2 font-medium">เช่น LG Chem (โควต้า 20 สิทธิ์)</div>
+              <div className="text-[11px] text-purple-700/80 mt-2 font-medium">สิทธิ์ Platinum (โควต้า 20 สิทธิ์)</div>
             </div>
 
             <div className="p-5 rounded-2xl bg-white border border-amber-200/90 shadow-sm hover:shadow transition-shadow">
@@ -1100,7 +1100,7 @@ export default function AdminSponsorsPanel({
                 <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 text-[10px] font-bold">8 ที่นั่ง/งาน</span>
               </div>
               <div className="text-3xl font-black text-amber-900 mt-2">{sponsorStats.gold}</div>
-              <div className="text-[11px] text-amber-700/80 mt-2 font-medium">เช่น Merck, Ferring, Organon</div>
+              <div className="text-[11px] text-amber-700/80 mt-2 font-medium">สิทธิ์ Gold (โควต้า 8 สิทธิ์)</div>
             </div>
 
             <div className="p-5 rounded-2xl bg-white border border-blue-200/90 shadow-sm hover:shadow transition-shadow">
@@ -1559,7 +1559,7 @@ export default function AdminSponsorsPanel({
                     type="text"
                     value={newSponsorForm.name}
                     onChange={(e) => setNewSponsorForm({ ...newSponsorForm, name: e.target.value })}
-                    placeholder="เช่น LG Chem, Merck, Ferring, Abbott"
+                    placeholder="ระบุชื่อบริษัทสปอนเซอร์"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:bg-white focus:outline-none focus:border-blue-500 transition-colors"
                     required
                   />
@@ -1633,7 +1633,7 @@ export default function AdminSponsorsPanel({
                     type="email"
                     value={newSponsorForm.contactEmail}
                     onChange={(e) => setNewSponsorForm({ ...newSponsorForm, contactEmail: e.target.value })}
-                    placeholder="rep@company.com"
+                    placeholder="youremail@example.com"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:bg-white focus:outline-none focus:border-blue-500 transition-colors"
                     required
                   />
@@ -1647,7 +1647,7 @@ export default function AdminSponsorsPanel({
                     type="text"
                     value={newSponsorForm.contactName}
                     onChange={(e) => setNewSponsorForm({ ...newSponsorForm, contactName: e.target.value })}
-                    placeholder="เช่น คุณสมชาย (ฝ่ายการตลาด)"
+                    placeholder="ชื่อผู้ประสานงาน"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:bg-white focus:outline-none focus:border-blue-500 transition-colors"
                   />
                 </div>
@@ -1826,7 +1826,7 @@ export default function AdminSponsorsPanel({
                     type="text"
                     value={editSponsorForm.contactName}
                     onChange={(e) => setEditSponsorForm({ ...editSponsorForm, contactName: e.target.value })}
-                    placeholder="เช่น คุณสมชาย"
+                    placeholder="ชื่อผู้ประสานงาน"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:bg-white focus:outline-none focus:border-blue-500 transition-colors"
                   />
                 </div>

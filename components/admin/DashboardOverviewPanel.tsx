@@ -173,7 +173,7 @@ export function DashboardOverviewPanel({
               ภาพรวมแดชบอร์ดผู้ดูแลระบบ
             </h1>
             <p className="text-xs sm:text-sm md:text-base text-blue-100 leading-relaxed font-medium text-pretty break-words">
-              สรุปผลการจัดงาน สถิติผู้เข้าร่วมงาน ยอดชำระเงิน และการตรวจสอบสลิปแบบเรียลไทม์
+              สรุปผลการจัดงาน สถิติผู้เข้าร่วมงาน ยอดชำระเงิน และการตรวจสอบการชำระเงินแบบเรียลไทม์
             </p>
           </div>
 
@@ -190,7 +190,7 @@ export function DashboardOverviewPanel({
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/25 text-xs sm:text-sm font-bold backdrop-blur-md shadow-xs transition active:scale-95 cursor-pointer"
             >
               <Receipt className="w-4 h-4 text-[#4ade80]" />
-              <span>ตรวจสลิป ({pendingSlips.length})</span>
+              <span>ตรวจสอบการชำระเงิน ({pendingSlips.length})</span>
             </button>
           </div>
         </div>

@@ -50,7 +50,6 @@ export function SponsorAuthModal({
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [devOtp, setDevOtp] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -63,7 +62,6 @@ export function SponsorAuthModal({
       setOtp('');
       setErrorMsg('');
       setSuccessMsg('');
-      setDevOtp('');
     }
   }, [isOpen]);
 
@@ -80,7 +78,6 @@ export function SponsorAuthModal({
     setLoading(true);
     setErrorMsg('');
     setSuccessMsg('');
-    setDevOtp('');
 
     try {
       const res = await fetch('/api/sponsors/auth/request-otp', {
@@ -96,9 +93,6 @@ export function SponsorAuthModal({
       }
 
       setSuccessMsg(data.message);
-      if (data.devOtp) {
-        setDevOtp(data.devOtp);
-      }
       setStep('otp');
     } catch (err) {
       setErrorMsg('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
@@ -183,13 +177,6 @@ export function SponsorAuthModal({
             </div>
           )}
 
-          {devOtp && (
-            <div className="mb-4 p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-center">
-              <p className="text-[11px] text-blue-700 font-semibold mb-0.5">รหัสชั่วคราวสำหรับทดสอบ (Dev):</p>
-              <span className="font-mono font-black text-lg text-blue-900 tracking-widest">{devOtp}</span>
-            </div>
-          )}
-
           {/* ── STEP 1: FORM EMAIL ── */}
           {step === 'email' ? (
             <form onSubmit={handleRequestOtp} className="space-y-4">
@@ -200,7 +187,7 @@ export function SponsorAuthModal({
                 <SmartEmailInput
                   value={email}
                   onChange={(val: string) => setEmail(val)}
-                  placeholder="เช่น natsuree@lgchem.com, pornpun.mongkonsawat@merckgroup.com"
+                  placeholder="youremail@example.com"
                   required
                 />
                 <p className="text-[11px] text-slate-500 mt-1">

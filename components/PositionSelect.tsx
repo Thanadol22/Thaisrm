@@ -16,39 +16,39 @@ export interface PositionOptionItem {
  */
 export const POSITION_CATEGORY_OPTIONS: PositionOptionItem[] = [
   {
-    value: 'RM',
-    labelTh: 'RM (แพทย์เวชศาสตร์การเจริญพันธุ์)',
-    labelEn: 'RM (Reproductive Medicine)',
+    value: '1 RM',
+    labelTh: '1 RM (แพทย์เวชศาสตร์การเจริญพันธุ์)',
+    labelEn: '1 RM (Reproductive Medicine)',
   },
   {
-    value: 'Fellow RM',
-    labelTh: 'Fellow RM (แพทย์ประจำบ้านต่อยอด RM)',
-    labelEn: 'Fellow RM (Fellow in RM)',
+    value: '2 Fellow RM',
+    labelTh: '2 Fellow RM (แพทย์ประจำบ้านต่อยอด RM)',
+    labelEn: '2 Fellow RM (Fellow in RM)',
   },
   {
-    value: 'Embryologist',
-    labelTh: 'Embryologist (นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อน)',
-    labelEn: 'Embryologist',
+    value: '3 Embryologist',
+    labelTh: '3 Embryologist (นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อน)',
+    labelEn: '3 Embryologist (Embryologist)',
   },
   {
-    value: 'Technologist for Andrology',
-    labelTh: 'Technologist for Andrology (นักวิทยาศาสตร์ห้องปฏิบัติการน้ำอสุจิ)',
-    labelEn: 'Technologist for Andrology',
+    value: '4 Technologist for Andrology',
+    labelTh: '4 Technologist for Andrology (นักวิทยาศาสตร์ห้องปฏิบัติการน้ำอสุจิ)',
+    labelEn: '4 Technologist for Andrology (Andrology Technologist)',
   },
   {
-    value: 'Molecular Geneticist',
-    labelTh: 'Molecular Geneticist (นักพันธุศาสตร์ระดับโมเลกุล)',
-    labelEn: 'Molecular Geneticist',
+    value: '5 Molecular Geneticist',
+    labelTh: '5 Molecular Geneticist (นักพันธุศาสตร์ระดับโมเลกุล)',
+    labelEn: '5 Molecular Geneticist (Molecular Geneticist)',
   },
   {
-    value: 'Nurse',
-    labelTh: 'Nurse (พยาบาลด้านเวชศาสตร์การเจริญพันธุ์)',
-    labelEn: 'Nurse',
+    value: '6 Nurse',
+    labelTh: '6 Nurse (พยาบาล)',
+    labelEn: '6 Nurse (Nurse)',
   },
   {
-    value: 'อื่นๆ',
-    labelTh: 'อื่นๆ (โปรดระบุ)...',
-    labelEn: 'Other (Please specify)...',
+    value: '0 อื่นๆ',
+    labelTh: '0 อื่นๆ (โปรดระบุ)...',
+    labelEn: '0 Other (Please specify)...',
   },
 ];
 
@@ -96,19 +96,41 @@ export interface PositionSelectProps {
 }
 
 /**
- * Normalizes legacy position values (e.g. '1 RM', 'ไม่ระบุ') into standard values
+ * Checks if a position value represents a Medical ART / Scientist role requiring referee endorsement
+ * (ตำแหน่งนักวิทยาศาสตร์: 3 Embryologist, 4 Technologist for Andrology, 5 Molecular Geneticist)
+ */
+export function isScientistPosition(pos?: string | null): boolean {
+  if (!pos) return false;
+  const p = pos.trim().toLowerCase();
+  return (
+    p.startsWith('3') ||
+    p.startsWith('4') ||
+    p.startsWith('5') ||
+    p.includes('embryo') ||
+    p.includes('andrology') ||
+    p.includes('geneticist') ||
+    p.includes('technologist') ||
+    p.includes('scientist') ||
+    p.includes('นักวิทย์') ||
+    p.includes('เพาะเลี้ยงตัวอ่อน') ||
+    p.includes('น้ำอสุจิ')
+  );
+}
+
+/**
+ * Normalizes legacy position values into standard values
  */
 export function normalizePosition(val?: string | null): string {
   if (!val) return '';
   const trimmed = val.trim();
   if (trimmed === 'ไม่ระบุ' || trimmed === '-- ไม่ระบุ --' || trimmed === 'Unspecified') return '';
-  if (trimmed === '1 RM' || trimmed.startsWith('1 RM') || trimmed.startsWith('RM (')) return 'RM';
-  if (trimmed === '2 Fellow RM' || trimmed.startsWith('2 Fellow RM') || trimmed.startsWith('Fellow RM (')) return 'Fellow RM';
-  if (trimmed === '3 Embryologist' || trimmed.startsWith('3 Embryologist') || trimmed.startsWith('Embryologist (')) return 'Embryologist';
-  if (trimmed === '4 Technologist for Andrology' || trimmed.startsWith('4 Technologist') || trimmed.startsWith('Technologist for Andrology (')) return 'Technologist for Andrology';
-  if (trimmed === '5 Molecular Geneticist' || trimmed.startsWith('5 Molecular') || trimmed.startsWith('Molecular Geneticist (')) return 'Molecular Geneticist';
-  if (trimmed === '6 Nurse' || trimmed.startsWith('6 Nurse') || trimmed.startsWith('Nurse (')) return 'Nurse';
-  if (trimmed === '0 อื่นๆ' || trimmed === '0 Other' || trimmed === 'Other' || trimmed.startsWith('อื่นๆ (')) return 'อื่นๆ';
+  if (trimmed === '1' || trimmed === '1 RM' || trimmed === 'RM' || trimmed.startsWith('1 RM') || trimmed.startsWith('RM (')) return '1 RM';
+  if (trimmed === '2' || trimmed === '2 Fellow RM' || trimmed === 'Fellow RM' || trimmed.startsWith('2 Fellow RM') || trimmed.startsWith('Fellow RM (')) return '2 Fellow RM';
+  if (trimmed === '3' || trimmed === '3 Embryologist' || trimmed === 'Embryologist' || trimmed.startsWith('3 Embryologist') || trimmed.startsWith('Embryologist (')) return '3 Embryologist';
+  if (trimmed === '4' || trimmed === '4 Technologist for Andrology' || trimmed === 'Technologist for Andrology' || trimmed.startsWith('4 Technologist') || trimmed.startsWith('Technologist for Andrology (')) return '4 Technologist for Andrology';
+  if (trimmed === '5' || trimmed === '5 Molecular Geneticist' || trimmed === 'Molecular Geneticist' || trimmed.startsWith('5 Molecular') || trimmed.startsWith('Molecular Geneticist (')) return '5 Molecular Geneticist';
+  if (trimmed === '6' || trimmed === '6 Nurse' || trimmed === 'Nurse' || trimmed.startsWith('6 Nurse') || trimmed.startsWith('Nurse (')) return '6 Nurse';
+  if (trimmed === '0' || trimmed === '0 อื่นๆ' || trimmed === '0 Other' || trimmed === 'อื่นๆ' || trimmed === 'Other' || trimmed.startsWith('อื่นๆ') || trimmed.startsWith('0 อื่นๆ')) return '0 อื่นๆ';
   return trimmed;
 }
 

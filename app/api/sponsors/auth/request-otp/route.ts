@@ -166,8 +166,6 @@ export async function POST(req: NextRequest) {
       sponsorName: sponsor.name,
       hasActiveCoupon: !!activeRotatedCouponCode,
       remainingQuota,
-      devOtp: process.env.NODE_ENV === 'development' ? otpCode : undefined,
-      devCouponCode: process.env.NODE_ENV === 'development' ? activeRotatedCouponCode : undefined,
     });
   } catch (error: any) {
     console.error('[RequestOTP] Error:', error);

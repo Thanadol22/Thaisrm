@@ -303,7 +303,7 @@ export function ChangeFormatModal({
                           handleSearch();
                         }
                       }}
-                      placeholder={lang === 'th' ? 'เช่น 0336, 1217 หรืออีเมลสมาชิก' : 'e.g. 0336, 1217 or member email'}
+                      placeholder={lang === 'th' ? '0001, 1217 หรือ youremail@example.com' : '0001, 1217 or youremail@example.com'}
                       className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
                     />
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />

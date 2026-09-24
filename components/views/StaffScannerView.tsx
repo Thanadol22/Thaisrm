@@ -833,7 +833,7 @@ export function StaffScannerView() {
                 type="text"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
-                placeholder={lang === 'th' ? 'เช่น 0123, TSRM-2026-8891, หรือเบอร์โทร' : t.staff.manualPlaceholder}
+                placeholder={lang === 'th' ? '0001, TSRM-2026-0001, หรือเบอร์โทร' : t.staff.manualPlaceholder}
                 className="bg-transparent w-full text-[11px] sm:text-xs text-slate-800 outline-none py-2.5 sm:py-3 placeholder:text-slate-400 font-medium min-w-0"
               />
             </div>

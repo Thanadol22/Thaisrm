@@ -122,6 +122,10 @@ export function sanitizeMemberInput<T extends CreateMemberInput | UpdateMemberIn
     const cleaned = sanitizeString(sanitized.scientist_reg_nw);
     sanitized.scientist_reg_nw = cleaned !== '' ? cleaned : null;
   }
+  if (sanitized.referees !== undefined) {
+    const cleaned = sanitizeString(sanitized.referees);
+    sanitized.referees = cleaned !== '' ? cleaned : null;
+  }
   if (sanitized.photo_path !== undefined) {
     const cleaned = sanitizeString(sanitized.photo_path);
     sanitized.photo_path = cleaned !== '' ? cleaned : null;
@@ -168,6 +172,7 @@ export async function validateCreateMember(
     ['member_type_other', input.member_type_other],
     ['scientist_reg_no', input.scientist_reg_no],
     ['scientist_reg_nw', input.scientist_reg_nw],
+    ['referees', input.referees],
   ];
 
   for (const [fieldName, val] of textFieldsToCheck) {
@@ -314,6 +319,7 @@ export async function validateUpdateMember(
     ['member_type_other', input.member_type_other],
     ['scientist_reg_no', input.scientist_reg_no],
     ['scientist_reg_nw', input.scientist_reg_nw],
+    ['referees', input.referees],
   ];
 
   for (const [fieldName, val] of textFieldsToCheck) {

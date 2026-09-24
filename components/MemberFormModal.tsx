@@ -80,6 +80,7 @@ export function MemberFormModal({
   const [membershipType, setMembershipType] = useState<string>('Regular');
   const [membershipStatus, setMembershipStatus] = useState<string>('Active');
   const [scientistRegNo, setScientistRegNo] = useState('');
+  const [referees, setReferees] = useState('');
   const [photoPath, setPhotoPath] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [educations, setEducations] = useState<EducationFormItem[]>([
@@ -125,6 +126,7 @@ export function MemberFormModal({
         setMembershipType(member.membership_type || 'Regular');
         setMembershipStatus(member.membership_status || 'Active');
         setScientistRegNo(member.scientist_reg_no || '');
+        setReferees(member.referees || '');
         setPhotoPath(member.photo_path || '');
 
         if (member.educations && member.educations.length > 0) {
@@ -156,6 +158,7 @@ export function MemberFormModal({
         setMembershipType('Regular');
         setMembershipStatus('Active');
         setScientistRegNo('');
+        setReferees('');
         setPhotoPath('');
         setEducations([{ degree: '', institution: '', graduation_year: '' }]);
       }
@@ -218,7 +221,7 @@ export function MemberFormModal({
     }
 
     if (mobile && !/^(0[2-9][0-9]{7,8}|\+66[2-9][0-9]{7,8})$/.test(mobile.replace(/[\s\-]/g, ''))) {
-      setFormError('เบอร์โทรศัพท์ไม่ถูกต้อง (กรุณากรอกตัวเลข 9-10 หลัก เช่น 0812345678)');
+      setFormError('เบอร์โทรศัพท์ไม่ถูกต้อง (กรุณากรอกตัวเลข 9-10 หลัก)');
       setActiveTab('basic');
       return;
     }
@@ -254,13 +257,14 @@ export function MemberFormModal({
           address: address.trim() || null,
           workplace: workplace.trim() || null,
           work_phone: workPhone.trim() || null,
-          position: position.trim() || null,
-          job_category: jobCategory === 'อื่นๆ' && jobCategoryOther.trim() ? jobCategoryOther.trim() : jobCategory.trim() || null,
-          member_type_other: jobCategory === 'อื่นๆ' ? jobCategoryOther.trim() : null,
+          position: (jobCategory === '0 อื่นๆ' || jobCategory === 'อื่นๆ') && jobCategoryOther.trim() ? jobCategoryOther.trim() : position.trim() || null,
+          job_category: (jobCategory === '0 อื่นๆ' || jobCategory === 'อื่นๆ') && jobCategoryOther.trim() ? jobCategoryOther.trim() : jobCategory.trim() || null,
+          member_type_other: (jobCategory === '0 อื่นๆ' || jobCategory === 'อื่นๆ') ? jobCategoryOther.trim() : null,
           membership_type: membershipType,
           membership_status: membershipStatus,
           start_date: startDate.trim() || null,
           scientist_reg_no: scientistRegNo.trim() || null,
+          referees: referees.trim() || null,
           photo_path: photoPath.trim() || null,
           educations: validEducations,
         };
@@ -290,13 +294,14 @@ export function MemberFormModal({
           address: address.trim() || null,
           workplace: workplace.trim() || null,
           work_phone: workPhone.trim() || null,
-          position: position.trim() || null,
-          job_category: jobCategory === 'อื่นๆ' && jobCategoryOther.trim() ? jobCategoryOther.trim() : jobCategory.trim() || null,
-          member_type_other: jobCategory === 'อื่นๆ' ? jobCategoryOther.trim() : null,
+          position: (jobCategory === '0 อื่นๆ' || jobCategory === 'อื่นๆ') && jobCategoryOther.trim() ? jobCategoryOther.trim() : position.trim() || null,
+          job_category: (jobCategory === '0 อื่นๆ' || jobCategory === 'อื่นๆ') && jobCategoryOther.trim() ? jobCategoryOther.trim() : jobCategory.trim() || null,
+          member_type_other: (jobCategory === '0 อื่นๆ' || jobCategory === 'อื่นๆ') ? jobCategoryOther.trim() : null,
           membership_type: membershipType,
           membership_status: membershipStatus,
           start_date: startDate.trim() || null,
           scientist_reg_no: scientistRegNo.trim() || null,
+          referees: referees.trim() || null,
           photo_path: photoPath.trim() || null,
           educations: validEducations,
         };
@@ -450,7 +455,7 @@ export function MemberFormModal({
                     maxLength={4}
                     value={idLast4}
                     onChange={(e) => setIdLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    placeholder="เช่น 1234"
+                    placeholder="1234"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent"
                   />
                 </div>
@@ -466,7 +471,7 @@ export function MemberFormModal({
                     maxLength={10}
                     value={mobile}
                     onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    placeholder="เช่น 0812345678"
+                    placeholder="08X-XXX-XXXX"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent"
                   />
                 </div>
@@ -477,7 +482,7 @@ export function MemberFormModal({
                     value={email}
                     onChange={(val) => setEmail(val)}
                     label="อีเมล"
-                    placeholder="เช่น member@example.com"
+                    placeholder="youremail@example.com"
                   />
                 </div>
 
@@ -575,7 +580,7 @@ export function MemberFormModal({
                     type="text"
                     value={position}
                     onChange={(e) => setPosition(e.target.value)}
-                    placeholder="เช่น สูตินรีแพทย์ ผู้เชี่ยวชาญเวชศาสตร์การเจริญพันธุ์ หรือ นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อนอาวุโส"
+                    placeholder="ระบุชื่อตำแหน่งงานเฉพาะทาง"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent"
                   />
                 </div>
@@ -590,7 +595,7 @@ export function MemberFormModal({
                     type="text"
                     value={workplace}
                     onChange={(e) => setWorkplace(e.target.value)}
-                    placeholder="เช่น โรงพยาบาลศิริราช, ศูนย์ผู้มีบุตรยาก..."
+                    placeholder="ระบุสถานที่ทำงาน / โรงพยาบาล / สถาบัน"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent"
                   />
                 </div>
@@ -605,7 +610,7 @@ export function MemberFormModal({
                     type="text"
                     value={workPhone}
                     onChange={(e) => setWorkPhone(e.target.value)}
-                    placeholder="เช่น 02-123-4567 ต่อ 123"
+                    placeholder="02-XXX-XXXX"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent"
                   />
                 </div>
@@ -633,7 +638,7 @@ export function MemberFormModal({
                     type="text"
                     value={scientistRegNo}
                     onChange={(e) => setScientistRegNo(e.target.value)}
-                    placeholder="เช่น ว.12345 หรือ ทบ.678"
+                    placeholder="ว.XXXXX หรือ ทบ.XXX"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent"
                   />
                 </div>
@@ -783,7 +788,7 @@ export function MemberFormModal({
                           onChange={(e) =>
                             handleEducationChange(index, 'degree', e.target.value)
                           }
-                          placeholder="เช่น แพทยศาสตรบัณฑิต (พบ.) หรือ วท.บ."
+                          placeholder="วุฒิการศึกษา / ปริญญาบัตร"
                           className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#0026b3]"
                         />
                       </div>
@@ -798,7 +803,7 @@ export function MemberFormModal({
                           onChange={(e) =>
                             handleEducationChange(index, 'institution', e.target.value)
                           }
-                          placeholder="เช่น จุฬาลงกรณ์มหาวิทยาลัย"
+                          placeholder="ชื่อสถาบันการศึกษา"
                           className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#0026b3]"
                         />
                       </div>
@@ -818,7 +823,7 @@ export function MemberFormModal({
                               e.target.value.replace(/\D/g, '')
                             )
                           }
-                          placeholder="เช่น 2555"
+                          placeholder="2560"
                           className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#0026b3] bg-white"
                         />
                       </div>

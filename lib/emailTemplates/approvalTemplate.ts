@@ -76,22 +76,20 @@ export interface MeetingApprovalEmailOptions {
   recipientName: string;
   meetingName: string;
   meetingDate?: string;
-  ticketCode: string;
   amountPaid: number;
   isMember: boolean;
-  qrCodeUrl?: string;
 }
 
 export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions): string {
   const content = `
     <div style="text-align: center; margin-bottom: 24px;">
-      <div style="font-size: 44px; margin-bottom: 8px;">🎟️</div>
-      <span class="badge-success">การลงทะเบียนได้รับการยืนยันแล้ว</span>
+      <div style="font-size: 44px; margin-bottom: 8px;">✅</div>
+      <span class="badge-success">การลงทะเบียนและการชำระเงินสำเร็จ</span>
       <h2 style="color: #0f172a; margin: 12px 0 6px 0; font-size: 22px; font-weight: 800;">
         ยืนยันการลงทะเบียนเข้าร่วมประชุม
       </h2>
       <p style="color: #64748b; font-size: 14px; margin: 0;">
-        เจ้าหน้าที่ได้ตรวจสอบหลักฐานการชำระเงินของท่านเรียบร้อยแล้ว
+        สมาคมฯ ได้ตรวจสอบหลักฐานการชำระเงินของท่านเรียบร้อยแล้ว
       </p>
     </div>
 
@@ -106,17 +104,13 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
         </tr>
         ${options.meetingDate ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">กำหนดการ</td>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">กำหนดการจัดงาน</td>
           <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.meetingDate}</td>
         </tr>
         ` : ''}
         <tr style="border-bottom: 1px dashed #e2e8f0;">
           <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ผู้ลงทะเบียน</td>
           <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.recipientName}</td>
-        </tr>
-        <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสบัตรเข้าร่วม (Ticket Code)</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 16px;">${options.ticketCode}</td>
         </tr>
         <tr style="border-bottom: 1px dashed #e2e8f0;">
           <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ประเภทผู้เข้าร่วม</td>
@@ -129,32 +123,23 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
       </table>
     </div>
 
-    ${options.qrCodeUrl ? `
-      <div style="text-align: center; margin: 24px 0; padding: 20px; background-color: #ffffff; border-radius: 12px; border: 2px dashed #cbd5e1;">
-        <div style="font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">
-          QR Code สำหรับเช็คอินเข้างาน (E-Ticket)
-        </div>
-        <p style="font-size: 12px; color: #64748b; margin: 0 0 12px 0;">
-          กรุณาแสดง QR Code นี้แก่เจ้าหน้าที่ ณ จุดลงทะเบียนหน้างาน
-        </p>
-        <img src="${options.qrCodeUrl}" alt="Check-in QR Code" style="width: 180px; height: 180px; border-radius: 8px; border: 4px solid #f8fafc; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);" />
-        <div style="font-size: 14px; font-weight: 800; color: #0026b3; margin-top: 8px; letter-spacing: 1px;">
-          ${options.ticketCode}
-        </div>
+    <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 18px 20px; margin-top: 24px; text-align: center;">
+      <div style="font-size: 14px; font-weight: 700; color: #1e40af; margin-bottom: 6px;">
+        🎟️ การรับบัตรเข้างาน (E-Ticket / Online Pass)
       </div>
-    ` : ''}
-
-    <div style="background-color: #eff6ff; border-left: 4px solid #0026b3; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-top: 20px;">
-      <div style="font-size: 13px; font-weight: 700; color: #0026b3; margin-bottom: 4px;">คำแนะนำในวันงาน:</div>
-      <p style="font-size: 13px; color: #1e3a8a; margin: 0; line-height: 1.5;">
-        โปรดเตรียมภาพ QR Code นี้ หรือเปิดอีเมลฉบับนี้แสดงต่อเจ้าหน้าที่เพื่อรับเอกสารและป้ายชื่อผู้เข้าร่วมประชุม
+      <p style="font-size: 13px; color: #1e3a8a; margin: 0; line-height: 1.6;">
+        ระบบจะจัดส่ง <strong>บัตรเข้างาน (E-Ticket พร้อม QR Code สำหรับ Onsite)</strong> หรือ <strong>ลิงก์ห้องประชุม (Online Pass สำหรับ Online)</strong> ให้ท่านทางอีเมลนี้อีกครั้ง ก่อนถึงกำหนดวันเริ่มงานประชุม
       </p>
     </div>
+
+    <p style="font-size: 13px; color: #64748b; margin-top: 24px; text-align: center;">
+      หากมีข้อสงสัยหรือต้องการสอบถามข้อมูลเพิ่มเติม สามารถติดต่อสมาคมฯ ได้ทางอีเมลนี้
+    </p>
   `;
 
   return renderBaseEmailLayout({
     title: `ยืนยันการลงทะเบียน ${options.meetingName} - TSRM`,
-    preheader: `ยืนยันการลงทะเบียน ${options.recipientName} รหัสบัตร ${options.ticketCode}`,
+    preheader: `ยืนยันการลงทะเบียน ${options.recipientName} สำหรับ ${options.meetingName}`,
     contentHtml: content,
   });
 }

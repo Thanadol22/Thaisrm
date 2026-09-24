@@ -10,6 +10,8 @@ interface RegistrationSuccessModalProps {
   onClose: () => void;
   onProceed?: () => void;
   title?: string;
+  message?: string;
+  statusBadge?: string;
 }
 
 export function RegistrationSuccessModal({
@@ -17,6 +19,8 @@ export function RegistrationSuccessModal({
   onClose,
   onProceed,
   title,
+  message,
+  statusBadge,
 }: RegistrationSuccessModalProps) {
   const { t } = useLanguage();
   const [mounted, setMounted] = useState(false);
@@ -48,11 +52,18 @@ export function RegistrationSuccessModal({
 
         {/* Title & Main Notice */}
         <div className="space-y-2">
+          {statusBadge && (
+            <div className="flex justify-center">
+              <span className="bg-amber-100 text-amber-900 border border-amber-300 text-xs font-black px-3 py-1 rounded-full shadow-2xs">
+                {statusBadge}
+              </span>
+            </div>
+          )}
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
             {title || t.successModal.title}
           </h2>
           <p className="text-xs sm:text-sm font-extrabold text-[#0026b3] leading-relaxed px-2">
-            {t.successModal.message}
+            {message || t.successModal.message}
           </p>
         </div>
 

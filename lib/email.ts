@@ -89,6 +89,26 @@ export async function generateQrCodeDataUrl(data: string): Promise<string> {
 }
 
 /**
+ * Generate a QR Code Buffer for inline CID email attachment
+ */
+export async function generateQrCodeBuffer(data: string): Promise<Buffer | null> {
+  try {
+    return await QRCode.toBuffer(data, {
+      errorCorrectionLevel: 'M',
+      margin: 2,
+      width: 300,
+      color: {
+        dark: '#0026b3',
+        light: '#ffffff',
+      },
+    });
+  } catch (err) {
+    console.error('Failed to generate QR Code Buffer:', err);
+    return null;
+  }
+}
+
+/**
  * Replace dynamic placeholders in subject and content
  */
 export function substitutePlaceholders(text: string, values: Record<string, string | number | undefined | null>): string {
@@ -115,12 +135,14 @@ async function dispatchEmail({
   subject,
   html,
   text,
+  attachments,
   customConfig,
 }: {
   to: string;
   subject: string;
   html: string;
   text?: string;
+  attachments?: any[];
   customConfig?: SmtpConfig;
 }): Promise<EmailSendResult> {
   const transporter = getMailTransporter(customConfig);
@@ -148,6 +170,7 @@ async function dispatchEmail({
       subject,
       html,
       text: text || subject,
+      attachments,
     });
 
     console.log('📧 [EMAIL DELIVERED] Successfully sent to:', to, 'ID:', info.messageId);
@@ -181,10 +204,10 @@ export interface SendMembershipApprovedParams {
  * Send email when membership application slip is approved
  */
 export async function sendMembershipApprovedEmail(params: SendMembershipApprovedParams): Promise<EmailSendResult> {
-  let qrCodeUrl = '';
-  if (params.qrCodeData || params.memberNo) {
-    qrCodeUrl = await generateQrCodeDataUrl(params.qrCodeData || `TSRM-MEMBER:${params.memberNo}`);
-  }
+  const qrPayload = params.qrCodeData || `TSRM-MEMBER:${params.memberNo}`;
+  const qrBuffer = await generateQrCodeBuffer(qrPayload);
+  const cid = `member-qr-${params.memberNo}`;
+  const qrCodeUrl = qrBuffer ? `cid:${cid}` : '';
 
   const html = renderMembershipApprovedEmail({
     recipientName: params.recipientName,
@@ -197,6 +220,11 @@ export async function sendMembershipApprovedEmail(params: SendMembershipApproved
     to: params.to,
     subject: `ยินดีต้อนรับสมาชิกใหม่ - รหัสสมาชิกของคุณคือ ${params.memberNo} (TSRM)`,
     html,
+    attachments: qrBuffer ? [{
+      filename: `member-qr-${params.memberNo}.png`,
+      content: qrBuffer,
+      cid,
+    }] : undefined,
   });
 }
 
@@ -205,7 +233,7 @@ export interface SendRegistrationApprovedParams {
   recipientName: string;
   meetingName: string;
   meetingDate?: string;
-  ticketCode: string;
+  ticketCode?: string;
   amountPaid: number;
   isMember: boolean;
   qrCodeData?: string;
@@ -215,24 +243,17 @@ export interface SendRegistrationApprovedParams {
  * Send email when meeting registration payment slip is approved
  */
 export async function sendRegistrationApprovedEmail(params: SendRegistrationApprovedParams): Promise<EmailSendResult> {
-  let qrCodeUrl = '';
-  if (params.qrCodeData || params.ticketCode) {
-    qrCodeUrl = await generateQrCodeDataUrl(params.qrCodeData || `TSRM-TICKET:${params.ticketCode}`);
-  }
-
   const html = renderMeetingApprovedEmail({
     recipientName: params.recipientName,
     meetingName: params.meetingName,
     meetingDate: params.meetingDate,
-    ticketCode: params.ticketCode,
     amountPaid: params.amountPaid,
     isMember: params.isMember,
-    qrCodeUrl,
   });
 
   return dispatchEmail({
     to: params.to,
-    subject: `ยืนยันการลงทะเบียน ${params.meetingName} (รหัสบัตร ${params.ticketCode}) - TSRM`,
+    subject: `ยืนยันการลงทะเบียนและการชำระเงิน ${params.meetingName} - TSRM`,
     html,
   });
 }
@@ -283,7 +304,9 @@ export interface SendAttendeeTicketParams {
  */
 export async function sendAttendeeTicketEmail(params: SendAttendeeTicketParams): Promise<EmailSendResult> {
   const qrPayload = params.qrCodeData || `TSRM-PASS:${params.ticketCode}`;
-  const qrCodeUrl = await generateQrCodeDataUrl(qrPayload);
+  const qrBuffer = await generateQrCodeBuffer(qrPayload);
+  const cid = `pass-qr-${params.ticketCode}`;
+  const qrCodeUrl = qrBuffer ? `cid:${cid}` : '';
 
   const html = renderAttendeeTicketEmail({
     recipientName: params.recipientName,
@@ -302,6 +325,11 @@ export async function sendAttendeeTicketEmail(params: SendAttendeeTicketParams):
     to: params.to,
     subject: `${subjectPrefix}บัตรเข้างาน (E-Ticket) ${params.meetingName} - คุณ ${params.recipientName}`,
     html,
+    attachments: qrBuffer ? [{
+      filename: `pass-qr-${params.ticketCode}.png`,
+      content: qrBuffer,
+      cid,
+    }] : undefined,
     customConfig: params.customConfig,
   });
 }
