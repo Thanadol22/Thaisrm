@@ -357,10 +357,26 @@ export async function validateUpdateMember(
     if (!EMAIL_REGEX.test(input.email)) {
       errors.push({ field: 'email', message: 'รูปแบบอีเมลไม่ถูกต้อง' });
     } else {
+      const notConditions: any[] = [
+        { member_no: strCurrentId },
+        { member_no: strCurrentId.padStart(4, '0') },
+      ];
+      const unpadded = strCurrentId.replace(/^0+/, '');
+      if (unpadded) {
+        notConditions.push({ member_no: unpadded });
+      }
+      if (/^\d+$/.test(strCurrentId)) {
+        try {
+          notConditions.push({ id: BigInt(strCurrentId) });
+        } catch {
+          // ignore
+        }
+      }
+
       const duplicateMember = await prisma.member.findFirst({
         where: {
           email: { equals: input.email, mode: 'insensitive' },
-          member_no: { not: strCurrentId },
+          NOT: notConditions,
         },
         select: { member_no: true },
       });

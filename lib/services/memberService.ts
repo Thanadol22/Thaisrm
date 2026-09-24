@@ -133,6 +133,24 @@ export async function getNextMemberCodes(): Promise<{ member_no: string }> {
 }
 
 /**
+ * ซิงค์ Sequence ของตาราง member_educations ให้ตรงกับค่า MAX(edu_id)
+ * เพื่อป้องกันปัญหา Primary Key Collision (edu_id unique constraint error)
+ */
+export async function syncEducationSequence(): Promise<void> {
+  try {
+    const rawResult = await prisma.$queryRaw<Array<{ max_id: bigint | number | null }>>`
+      SELECT COALESCE(MAX(edu_id), 0) AS max_id FROM member_educations
+    `;
+    const maxId = Number(rawResult?.[0]?.max_id || 0);
+    if (maxId > 0) {
+      await prisma.$executeRawUnsafe(`SELECT setval('member_educations_edu_id_seq', ${maxId}, true)`);
+    }
+  } catch {
+    // ignore if sequence does not exist or permission denied
+  }
+}
+
+/**
  * สร้าง QR Code ในรูปแบบ Data URL (Base64)
  */
 export async function generateQrCode(text: string): Promise<string> {
@@ -453,8 +471,14 @@ export async function getMembers(params: MemberQueryParams = {}) {
 export async function getMemberById(id: string | number | bigint): Promise<Member | null> {
   const strId = String(id).trim();
 
-  let member = await prisma.member.findUnique({
-    where: { member_no: strId },
+  let member = await prisma.member.findFirst({
+    where: {
+      OR: [
+        { member_no: strId },
+        { member_no: strId.padStart(4, '0') },
+        { member_no: strId.replace(/^0+/, '') },
+      ],
+    },
     include: {
       member_educations: true,
     },
@@ -489,6 +513,7 @@ export async function getMemberByCodeOrNo(identifier: string): Promise<Member | 
       OR: [
         { member_no: trimmed },
         { member_no: trimmed.padStart(4, '0') },
+        { member_no: trimmed.replace(/^0+/, '') },
       ],
     },
     include: {
@@ -508,19 +533,32 @@ export async function updateMember(id: string | number | bigint, rawInput: Updat
   const input = sanitizeMemberInput(rawInput);
 
   // ตรวจสอบว่ามีสมาชิกนี้อยู่หรือไม่
-  let existing = await prisma.member.findUnique({
-    where: { member_no: strId },
+  let existing = await prisma.member.findFirst({
+    where: {
+      OR: [
+        { member_no: strId },
+        { member_no: strId.padStart(4, '0') },
+        { member_no: strId.replace(/^0+/, '') },
+      ],
+    },
   });
 
   if (!existing && /^\d+$/.test(strId)) {
-    existing = await prisma.member.findFirst({
-      where: { id: BigInt(strId) },
-    });
+    try {
+      existing = await prisma.member.findFirst({
+        where: { id: BigInt(strId) },
+      });
+    } catch {
+      // ignore
+    }
   }
 
   if (!existing) return null;
 
   const member_no = existing.member_no;
+
+  // ซิงค์ Sequence อัตโนมัติป้องกัน edu_id collision
+  await syncEducationSequence();
 
   // ดำเนินการ Transaction สำหรับอัปเดตสมาชิกและรายการศึกษา
   const updated = await prisma.$transaction(async (tx) => {
@@ -533,14 +571,32 @@ export async function updateMember(id: string | number | bigint, rawInput: Updat
 
       // เพิ่มรายการใหม่
       if (input.educations.length > 0) {
-        await tx.member_educations.createMany({
-          data: input.educations.map((edu) => ({
-            member_no,
-            degree: edu.degree || '',
-            institution: edu.institution || '',
-            graduation_year: edu.graduation_year ? String(edu.graduation_year) : null,
-          })),
-        });
+        try {
+          await tx.member_educations.createMany({
+            data: input.educations.map((edu) => ({
+              member_no,
+              degree: edu.degree || '',
+              institution: edu.institution || '',
+              graduation_year: edu.graduation_year ? String(edu.graduation_year) : null,
+            })),
+          });
+        } catch (eduErr: any) {
+          if (eduErr?.code === 'P2002') {
+            await syncEducationSequence();
+            for (const edu of input.educations) {
+              await tx.member_educations.create({
+                data: {
+                  member_no,
+                  degree: edu.degree || '',
+                  institution: edu.institution || '',
+                  graduation_year: edu.graduation_year ? String(edu.graduation_year) : null,
+                },
+              });
+            }
+          } else {
+            throw eduErr;
+          }
+        }
       }
     }
 
@@ -594,12 +650,20 @@ export async function deleteMember(id: string | number | bigint): Promise<boolea
 
   try {
     let member_no = strId;
-    const existing = await prisma.member.findUnique({
-      where: { member_no: strId },
+    const existing = await prisma.member.findFirst({
+      where: {
+        OR: [
+          { member_no: strId },
+          { member_no: strId.padStart(4, '0') },
+          { member_no: strId.replace(/^0+/, '') },
+        ],
+      },
       select: { member_no: true },
     });
 
-    if (!existing && /^\d+$/.test(strId)) {
+    if (existing) {
+      member_no = existing.member_no;
+    } else if (/^\d+$/.test(strId)) {
       const byId = await prisma.member.findFirst({
         where: { id: BigInt(strId) },
         select: { member_no: true },
