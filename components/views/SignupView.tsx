@@ -371,45 +371,115 @@ export function SignupView({
 
     const applicantsToSubmit = regMode === 'individual' ? [applicants[0]] : applicants;
 
-    // ── 1. Validation for each applicant ──────────────────────────────────────────
+    const THAI_NAME_REGEX = /[\u0E00-\u0E7F]/;
+    const ENG_NAME_REGEX = /[a-zA-Z]/;
+    const ID_LAST4_REGEX = /^\d{4}$/;
+    const THAI_MOBILE_REGEX = /^(0[2-9][0-9]{7,8}|\+66[2-9][0-9]{7,8})$/;
+    const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+    // ── 1. Strict Validation for each applicant ───────────────────────────────────
     for (let i = 0; i < applicantsToSubmit.length; i++) {
       const app = applicantsToSubmit[i];
       const personLabel = regMode === 'group' ? (lang === 'th' ? `(ผู้สมัครคนที่ ${i + 1})` : `(Applicant #${i + 1})`) : '';
 
-      if (!app.nameTh || !app.nameTh.trim()) {
+      // 1.1 Thai Name
+      const cleanNameTh = (app.nameTh || '').trim();
+      if (!cleanNameTh) {
         setSubmitError(lang === 'th' ? `กรุณากรอกชื่อ-นามสกุล (ภาษาไทย) ${personLabel}` : `Please enter full name in Thai ${personLabel}`);
         triggerPersonSwitch(i);
         return;
       }
+      if (!THAI_NAME_REGEX.test(cleanNameTh) || cleanNameTh.length < 2) {
+        setSubmitError(lang === 'th' ? `ชื่อ-นามสกุลภาษาไทยต้องประกอบด้วยตัวอักษรภาษาไทย ${personLabel}` : `Thai full name must contain Thai characters ${personLabel}`);
+        triggerPersonSwitch(i);
+        return;
+      }
 
-      if (!app.nameEn || !app.nameEn.trim()) {
+      // 1.2 English Name
+      const cleanNameEn = (app.nameEn || '').trim();
+      if (!cleanNameEn) {
         setSubmitError(lang === 'th' ? `กรุณากรอกชื่อ-นามสกุล (ภาษาอังกฤษ) ${personLabel}` : `Please enter full name in English ${personLabel}`);
         triggerPersonSwitch(i);
         return;
       }
-
-      if (!app.id4Digits || app.id4Digits.length !== 4) {
-        setSubmitError(lang === 'th' ? `กรุณากรอกเลข 4 หลักท้ายบัตรประชาชนให้ครบถ้วน ${personLabel}` : `Please enter 4 digits of ID card ${personLabel}`);
+      if (!ENG_NAME_REGEX.test(cleanNameEn) || cleanNameEn.length < 2) {
+        setSubmitError(lang === 'th' ? `ชื่อ-นามสกุลภาษาอังกฤษต้องประกอบด้วยตัวอักษรภาษาอังกฤษ ${personLabel}` : `English full name must contain English letters ${personLabel}`);
         triggerPersonSwitch(i);
         return;
       }
 
-      if (!app.mobile || app.mobile.length < 9) {
-        setSubmitError(lang === 'th' ? `กรุณากรอกเบอร์โทรศัพท์มือถือ ${personLabel}` : `Please enter mobile number ${personLabel}`);
+      // 1.3 ID Last 4 Digits
+      const cleanId4 = (app.id4Digits || '').trim();
+      if (!cleanId4 || !ID_LAST4_REGEX.test(cleanId4)) {
+        setSubmitError(lang === 'th' ? `กรุณากรอกเลข 4 หลักท้ายบัตรประชาชนให้ครบถ้วน 4 หลักตัวเลข ${personLabel}` : `Please enter 4 numeric digits of ID card ${personLabel}`);
         triggerPersonSwitch(i);
         return;
       }
 
-      if (!app.email || !app.email.includes('@')) {
-        setSubmitError(lang === 'th' ? `กรุณากรอกอีเมลให้ถูกต้อง ${personLabel}` : `Please enter valid email ${personLabel}`);
+      // 1.4 Mobile Phone
+      const cleanMobile = (app.mobile || '').replace(/[\s\-]/g, '');
+      if (!cleanMobile || !THAI_MOBILE_REGEX.test(cleanMobile)) {
+        setSubmitError(lang === 'th' ? `กรุณากรอกเบอร์โทรศัพท์มือถือที่ถูกต้อง (เช่น 0812345678) ${personLabel}` : `Please enter a valid mobile number (e.g., 0812345678) ${personLabel}`);
         triggerPersonSwitch(i);
         return;
       }
 
+      // 1.5 Email
+      const cleanEmail = (app.email || '').trim().toLowerCase();
+      if (!cleanEmail || !EMAIL_REGEX.test(cleanEmail)) {
+        setSubmitError(lang === 'th' ? `กรุณากรอกอีเมลให้ถูกต้องตามรูปแบบ (เช่น name@example.com) ${personLabel}` : `Please enter a valid email address ${personLabel}`);
+        triggerPersonSwitch(i);
+        return;
+      }
+
+      // 1.6 Workplace
       if (!app.workplace || !app.workplace.trim()) {
         setSubmitError(lang === 'th' ? `กรุณากรอกสถานที่ทำงาน/หน่วยงาน ${personLabel}` : `Please enter workplace ${personLabel}`);
         triggerPersonSwitch(i);
         return;
+      }
+
+      // 1.7 Position
+      if (!app.position || !app.position.trim()) {
+        setSubmitError(lang === 'th' ? `กรุณาเลือกตำแหน่งการทำงาน ${personLabel}` : `Please select work position ${personLabel}`);
+        triggerPersonSwitch(i);
+        return;
+      }
+      if ((app.position === '0 อื่นๆ' || app.position === '0 Other') && (!app.positionOther || !app.positionOther.trim())) {
+        setSubmitError(lang === 'th' ? `กรุณาระบุรายละเอียดตำแหน่งงานเพิ่มเติม ${personLabel}` : `Please specify position details ${personLabel}`);
+        triggerPersonSwitch(i);
+        return;
+      }
+
+      // 1.8 Educations Validation
+      if (app.educations && Array.isArray(app.educations)) {
+        for (let eduIdx = 0; eduIdx < app.educations.length; eduIdx++) {
+          const edu = app.educations[eduIdx];
+          if (edu.year && edu.year.trim()) {
+            const yearNum = Number(edu.year.trim());
+            if (isNaN(yearNum) || !/^\d{4}$/.test(edu.year.trim()) || (yearNum < 1900 || (yearNum > 2100 && yearNum < 2450) || yearNum > 2650)) {
+              setSubmitError(lang === 'th' ? `ปีที่จบการศึกษาในประวัติการศึกษาแถวที่ ${eduIdx + 1} ไม่ถูกต้อง (ระบุเป็น พ.ศ. หรือ ค.ศ. 4 หลัก) ${personLabel}` : `Graduation year in education row #${eduIdx + 1} is invalid ${personLabel}`);
+              triggerPersonSwitch(i);
+              return;
+            }
+          }
+        }
+      }
+    }
+
+    // 1.9 Check in-form duplicate emails in group mode
+    if (regMode === 'group' && applicantsToSubmit.length > 1) {
+      const emailSet = new Set<string>();
+      for (let i = 0; i < applicantsToSubmit.length; i++) {
+        const email = applicantsToSubmit[i].email?.trim()?.toLowerCase();
+        if (email) {
+          if (emailSet.has(email)) {
+            setSubmitError(lang === 'th' ? `พบอีเมล ${email} ซ้ำกันในรายการผู้สมัครกลุ่ม (ผู้สมัครคนที่ ${i + 1})` : `Duplicate email ${email} in applicant roster (#${i + 1})`);
+            triggerPersonSwitch(i);
+            return;
+          }
+          emailSet.add(email);
+        }
       }
     }
 
@@ -421,6 +491,26 @@ export function SignupView({
 
     setSubmitting(true);
     setSubmitError(null);
+
+    // ── 2. Pre-check Database Duplicates (Real-time DB query) ──────────────────────
+    try {
+      const allEmails = applicantsToSubmit.map(a => a.email.trim().toLowerCase()).filter(Boolean);
+      const dupCheckRes = await fetch('/api/members/check-duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emails: allEmails }),
+      });
+      if (dupCheckRes.ok) {
+        const dupData = await dupCheckRes.json();
+        if (dupData.isDuplicate) {
+          setSubmitError(dupData.message || (lang === 'th' ? 'มีอีเมลนี้อยู่ในระบบสมาชิกแล้ว' : 'Email is already registered'));
+          setSubmitting(false);
+          return;
+        }
+      }
+    } catch (dupErr) {
+      console.warn('Pre-duplicate check warning:', dupErr);
+    }
 
     try {
       // ── 2. Upload files for each applicant ───────────────────────────────────────

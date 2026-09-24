@@ -17,12 +17,13 @@ export async function POST(request: NextRequest) {
       transferTime,
       refNo,
       slipUrl,
+      isPayLater: isPayLaterInput,
     } = body;
 
-    const isPayLater = Boolean(body.isPayLater || isGroup && !slipUrl);
-    if (!slipUrl && !isGroup && !isPayLater) {
+    const isPayLater = Boolean(isPayLaterInput || body.isPayLater);
+    if (!slipUrl && !isPayLater) {
       return NextResponse.json(
-        { success: false, error: 'กรุณาแนบรูปภาพสลิปหลักฐานการโอนเงิน' },
+        { success: false, error: 'กรุณาแนบรูปภาพสลิปหลักฐานการโอนเงิน (ยกเว้นกรณีเลือกชำระเงินภายหลัง)' },
         { status: 400 }
       );
     }

@@ -29,6 +29,7 @@ export async function POST(
       selectedActivities,
       couponCode,
       originalAmount,
+      isPayLater,
     } = body;
 
     if (!meetingId) {
@@ -38,12 +39,14 @@ export async function POST(
       );
     }
 
+    const isPayLaterMode = Boolean(isPayLater);
     const numericAmount = Math.max(0, Number(amount) || 0);
     const isFreeRegistration = numericAmount === 0;
 
-    if (!slipUrl && !isFreeRegistration) {
+    // บังคับแนบสลิป ยกเว้นกรณีเลือกชำระเงินภายหลัง (Pay Later) หรือได้สิทธิ์ฟรี 100%
+    if (!slipUrl && !isFreeRegistration && !isPayLaterMode) {
       return NextResponse.json(
-        { success: false, error: 'Payment slip image is required' },
+        { success: false, error: 'กรุณาแนบรูปภาพสลิปหลักฐานการโอนเงิน (ยกเว้นกรณีเลือกชำระเงินภายหลัง)' },
         { status: 400 }
       );
     }

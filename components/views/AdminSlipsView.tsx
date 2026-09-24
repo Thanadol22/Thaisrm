@@ -91,8 +91,8 @@ export function AdminSlipsView() {
   const [slips, setSlips] = useState<SlipRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'individual' | 'corporate'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'pay_later'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'individual' | 'corporate' | 'corporate_pay_later'>('all');
   const [selectedSlip, setSelectedSlip] = useState<SlipRecord | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -243,18 +243,100 @@ export function AdminSlipsView() {
     }
   };
 
-  const filteredSlips = React.useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
+  const isCorporateSlip = (s: SlipRecord) =>
+    Boolean(s.isGroupMembership || s.groupPayload || s.ticketCode?.startsWith('MEMGRP'));
+
+  const isPayLaterSlip = (s: SlipRecord) =>
+    Boolean(
+      s.bank?.includes('ชำระเงินภายหลัง') ||
+      s.bank?.toLowerCase().includes('pay later') ||
+      s.slipUrl === 'PAY_LATER' ||
+      s.slipUrl === '/placeholder-slip.png' ||
+      !s.slipUrl
+    );
+
+  // Slips filtered only by Category (used for scoped metrics and status filter counts)
+  const categorySlips = React.useMemo(() => {
     return slips.filter((s) => {
-      const isCorporate = Boolean(s.isGroupMembership || s.groupPayload || s.ticketCode?.startsWith('MEMGRP'));
+      const isCorporate = isCorporateSlip(s);
+      const isPayLater = isPayLaterSlip(s);
       if (categoryFilter === 'individual' && isCorporate) return false;
       if (categoryFilter === 'corporate' && !isCorporate) return false;
+      if (categoryFilter === 'corporate_pay_later' && (!isCorporate || !isPayLater)) return false;
+      return true;
+    });
+  }, [slips, categoryFilter]);
+
+  // Overall category counts
+  const totalCount = slips.length;
+  const individualSlips = React.useMemo(
+    () => slips.filter((s) => !isCorporateSlip(s)),
+    [slips]
+  );
+  const corporateSlips = React.useMemo(
+    () => slips.filter((s) => isCorporateSlip(s)),
+    [slips]
+  );
+  const corporatePayLaterSlips = React.useMemo(
+    () => slips.filter((s) => isCorporateSlip(s) && isPayLaterSlip(s)),
+    [slips]
+  );
+
+  // Scoped metrics for current category
+  const categoryTotalCount = categorySlips.length;
+  const categoryPendingCount = React.useMemo(
+    () => categorySlips.filter((s) => s.status === 'pending').length,
+    [categorySlips]
+  );
+  const categoryApprovedCount = React.useMemo(
+    () => categorySlips.filter((s) => s.status === 'approved').length,
+    [categorySlips]
+  );
+  const categoryRejectedCount = React.useMemo(
+    () => categorySlips.filter((s) => s.status === 'rejected').length,
+    [categorySlips]
+  );
+  const categoryPayLaterCount = React.useMemo(
+    () => categorySlips.filter((s) => isPayLaterSlip(s)).length,
+    [categorySlips]
+  );
+
+  // Total pending across all categories (for header quick badge)
+  const allPendingCount = React.useMemo(
+    () => slips.filter((s) => s.status === 'pending').length,
+    [slips]
+  );
+
+  const filteredSlips = React.useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    return categorySlips.filter((s) => {
+      // Status filter
+      if (statusFilter === 'pay_later') {
+        if (!isPayLaterSlip(s)) return false;
+      } else if (statusFilter !== 'all' && s.status !== statusFilter) {
+        return false;
+      }
+
+      // Search query filter
+      if (!q) return true;
 
       const acts = parseSlipActivities(s.selectedActivities);
       const matchesActivities = acts.some((a) => a.name && a.name.toLowerCase().includes(q));
 
-      const matchesSearch =
-        !q ||
+      // Also search group applicants names / email / phone
+      const matchesApplicants = Boolean(
+        s.groupPayload?.applicants &&
+          Array.isArray(s.groupPayload.applicants) &&
+          s.groupPayload.applicants.some(
+            (app: any) =>
+              (app.full_name_th && app.full_name_th.toLowerCase().includes(q)) ||
+              (app.full_name_en && app.full_name_en.toLowerCase().includes(q)) ||
+              (app.email && app.email.toLowerCase().includes(q)) ||
+              (app.mobile && app.mobile.toLowerCase().includes(q))
+          )
+      );
+
+      return (
         (s.nameTh && s.nameTh.toLowerCase().includes(q)) ||
         (s.nameEn && s.nameEn.toLowerCase().includes(q)) ||
         (s.companyName && s.companyName.toLowerCase().includes(q)) ||
@@ -262,12 +344,13 @@ export function AdminSlipsView() {
         (s.refNo && s.refNo.toLowerCase().includes(q)) ||
         (s.workplace && s.workplace.toLowerCase().includes(q)) ||
         (s.memberNo && s.memberNo.toLowerCase().includes(q)) ||
-        matchesActivities;
-
-      const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
-      return matchesSearch && matchesStatus;
+        (s.email && s.email.toLowerCase().includes(q)) ||
+        (s.phone && s.phone.toLowerCase().includes(q)) ||
+        matchesActivities ||
+        matchesApplicants
+      );
     });
-  }, [slips, searchQuery, statusFilter, categoryFilter]);
+  }, [categorySlips, searchQuery, statusFilter]);
 
   // Paginated slips (5 items per page)
   const paginatedSlips = React.useMemo(() => {
@@ -276,20 +359,6 @@ export function AdminSlipsView() {
     const start = (validPage - 1) * pageSize;
     return filteredSlips.slice(start, start + pageSize);
   }, [filteredSlips, currentPage, pageSize]);
-
-  const totalCount = slips.length;
-  const individualSlips = React.useMemo(
-    () => slips.filter((s) => !s.isGroupMembership && !s.groupPayload && !s.ticketCode?.startsWith('MEMGRP')),
-    [slips]
-  );
-  const corporateSlips = React.useMemo(
-    () => slips.filter((s) => Boolean(s.isGroupMembership || s.groupPayload || s.ticketCode?.startsWith('MEMGRP'))),
-    [slips]
-  );
-
-  const pendingCount = React.useMemo(() => slips.filter((s) => s.status === 'pending').length, [slips]);
-  const approvedCount = React.useMemo(() => slips.filter((s) => s.status === 'approved').length, [slips]);
-  const rejectedCount = React.useMemo(() => slips.filter((s) => s.status === 'rejected').length, [slips]);
 
   return (
     <div className="flex-1 flex flex-col justify-start animate-fade-in p-3 sm:p-6 space-y-4 max-w-6xl mx-auto w-full">
@@ -344,18 +413,18 @@ export function AdminSlipsView() {
             <span className="bg-amber-400 text-amber-950 px-3 py-1.5 rounded-2xl text-xs font-black flex items-center gap-1.5 shadow-sm">
               <Clock className="w-3.5 h-3.5" />
               <span>
-                {lang === 'th' ? 'รอตรวจ' : 'Pending'}: {pendingCount}
+                {lang === 'th' ? 'รอตรวจ' : 'Pending'}: {allPendingCount}
               </span>
             </span>
           </div>
         </div>
       </div>
 
-      {/* ─── Mode / Module Switcher: Individual vs Corporate Group ─── */}
+      {/* ─── Mode / Module Switcher: Individual vs Corporate Group vs Corporate Pay Later ─── */}
       <div className="flex items-center p-1.5 bg-slate-100 rounded-2xl w-full border border-slate-200 shadow-2xs gap-1.5 overflow-x-auto">
         <button
           onClick={() => setCategoryFilter('all')}
-          className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
+          className={`flex-1 min-w-[130px] flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
             categoryFilter === 'all'
               ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -374,7 +443,7 @@ export function AdminSlipsView() {
 
         <button
           onClick={() => setCategoryFilter('individual')}
-          className={`flex-1 min-w-[170px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
+          className={`flex-1 min-w-[160px] flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
             categoryFilter === 'individual'
               ? 'bg-white text-slate-900 shadow-sm border border-purple-200 ring-1 ring-purple-400/20'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -393,14 +462,14 @@ export function AdminSlipsView() {
 
         <button
           onClick={() => setCategoryFilter('corporate')}
-          className={`flex-1 min-w-[170px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
+          className={`flex-1 min-w-[160px] flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
             categoryFilter === 'corporate'
               ? 'bg-white text-slate-900 shadow-sm border border-indigo-200 ring-1 ring-indigo-400/20'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
           }`}
         >
           <Building2 className="w-4 h-4 text-indigo-600" />
-          <span>{lang === 'th' ? 'องค์กร / สมัครแบบกลุ่มบริษัท' : 'Corporate Group'}</span>
+          <span>{lang === 'th' ? 'องค์กร / กลุ่มบริษัททั้งหมด' : 'Corporate Group (All)'}</span>
           <span
             className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
               categoryFilter === 'corporate' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-600'
@@ -409,10 +478,29 @@ export function AdminSlipsView() {
             {corporateSlips.length}
           </span>
         </button>
+
+        <button
+          onClick={() => setCategoryFilter('corporate_pay_later')}
+          className={`flex-1 min-w-[165px] flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
+            categoryFilter === 'corporate_pay_later'
+              ? 'bg-amber-500 text-amber-950 shadow-sm border border-amber-600 ring-2 ring-amber-400/40 font-black'
+              : 'text-amber-800 bg-amber-50/80 hover:bg-amber-100 border border-amber-200/70'
+          }`}
+        >
+          <CreditCard className="w-4 h-4 text-amber-900" />
+          <span>{lang === 'th' ? 'กลุ่มรอชำระเงิน' : 'Corporate Pay Later'}</span>
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+              categoryFilter === 'corporate_pay_later' ? 'bg-amber-950 text-amber-100' : 'bg-amber-200 text-amber-900'
+            }`}
+          >
+            {corporatePayLaterSlips.length}
+          </span>
+        </button>
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+      {/* Metrics Row (Scoped to selected Category) */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 sm:gap-3">
         <div
           onClick={() => setStatusFilter('all')}
           className={`p-3.5 rounded-2xl border transition cursor-pointer ${
@@ -421,8 +509,8 @@ export function AdminSlipsView() {
               : 'bg-white border-slate-200 hover:border-slate-300'
           }`}
         >
-          <p className="text-[11px] font-bold text-slate-500">{lang === 'th' ? 'ทั้งหมด' : 'All Slips'}</p>
-          <p className="text-xl font-black text-slate-900 mt-0.5">{filteredSlips.length}</p>
+          <p className="text-[11px] font-bold text-slate-500">{lang === 'th' ? 'ทั้งหมด (ในหมวดนี้)' : 'All (In Category)'}</p>
+          <p className="text-xl font-black text-slate-900 mt-0.5">{categoryTotalCount}</p>
         </div>
 
         <div
@@ -435,9 +523,24 @@ export function AdminSlipsView() {
         >
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-bold text-amber-800">{lang === 'th' ? 'รอตรวจสอบ' : 'Pending Review'}</p>
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            {categoryPendingCount > 0 && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />}
           </div>
-          <p className="text-xl font-black text-amber-900 mt-0.5">{pendingCount}</p>
+          <p className="text-xl font-black text-amber-900 mt-0.5">{categoryPendingCount}</p>
+        </div>
+
+        <div
+          onClick={() => setStatusFilter('pay_later')}
+          className={`p-3.5 rounded-2xl border transition cursor-pointer ${
+            statusFilter === 'pay_later'
+              ? 'bg-orange-50 border-orange-400 shadow-sm ring-1 ring-orange-400/30'
+              : 'bg-white border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-bold text-orange-800">{lang === 'th' ? 'รอชำระเงิน' : 'Pay Later'}</p>
+            {categoryPayLaterCount > 0 && <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />}
+          </div>
+          <p className="text-xl font-black text-orange-900 mt-0.5">{categoryPayLaterCount}</p>
         </div>
 
         <div
@@ -449,7 +552,7 @@ export function AdminSlipsView() {
           }`}
         >
           <p className="text-[11px] font-bold text-emerald-800">{lang === 'th' ? 'อนุมัติแล้ว' : 'Approved'}</p>
-          <p className="text-xl font-black text-emerald-900 mt-0.5">{approvedCount}</p>
+          <p className="text-xl font-black text-emerald-900 mt-0.5">{categoryApprovedCount}</p>
         </div>
 
         <div
@@ -461,7 +564,7 @@ export function AdminSlipsView() {
           }`}
         >
           <p className="text-[11px] font-bold text-rose-800">{lang === 'th' ? 'ปฏิเสธ / แก้ไข' : 'Rejected'}</p>
-          <p className="text-xl font-black text-rose-900 mt-0.5">{rejectedCount}</p>
+          <p className="text-xl font-black text-rose-900 mt-0.5">{categoryRejectedCount}</p>
         </div>
       </div>
 
@@ -490,22 +593,97 @@ export function AdminSlipsView() {
           )}
         </div>
 
-        {/* Status Filter Buttons */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
-          {(['all', 'pending', 'approved', 'rejected'] as const).map((st) => (
-            <button
-              key={st}
-              onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-                statusFilter === st ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'
+        {/* Status Filter Buttons with scoped counts */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              statusFilter === 'all'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'text-slate-600 bg-slate-100 hover:bg-slate-200'
+            }`}
+          >
+            <span>{lang === 'th' ? 'ทั้งหมด' : 'All'}</span>
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
+                statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
               }`}
             >
-              {st === 'all' && (lang === 'th' ? 'ทั้งหมด' : 'All')}
-              {st === 'pending' && (lang === 'th' ? 'รอตรวจ' : 'Pending')}
-              {st === 'approved' && (lang === 'th' ? 'อนุมัติแล้ว' : 'Approved')}
-              {st === 'rejected' && (lang === 'th' ? 'ปฏิเสธ' : 'Rejected')}
-            </button>
-          ))}
+              {categoryTotalCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setStatusFilter('pending')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              statusFilter === 'pending'
+                ? 'bg-amber-500 text-amber-950 font-black shadow-xs'
+                : 'text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/60'
+            }`}
+          >
+            <span>{lang === 'th' ? 'รอตรวจ' : 'Pending'}</span>
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
+                statusFilter === 'pending' ? 'bg-amber-950/20 text-amber-950' : 'bg-amber-200/80 text-amber-900'
+              }`}
+            >
+              {categoryPendingCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setStatusFilter('pay_later')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              statusFilter === 'pay_later'
+                ? 'bg-orange-500 text-orange-950 font-black shadow-xs'
+                : 'text-orange-800 bg-orange-50 hover:bg-orange-100 border border-orange-200/60'
+            }`}
+          >
+            <span>{lang === 'th' ? 'รอชำระเงิน' : 'Pay Later'}</span>
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
+                statusFilter === 'pay_later' ? 'bg-orange-950/20 text-orange-950' : 'bg-orange-200/80 text-orange-900'
+              }`}
+            >
+              {categoryPayLaterCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setStatusFilter('approved')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              statusFilter === 'approved'
+                ? 'bg-emerald-600 text-white font-black shadow-xs'
+                : 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/60'
+            }`}
+          >
+            <span>{lang === 'th' ? 'อนุมัติแล้ว' : 'Approved'}</span>
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
+                statusFilter === 'approved' ? 'bg-white/20 text-white' : 'bg-emerald-200/80 text-emerald-900'
+              }`}
+            >
+              {categoryApprovedCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setStatusFilter('rejected')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              statusFilter === 'rejected'
+                ? 'bg-rose-600 text-white font-black shadow-xs'
+                : 'text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200/60'
+            }`}
+          >
+            <span>{lang === 'th' ? 'ปฏิเสธ' : 'Rejected'}</span>
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
+                statusFilter === 'rejected' ? 'bg-white/20 text-white' : 'bg-rose-200/80 text-rose-900'
+              }`}
+            >
+              {categoryRejectedCount}
+            </span>
+          </button>
         </div>
       </div>
 

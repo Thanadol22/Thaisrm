@@ -818,10 +818,15 @@ export function PaymentView({
           {!isCouponSponsored && !isPayLaterMode && !uploadedSlipData ? (
             <button
               onClick={onOpenUploadModal}
-              className="w-full bg-white hover:bg-blue-50/50 text-[#0026b3] border-2 border-dashed border-[#0026b3]/40 font-bold text-sm sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-2xs transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-blue-50/90 via-indigo-50/80 to-blue-50/90 hover:from-blue-100 hover:to-indigo-100 text-[#0026b3] border-2 border-dashed border-[#0026b3]/40 hover:border-[#0026b3] font-black text-xs sm:text-base py-3.5 sm:py-4.5 px-4 rounded-2xl shadow-sm transition active:scale-[0.99] cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-2 ring-2 ring-[#0026b3]/10"
             >
-              <Upload className="w-5 h-5 stroke-[2.5]" />
-              <span>{t.payment.uploadButton}</span>
+              <div className="flex items-center gap-2">
+                <Upload className="w-5 h-5 stroke-[2.5] text-[#0026b3] shrink-0" />
+                <span>{lang === 'th' ? 'คลิกที่นี่เพื่อแนบสลิปหลักฐานการโอนเงิน' : 'Click here to upload payment slip'}</span>
+              </div>
+              <span className="text-[11px] font-extrabold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md shrink-0">
+                {lang === 'th' ? '* จำเป็นต้องแนบสลิป' : '* Slip Required'}
+              </span>
             </button>
           ) : null}
 
@@ -854,11 +859,17 @@ export function PaymentView({
                   : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-blue-900/10'
               }`}
             >
-              <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
+              {uploadedSlipData || isCouponSponsored ? (
+                <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
+              ) : (
+                <Upload className="w-5 h-5 stroke-[2.5]" />
+              )}
               <span>
                 {isCouponSponsored
                   ? (lang === 'th' ? 'ยืนยันการลงทะเบียน (ใช้สิทธิ์คูปอง)' : 'Confirm Registration (Use Sponsor Pass)')
-                  : t.payment.confirmPaymentButton}
+                  : uploadedSlipData
+                  ? (lang === 'th' ? 'ยืนยันการชำระเงิน (สลิปพร้อมส่ง)' : 'Confirm Payment (Slip Attached)')
+                  : (lang === 'th' ? 'แนบสลิปและยืนยันการชำระเงิน' : 'Attach Slip & Confirm Payment')}
               </span>
             </button>
           )}

@@ -26,6 +26,10 @@ import {
   renderSponsorOtpEmail,
   SponsorOtpEmailOptions,
 } from './emailTemplates/sponsorOtpTemplate';
+import {
+  renderMemberOtpEmail,
+  MemberOtpEmailOptions,
+} from './emailTemplates/memberOtpTemplate';
 
 export interface SmtpConfig {
   host?: string;
@@ -456,4 +460,24 @@ export async function sendSponsorOtpEmail(
     customConfig,
   });
 }
+
+/**
+ * Send OTP Email to Individual Member for Profile Update
+ */
+export async function sendMemberOtpEmail(
+  to: string,
+  options: MemberOtpEmailOptions,
+  customConfig?: SmtpConfig
+) {
+  const subject = `[TSRM] รหัสชั่วคราว (OTP) สำหรับตรวจสอบและอัปเดตข้อมูลสมาชิก: ${options.otpCode}`;
+  const html = renderMemberOtpEmail(options);
+
+  return dispatchEmail({
+    to,
+    subject,
+    html,
+    customConfig,
+  });
+}
+
 

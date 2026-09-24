@@ -71,6 +71,8 @@ function PaymentContent() {
     nameTh?: string;
     nameEn?: string;
     email?: string;
+    phone?: string;
+    mobile?: string;
     workplace?: string;
     position?: string;
     positionCode?: string;
@@ -631,7 +633,7 @@ function PaymentContent() {
               memberNo: isMember ? regData?.memberNo : undefined,
               guestName: !isMember ? (regData?.nameTh || regData?.nameEn || 'Guest Attendee') : undefined,
               guestEmail: !isMember ? (regData?.email || 'guest@tsrm.org') : undefined,
-              guestPhone: undefined,
+              guestPhone: !isMember ? (regData?.phone || regData?.mobile || undefined) : undefined,
               guestWorkplace: !isMember ? (regData?.workplace || null) : undefined,
               amount: calculationResult.totalAmount,
               originalAmount: calculationResult.originalAmount,

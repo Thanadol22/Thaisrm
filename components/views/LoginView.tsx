@@ -32,6 +32,7 @@ import {
   Trash2,
   Copy,
   Layers,
+  UserCheck,
 } from 'lucide-react';
 import { TsrmLogo } from '@/components/TsrmLogo';
 import { GoogleIcon } from '@/components/GoogleIcon';
@@ -40,6 +41,7 @@ import { ExpiredMemberModal } from '@/components/ExpiredMemberModal';
 import { ChangeFormatModal } from '@/components/ChangeFormatModal';
 import { SignupView } from '@/components/views/SignupView';
 import { SponsorAuthModal, SponsorSessionData } from '@/components/SponsorAuthModal';
+import { ProfileAndSponsorUpdateModal } from '@/components/ProfileAndSponsorUpdateModal';
 import { PositionSelect } from '@/components/PositionSelect';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
 import { useLanguage } from '@/context/LanguageContext';
@@ -173,6 +175,7 @@ export function LoginView({
   const { lang, toggleLang, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'conference' | 'membership'>(defaultTab);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [autofillSuccess, setAutofillSuccess] = useState(false);
 
   // Active Meeting state
@@ -1094,6 +1097,17 @@ export function LoginView({
             <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 shrink-0">
               <button
                 type="button"
+                onClick={() => setIsUpdateModalOpen(true)}
+                className="flex items-center gap-1 xs:gap-1.5 px-2 xs:px-2.5 sm:px-3.5 py-1 sm:py-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md rounded-xl text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-bold transition border border-white/20 cursor-pointer active:scale-95 shadow-2xs group shrink-0"
+                title={lang === 'th' ? 'อัปเดตข้อมูลสมาชิก / บริษัท' : 'Update Member / Sponsor Profile'}
+                aria-label={lang === 'th' ? 'อัปเดตข้อมูลสมาชิก / บริษัท' : 'Update Member / Sponsor Profile'}
+              >
+                <UserCheck className="w-3 h-3 xs:w-3.5 xs:h-3.5 text-blue-200 group-hover:scale-110 transition-transform shrink-0" />
+                <span className="font-semibold whitespace-nowrap">{lang === 'th' ? 'อัปเดตข้อมูล' : 'Update Info'}</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setIsSearchOpen(true)}
                 className="flex items-center gap-1 xs:gap-1.5 px-2 xs:px-2.5 sm:px-3.5 py-1 sm:py-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md rounded-xl text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-bold transition border border-white/20 cursor-pointer active:scale-95 shadow-2xs group shrink-0"
                 title={lang === 'th' ? 'ค้นหาข้อมูลสมาชิก' : 'Search Members'}
@@ -1906,6 +1920,13 @@ export function LoginView({
           setSponsorSession(sessionData);
           setRegMode('group');
         }}
+      />
+
+      {/* Profile & Sponsor Update Modal */}
+      <ProfileAndSponsorUpdateModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+        lang={lang}
       />
     </div>
   );
