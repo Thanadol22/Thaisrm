@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   User,
@@ -123,6 +123,8 @@ export function SignupView({
   const [activeApplicantIdx, setActiveApplicantIdx] = useState(0);
   const [sponsorAuthModalOpen, setSponsorAuthModalOpen] = useState(false);
   const [sponsorSession, setSponsorSession] = useState<SponsorSessionData | null>(null);
+  const [sponsorSecondsRemaining, setSponsorSecondsRemaining] = useState<number>(300);
+  const lastSponsorActivityRef = useRef<number>(Date.now());
 
   // Fast person switch animation state
   const [isSwitchingPerson, setIsSwitchingPerson] = useState(false);
@@ -132,6 +134,66 @@ export function SignupView({
   const [applicants, setApplicants] = useState<ApplicantFormData[]>([
     createInitialApplicant('1'),
   ]);
+
+  const handleSponsorLogout = () => {
+    setSponsorSession(null);
+    setRegMode('individual');
+    setApplicants([createInitialApplicant('1')]);
+    setActiveApplicantIdx(0);
+  };
+
+  // Inactivity tracking when sponsor session is active (5 minutes timeout)
+  useEffect(() => {
+    if (!sponsorSession) return;
+
+    // Reset last activity timestamp immediately on session start / restore
+    lastSponsorActivityRef.current = Date.now();
+    setSponsorSecondsRemaining(300);
+
+    let isTerminated = false;
+
+    const checkAndSyncTime = () => {
+      if (isTerminated) return;
+      const elapsed = Math.floor((Date.now() - lastSponsorActivityRef.current) / 1000);
+      const remaining = Math.max(0, 300 - elapsed);
+      setSponsorSecondsRemaining(remaining);
+
+      if (remaining <= 0) {
+        isTerminated = true;
+        handleSponsorLogout();
+        alert(
+          lang === 'th'
+            ? 'เซสชันของบริษัทหมดอายุเนื่องจากไม่มีการเคลื่อนไหวนานเกิน 5 นาที กรุณาขอรหัสชั่วคราวใหม่อีกครั้ง'
+            : 'Corporate sponsor session has expired due to 5 minutes of inactivity. Please request a new OTP.'
+        );
+      }
+    };
+
+    let lastResetCall = 0;
+    const resetActivity = () => {
+      if (isTerminated) return;
+      const now = Date.now();
+      lastSponsorActivityRef.current = now;
+      if (now - lastResetCall > 1000) {
+        lastResetCall = now;
+        setSponsorSecondsRemaining(300);
+      }
+    };
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+    events.forEach((evt) => window.addEventListener(evt, resetActivity, { passive: true }));
+    window.addEventListener('focus', checkAndSyncTime);
+    document.addEventListener('visibilitychange', checkAndSyncTime);
+
+    const interval = setInterval(checkAndSyncTime, 1000);
+
+    return () => {
+      events.forEach((evt) => window.removeEventListener(evt, resetActivity));
+      window.removeEventListener('focus', checkAndSyncTime);
+      document.removeEventListener('visibilitychange', checkAndSyncTime);
+      clearInterval(interval);
+    };
+  }, [sponsorSession, lang]);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -527,6 +589,34 @@ export function SignupView({
             </div>
           )}
         </div>
+
+        {/* Corporate Sponsor Active Banner */}
+        {regMode === 'group' && sponsorSession && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between gap-3 animate-fade-in">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                🏢
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-800">
+                  {lang === 'th' ? 'สมัครสมาชิกในนาม:' : 'Registering as:'}{' '}
+                  <span className="text-[#0026b3]">{sponsorSession.sponsorName}</span>
+                  <span className="ml-1 text-[11px] font-normal text-slate-500">({sponsorSession.tier} Sponsor)</span>
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {lang === 'th' ? 'ผู้ประสานงาน:' : 'Contact:'} {sponsorSession.contactEmail}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleSponsorLogout}
+              className="text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition cursor-pointer shadow-2xs shrink-0"
+            >
+              {lang === 'th' ? 'ออกจากระบบบริษัท' : 'Exit Sponsor Mode'}
+            </button>
+          </div>
+        )}
 
         {/* Multi-Applicant Pagination Header Tabs (When in Group Mode) */}
         {regMode === 'group' && (
@@ -1171,6 +1261,8 @@ export function SignupView({
         isOpen={sponsorAuthModalOpen}
         onClose={() => setSponsorAuthModalOpen(false)}
         onSuccess={(sessionData) => {
+          lastSponsorActivityRef.current = Date.now();
+          setSponsorSecondsRemaining(300);
           setSponsorSession(sessionData);
           setRegMode('group');
         }}

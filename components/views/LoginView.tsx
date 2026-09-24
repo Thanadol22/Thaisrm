@@ -382,6 +382,8 @@ export function LoginView({
                     setCouponCodeInput(savedDraft.couponData.code || '');
                   }
                   if (savedDraft.sponsorSession) {
+                    lastSponsorActivityRef.current = Date.now();
+                    setSponsorSecondsRemaining(300);
                     setSponsorSession(savedDraft.sponsorSession);
                   }
 
@@ -689,34 +691,59 @@ export function LoginView({
   const [isChangeFormatOpen, setIsChangeFormatOpen] = useState(false);
 
 
-  // Inactivity tracking when sponsor session is active
+  // Inactivity tracking when sponsor session is active (5 minutes timeout)
   useEffect(() => {
     if (!sponsorSession) return;
 
-    const resetActivity = () => {
-      lastSponsorActivityRef.current = Date.now();
-      setSponsorSecondsRemaining(300);
-    };
+    // Reset last activity timestamp immediately on session start / restore
+    lastSponsorActivityRef.current = Date.now();
+    setSponsorSecondsRemaining(300);
 
-    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
-    events.forEach((evt) => window.addEventListener(evt, resetActivity));
+    let isTerminated = false;
 
-    const interval = setInterval(() => {
+    const checkAndSyncTime = () => {
+      if (isTerminated) return;
       const elapsed = Math.floor((Date.now() - lastSponsorActivityRef.current) / 1000);
       const remaining = Math.max(0, 300 - elapsed);
       setSponsorSecondsRemaining(remaining);
 
       if (remaining <= 0) {
+        isTerminated = true;
         handleSponsorLogout();
-        alert('เซสชันของบริษัทหมดอายุเนื่องจากไม่มีการเคลื่อนไหวนานเกิน 5 นาที กรุณาขอรหัสชั่วคราวใหม่อีกครั้ง');
+        alert(
+          lang === 'th'
+            ? 'เซสชันของบริษัทหมดอายุเนื่องจากไม่มีการเคลื่อนไหวนานเกิน 5 นาที กรุณาขอรหัสชั่วคราวใหม่อีกครั้ง'
+            : 'Corporate sponsor session has expired due to 5 minutes of inactivity. Please request a new OTP.'
+        );
       }
-    }, 1000);
+    };
+
+    let lastResetCall = 0;
+    const resetActivity = () => {
+      if (isTerminated) return;
+      const now = Date.now();
+      lastSponsorActivityRef.current = now;
+      // Throttle updating state to avoid continuous re-rendering on mousemove
+      if (now - lastResetCall > 1000) {
+        lastResetCall = now;
+        setSponsorSecondsRemaining(300);
+      }
+    };
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+    events.forEach((evt) => window.addEventListener(evt, resetActivity, { passive: true }));
+    window.addEventListener('focus', checkAndSyncTime);
+    document.addEventListener('visibilitychange', checkAndSyncTime);
+
+    const interval = setInterval(checkAndSyncTime, 1000);
 
     return () => {
       events.forEach((evt) => window.removeEventListener(evt, resetActivity));
+      window.removeEventListener('focus', checkAndSyncTime);
+      document.removeEventListener('visibilitychange', checkAndSyncTime);
       clearInterval(interval);
     };
-  }, [sponsorSession]);
+  }, [sponsorSession, lang]);
 
   // Submit conference registration (Individual or Group)
   const handleSubmitRegistration = async (e: React.FormEvent) => {
@@ -1274,11 +1301,6 @@ export function LoginView({
 
                     {regMode === 'group' && (
                       <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                        {sponsorSession && (
-                          <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg flex items-center gap-1">
-                            ⏱️ {Math.floor(sponsorSecondsRemaining / 60)}:{(sponsorSecondsRemaining % 60).toString().padStart(2, '0')}
-                          </span>
-                        )}
                         <button
                           type="button"
                           onClick={handleCopyWorkplaceToAll}
@@ -1879,6 +1901,8 @@ export function LoginView({
         isOpen={sponsorAuthModalOpen}
         onClose={() => setSponsorAuthModalOpen(false)}
         onSuccess={(sessionData) => {
+          lastSponsorActivityRef.current = Date.now();
+          setSponsorSecondsRemaining(300);
           setSponsorSession(sessionData);
           setRegMode('group');
         }}
