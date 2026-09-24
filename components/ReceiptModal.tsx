@@ -49,7 +49,7 @@ export function ReceiptModal({ receipt, isOpen, onClose, onEdit }: ReceiptModalP
   };
 
   return createPortal(
-    <div className="receipt-modal-backdrop fixed inset-0 z-[9999] overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center p-2 sm:p-4 md:p-6 print:p-0 print:bg-white print:static print:inset-auto print:overflow-visible print:block animate-fade-in">
+    <div className="receipt-modal-backdrop fixed inset-0 z-[10000] overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center p-2 sm:p-4 md:p-6 print:p-0 print:bg-white print:static print:inset-auto print:overflow-visible print:block animate-fade-in">
       {/* ─── Printable Area container ──────────────────────────────── */}
       <div className="receipt-modal-inner relative w-full max-w-4xl bg-transparent flex flex-col items-center my-auto print:w-full print:max-w-none print:my-0 print:static print:block">
         {/* Modal Action Bar (Hidden in Print) */}

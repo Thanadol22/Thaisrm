@@ -20,7 +20,9 @@ import {
   DollarSign,
   PenTool,
   Sparkles,
+  Eye,
 } from 'lucide-react';
+import { ReceiptModal } from '@/components/ReceiptModal';
 
 interface ReceiptFormModalProps {
   isOpen: boolean;
@@ -28,6 +30,7 @@ interface ReceiptFormModalProps {
   onSave: (receipt: ReceiptData, andPrint?: boolean) => void;
   initialData?: ReceiptData | null;
   receipts?: ReceiptData[];
+  isEditing?: boolean;
   meetings?: Array<{
     id: string;
     titleTh: string;
@@ -42,6 +45,7 @@ export function ReceiptFormModal({
   onSave,
   initialData,
   receipts = [],
+  isEditing,
   meetings = [],
 }: ReceiptFormModalProps) {
   const [mounted, setMounted] = useState(false);
@@ -50,6 +54,11 @@ export function ReceiptFormModal({
   const [nameError, setNameError] = useState<string | null>(null);
   const [subDetailsText, setSubDetailsText] = useState<string>('');
   const [showCustomBahtText, setShowCustomBahtText] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const isEditMode = isEditing !== undefined 
+    ? isEditing 
+    : Boolean(initialData && (initialData.payerName?.trim() || receipts.some(r => r.id === initialData.id)));
 
   const [formData, setFormData] = useState<ReceiptData>(() => {
     return initialData || {
@@ -141,11 +150,7 @@ export function ReceiptFormModal({
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
-      if (initialData.payerName && initialData.payerName.trim().length > 0) {
-        setSelectedTemplate(4); // Editing existing saved receipt
-      } else {
-        setSelectedTemplate(3); // Creating new receipt
-      }
+      setSelectedTemplate(4); // Editing existing saved receipt
       setNameError(null);
       const lines = initialData.items?.[0]?.subDetails || [];
       setSubDetailsText(lines.join('\n'));
@@ -162,12 +167,58 @@ export function ReceiptFormModal({
         }
       });
       const nextSeqNo = generateReceiptNo(new Date(), maxSeq + 1);
-      setFormData((prev) => ({
-        ...prev,
+      const defaultSubDetails = [
+        'ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์',
+        'จัดขึ้นวันที่ 20-21-22 ตุลาคม  2569',
+        'โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ',
+      ];
+
+      setFormData({
+        id: String(Date.now()),
         receiptNo: nextSeqNo,
-      }));
+        receiptDate: new Date().toLocaleDateString('th-TH', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        }),
+        purposeText: 'ได้รับเงินสนับสนุน ประจำปี 2569',
+        payerType: 'company',
+        payerName: '',
+        branchName: 'สำนักงานแห่งใหญ่',
+        payerAddressLine1: '',
+        payerAddressLine2: '',
+        payerPhone: '',
+        payerTaxId: '',
+        associationNameTh: settings.association_name_th || DEFAULT_ASSOCIATION_INFO.nameTh,
+        associationNameEn: settings.association_name_en || DEFAULT_ASSOCIATION_INFO.nameEn,
+        associationAddress: settings.association_address || DEFAULT_ASSOCIATION_INFO.address,
+        associationContact: settings.association_contact || DEFAULT_ASSOCIATION_INFO.contact,
+        associationTaxId: settings.association_tax_id || DEFAULT_ASSOCIATION_INFO.taxId,
+        authorizedSignerName: settings.receipt_authorized_signer || 'แพทย์หญิงพิมพกา ชวนะเวสน์',
+        authorizedSignerRole: settings.receipt_authorized_role || 'เหรัญญิก / ผู้รับเงิน',
+        preparedByName: settings.receipt_prepared_by || 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม',
+        preparedByRole: settings.receipt_prepared_role || 'ผู้จัดทำ',
+        items: [
+          {
+            id: `item-${Date.now()}`,
+            itemNumber: 1,
+            title: 'ค่าสนับสนุนการประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569',
+            subDetails: defaultSubDetails,
+            amount: 50000,
+          },
+        ],
+        totalAmount: 50000,
+        payerSignerName: '',
+        payerSignerRole: 'ผู้จ่ายเงิน',
+        createdAt: new Date().toISOString().split('T')[0],
+        status: 'issued',
+      });
+      setSelectedTemplate(3);
+      setNameError(null);
+      setSubDetailsText(defaultSubDetails.join('\n'));
+      setShowCustomBahtText(false);
     }
-  }, [initialData, isOpen, receipts]);
+  }, [initialData, isOpen, receipts, settings]);
 
   if (!isOpen || !mounted) return null;
 
@@ -375,7 +426,7 @@ export function ReceiptFormModal({
             </div>
             <div>
               <h2 className="text-lg font-bold">
-                {initialData ? 'แก้ไขใบเสร็จรับเงิน' : 'ออกใบเสร็จรับเงิน'}
+                {isEditMode ? 'แก้ไขใบเสร็จรับเงิน' : 'ออกใบเสร็จรับเงิน'}
               </h2>
               <p className="text-xs text-blue-100">
                 สมาคมเวชศาสตร์การเจริญพันธุ์ไทย
@@ -383,13 +434,25 @@ export function ReceiptFormModal({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 text-white/70 hover:text-white hover:bg-white/20 rounded-xl transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsPreviewOpen(true)}
+              className="px-3 py-1.5 text-xs font-bold text-white bg-white/15 hover:bg-white/25 border border-white/20 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="ดูตัวอย่างใบเสร็จ"
+            >
+              <Eye className="w-4 h-4" />
+              <span className="hidden sm:inline">พรีวิว</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 text-white/70 hover:text-white hover:bg-white/20 rounded-xl transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Form Body */}
@@ -888,7 +951,16 @@ export function ReceiptFormModal({
             ยกเลิก
           </button>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => setIsPreviewOpen(true)}
+              className="px-4 py-2.5 text-sm font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 rounded-xl shadow-xs flex items-center gap-2 transition-all cursor-pointer"
+            >
+              <Eye className="w-4 h-4 text-indigo-600" />
+              <span>พรีวิวใบเสร็จ</span>
+            </button>
+
             <button
               type="button"
               onClick={() => handleSubmit(false)}
@@ -910,6 +982,15 @@ export function ReceiptFormModal({
         </div>
 
       </div>
+
+      {/* Receipt Preview Modal */}
+      {isPreviewOpen && (
+        <ReceiptModal
+          receipt={formData}
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+        />
+      )}
     </div>,
     document.body
   );

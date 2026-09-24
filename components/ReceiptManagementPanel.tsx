@@ -107,59 +107,7 @@ export function ReceiptManagementPanel({
   }, [filteredReceipts, currentPage, pageSize]);
 
   const handleOpenCreate = () => {
-    let maxSeq = DEFAULT_RECEIPT_START_SEQ - 1;
-    let maxId = 0;
-    receipts.forEach((r) => {
-      const match = r.receiptNo?.match(/-(\d+)/);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (!isNaN(num) && num > maxSeq) maxSeq = num;
-      }
-      const numId = parseInt(r.id, 10);
-      if (!isNaN(numId) && numId > maxId) maxId = numId;
-    });
-    const nextReceiptNo = generateReceiptNo(new Date(), maxSeq + 1);
-    const nextId = String(maxId + 1);
-
-    setEditReceipt({
-      id: nextId,
-      receiptNo: nextReceiptNo,
-      receiptDate: new Date().toLocaleDateString('th-TH', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      }),
-      purposeText: 'ได้รับเงินสนับสนุน ประจำปี 2569',
-      payerType: 'company',
-      payerName: '',
-      branchName: 'สำนักงานแห่งใหญ่',
-      payerAddressLine1: '',
-      payerAddressLine2: '',
-      payerPhone: '',
-      payerTaxId: '',
-      items: [
-        {
-          id: `item-${Date.now()}`,
-          itemNumber: 1,
-          title: 'ค่าสนับสนุนการประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569',
-          subDetails: [
-            'ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์',
-            'จัดขึ้นวันที่ 20-21-22 ตุลาคม  2569',
-            'โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ',
-          ],
-          amount: 50000,
-        },
-      ],
-      totalAmount: 50000,
-      payerSignerName: '',
-      payerSignerRole: 'ผู้จ่ายเงิน',
-      authorizedSignerName: 'แพทย์หญิงพิมพกา ชวนะเวสน์',
-      authorizedSignerRole: 'เหรัญญิก / ผู้รับเงิน',
-      preparedByName: 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม',
-      preparedByRole: 'ผู้จัดทำ',
-      createdAt: new Date().toISOString().split('T')[0],
-      status: 'issued',
-    });
+    setEditReceipt(null);
     setIsFormOpen(true);
   };
 
@@ -518,6 +466,7 @@ export function ReceiptManagementPanel({
         onClose={() => setIsFormOpen(false)}
         onSave={handleSaveFromForm}
         initialData={editReceipt}
+        isEditing={Boolean(editReceipt)}
         receipts={receipts}
         meetings={meetings}
       />
