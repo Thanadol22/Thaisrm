@@ -186,7 +186,7 @@ export function AdminSlipsView() {
           approvedMemberNo
             ? (lang === 'th' ? `อนุมัติสิทธิ์และสร้างบัญชีสมาชิกเรียบร้อยแล้ว (รหัส: ${approvedMemberNo})` : `Access approved and member created (No: ${approvedMemberNo})`)
             : isPayLaterSlip
-            ? (lang === 'th' ? 'อนุมัติสิทธิ์เข้างาน/สมาชิกเรียบร้อยแล้ว (สถานะ: รอชำระเงิน/รอสลิป)' : 'Access approved (Awaiting Payment)')
+            ? (lang === 'th' ? 'อนุมัติคำขอและสร้างบัญชีสมาชิกเรียบร้อยแล้ว (สถานะ: รอชำระเงิน/รอสลิป)' : 'Request approved (Awaiting Payment)')
             : (lang === 'th' ? 'อนุมัติรายการเรียบร้อยแล้ว' : 'Approved successfully')
         );
       } else {
@@ -251,6 +251,7 @@ export function AdminSlipsView() {
       s.bank?.includes('ชำระเงินภายหลัง') ||
       s.bank?.toLowerCase().includes('pay later') ||
       s.slipUrl === 'PAY_LATER' ||
+      s.slipUrl === 'pay_later_pending' ||
       s.slipUrl === '/placeholder-slip.png' ||
       !s.slipUrl
     );
@@ -1184,21 +1185,22 @@ export function AdminSlipsView() {
                               )}
                             </span>
                             <span className="text-[11px] text-indigo-600 font-mono">
-                              {app.mobile || app.email}
+                              {app.email || app.mobile || '-'}
                             </span>
                           </div>
                           <div className="text-[11px] text-slate-500 pl-7 flex flex-wrap gap-x-3 gap-y-0.5">
                             <span>ตำแหน่ง: {app.position || app.job_category || '-'}</span>
                             {app.scientist_reg_no && <span>เลขใบอนุญาต: {app.scientist_reg_no}</span>}
                             {app.id_last4 && <span>เลขท้ายบัตร: {app.id_last4}</span>}
+                            {app.mobile && <span>เบอร์โทร: {app.mobile}</span>}
                           </div>
                         </div>
                       ))}
                     </div>
 
-                    {selectedSlip.status === 'pending' && (
+                    {selectedSlip.status === 'pending' && isPayLaterSlip(selectedSlip) && (
                       <p className="text-[11px] text-indigo-900 bg-indigo-100/80 p-3 rounded-xl font-medium leading-relaxed border border-indigo-200">
-                        🏢 เมื่อกด <strong>&ldquo;อนุมัติ&rdquo;</strong> ระบบจะทำการอนุมัติสิทธิ์เข้างานและสร้างบัญชีสมาชิกให้กับผู้สมัครทุกคนในกลุ่ม พร้อมออกเลขที่สมาชิกอัตโนมัติเพื่อให้สามารถนำไปลงทะเบียนเข้างานได้ทันที โดยสถานะการชำระเงินจะยังคงเป็น <strong>&ldquo;รอชำระเงิน / รอแนบสลิป&rdquo;</strong> เพื่อให้บริษัทแนบสลิปเข้ามาในภายหลัง
+                        🏢 เมื่อกด <strong>&ldquo;อนุมัติ&rdquo;</strong> ระบบจะทำการอนุมัติและสร้างบัญชีสมาชิกให้กับผู้สมัครทุกคนในกลุ่ม พร้อมออกเลขที่สมาชิกอัตโนมัติ โดยสถานะการชำระเงินจะยังคงเป็น <strong>&ldquo;รอชำระเงิน / รอแนบสลิป&rdquo;</strong> เพื่อให้บริษัทแนบสลิปเข้ามาในภายหลัง
                       </p>
                     )}
                   </div>

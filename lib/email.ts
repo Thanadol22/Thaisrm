@@ -450,7 +450,10 @@ export async function sendSponsorOtpEmail(
   options: SponsorOtpEmailOptions,
   customConfig?: SmtpConfig
 ) {
-  const subject = `[TSRM] รหัสชั่วคราว (OTP) สำหรับเข้าสู่ระบบลงทะเบียนบริษัท: ${options.otpCode}`;
+  const isMembership = options.systemType === 'membership';
+  const subject = isMembership
+    ? `[TSRM] รหัสชั่วคราว (OTP) สำหรับเข้าสู่ระบบสมัครสมาชิกบริษัท: ${options.otpCode}`
+    : `[TSRM] รหัสชั่วคราว (OTP) สำหรับเข้าสู่ระบบลงทะเบียนบริษัท: ${options.otpCode}`;
   const html = renderSponsorOtpEmail(options);
 
   return dispatchEmail({

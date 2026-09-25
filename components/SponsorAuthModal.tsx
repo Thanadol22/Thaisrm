@@ -36,12 +36,14 @@ interface SponsorAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (sessionData: SponsorSessionData) => void;
+  systemType?: 'membership' | 'registration';
 }
 
 export function SponsorAuthModal({
   isOpen,
   onClose,
   onSuccess,
+  systemType = 'registration',
 }: SponsorAuthModalProps) {
   const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState<'email' | 'otp'>('email');
@@ -83,7 +85,7 @@ export function SponsorAuthModal({
       const res = await fetch('/api/sponsors/auth/request-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, systemType }),
       });
 
       const data = await res.json();
@@ -150,7 +152,11 @@ export function SponsorAuthModal({
               <h3 className="font-bold text-base leading-tight">
                 {step === 'email' ? 'ยืนยันตัวตนตัวแทนบริษัท' : 'กรอกรหัสชั่วคราว (OTP)'}
               </h3>
-              <p className="text-[11px] text-blue-100">ระบบลงทะเบียนกลุ่มบริษัทสปอนเซอร์ (TSRM)</p>
+              <p className="text-[11px] text-blue-100">
+                {systemType === 'membership'
+                  ? 'ระบบสมัครสมาชิกสมาคมแบบกลุ่มสำหรับบริษัท (TSRM)'
+                  : 'ระบบลงทะเบียนกลุ่มบริษัทสปอนเซอร์ (TSRM)'}
+              </p>
             </div>
           </div>
           <button

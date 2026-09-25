@@ -736,7 +736,11 @@ function PaymentContent() {
     ? (lang === 'th'
         ? 'ระบบได้บันทึกข้อมูลเรียบร้อยแล้วในสถานะ "รอชำระเงิน" ท่านสามารถชำระเงินและแจ้งหลักฐานการโอนในภายหลังได้'
         : 'Registration has been recorded with "Pending Payment" status. You may settle the payment and upload proof later.')
-    : undefined;
+    : (paymentType === 'membership'
+        ? (lang === 'th'
+            ? 'ระบบได้รับข้อมูลการสมัครสมาชิกและหลักฐานของท่านแล้ว เจ้าหน้าที่จะดำเนินการตรวจสอบและแจ้งผลการอนุมัติทางอีเมล'
+            : 'Your membership application and proof of payment have been received. Staff will review and notify you via email.')
+        : undefined);
 
   const successStatusBadge = isPayLaterSubmitted
     ? (lang === 'th' ? 'สถานะ: รอชำระเงิน (Pending Payment)' : 'Status: Pending Payment')
@@ -752,6 +756,7 @@ function PaymentContent() {
         title={successModalTitle}
         message={successModalMessage}
         statusBadge={successStatusBadge}
+        type={paymentType}
       />
 
       <main className="w-full min-h-screen bg-[#f6f8fc] shadow-2xl flex flex-col justify-between relative border-x border-slate-200/80 overflow-hidden transition-all duration-300">
@@ -774,7 +779,7 @@ function PaymentContent() {
           couponCode={regData?.couponData?.code}
           discountAmount={calculationResult.discountAmount}
           submitting={submitting}
-          onNavigateBack={() => router.push('/login?tab=conference&restore=1')}
+          onNavigateBack={() => router.push(paymentType === 'registration' ? '/login?tab=conference&restore=1' : '/signup')}
           onOpenUploadModal={() => setUploadModalOpen(true)}
           onCopyBank={handleCopyBank}
           copiedBank={copiedBank}

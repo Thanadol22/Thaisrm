@@ -318,15 +318,17 @@ export function PaymentView({
                   </button>
                 </div>
 
-                {/* Chronology Notice Box */}
-                <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-2.5 sm:p-3 flex items-start gap-2">
-                  <span className="text-amber-700 text-xs mt-0.5">📌</span>
-                  <p className="text-[10px] sm:text-[11px] text-amber-900 leading-relaxed font-semibold">
-                    {lang === 'th'
-                      ? 'การจัดสรรส่วนลดและการใช้สิทธิ์คูปองจะถูกคำนวณตามลำดับการกรอกข้อมูลผู้ลงทะเบียน (First-Come, First-Served)'
-                      : 'Discounts and coupon allocations are calculated chronologically according to attendee registration order (First-Come, First-Served).'}
-                  </p>
-                </div>
+                {/* Chronology Notice Box - Only show for conference registration when discounts/coupons are used, NEVER for membership application */}
+                {isRegistration && (couponCode || discountAmount > 0 || isCouponSponsored) && (
+                  <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-2.5 sm:p-3 flex items-start gap-2">
+                    <span className="text-amber-700 text-xs mt-0.5">📌</span>
+                    <p className="text-[10px] sm:text-[11px] text-amber-900 leading-relaxed font-semibold">
+                      {lang === 'th'
+                        ? 'การจัดสรรส่วนลดและการใช้สิทธิ์คูปองจะถูกคำนวณตามลำดับการกรอกข้อมูลผู้ลงทะเบียน (First-Come, First-Served)'
+                        : 'Discounts and coupon allocations are calculated chronologically according to attendee registration order (First-Come, First-Served).'}
+                    </p>
+                  </div>
+                )}
 
                 <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-2xl overflow-hidden bg-slate-50/50">
                   {groupAttendees.map((att, idx) => (
@@ -351,14 +353,14 @@ export function PaymentView({
                                 {att.position}
                               </span>
                             )}
-                            {att.isMember !== undefined && (
+                            {isRegistration && att.isMember !== undefined && (
                               <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
                                 att.isMember ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-700'
                               }`}>
                                 {att.isMember ? (lang === 'th' ? 'สมาชิก' : 'Member') : (lang === 'th' ? 'บุคคลทั่วไป' : 'Non-Member')}
                               </span>
                             )}
-                            {att.attendanceType && (
+                            {isRegistration && att.attendanceType && (
                               <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
                                 {att.attendanceType === 'online' ? '💻 Online' : '🏢 Onsite'}
                               </span>

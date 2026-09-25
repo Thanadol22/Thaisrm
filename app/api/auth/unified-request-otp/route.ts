@@ -104,12 +104,14 @@ export async function POST(req: NextRequest) {
         // Fallback
       }
 
+      const systemType = body.systemType || body.mode || 'registration';
       emailResult = await sendSponsorOtpEmail(email, {
         otpCode,
         companyName: sponsor.name,
         contactEmail: email,
         meetingName,
         expiresInMinutes: 10,
+        systemType,
       });
     }
 

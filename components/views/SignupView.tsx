@@ -200,6 +200,7 @@ export function SignupView({
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [workplaceCopiedNotice, setWorkplaceCopiedNotice] = useState<string | null>(null);
 
   const currentApplicant = applicants[activeApplicantIdx] || applicants[0];
 
@@ -213,24 +214,33 @@ export function SignupView({
   };
 
   const updateCurrentApplicant = (field: keyof ApplicantFormData, value: any) => {
-    setApplicants(prev => prev.map((app, idx) => {
-      if (idx !== activeApplicantIdx) return app;
-      let sanitized = value;
-      if (field === 'nameTh') {
-        sanitized = value.replace(/[^\u0E00-\u0E7F\s\.\-]/g, '');
-      } else if (field === 'nameEn') {
-        sanitized = value.replace(/[^a-zA-Z\s\.\-']/g, '');
-      } else if (field === 'id4Digits') {
-        sanitized = value.replace(/\D/g, '').slice(0, 4);
-      } else if (field === 'mobile') {
-        sanitized = value.replace(/\D/g, '').slice(0, 10);
-      }
-      return { ...app, [field]: sanitized };
-    }));
+    setApplicants(prev => {
+      const isFirstApplicant = activeApplicantIdx === 0;
+      return prev.map((app, idx) => {
+        if (idx === activeApplicantIdx) {
+          let sanitized = value;
+          if (field === 'nameTh') {
+            sanitized = value.replace(/[^\u0E00-\u0E7F\s\.\-]/g, '');
+          } else if (field === 'nameEn') {
+            sanitized = value.replace(/[^a-zA-Z\s\.\-']/g, '');
+          } else if (field === 'id4Digits') {
+            sanitized = value.replace(/\D/g, '').slice(0, 4);
+          } else if (field === 'mobile') {
+            sanitized = value.replace(/\D/g, '').slice(0, 10);
+          }
+          return { ...app, [field]: sanitized };
+        }
+        // In group mode, when applicant 0 changes workplace, auto-fill for any other applicants whose workplace is empty
+        if (regMode === 'group' && isFirstApplicant && field === 'workplace' && (!app.workplace || app.workplace === prev[0]?.workplace)) {
+          return { ...app, workplace: value };
+        }
+        return app;
+      });
+    });
   };
 
   const handleAddApplicant = () => {
-    const defaultWorkplace = applicants[0]?.workplace || '';
+    const defaultWorkplace = sponsorSession?.sponsorName || applicants[0]?.workplace || '';
     const newId = Date.now().toString();
     const newIdx = applicants.length;
     setApplicants(prev => [...prev, createInitialApplicant(newId, defaultWorkplace)]);
@@ -247,13 +257,16 @@ export function SignupView({
   };
 
   const handleCopyWorkplaceToAll = () => {
-    const wp = currentApplicant?.workplace?.trim() || '';
+    const wp = sponsorSession?.sponsorName || currentApplicant?.workplace?.trim() || applicants[0]?.workplace?.trim() || '';
     if (!wp) {
       alert(lang === 'th' ? 'กรุณาระบุสถานที่ทำงานก่อนคัดลอก' : 'Please enter workplace first');
       return;
     }
     setApplicants(prev => prev.map(app => ({ ...app, workplace: wp })));
-    alert(lang === 'th' ? `คัดลอก "${wp}" ไปยังผู้สมัครทุกคนแล้ว` : `Copied "${wp}" to all applicants`);
+    setWorkplaceCopiedNotice(wp);
+    setTimeout(() => {
+      setWorkplaceCopiedNotice(null);
+    }, 4000);
   };
 
   const handleEducationChange = (eduId: string, field: keyof EducationRow, value: string) => {
@@ -447,6 +460,29 @@ export function SignupView({
       }
       if ((app.position === '0 อื่นๆ' || app.position === '0 Other') && (!app.positionOther || !app.positionOther.trim())) {
         setSubmitError(lang === 'th' ? `กรุณาระบุรายละเอียดตำแหน่งงานเพิ่มเติม ${personLabel}` : `Please specify position details ${personLabel}`);
+        triggerPersonSwitch(i);
+        return;
+      }
+
+      // 1.7.1 Scientist License No. (Mandatory for Position 1 and 2)
+      const isDoctorOrFellow = app.position.startsWith('1') || app.position.startsWith('2');
+      if (isDoctorOrFellow && (!app.scientistNo || !app.scientistNo.trim())) {
+        setSubmitError(
+          lang === 'th'
+            ? `กรุณากรอกเลขทะเบียนนักวิทย์ (นว) เนื่องจากเลือกตำแหน่ง ${app.position} ${personLabel}`
+            : `Please enter scientist registration number for position ${app.position} ${personLabel}`
+        );
+        triggerPersonSwitch(i);
+        return;
+      }
+
+      // 1.7.2 Work Certificate Document (Mandatory)
+      if (!app.selectedWorkCertFile && !app.workCertPreview) {
+        setSubmitError(
+          lang === 'th'
+            ? `กรุณาแนบรูปหลักฐานใบรับรองการทำงาน ${personLabel}`
+            : `Please upload work certificate document ${personLabel}`
+        );
         triggerPersonSwitch(i);
         return;
       }
@@ -671,6 +707,12 @@ export function SignupView({
 
           {regMode === 'group' && (
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              {workplaceCopiedNotice && (
+                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg animate-fade-in flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  {lang === 'th' ? `คัดลอก "${workplaceCopiedNotice}" ให้ทุกคนแล้ว` : `Copied to all applicants`}
+                </span>
+              )}
               <button
                 type="button"
                 onClick={handleCopyWorkplaceToAll}
@@ -971,8 +1013,15 @@ export function SignupView({
               {/* Workplace & Start Date */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    {t.signup.workplaceLabel} <span className="text-red-500">*</span>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      {t.signup.workplaceLabel} <span className="text-red-500">*</span>
+                    </span>
+                    {sponsorSession?.sponsorName && (
+                      <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
+                        🏢 {lang === 'th' ? 'ออโต้ฟิลจากชื่อบริษัท' : 'Auto-filled from company'}
+                      </span>
+                    )}
                   </label>
                   <div className="relative flex items-center">
                     <Building className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none shrink-0" />
@@ -1020,32 +1069,51 @@ export function SignupView({
                 selectClassName="px-3.5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold shadow-2xs"
               />
 
-              {/* Scientist License No. (Optional) */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 sm:p-3.5 space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 flex items-center justify-between">
-                  <span>{t.signup.scientistNoTitle}</span>
-                  <span className="text-[11px] font-medium text-slate-400">({lang === 'th' ? 'ถ้ามี' : 'Optional'})</span>
-                </label>
-                <input
-                  type="text"
-                  name="scientistNo"
-                  autoComplete="off"
-                  placeholder={lang === 'th' ? 'กรอกเลขทะเบียนนักวิทย์ (ถ้ามี)...' : 'Enter scientist registration number (optional)...'}
-                  value={currentApplicant.scientistNo}
-                  onChange={(e) => updateCurrentApplicant('scientistNo', e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0026b3] font-medium placeholder:text-slate-400"
-                />
-              </div>
+              {/* Scientist License No. (Required if position starts with '1' or '2') */}
+              {(() => {
+                const isDoctorOrFellow = currentApplicant.position.startsWith('1') || currentApplicant.position.startsWith('2');
+                return (
+                  <div className={`border rounded-2xl p-3 sm:p-3.5 space-y-1.5 transition-all ${
+                    isDoctorOrFellow ? 'bg-blue-50/50 border-blue-300 ring-1 ring-blue-300/40' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <label className="block text-xs font-bold text-slate-700 flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <span>{t.signup.scientistNoTitle}</span>
+                        {isDoctorOrFellow && <span className="text-red-500 font-black">*</span>}
+                      </span>
+                      <span className={`text-[11px] font-bold ${isDoctorOrFellow ? 'text-red-600' : 'text-slate-400'}`}>
+                        {isDoctorOrFellow ? (lang === 'th' ? '(บังคับกรอกสำหรับตำแหน่ง 1, 2) *' : '(Required for 1, 2) *') : (lang === 'th' ? '(ถ้ามี)' : '(Optional)')}
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      name="scientistNo"
+                      autoComplete="off"
+                      placeholder={
+                        isDoctorOrFellow
+                          ? (lang === 'th' ? 'กรอกเลขทะเบียนนักวิทย์ (นว) *จำเป็นต้องกรอกสำหรับตำแหน่ง 1, 2' : 'Enter scientist registration number *Required')
+                          : (lang === 'th' ? 'กรอกเลขทะเบียนนักวิทย์ (ถ้ามี)...' : 'Enter scientist registration number (optional)...')
+                      }
+                      value={currentApplicant.scientistNo}
+                      onChange={(e) => updateCurrentApplicant('scientistNo', e.target.value)}
+                      className={`w-full bg-white border rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0026b3] font-medium placeholder:text-slate-400 ${
+                        isDoctorOrFellow && !currentApplicant.scientistNo.trim() ? 'border-amber-300 bg-amber-50/20' : 'border-slate-200'
+                      }`}
+                    />
+                  </div>
+                );
+              })()}
 
-              {/* Embedded Work Certificate Upload Box */}
-              <div className="p-3.5 sm:p-4 rounded-2xl border border-indigo-100 bg-indigo-50/40 space-y-2">
+              {/* Embedded Work Certificate Upload Box (Mandatory) */}
+              <div className="p-3.5 sm:p-4 rounded-2xl border border-indigo-200 bg-indigo-50/50 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <Building className="w-4 h-4 text-[#0026b3]" />
                     <span>{lang === 'th' ? 'รูปหลักฐานใบรับรองการทำงาน' : 'Work Certificate Document'}</span>
+                    <span className="text-red-500 font-black">*</span>
                   </span>
-                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md">
-                    {lang === 'th' ? 'เอกสารรับรองงาน' : 'Work Cert'}
+                  <span className="text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded-md">
+                    {lang === 'th' ? 'บังคับแนบเอกสาร *' : 'Required *'}
                   </span>
                 </div>
 
@@ -1059,7 +1127,7 @@ export function SignupView({
                       />
                     </div>
                   ) : (
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl border-2 border-dashed border-indigo-200 bg-indigo-50/50 flex items-center justify-center text-indigo-500 shrink-0">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-indigo-500 shrink-0">
                       <FileCheck className="w-6 h-6" />
                     </div>
                   )}
@@ -1067,14 +1135,14 @@ export function SignupView({
                   <div className="flex-1 space-y-1 min-w-0">
                     <p className="text-[11px] text-slate-600 leading-tight font-medium">
                       {currentApplicant.workCertPreview
-                        ? (lang === 'th' ? 'แนบรูปหลักฐานใบรับรองการทำงานแล้ว' : 'Work certificate attached')
-                        : (lang === 'th' ? 'อัปโหลดใบรับรองการทำงาน (JPG, PNG หรือ PDF ไม่เกิน 10MB)' : 'Upload work certificate (JPG, PNG, PDF max 10MB)')}
+                        ? (lang === 'th' ? 'แนบรูปหลักฐานใบรับรองการทำงานเรียบร้อยแล้ว' : 'Work certificate attached')
+                        : (lang === 'th' ? 'อัปโหลดใบรับรองการทำงาน (JPG, PNG หรือ PDF ไม่เกิน 10MB) *จำเป็นต้องแนบ' : 'Upload work certificate (JPG, PNG, PDF max 10MB) *Required')}
                     </p>
 
                     <div className="flex flex-wrap items-center gap-2 pt-0.5">
                       <label className="relative cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-900 text-xs font-bold border border-indigo-200 shadow-2xs transition active:scale-95">
                         <Upload className="w-3.5 h-3.5 text-[#0026b3]" />
-                        <span>{currentApplicant.workCertPreview ? (lang === 'th' ? 'เปลี่ยนไฟล์' : 'Change') : (lang === 'th' ? 'อัปโหลดใบรับรองงาน' : 'Upload Work Cert')}</span>
+                        <span>{currentApplicant.workCertPreview ? (lang === 'th' ? 'เปลี่ยนไฟล์' : 'Change') : (lang === 'th' ? 'อัปโหลดใบรับรองงาน *' : 'Upload Work Cert *')}</span>
                         <input
                           type="file"
                           accept="image/*,.pdf"
@@ -1354,11 +1422,19 @@ export function SignupView({
       <SponsorAuthModal
         isOpen={sponsorAuthModalOpen}
         onClose={() => setSponsorAuthModalOpen(false)}
+        systemType="membership"
         onSuccess={(sessionData) => {
           lastSponsorActivityRef.current = Date.now();
           setSponsorSecondsRemaining(300);
           setSponsorSession(sessionData);
           setRegMode('group');
+          const compName = sessionData.sponsorName?.trim() || '';
+          if (compName) {
+            setApplicants(prev => prev.map(app => ({
+              ...app,
+              workplace: compName,
+            })));
+          }
         }}
       />
     </div>

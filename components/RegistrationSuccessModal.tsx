@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle2, Mail, QrCode, X, ArrowRight } from 'lucide-react';
+import { CheckCircle2, Mail, QrCode, X, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface RegistrationSuccessModalProps {
@@ -12,6 +12,7 @@ interface RegistrationSuccessModalProps {
   title?: string;
   message?: string;
   statusBadge?: string;
+  type?: 'registration' | 'membership';
 }
 
 export function RegistrationSuccessModal({
@@ -21,8 +22,9 @@ export function RegistrationSuccessModal({
   title,
   message,
   statusBadge,
+  type = 'registration',
 }: RegistrationSuccessModalProps) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -30,6 +32,12 @@ export function RegistrationSuccessModal({
   }, []);
 
   if (!isOpen || !mounted) return null;
+
+  const defaultMessage = type === 'membership'
+    ? (lang === 'th'
+        ? 'ระบบได้รับข้อมูลการสมัครสมาชิกและหลักฐานของท่านแล้ว เจ้าหน้าที่จะดำเนินการตรวจสอบและแจ้งผลการอนุมัติทางอีเมล'
+        : 'Your membership application and slip have been received. Staff will review and notify you via email.')
+    : t.successModal.message;
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in">
@@ -60,24 +68,37 @@ export function RegistrationSuccessModal({
             </div>
           )}
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            {title || t.successModal.title}
+            {title || (type === 'membership' ? (lang === 'th' ? 'ส่งใบสมัครและหลักฐานการชำระเงินเรียบร้อยแล้ว' : 'Membership Application Submitted') : t.successModal.title)}
           </h2>
           <p className="text-xs sm:text-sm font-extrabold text-[#0026b3] leading-relaxed px-2">
-            {message || t.successModal.message}
+            {message || defaultMessage}
           </p>
         </div>
 
-        {/* Email & QR Info Card */}
-        <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-3.5 space-y-2.5 text-left text-xs text-slate-700">
-          <div className="flex items-center gap-2.5 text-[#0026b3] font-bold">
-            <Mail className="w-4 h-4 shrink-0 text-[#0026b3]" />
-            <span>{t.successModal.emailSent}</span>
+        {/* Info Card (Membership verification vs Conference QR entrance) */}
+        {type === 'membership' ? (
+          <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-3.5 space-y-2.5 text-left text-xs text-slate-700">
+            <div className="flex items-center gap-2.5 text-[#0026b3] font-bold">
+              <Mail className="w-4 h-4 shrink-0 text-[#0026b3]" />
+              <span>{lang === 'th' ? 'ส่งข้อมูลยืนยันการสมัครไปยัง Email เรียบร้อยแล้ว' : 'Application confirmation sent to your email'}</span>
+            </div>
+            <div className="flex items-center gap-2.5 text-emerald-800 font-semibold">
+              <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>{lang === 'th' ? 'เจ้าหน้าที่จะตรวจสอบเอกสารและแจ้งผลการอนุมัติสถานะสมาชิกผ่านทางอีเมล' : 'Staff will review documents and confirm membership status via email'}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2.5 text-slate-600 font-medium">
-            <QrCode className="w-4 h-4 shrink-0 text-emerald-600" />
-            <span>{t.successModal.qrInstruction}</span>
+        ) : (
+          <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-3.5 space-y-2.5 text-left text-xs text-slate-700">
+            <div className="flex items-center gap-2.5 text-[#0026b3] font-bold">
+              <Mail className="w-4 h-4 shrink-0 text-[#0026b3]" />
+              <span>{t.successModal.emailSent}</span>
+            </div>
+            <div className="flex items-center gap-2.5 text-slate-600 font-medium">
+              <QrCode className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>{t.successModal.qrInstruction}</span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Buttons */}
         <div className="space-y-2 pt-1">

@@ -1914,11 +1914,19 @@ export function LoginView({
       <SponsorAuthModal
         isOpen={sponsorAuthModalOpen}
         onClose={() => setSponsorAuthModalOpen(false)}
+        systemType="registration"
         onSuccess={(sessionData) => {
           lastSponsorActivityRef.current = Date.now();
           setSponsorSecondsRemaining(300);
           setSponsorSession(sessionData);
           setRegMode('group');
+          const compName = sessionData.sponsorName?.trim() || '';
+          if (compName) {
+            setAttendees(prev => prev.map(att => ({
+              ...att,
+              workplace: compName
+            })));
+          }
         }}
       />
 

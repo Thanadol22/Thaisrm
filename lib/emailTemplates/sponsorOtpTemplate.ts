@@ -7,6 +7,7 @@ export interface SponsorOtpEmailOptions {
   remainingQuota?: number;
   totalQuota?: number;
   meetingName?: string;
+  systemType?: 'membership' | 'registration';
 }
 
 export function renderSponsorOtpEmail(options: SponsorOtpEmailOptions): string {
@@ -18,7 +19,19 @@ export function renderSponsorOtpEmail(options: SponsorOtpEmailOptions): string {
     remainingQuota,
     totalQuota,
     meetingName = 'การประชุมวิชาการประจำปี TSRM',
+    systemType = 'registration',
   } = options;
+
+  const isMembership = systemType === 'membership';
+  const pageTitle = isMembership
+    ? 'รหัสชั่วคราว (OTP) สำหรับเข้าสู่ระบบสมัครสมาชิกบริษัท - TSRM'
+    : 'รหัสชั่วคราวและคูปองสิทธิ์สำหรับเข้าสู่ระบบลงทะเบียนสปอนเซอร์ - TSRM';
+  const headerSubtitle = isMembership
+    ? 'ระบบสมัครสมาชิกสมาคมแบบกลุ่มสำหรับบริษัท (Corporate Membership)'
+    : 'ระบบลงทะเบียนผู้เข้าร่วมประชุมแบบกลุ่มสำหรับบริษัทสปอนเซอร์';
+  const introMessage = isMembership
+    ? `คุณได้ทำการร้องขอรหัสชั่วคราว (OTP) เพื่อเข้าสู่ระบบสมัครสมาชิกสมาคมแบบกลุ่มในนามบริษัท <strong>${companyName}</strong> กรุณาใช้รหัสด้านล่างนี้เพื่อยืนยันตัวตน:`
+    : `คุณได้ทำการร้องขอรหัสชั่วคราว (OTP) เพื่อเข้าสู่ระบบลงทะเบียนและจัดการสิทธิ์ของบริษัทสำหรับงาน <strong>${meetingName}</strong> กรุณาใช้รหัสด้านล่างนี้เพื่อยืนยันตัวตน:`;
 
   return `
 <!DOCTYPE html>
@@ -26,7 +39,7 @@ export function renderSponsorOtpEmail(options: SponsorOtpEmailOptions): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>รหัสชั่วคราวและคูปองสิทธิ์สำหรับเข้าสู่ระบบลงทะเบียนสปอนเซอร์ - TSRM</title>
+  <title>${pageTitle}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #1e293b;">
   <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 30px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
@@ -37,7 +50,7 @@ export function renderSponsorOtpEmail(options: SponsorOtpEmailOptions): string {
           สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (TSRM)
         </h1>
         <p style="color: #93c5fd; margin: 0; font-size: 14px; font-weight: 500;">
-          ระบบลงทะเบียนผู้เข้าร่วมประชุมแบบกลุ่มสำหรับบริษัทสปอนเซอร์
+          ${headerSubtitle}
         </p>
       </td>
     </tr>
@@ -49,7 +62,7 @@ export function renderSponsorOtpEmail(options: SponsorOtpEmailOptions): string {
           เรียน ตัวแทนผู้ประสานงาน <strong>${companyName}</strong>,
         </p>
         <p style="font-size: 15px; color: #475569; line-height: 1.6;">
-          คุณได้ทำการร้องขอรหัสชั่วคราว (OTP) เพื่อเข้าสู่ระบบลงทะเบียนและจัดการสิทธิ์ของบริษัทสำหรับงาน <strong>${meetingName}</strong> กรุณาใช้รหัสด้านล่างนี้เพื่อยืนยันตัวตน:
+          ${introMessage}
         </p>
 
         <!-- OTP Box -->
@@ -65,7 +78,7 @@ export function renderSponsorOtpEmail(options: SponsorOtpEmailOptions): string {
         </div>
 
         ${
-          couponCode
+          !isMembership && couponCode
             ? `
         <!-- Rotated Coupon Code Box (Anti-Impersonation) -->
         <div style="margin: 28px 0; background: #faf5ff; border: 2px solid #d8b4fe; border-radius: 14px; padding: 20px 24px; text-align: center;">
@@ -85,7 +98,7 @@ export function renderSponsorOtpEmail(options: SponsorOtpEmailOptions): string {
           </p>
         </div>
         `
-            : totalQuota && totalQuota > 0
+            : (!isMembership && totalQuota && totalQuota > 0)
             ? `
         <!-- Quota Exhausted Notice -->
         <div style="margin: 24px 0; background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 16px 20px;">

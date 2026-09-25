@@ -6,6 +6,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const email = (body.email || '').trim().toLowerCase();
+    const systemType: 'membership' | 'registration' = body.systemType === 'membership' || body.mode === 'membership' ? 'membership' : 'registration';
 
     if (!email || !email.includes('@')) {
       return NextResponse.json(
@@ -151,21 +152,27 @@ export async function POST(req: NextRequest) {
         contactEmail: email,
         otpCode,
         expiresInMinutes: 10,
-        couponCode: activeRotatedCouponCode,
-        remainingQuota,
-        totalQuota: totalQuota ?? undefined,
+        couponCode: systemType === 'membership' ? undefined : activeRotatedCouponCode,
+        remainingQuota: systemType === 'membership' ? undefined : remainingQuota,
+        totalQuota: systemType === 'membership' ? undefined : (totalQuota ?? undefined),
         meetingName,
+        systemType,
       });
     } catch (emailErr) {
       console.error('[RequestOTP] Failed to send email:', emailErr);
     }
 
+    const isMembership = systemType === 'membership';
+    const successMessage = isMembership
+      ? `ระบบได้ส่งรหัสชั่วคราว (OTP) 6 หลักสำหรับเข้าสู่ระบบสมัครสมาชิก ไปยัง ${email} เรียบร้อยแล้ว`
+      : `ระบบได้ส่งรหัสชั่วคราว (OTP) 6 หลัก${activeRotatedCouponCode ? ' พร้อมรหัสคูปองสิทธิ์ฟรี' : ''} ไปยัง ${email} เรียบร้อยแล้ว`;
+
     return NextResponse.json({
       success: true,
-      message: `ระบบได้ส่งรหัสชั่วคราว (OTP) 6 หลัก${activeRotatedCouponCode ? ' พร้อมรหัสคูปองสิทธิ์ฟรี' : ''} ไปยัง ${email} เรียบร้อยแล้ว`,
+      message: successMessage,
       sponsorName: sponsor.name,
-      hasActiveCoupon: !!activeRotatedCouponCode,
-      remainingQuota,
+      hasActiveCoupon: isMembership ? false : !!activeRotatedCouponCode,
+      remainingQuota: isMembership ? undefined : remainingQuota,
     });
   } catch (error: any) {
     console.error('[RequestOTP] Error:', error);
