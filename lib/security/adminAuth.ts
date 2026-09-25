@@ -85,14 +85,19 @@ export async function verifyAdminCredentials(
   // 2. Verify password using bcrypt hash if available (preferred)
   if (configuredPasswordHash) {
     try {
-      return await bcrypt.compare(cleanPass, configuredPasswordHash);
+      const isMatch = await bcrypt.compare(cleanPass, configuredPasswordHash);
+      if (isMatch) return true;
     } catch {
-      return false;
+      // Proceed to dev fallback if comparison fails
     }
   }
 
   // 3. Fallback: direct timing-safe comparison with plaintext (dev only)
-  return timingSafeCompare(cleanPass, configuredPassword!);
+  if (process.env.NODE_ENV !== 'production' && configuredPassword) {
+    return timingSafeCompare(cleanPass, configuredPassword);
+  }
+
+  return false;
 }
 
 /**
