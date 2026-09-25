@@ -72,14 +72,47 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 3. ตรวจสอบว่าชื่อที่กรอกตรงกับข้อมูลในระบบจริงหรือไม่ (เปรียบเทียบเต็มชื่อแบบ Exact Match ไม่ใช้ substring)
+    // 3. ตรวจสอบว่าสมาชิกเคยลงทะเบียนในงานประชุมนี้แล้วหรือยัง (ถ้ามี meetingId)
+    let alreadyRegistered = false;
+    if (meetingId) {
+      const existingAttendance = await prisma.meeting_attendances.findFirst({
+        where: {
+          meeting_id: meetingId,
+          member_no: member.member_no,
+        },
+      });
+
+      if (existingAttendance) {
+        alreadyRegistered = true;
+        return NextResponse.json({
+          success: false,
+          valid: false,
+          alreadyRegistered: true,
+          message: `สมาชิกหมายเลข ${member.member_no} ได้ลงทะเบียนเข้าร่วมงานประชุมนี้แล้ว`,
+        });
+      }
+    }
+
+    // 4. ตรวจสอบว่ามีชื่อส่งมาด้วยหรือไม่ หากยังไม่มี ถือเป็นการ Lookup เพื่อ Autofill ข้อมูล
     const activeNameInput = nameThInput || nameEnInput || nameInput;
     if (!activeNameInput) {
       return NextResponse.json({
-        success: false,
-        valid: false,
-        nameMismatch: true,
-        message: 'กรุณาระบุชื่อ-นามสกุลเพื่อตรวจสอบกับเลขสมาชิก',
+        success: true,
+        valid: true,
+        isLookup: true,
+        message: `พบข้อมูลสมาชิก: ${member.fullNameTh || member.fullNameEn || member.member_no}`,
+        member: {
+          member_no: member.member_no,
+          fullNameTh: member.fullNameTh || '',
+          fullNameEn: member.fullNameEn || '',
+          email: member.email || '',
+          mobile: member.mobile || '',
+          workplace: member.workplace || '',
+          position: member.position || member.job_category || '',
+          membership_status: member.membership_status,
+          membership_type: member.membership_type,
+          expire_date: member.expire_date,
+        },
       });
     }
 
@@ -113,28 +146,14 @@ export async function POST(req: NextRequest) {
         valid: false,
         nameMismatch: true,
         message: 'ชื่อไม่ตรงกับเลขสมาชิกในระบบ',
-      });
-    }
-
-    // 4. ตรวจสอบว่าสมาชิกเคยลงทะเบียนในงานประชุมนี้แล้วหรือยัง (ถ้ามี meetingId)
-    let alreadyRegistered = false;
-    if (meetingId) {
-      const existingAttendance = await prisma.meeting_attendances.findFirst({
-        where: {
-          meeting_id: meetingId,
+        member: {
           member_no: member.member_no,
+          fullNameTh: member.fullNameTh || '',
+          fullNameEn: member.fullNameEn || '',
+          email: member.email || '',
+          position: member.position || member.job_category || '',
         },
       });
-
-      if (existingAttendance) {
-        alreadyRegistered = true;
-        return NextResponse.json({
-          success: false,
-          valid: false,
-          alreadyRegistered: true,
-          message: `สมาชิกหมายเลข ${member.member_no} ได้ลงทะเบียนเข้าร่วมงานประชุมนี้แล้ว`,
-        });
-      }
     }
 
     // สมาชิกถูกต้องสมบูรณ์
@@ -149,8 +168,10 @@ export async function POST(req: NextRequest) {
         email: member.email,
         mobile: member.mobile,
         workplace: member.workplace,
+        position: member.position || member.job_category || '',
         membership_status: member.membership_status,
         membership_type: member.membership_type,
+        expire_date: member.expire_date,
       },
     });
   } catch (error: any) {

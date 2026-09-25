@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     const slipsModel = (prisma as any).payment_slips || (prisma as any).paymentSlip;
 
-    const parseActivitiesData = (act: any) => {
+    const parseActivitiesData = (act: any, slipAmount?: any) => {
       if (!act) return { activities: [], isMembership: false, isFormatChange: false, formatChangePayload: null, memberPayload: null };
       let parsed = act;
       if (typeof act === 'string') {
@@ -35,17 +35,51 @@ export async function GET(request: NextRequest) {
       }
 
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && (parsed.type === 'membership_group_registration' || (parsed.isGroup && parsed.applicants))) {
+        const applicantCount = parsed.applicants?.length || 1;
+        const effectivePrice = Number(slipAmount) || Number(parsed.amount) || (applicantCount * 1000);
         return {
           activities: [{
             id: 'membership_group_registration',
-            name: `ค่าสมัครสมาชิกแบบกลุ่ม (${parsed.companyName || 'Corporate'} - ${parsed.applicants?.length || 0} ท่าน)`,
+            name: `ค่าสมัครสมาชิกแบบกลุ่ม (${parsed.companyName || 'Corporate'} - ${applicantCount} ท่าน)`,
             type: 'membership_group_registration',
-            price: parsed.amount || ((parsed.applicants?.length || 1) * 1000),
-            rateBadgeTh: `กลุ่ม ${parsed.applicants?.length || 0} ท่าน`,
-            rateBadgeEn: `Group (${parsed.applicants?.length || 0})`,
+            price: effectivePrice,
+            rateBadgeTh: `กลุ่ม ${applicantCount} ท่าน`,
+            rateBadgeEn: `Group (${applicantCount})`,
           }],
           isMembership: true,
           isGroupMembership: true,
+          isGroupConference: false,
+          isFormatChange: false,
+          formatChangePayload: null,
+          memberPayload: null,
+          groupPayload: parsed,
+        };
+      }
+
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && (parsed.type === 'conference_group_registration' || (parsed.isGroup && (parsed.attendees || !parsed.applicants)))) {
+        const attendeeCount = Array.isArray(parsed.attendees) ? parsed.attendees.length : 1;
+        const attendeesSum = Array.isArray(parsed.attendees)
+          ? parsed.attendees.reduce((sum: number, a: any) => sum + Number(a.subtotal || a.price || 0), 0)
+          : 0;
+        const effectivePrice = Number(slipAmount) || Number(parsed.amount) || attendeesSum || 0;
+        const hasMemberAttendees = Array.isArray(parsed.attendees) && parsed.attendees.some((a: any) => a.isMember || a.memberNo);
+        const groupActivities: any[] = [{
+          id: 'conference_group_registration',
+          name: hasMemberAttendees
+            ? `ลงทะเบียนประชุมแบบกลุ่ม - สมาชิกสมาคม (${parsed.companyName || 'Corporate'} - รวม ${attendeeCount} ท่าน)`
+            : `ลงทะเบียนประชุมแบบกลุ่ม (${parsed.companyName || 'Corporate'} - รวม ${attendeeCount} ท่าน)`,
+          type: 'conference_group',
+          price: effectivePrice,
+          rateBadgeTh: hasMemberAttendees ? `กลุ่มสมาชิก ${attendeeCount} ท่าน` : `กลุ่ม ${attendeeCount} ท่าน`,
+          rateBadgeEn: hasMemberAttendees ? `Member Group (${attendeeCount})` : `Group (${attendeeCount})`,
+        }];
+
+        return {
+          activities: groupActivities,
+          isMembership: false,
+          isGroupMembership: false,
+          isGroupConference: true,
+          hasMemberAttendees,
           isFormatChange: false,
           formatChangePayload: null,
           memberPayload: null,
@@ -54,12 +88,13 @@ export async function GET(request: NextRequest) {
       }
 
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.type === 'membership_registration') {
+        const effectivePrice = Number(slipAmount) || Number(parsed.amount) || 1000;
         return {
           activities: [{
             id: 'membership_registration',
             name: 'ค่าสมัครสมาชิก (Membership Fee)',
             type: 'membership_registration',
-            price: parsed.amount || 1000,
+            price: effectivePrice,
             rateBadgeTh: 'สมัครสมาชิกใหม่',
             rateBadgeEn: 'New Member',
           }],
@@ -75,24 +110,33 @@ export async function GET(request: NextRequest) {
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.isFormatChange) {
         const origFmt = parsed.originalFormat === 'onsite' ? 'Onsite' : 'Online';
         const targetFmt = parsed.targetFormat === 'onsite' ? 'Onsite' : 'Online';
+        const effectivePrice = Number(slipAmount) || Number(parsed.changeFee) || 1000;
         return {
           activities: [{
             id: 'format_change',
             name: `ค่าธรรมเนียมเปลี่ยนรูปแบบการเข้าร่วม (${origFmt} ➔ ${targetFmt})`,
             type: 'format_change',
-            price: parsed.changeFee || 1000,
+            price: effectivePrice,
             rateBadgeTh: `เปลี่ยนเป็น ${targetFmt}`,
             rateBadgeEn: `Change to ${targetFmt}`,
           }],
           isMembership: false,
+          isGroupMembership: false,
           isFormatChange: true,
           formatChangePayload: parsed,
           memberPayload: null,
+          groupPayload: null,
         };
       }
 
       if (Array.isArray(parsed)) {
-        return { activities: parsed, isMembership: false, isFormatChange: false, formatChangePayload: null, memberPayload: null };
+        const activities = parsed.map((actItem: any) => {
+          if (parsed.length === 1 && (!actItem.price || Number(actItem.price) === 0) && Number(slipAmount) > 0) {
+            return { ...actItem, price: Number(slipAmount) };
+          }
+          return actItem;
+        });
+        return { activities, isMembership: false, isFormatChange: false, formatChangePayload: null, memberPayload: null };
       }
 
       return { activities: [], isMembership: false, isFormatChange: false, formatChangePayload: null, memberPayload: null };
@@ -129,37 +173,145 @@ export async function GET(request: NextRequest) {
         },
       });
 
+      const allTicketCodes = slips.map((s: any) => s.ticket_code).filter(Boolean);
+      const allSlipIds = slips.map((s: any) => s.slip_id).filter(Boolean);
+
+      let allCouponUsages: any[] = [];
+      let allCoupons: any[] = [];
+      try {
+        allCouponUsages = await prisma.coupon_usages.findMany({
+          where: {
+            OR: [
+              { ticket_code: { in: allTicketCodes } },
+              { slip_id: { in: allSlipIds } },
+            ],
+          },
+          include: {
+            coupon: true,
+          },
+        });
+        allCoupons = await prisma.coupons.findMany();
+      } catch (cErr) {
+        console.warn('Could not query coupon data for slips:', cErr);
+      }
+
       formattedSlips = slips.map((s: any) => {
-        const parsedAct = parseActivitiesData(s.selected_activities);
-        const isMember = s.is_member && s.members;
-        const companyName = parsedAct.groupPayload?.companyName || s.guest_workplace || s.members?.workplace || '';
-        const nameTh = parsedAct.isGroupMembership && companyName
+        const parsedAct = parseActivitiesData(s.selected_activities, s.amount);
+        const hasMemberAttendees = Boolean(
+          parsedAct.hasMemberAttendees ||
+          (parsedAct.groupPayload?.attendees && Array.isArray(parsedAct.groupPayload.attendees) &&
+           parsedAct.groupPayload.attendees.some((a: any) => a.isMember || a.memberNo))
+        );
+        const isMember = (s.is_member && s.members) || hasMemberAttendees;
+        const isGroupConference = parsedAct.isGroupConference || Boolean(s.ticket_code?.startsWith('GRP-'));
+        const isCorporate = parsedAct.isGroupMembership || isGroupConference || Boolean(s.ticket_code?.startsWith('GRP-')) || Boolean(s.ticket_code?.startsWith('MEMGRP'));
+        const companyName = parsedAct.groupPayload?.companyName || (isCorporate ? s.guest_workplace : null) || '';
+        
+        // Isolate company data from personal attendee data (Rule: do not mix personal with corporate)
+        const nameTh = isCorporate && companyName
           ? companyName
           : isMember
             ? s.members?.fullNameTh || 'สมาชิก'
             : s.guest_name || parsedAct.memberPayload?.full_name_th || 'ผู้สมัครทั่วไป';
-        const nameEn = parsedAct.isGroupMembership && companyName
+        const nameEn = isCorporate && companyName
           ? companyName
           : isMember
             ? s.members?.fullNameEn || ''
             : parsedAct.memberPayload?.full_name_en || '';
-        const email = isMember
-          ? s.members?.email || ''
-          : s.guest_email || parsedAct.memberPayload?.email || '';
-        const phone = isMember
-          ? s.members?.mobile || ''
-          : s.guest_phone || parsedAct.memberPayload?.mobile || '';
-        const workplace = isMember
-          ? s.members?.workplace || ''
-          : s.guest_workplace || parsedAct.memberPayload?.workplace || '';
+
+        // For corporate, use coordinator contact only, NEVER personal attendee email/phone
+        const coordinatorEmail = parsedAct.groupPayload?.groupContact?.coordinatorEmail || null;
+        const coordinatorPhone = parsedAct.groupPayload?.groupContact?.coordinatorPhone || null;
+        const coordinatorName = parsedAct.groupPayload?.groupContact?.coordinatorName || null;
+
+        const email = isCorporate
+          ? (coordinatorEmail || '')
+          : isMember
+            ? s.members?.email || ''
+            : s.guest_email || parsedAct.memberPayload?.email || '';
+        const phone = isCorporate
+          ? (coordinatorPhone || '')
+          : isMember
+            ? s.members?.mobile || ''
+            : s.guest_phone || parsedAct.memberPayload?.mobile || '';
+        const workplace = isCorporate
+          ? companyName
+          : isMember
+            ? s.members?.workplace || ''
+            : s.guest_workplace || parsedAct.memberPayload?.workplace || '';
+
+        // Match coupon usages
+        const matchedUsages = allCouponUsages.filter(
+          (cu) => (s.ticket_code && cu.ticket_code === s.ticket_code) || (s.slip_id && cu.slip_id === s.slip_id)
+        );
+
+        let couponCode = parsedAct.groupPayload?.couponCode || parsedAct.groupPayload?.couponData?.code || null;
+        if (!couponCode && matchedUsages.length > 0) {
+          couponCode = matchedUsages[0]?.coupon?.code || null;
+        }
+
+        const couponRecord = couponCode
+          ? allCoupons.find((c) => c.code?.toUpperCase() === couponCode?.toUpperCase()) || matchedUsages[0]?.coupon || null
+          : null;
+
+        const couponInfo = couponRecord
+          ? {
+              code: couponRecord.code,
+              companyName: couponRecord.company_name,
+              discountType: couponRecord.discount_type,
+              discountValue: Number(couponRecord.discount_value) || 0,
+              remarks: couponRecord.remarks,
+              usedCount: matchedUsages.length,
+            }
+          : (parsedAct.groupPayload?.couponData
+            ? {
+                code: parsedAct.groupPayload.couponData.code || couponCode,
+                companyName: parsedAct.groupPayload.couponData.companyName,
+                discountType: parsedAct.groupPayload.couponData.discountType || 'free',
+                discountValue: Number(parsedAct.groupPayload.couponData.discountValue) || 0,
+                remarks: parsedAct.groupPayload.couponData.description,
+                usedCount: parsedAct.groupPayload?.attendees?.length || 1,
+              }
+            : null);
+
+        // Calculate total discount applied
+        let discountTotal = 0;
+        if (matchedUsages.length > 0) {
+          const usageSum = matchedUsages.reduce((sum, cu) => sum + (Number(cu.discount_applied) || 0), 0);
+          if (usageSum > 0) {
+            discountTotal = usageSum;
+          } else if (couponRecord?.discount_type === 'free') {
+            // Free Main Program pass for each attendee
+            discountTotal = matchedUsages.length * 4000;
+          }
+        }
+        if (!discountTotal && parsedAct.groupPayload?.discountAmount) {
+          discountTotal = Number(parsedAct.groupPayload.discountAmount) || 0;
+        }
+
+        const couponUsagesList = matchedUsages.map((cu) => ({
+          id: cu.id.toString(),
+          couponCode: cu.coupon?.code || couponCode,
+          memberNo: cu.member_no,
+          attendeeName: cu.attendee_name,
+          attendeeEmail: cu.attendee_email,
+          attendeePhone: cu.attendee_phone,
+          workplace: cu.workplace,
+          discountApplied: Number(cu.discount_applied) > 0 ? Number(cu.discount_applied) : (couponRecord?.discount_type === 'free' ? 4000 : 0),
+          finalAmount: Number(cu.final_amount) || 0,
+        }));
 
         const ticketType = parsedAct.isFormatChange
           ? `🔄 ขอเปลี่ยนเป็น ${parsedAct.formatChangePayload?.targetFormat === 'onsite' ? 'Onsite' : 'Online'}`
           : parsedAct.isMembership
-            ? 'Membership Registration'
-            : s.is_member
-              ? 'Member Pass'
-              : 'Non-Member Pass';
+            ? (parsedAct.isGroupMembership ? 'Group Membership' : 'Membership Registration')
+            : isGroupConference
+              ? (hasMemberAttendees
+                  ? `Group Member Pass (${parsedAct.groupPayload?.attendees?.length || 0} ท่าน)`
+                  : `Group Conference Pass (${parsedAct.groupPayload?.attendees?.length || 0} ท่าน)`)
+              : s.is_member
+                ? 'Member Pass'
+                : 'Non-Member Pass';
 
         return {
           id: s.slip_id,
@@ -171,11 +323,15 @@ export async function GET(request: NextRequest) {
               ? `แจ้งเปลี่ยนรูปแบบ - ${s.meetings?.meeting_name || ''}`
               : (s.meetings?.meeting_name || ''),
           memberNo: s.member_no,
-          isMember: s.is_member,
+          isMember: Boolean(s.is_member || hasMemberAttendees),
           isMembershipRegistration: parsedAct.isMembership,
           isGroupMembership: parsedAct.isGroupMembership,
+          isGroupConference,
           groupPayload: parsedAct.groupPayload,
           companyName,
+          coordinatorName,
+          coordinatorEmail,
+          coordinatorPhone,
           isFormatChange: parsedAct.isFormatChange,
           formatChangePayload: parsedAct.formatChangePayload,
           memberPayload: parsedAct.memberPayload,
@@ -197,6 +353,10 @@ export async function GET(request: NextRequest) {
           resubmitToken: s.resubmit_token,
           selectedActivities: parsedAct.activities,
           createdAt: s.created_at ? new Date(s.created_at).toISOString() : new Date().toISOString(),
+          couponCode: couponCode || null,
+          couponInfo: couponInfo || null,
+          couponUsages: couponUsagesList,
+          discountTotal: discountTotal || 0,
         };
       });
     } else {
@@ -232,35 +392,137 @@ export async function GET(request: NextRequest) {
 
       const slips: any[] = await prisma.$queryRawUnsafe(query, ...params);
 
+      const allTicketCodes = slips.map((s: any) => s.ticket_code).filter(Boolean);
+      const allSlipIds = slips.map((s: any) => s.slip_id).filter(Boolean);
+
+      let allCouponUsages: any[] = [];
+      let allCoupons: any[] = [];
+      try {
+        allCouponUsages = await prisma.coupon_usages.findMany({
+          where: {
+            OR: [
+              { ticket_code: { in: allTicketCodes } },
+              { slip_id: { in: allSlipIds } },
+            ],
+          },
+          include: {
+            coupon: true,
+          },
+        });
+        allCoupons = await prisma.coupons.findMany();
+      } catch (cErr) {
+        console.warn('Could not query coupon data for fallback slips:', cErr);
+      }
+
       formattedSlips = slips.map((s: any) => {
-        const parsedAct = parseActivitiesData(s.selected_activities);
-        const isMember = s.is_member && s.member_full_name_th;
-        const companyName = parsedAct.groupPayload?.companyName || s.guest_workplace || s.member_workplace || '';
-        const nameTh = parsedAct.isGroupMembership && companyName
+        const parsedAct = parseActivitiesData(s.selected_activities, s.amount);
+        const hasMemberAttendees = Boolean(
+          parsedAct.hasMemberAttendees ||
+          (parsedAct.groupPayload?.attendees && Array.isArray(parsedAct.groupPayload.attendees) &&
+           parsedAct.groupPayload.attendees.some((a: any) => a.isMember || a.memberNo))
+        );
+        const isMember = (s.is_member && s.member_full_name_th) || hasMemberAttendees;
+        const isGroupConference = parsedAct.isGroupConference || Boolean(s.ticket_code?.startsWith('GRP-'));
+        const isCorporate = parsedAct.isGroupMembership || isGroupConference || Boolean(s.ticket_code?.startsWith('GRP-')) || Boolean(s.ticket_code?.startsWith('MEMGRP'));
+        const companyName = parsedAct.groupPayload?.companyName || (isCorporate ? (s.guest_workplace || s.member_workplace) : null) || '';
+        const nameTh = isCorporate && companyName
           ? companyName
           : isMember
             ? s.member_full_name_th
             : s.guest_name || parsedAct.memberPayload?.full_name_th || 'ผู้สมัครทั่วไป';
-        const nameEn = parsedAct.isGroupMembership && companyName
+        const nameEn = isCorporate && companyName
           ? companyName
           : isMember
             ? s.member_full_name_en || ''
             : parsedAct.memberPayload?.full_name_en || '';
-        const email = isMember
-          ? s.member_email || ''
-          : s.guest_email || parsedAct.memberPayload?.email || '';
-        const phone = isMember
-          ? s.member_mobile || ''
-          : s.guest_phone || parsedAct.memberPayload?.mobile || '';
-        const workplace = isMember
-          ? s.member_workplace || ''
-          : s.guest_workplace || parsedAct.memberPayload?.workplace || '';
+
+        const coordinatorEmail = parsedAct.groupPayload?.groupContact?.coordinatorEmail || null;
+        const coordinatorPhone = parsedAct.groupPayload?.groupContact?.coordinatorPhone || null;
+        const coordinatorName = parsedAct.groupPayload?.groupContact?.coordinatorName || null;
+
+        const email = isCorporate
+          ? (coordinatorEmail || '')
+          : isMember
+            ? s.member_email || ''
+            : s.guest_email || parsedAct.memberPayload?.email || '';
+        const phone = isCorporate
+          ? (coordinatorPhone || '')
+          : isMember
+            ? s.member_mobile || ''
+            : s.guest_phone || parsedAct.memberPayload?.mobile || '';
+        const workplace = isCorporate
+          ? companyName
+          : isMember
+            ? s.member_workplace || ''
+            : s.guest_workplace || parsedAct.memberPayload?.workplace || '';
+
+        const matchedUsages = allCouponUsages.filter(
+          (cu) => (s.ticket_code && cu.ticket_code === s.ticket_code) || (s.slip_id && cu.slip_id === s.slip_id)
+        );
+
+        let couponCode = parsedAct.groupPayload?.couponCode || parsedAct.groupPayload?.couponData?.code || null;
+        if (!couponCode && matchedUsages.length > 0) {
+          couponCode = matchedUsages[0]?.coupon?.code || null;
+        }
+
+        const couponRecord = couponCode
+          ? allCoupons.find((c) => c.code?.toUpperCase() === couponCode?.toUpperCase()) || matchedUsages[0]?.coupon || null
+          : null;
+
+        const couponInfo = couponRecord
+          ? {
+              code: couponRecord.code,
+              companyName: couponRecord.company_name,
+              discountType: couponRecord.discount_type,
+              discountValue: Number(couponRecord.discount_value) || 0,
+              remarks: couponRecord.remarks,
+              usedCount: matchedUsages.length,
+            }
+          : (parsedAct.groupPayload?.couponData
+            ? {
+                code: parsedAct.groupPayload.couponData.code || couponCode,
+                companyName: parsedAct.groupPayload.couponData.companyName,
+                discountType: parsedAct.groupPayload.couponData.discountType || 'free',
+                discountValue: Number(parsedAct.groupPayload.couponData.discountValue) || 0,
+                remarks: parsedAct.groupPayload.couponData.description,
+                usedCount: parsedAct.groupPayload?.attendees?.length || 1,
+              }
+            : null);
+
+        let discountTotal = 0;
+        if (matchedUsages.length > 0) {
+          const usageSum = matchedUsages.reduce((sum, cu) => sum + (Number(cu.discount_applied) || 0), 0);
+          if (usageSum > 0) {
+            discountTotal = usageSum;
+          } else if (couponRecord?.discount_type === 'free') {
+            discountTotal = matchedUsages.length * 4000;
+          }
+        }
+        if (!discountTotal && parsedAct.groupPayload?.discountAmount) {
+          discountTotal = Number(parsedAct.groupPayload.discountAmount) || 0;
+        }
+
+        const couponUsagesList = matchedUsages.map((cu) => ({
+          id: cu.id.toString(),
+          couponCode: cu.coupon?.code || couponCode,
+          memberNo: cu.member_no,
+          attendeeName: cu.attendee_name,
+          attendeeEmail: cu.attendee_email,
+          attendeePhone: cu.attendee_phone,
+          workplace: cu.workplace,
+          discountApplied: Number(cu.discount_applied) > 0 ? Number(cu.discount_applied) : (couponRecord?.discount_type === 'free' ? 4000 : 0),
+          finalAmount: Number(cu.final_amount) || 0,
+        }));
 
         const ticketType = parsedAct.isMembership
-          ? 'Membership Registration'
-          : s.is_member
-            ? 'Member Pass'
-            : 'Non-Member Pass';
+          ? (parsedAct.isGroupMembership ? 'Group Membership' : 'Membership Registration')
+          : isGroupConference
+            ? (hasMemberAttendees
+                ? `Group Member Pass (${parsedAct.groupPayload?.attendees?.length || 0} ท่าน)`
+                : `Group Conference Pass (${parsedAct.groupPayload?.attendees?.length || 0} ท่าน)`)
+            : s.is_member
+              ? 'Member Pass'
+              : 'Non-Member Pass';
 
         return {
           id: s.slip_id,
@@ -268,11 +530,15 @@ export async function GET(request: NextRequest) {
           meetingId: s.meeting_id,
           meetingName: parsedAct.isMembership ? 'สมัครสมาชิกสมาคม (Membership Registration)' : (s.meeting_name || ''),
           memberNo: s.member_no,
-          isMember: s.is_member,
+          isMember: Boolean(s.is_member || hasMemberAttendees),
           isMembershipRegistration: parsedAct.isMembership,
           isGroupMembership: parsedAct.isGroupMembership,
+          isGroupConference,
           groupPayload: parsedAct.groupPayload,
           companyName,
+          coordinatorName,
+          coordinatorEmail,
+          coordinatorPhone,
           memberPayload: parsedAct.memberPayload,
           nameTh,
           nameEn,
@@ -292,6 +558,10 @@ export async function GET(request: NextRequest) {
           resubmitToken: s.resubmit_token,
           selectedActivities: parsedAct.activities,
           createdAt: s.created_at ? new Date(s.created_at).toISOString() : new Date().toISOString(),
+          couponCode: couponCode || null,
+          couponInfo: couponInfo || null,
+          couponUsages: couponUsagesList,
+          discountTotal: discountTotal || 0,
         };
       });
     }
@@ -550,13 +820,19 @@ export async function POST(request: NextRequest) {
       }
 
       // 2. Update slip status to approved and attach member_no
+      const hasMemberAttendeesInGroup = Boolean(
+        groupPayload?.attendees &&
+        Array.isArray(groupPayload.attendees) &&
+        groupPayload.attendees.some((a: any) => a.isMember || a.memberNo)
+      );
+
       if ((prisma as any).payment_slips) {
         await (prisma as any).payment_slips.update({
           where: { slip_id: slipId },
           data: {
             status: 'approved',
             member_no: assignedMemberNo || null,
-            is_member: !!assignedMemberNo,
+            is_member: !!assignedMemberNo || hasMemberAttendeesInGroup,
             rejection_reason: null,
             resubmit_token: null,
             reviewed_by: reviewer || 'Admin',
@@ -568,7 +844,7 @@ export async function POST(request: NextRequest) {
           UPDATE payment_slips
           SET status = 'approved',
               member_no = ${assignedMemberNo || null},
-              is_member = ${!!assignedMemberNo},
+              is_member = ${!!assignedMemberNo || hasMemberAttendeesInGroup},
               rejection_reason = NULL,
               resubmit_token = NULL,
               reviewed_by = ${reviewer || 'Admin'},

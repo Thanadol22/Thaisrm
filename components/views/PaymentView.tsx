@@ -86,6 +86,7 @@ interface PaymentViewProps {
   sponsorCompanyName?: string;
   couponCode?: string;
   discountAmount?: number;
+  originalAmount?: number;
   submitting?: boolean;
   onNavigateBack?: () => void;
   onOpenUploadModal: () => void;
@@ -118,6 +119,7 @@ export function PaymentView({
   sponsorCompanyName,
   couponCode,
   discountAmount = 0,
+  originalAmount,
   submitting = false,
   onNavigateBack,
   onOpenUploadModal,
@@ -588,6 +590,12 @@ export function PaymentView({
             <div className="border-t border-slate-200/90 pt-4 flex items-baseline justify-between bg-blue-50/40 -mx-5 sm:-mx-6 -mb-5 sm:-mb-6 p-4 sm:p-5 rounded-b-3xl">
               <div>
                 <span className="text-xs sm:text-sm font-extrabold text-slate-700 block">{t.payment.totalDue}</span>
+                {discountAmount > 0 && (
+                  <span className="text-[11px] sm:text-xs text-emerald-600 font-bold block mt-0.5">
+                    {lang === 'th' ? `ส่วนลดจากคูปอง: -${discountAmount.toLocaleString()} บาท` : `Coupon Discount: -${discountAmount.toLocaleString()} THB`}
+                    {couponCode ? ` (${couponCode})` : ''}
+                  </span>
+                )}
                 {isRegistration && (
                   <span className="text-[11px] text-slate-500 font-medium">
                     {lang === 'th' ? `คำนวณตามรูปแบบ: ${attendanceType === 'online' ? 'Online' : 'Onsite'}` : `Calculated for: ${attendanceType === 'online' ? 'Online' : 'Onsite'}`}
@@ -595,6 +603,11 @@ export function PaymentView({
                 )}
               </div>
               <div className="text-right">
+                {discountAmount > 0 && (
+                  <div className="text-xs sm:text-sm text-slate-400 line-through font-semibold mb-0.5">
+                    {(originalAmount || (typeof customAmount === 'number' ? customAmount + discountAmount : 0)).toLocaleString()} {t.payment.currency}
+                  </div>
+                )}
                 <span className="text-2xl sm:text-3xl font-black text-[#0026b3] tracking-tight">
                   {totalAmount} <span className="text-base sm:text-lg font-bold text-slate-700">{t.payment.currency}</span>
                 </span>

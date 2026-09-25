@@ -42,6 +42,21 @@ const INITIAL_RECEIPTS: ReceiptData[] = [];
 
 /* ─── MAIN ADMIN ROOT COMPONENT ───────────────────────────────────────────── */
 
+const VALID_ADMIN_TABS: AdminTab[] = [
+  'dashboard',
+  'revenue-report',
+  'members',
+  'add-meeting',
+  'meeting-history',
+  'sponsors',
+  'coupons',
+  'verify-slip',
+  'verify-attendees',
+  'receipts',
+  'emails',
+  'settings',
+];
+
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [selectedAttendeeMeetingId, setSelectedAttendeeMeetingId] = useState<string>('default');
@@ -53,7 +68,9 @@ export default function AdminPage() {
   const [membersCount, setMembersCount] = useState<number>(0);
   const [systemSettings, setSystemSettings] = useState<SystemSettings>(DEFAULT_SYSTEM_SETTINGS);
 
-  const handleNavigateTab = (tab: AdminTab, meetingId?: string) => {
+  const handleTabChange = useCallback((tab: AdminTab, meetingId?: string, replace = false) => {
+    if (!VALID_ADMIN_TABS.includes(tab)) return;
+    setActiveTab(tab);
     if (meetingId) {
       if (tab === 'verify-attendees') {
         setSelectedAttendeeMeetingId(meetingId);
@@ -61,8 +78,84 @@ export default function AdminPage() {
         setSelectedRevenueMeetingId(meetingId);
       }
     }
-    setActiveTab(tab);
+
+    try {
+      localStorage.setItem('admin_active_tab', tab);
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', tab);
+      if (meetingId) {
+        url.searchParams.set('meetingId', meetingId);
+      } else {
+        url.searchParams.delete('meetingId');
+      }
+
+      if (replace) {
+        window.history.replaceState(null, '', url.toString());
+      } else {
+        window.history.pushState(null, '', url.toString());
+      }
+    } catch (err) {
+      console.error('Failed to persist active tab:', err);
+    }
+  }, []);
+
+  const handleNavigateTab = (tab: AdminTab, meetingId?: string) => {
+    handleTabChange(tab, meetingId);
   };
+
+  // Restore tab on mount & handle browser Back/Forward (popstate)
+  useEffect(() => {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const tabParam = searchParams.get('tab') as AdminTab | null;
+      const meetingIdParam = searchParams.get('meetingId');
+      const savedTab = localStorage.getItem('admin_active_tab') as AdminTab | null;
+
+      const targetTab = (tabParam && VALID_ADMIN_TABS.includes(tabParam))
+        ? tabParam
+        : (savedTab && VALID_ADMIN_TABS.includes(savedTab) ? savedTab : 'dashboard');
+
+      setActiveTab(targetTab);
+      if (meetingIdParam) {
+        if (targetTab === 'verify-attendees') {
+          setSelectedAttendeeMeetingId(meetingIdParam);
+        } else if (targetTab === 'revenue-report') {
+          setSelectedRevenueMeetingId(meetingIdParam);
+        }
+      }
+
+      // Sync URL & localStorage to match current tab cleanly
+      localStorage.setItem('admin_active_tab', targetTab);
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', targetTab);
+      if (meetingIdParam) {
+        url.searchParams.set('meetingId', meetingIdParam);
+      }
+      window.history.replaceState(null, '', url.toString());
+    } catch (e) {
+      console.error('Failed to restore active tab from URL or localStorage:', e);
+    }
+
+    const handlePopState = () => {
+      try {
+        const searchParams = new URLSearchParams(window.location.search);
+        const tabParam = searchParams.get('tab') as AdminTab | null;
+        if (tabParam && VALID_ADMIN_TABS.includes(tabParam)) {
+          setActiveTab(tabParam);
+          const meetingIdParam = searchParams.get('meetingId');
+          if (meetingIdParam) {
+            if (tabParam === 'verify-attendees') setSelectedAttendeeMeetingId(meetingIdParam);
+            if (tabParam === 'revenue-report') setSelectedRevenueMeetingId(meetingIdParam);
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // ─── Admin Authentication State ───
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -99,6 +192,15 @@ export default function AdminPage() {
       await fetch('/api/admin/auth/logout', { method: 'POST' });
     } catch (e) {
       console.error('Failed to logout admin:', e);
+    }
+    try {
+      localStorage.removeItem('admin_active_tab');
+      const url = new URL(window.location.href);
+      url.searchParams.delete('tab');
+      url.searchParams.delete('meetingId');
+      window.history.replaceState(null, '', url.toString());
+    } catch (e) {
+      // ignore
     }
     setIsAuthenticated(false);
     setAdminUser(null);
@@ -772,7 +874,7 @@ export default function AdminPage() {
       {/* Navigation Sidebar (desktop) & Top bar (mobile) */}
       <AdminNavbar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         pendingSlipsCount={pendingSlipsCount}
         totalAttendeesCount={ongoingAttendees.length}
         checkedInCount={ongoingCheckedInCount}
@@ -795,7 +897,7 @@ export default function AdminPage() {
         onClose={() => setIsGlobalReceiptOpen(false)}
         onEdit={() => {
           setIsGlobalReceiptOpen(false);
-          setActiveTab('receipts');
+          handleTabChange('receipts');
         }}
       />
 

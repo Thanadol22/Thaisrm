@@ -223,17 +223,18 @@ export function LoginView({
     netPrice: number;
     description: string;
     remainingUses?: number;
+    remainingSeats?: number;
   } | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState('');
   const [couponSuccessMsg, setCouponSuccessMsg] = useState('');
 
   // Handle coupon validation
-  const handleApplyCoupon = async (codeOverride?: string) => {
+  const handleApplyCoupon = async (codeOverride?: string): Promise<any | null> => {
     const code = (codeOverride || couponCodeInput).trim().toUpperCase();
     if (!code) {
       setCouponError(lang === 'th' ? 'กรุณาระบุรหัสคูปอง' : 'Please enter coupon code');
-      return;
+      return null;
     }
 
     setCouponLoading(true);
@@ -253,12 +254,14 @@ export function LoginView({
 
       const data = await res.json();
       if (!res.ok || !data.valid) {
-        setCouponError(data.message || (lang === 'th' ? 'รหัสคูปองไม่ถูกต้องหรือหมดอายุแล้ว' : 'Invalid or expired coupon code'));
+        const errMsg = data.message || (lang === 'th' ? 'รหัสคูปองไม่ถูกต้องหรือหมดอายุแล้ว' : 'Invalid or expired coupon code');
+        setCouponError(errMsg);
         setCouponState(null);
-        return;
+        return null;
       }
 
-      setCouponState({
+      const usesLeft = typeof data.coupon.remaining_uses === 'number' ? data.coupon.remaining_uses : 9999;
+      const verified = {
         code: data.coupon.code,
         companyName: data.coupon.company_name,
         discountType: data.coupon.discount_type,
@@ -266,19 +269,26 @@ export function LoginView({
         discountAmount: data.coupon.discount_amount,
         netPrice: data.coupon.net_price,
         description: data.coupon.discount_description,
-        remainingUses: data.coupon.remaining_uses,
-      });
+        remainingUses: usesLeft,
+        remainingSeats: usesLeft,
+      };
+      setCouponState(verified);
+      setCouponCodeInput(data.coupon.code);
       setCouponSuccessMsg(
         lang === 'th'
           ? `✓ ใช้งานคูปองสำเร็จ: ${data.coupon.company_name} (${data.coupon.discount_description})`
           : `✓ Coupon applied: ${data.coupon.company_name} (${data.coupon.discount_description})`
       );
+      return verified;
     } catch (err) {
-      setCouponError(lang === 'th' ? 'เกิดข้อผิดพลาดในการตรวจสอบคูปอง' : 'Failed to validate coupon');
+      const errTxt = lang === 'th' ? 'เกิดข้อผิดพลาดในการตรวจสอบคูปอง' : 'Failed to validate coupon';
+      setCouponError(errTxt);
+      return null;
     } finally {
       setCouponLoading(false);
     }
   };
+
 
   const handleClearCoupon = () => {
     setCouponCodeInput('');
@@ -508,7 +518,7 @@ export function LoginView({
     alert(lang === 'th' ? `คัดลอก "${wp}" ไปยังผู้ลงทะเบียนทั้งหมดแล้ว` : `Copied "${wp}" to all attendees`);
   };
 
-  // Debounced Member Verification for current attendee
+  // Debounced Member Verification & Profile Autofill for current attendee
   useEffect(() => {
     const memNo = currentAttendee?.memberNo?.trim();
     const nameTh = currentAttendee?.nameTh?.trim() || '';
@@ -521,20 +531,10 @@ export function LoginView({
       return;
     }
 
-    if (!nameTh && !nameEn) {
-      updateCurrentAttendee('memberCheckStatus', 'checking');
-      updateCurrentAttendee(
-        'memberCheckMessage',
-        lang === 'th' ? 'ℹ️ กรุณากรอกชื่อ-นามสกุลเพื่อตรวจสอบกับเลขสมาชิก' : 'ℹ️ Please enter name to verify with member ID'
-      );
-      updateCurrentAttendee('verifiedMember', null);
-      return;
-    }
-
     updateCurrentAttendee('memberCheckStatus', 'checking');
     updateCurrentAttendee(
       'memberCheckMessage',
-      lang === 'th' ? '⏳ กำลังตรวจสอบเลขสมาชิก...' : '⏳ Checking member ID...'
+      lang === 'th' ? '⏳ กำลังตรวจสอบและค้นหาข้อมูลสมาชิก...' : '⏳ Checking & searching member info...'
     );
 
     const timer = setTimeout(async () => {
@@ -551,13 +551,30 @@ export function LoginView({
           }),
         });
         const data = await res.json();
-        if (data.valid) {
-          updateCurrentAttendee('memberCheckStatus', 'valid');
-          updateCurrentAttendee(
-            'memberCheckMessage',
-            lang === 'th' ? '✅ ชื่อตรงกับเลขสมาชิก' : '✅ Name matches Member ID'
-          );
-          updateCurrentAttendee('verifiedMember', data.member);
+        if (data.valid && data.member) {
+          setAttendees(prev => prev.map((att, idx) => {
+            if (idx !== activeAttendeeIdx) return att;
+            // Autofill fields from member if empty or if looking up by memberNo
+            const nextNameTh = data.member.fullNameTh || att.nameTh;
+            const nextNameEn = data.member.fullNameEn || att.nameEn;
+            const nextEmail = att.email || data.member.email || '';
+            const nextPosition = data.member.position || att.position || '';
+            const nextWorkplace = sponsorSession?.sponsorName || att.workplace || data.member.workplace || '';
+
+            return {
+              ...att,
+              nameTh: nextNameTh,
+              nameEn: nextNameEn,
+              email: nextEmail,
+              position: nextPosition,
+              workplace: nextWorkplace,
+              memberCheckStatus: 'valid',
+              memberCheckMessage: lang === 'th'
+                ? `✅ พบข้อมูลสมาชิก: ${data.member.fullNameTh || data.member.fullNameEn} (#${data.member.member_no})`
+                : `✅ Member found: ${data.member.fullNameTh || data.member.fullNameEn} (#${data.member.member_no})`,
+              verifiedMember: data.member,
+            };
+          }));
         } else if (data.nameMismatch) {
           updateCurrentAttendee('memberCheckStatus', 'mismatch');
           updateCurrentAttendee(
@@ -835,6 +852,28 @@ export function LoginView({
     setVerifyingMember(true);
 
     try {
+      // ── 1.1 Check Coupon in input box: auto-apply if entered but user forgot to click "ใช้คูปอง" ──
+      const rawCoupon = couponCodeInput.trim().toUpperCase();
+      let effectiveCoupon = couponState;
+
+      if (rawCoupon) {
+        if (!effectiveCoupon || effectiveCoupon.code !== rawCoupon) {
+          const applied = await handleApplyCoupon(rawCoupon);
+          if (!applied) {
+            alert(
+              lang === 'th'
+                ? `รหัสคูปอง "${rawCoupon}" ไม่ถูกต้องหรือหมดอายุการใช้งาน กรุณาตรวจสอบรหัสคูปอง หรือลบออกหากไม่ต้องการใช้งาน`
+                : `Coupon code "${rawCoupon}" is invalid or expired. Please check the code or remove it to proceed.`
+            );
+            setVerifyingMember(false);
+            return;
+          }
+          effectiveCoupon = applied;
+        }
+      } else {
+        effectiveCoupon = null;
+      }
+
       // ── 2. Process each attendee (Verify memberNo & Calculate item pricing) ───
       const processedAttendees: any[] = [];
       let groupTotalAmount = 0;
@@ -959,6 +998,7 @@ export function LoginView({
         });
       }
 
+
       // If single individual registration, keep backward compatible structure
       if (regMode === 'individual' && processedAttendees.length === 1) {
         const single = processedAttendees[0];
@@ -1007,7 +1047,7 @@ export function LoginView({
           positionCode: single.positionCode,
           email: single.email,
           totalAmount: single.subtotal,
-          couponData: couponState || undefined,
+          couponData: effectiveCoupon || undefined,
           registeredAt: new Date().toISOString(),
         };
 
@@ -1037,7 +1077,7 @@ export function LoginView({
           companyName: sponsorSession?.sponsorName || processedAttendees[0]?.workplace || 'Corporate Registration',
           attendees: processedAttendees,
           totalAmount: groupTotalAmount,
-          couponData: couponState || undefined,
+          couponData: effectiveCoupon || undefined,
           sponsorSession: sponsorSession || undefined,
           registeredAt: new Date().toISOString(),
         };
@@ -1389,7 +1429,7 @@ export function LoginView({
                               setCouponSuccessMsg('');
                             }}
                             placeholder={lang === 'th' ? 'กรอกคูปองบริษัท' : 'Enter company coupon'}
-                            className="w-full pl-9 pr-3 py-2 bg-white text-slate-900 rounded-xl border border-slate-300 text-xs sm:text-sm font-mono font-bold tracking-wider placeholder:text-slate-400 focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition uppercase"
+                            className="w-full pl-9 pr-3 py-2 bg-white text-slate-900 rounded-xl border border-slate-300 text-xs sm:text-sm font-mono font-bold tracking-wider placeholder:font-sans placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400 focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition uppercase"
                           />
                         </div>
                         <button
@@ -1413,16 +1453,26 @@ export function LoginView({
                       </div>
 
                       {couponError && (
-                        <div className="text-[11px] font-semibold text-rose-600 bg-rose-50 border border-rose-200/80 px-2.5 py-1 rounded-lg flex items-center gap-1.5 animate-fade-in">
+                        <div className="text-[11px] font-semibold text-rose-600 bg-rose-50 border border-rose-200/80 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 animate-fade-in">
                           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                           <span>{couponError}</span>
                         </div>
                       )}
 
-                      {couponSuccessMsg && (
-                        <div className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg flex items-center gap-1.5 animate-fade-in">
-                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
-                          <span>{couponSuccessMsg}</span>
+                      {couponState && (
+                        <div className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/90 px-3 py-2 rounded-xl flex items-start gap-2 animate-fade-in">
+                          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
+                          <div className="space-y-0.5">
+                            <div>
+                              <span className="font-bold text-emerald-950">{couponState.companyName}</span>
+                              <span className="font-mono font-bold text-blue-800 ml-1.5 bg-blue-100/70 border border-blue-200 px-1.5 py-0.5 rounded text-[10px]">
+                                {couponState.code}
+                              </span>
+                            </div>
+                            <div className="text-emerald-700 text-[10.5px]">
+                              {couponState.description} • {lang === 'th' ? 'ระบบจะนำส่วนลดไปหักลบในขั้นตอนสรุปยอดชำระเงินอัตโนมัติ' : 'Discounts will be automatically calculated on the payment step.'}
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1514,7 +1564,59 @@ export function LoginView({
                       )}
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5">
-                        {/* 1. ชื่อ-นามสกุล(ไทย) */}
+                        {/* 1. รหัสสมาชิก (Member ID) - ช่องแรกสุด พร้อมฟังก์ชันออโต้ฟิล */}
+                        <div className="sm:col-span-2 bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-blue-50/80 border border-blue-200/90 rounded-2xl p-3 sm:p-3.5 shadow-2xs space-y-1.5">
+                          <div className="flex items-center justify-between flex-wrap gap-1">
+                            <label className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
+                              <Hash className="w-4 h-4 text-[#0026b3]" />
+                              <span>
+                                {lang === 'th'
+                                  ? `รหัสสมาชิก TSRM ${regMode === 'group' ? '(บังคับสำหรับกลุ่ม)' : ''}`
+                                  : `TSRM Member No. ${regMode === 'group' ? '(Required for Group)' : ''}`}
+                              </span>
+                              {regMode === 'group' && <span className="text-rose-500 font-bold ml-0.5">*</span>}
+                            </label>
+                            <span className="text-[10px] sm:text-[11px] text-blue-700 font-extrabold bg-blue-100/90 border border-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-blue-600" />
+                              <span>{lang === 'th' ? 'กรอกเลขสมาชิกเพื่อดึงข้อมูลอัตโนมัติ' : 'Auto-fills profile from Member ID'}</span>
+                            </span>
+                          </div>
+                          <div className="relative">
+                            <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none font-mono font-bold text-sm">#</span>
+                            <input
+                              type="text"
+                              value={currentAttendee.memberNo}
+                              onChange={(e) => updateCurrentAttendee('memberNo', e.target.value)}
+                              placeholder={lang === 'th' ? 'กรอกเลขสมาชิก (เว้นว่างหากไม่ใช่สมาชิก)' : 'Enter Member No. (Leave blank if not a member)'}
+                              className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-white text-slate-900 rounded-xl border text-xs sm:text-sm font-mono font-bold tracking-wider placeholder:font-sans placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:outline-none transition ${currentAttendee.memberCheckStatus === 'valid'
+                                ? 'border-emerald-500 focus:ring-emerald-500 ring-1 ring-emerald-400/50'
+                                : currentAttendee.memberCheckStatus === 'mismatch' || currentAttendee.memberCheckStatus === 'invalid'
+                                  ? 'border-rose-400 focus:ring-rose-500 ring-1 ring-rose-300'
+                                  : currentAttendee.memberCheckStatus === 'expired'
+                                    ? 'border-amber-400 focus:ring-amber-500 ring-1 ring-amber-300'
+                                    : 'border-slate-300 focus:ring-[#0026b3]'
+                                }`}
+                            />
+                          </div>
+
+                          {/* Debounced Member Check Message below input */}
+                          {currentAttendee.memberCheckStatus && currentAttendee.memberCheckStatus !== 'idle' && (
+                            <div
+                              className={`mt-1.5 text-[11px] font-bold flex items-center gap-1.5 transition-all animate-fade-in ${currentAttendee.memberCheckStatus === 'valid'
+                                ? 'text-emerald-800 bg-emerald-100/90 border border-emerald-300/80 px-2.5 py-1 rounded-lg'
+                                : currentAttendee.memberCheckStatus === 'checking'
+                                  ? 'text-blue-800 bg-blue-100/90 border border-blue-300/80 px-2.5 py-1 rounded-lg'
+                                  : currentAttendee.memberCheckStatus === 'expired'
+                                    ? 'text-amber-800 bg-amber-100/90 border border-amber-300/80 px-2.5 py-1 rounded-lg'
+                                    : 'text-rose-800 bg-rose-100/90 border border-rose-300/80 px-2.5 py-1 rounded-lg'
+                                }`}
+                            >
+                              <span>{currentAttendee.memberCheckMessage}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 2. ชื่อ-นามสกุล(ไทย) */}
                         <div>
                           <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
                             {lang === 'th' ? 'ชื่อ-นามสกุล (ภาษาไทย)' : 'Full Name (Thai)'} <span className="text-rose-500 font-bold">*</span>
@@ -1531,7 +1633,7 @@ export function LoginView({
                           </div>
                         </div>
 
-                        {/* 2. ชื่อ-นามสกุล(อังกฤษ) */}
+                        {/* 3. ชื่อ-นามสกุล(อังกฤษ) */}
                         <div>
                           <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
                             {lang === 'th' ? 'ชื่อ-นามสกุล (ภาษาอังกฤษ)' : 'Full Name (English)'} <span className="text-rose-500 font-bold">*</span>
@@ -1548,7 +1650,7 @@ export function LoginView({
                           </div>
                         </div>
 
-                        {/* 3. อีเมล */}
+                        {/* 4. อีเมล */}
                         <div>
                           <SmartEmailInput
                             value={currentAttendee.email}
@@ -1560,7 +1662,7 @@ export function LoginView({
                           />
                         </div>
 
-                        {/* 4. หน่วยงาน */}
+                        {/* 5. หน่วยงาน */}
                         <div>
                           <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
                             {lang === 'th' ? 'หน่วยงาน / บริษัท' : 'Organization / Workplace'} <span className="text-rose-500 font-bold">*</span>
@@ -1577,8 +1679,8 @@ export function LoginView({
                           </div>
                         </div>
 
-                        {/* 5. ตำแหน่ง (Select + Other input) */}
-                        <div>
+                        {/* 6. ตำแหน่ง (Select + Other input) */}
+                        <div className="sm:col-span-2">
                           <PositionSelect
                             value={currentAttendee.position}
                             onChange={(val) => updateCurrentAttendee('position', val)}
@@ -1587,54 +1689,6 @@ export function LoginView({
                             required
                             label={lang === 'th' ? 'ตำแหน่ง' : 'Position'}
                           />
-                        </div>
-
-                        {/* 6. รหัสสมาชิก (Member ID) */}
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-[11px] sm:text-xs font-bold text-slate-700">
-                              {lang === 'th'
-                                ? `รหัสสมาชิก TSRM ${regMode === 'group' ? '(บังคับสำหรับกลุ่ม)' : ''}`
-                                : `TSRM Member No. ${regMode === 'group' ? '(Required)' : ''}`}
-                              {regMode === 'group' && <span className="text-rose-500 font-bold ml-1">*</span>}
-                            </label>
-                            <span className="text-[9.5px] xs:text-[10px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded">
-                              {lang === 'th' ? 'รับสิทธิ์ราคาพิเศษ' : 'For Special Rate'}
-                            </span>
-                          </div>
-                          <div className="relative">
-                            <Hash className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                            <input
-                              type="text"
-                              value={currentAttendee.memberNo}
-                              onChange={(e) => updateCurrentAttendee('memberNo', e.target.value)}
-                              placeholder={lang === 'th' ? (regMode === 'group' ? 'กรอกเลขสมาชิก 4 หลัก' : '(เว้นว่างได้ถ้าไม่ใช่สมาชิก)') : ''}
-                              className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:outline-none transition ${currentAttendee.memberCheckStatus === 'valid'
-                                ? 'border-emerald-400 focus:ring-emerald-500'
-                                : currentAttendee.memberCheckStatus === 'mismatch' || currentAttendee.memberCheckStatus === 'invalid'
-                                  ? 'border-rose-400 focus:ring-rose-500'
-                                  : currentAttendee.memberCheckStatus === 'expired'
-                                    ? 'border-amber-400 focus:ring-amber-500'
-                                    : 'border-slate-200 focus:ring-[#0026b3]'
-                                }`}
-                            />
-                          </div>
-
-                          {/* Debounced Member Check Message below input */}
-                          {currentAttendee.memberCheckStatus && currentAttendee.memberCheckStatus !== 'idle' && (
-                            <div
-                              className={`mt-1.5 text-[11px] font-semibold flex items-center gap-1.5 transition-all animate-fade-in ${currentAttendee.memberCheckStatus === 'valid'
-                                ? 'text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg'
-                                : currentAttendee.memberCheckStatus === 'checking'
-                                  ? 'text-blue-700 bg-blue-50 border border-blue-200/80 px-2.5 py-1 rounded-lg'
-                                  : currentAttendee.memberCheckStatus === 'expired'
-                                    ? 'text-amber-700 bg-amber-50 border border-amber-200/80 px-2.5 py-1 rounded-lg'
-                                    : 'text-rose-700 bg-rose-50 border border-rose-200/80 px-2.5 py-1 rounded-lg'
-                                }`}
-                            >
-                              <span>{currentAttendee.memberCheckMessage}</span>
-                            </div>
-                          )}
                         </div>
                       </div>
 

@@ -105,6 +105,9 @@ export async function POST(
       const effectiveSponsorId = sponsorRecord?.id || body.sponsorId || null;
       const effectiveSponsorName = sponsorRecord?.name || companyName || null;
 
+      const hasMemberAttendees = Array.isArray(attendees) && attendees.some((a: any) => a.isMember || a.memberNo);
+      const primaryMemberNo = hasMemberAttendees ? attendees.find((a: any) => a.memberNo)?.memberNo?.trim() || null : null;
+
       // ห่อทุก DB write ด้วย Transaction เพื่อความ Atomic
       let slip: any;
       await prisma.$transaction(async (tx) => {
@@ -113,12 +116,12 @@ export async function POST(
           data: {
             slip_id: slipId,
             meeting_id: meetingId,
-            member_no: null,
+            member_no: primaryMemberNo,
             guest_name: `${companyName || 'Corporate Group'} (${attendees.length} ท่าน)`,
             guest_email: groupContact?.coordinatorEmail || attendees[0]?.email || null,
             guest_phone: groupContact?.coordinatorPhone || null,
             guest_workplace: companyName || null,
-            is_member: false,
+            is_member: hasMemberAttendees,
             ticket_code: ticketCode,
             amount: numericAmount,
             bank: isPayLaterMode ? 'ชำระเงินภายหลัง (Pay Later)' : (bank || 'Kasikorn (KBANK)'),

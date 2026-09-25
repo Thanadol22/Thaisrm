@@ -218,13 +218,15 @@ function PaymentContent() {
 
       // Initialize coupon quota & pool
       let remainingFreeSeats = 0;
-      if (couponData && (couponData.isFullFree || couponData.discountType === 'free')) {
+      if (couponData && (couponData.isFullFree || couponData.discountType?.toLowerCase() === 'free')) {
         remainingFreeSeats = typeof couponData.remainingSeats === 'number'
           ? couponData.remainingSeats
-          : (typeof couponData.totalSeats === 'number' ? couponData.totalSeats : 9999);
+          : (typeof couponData.remainingUses === 'number'
+              ? couponData.remainingUses
+              : (typeof couponData.totalSeats === 'number' ? couponData.totalSeats : 9999));
       }
-      let remainingFixedPool = (couponData && couponData.discountType === 'fixed') ? (couponData.discountValue || 0) : 0;
-      const percentVal = (couponData && couponData.discountType === 'percent') ? Math.min(100, Math.max(0, couponData.discountValue || 0)) : 0;
+      let remainingFixedPool = (couponData && couponData.discountType?.toLowerCase() === 'fixed') ? (couponData.discountValue || 0) : 0;
+      const percentVal = (couponData && couponData.discountType?.toLowerCase() === 'percent') ? Math.min(100, Math.max(0, couponData.discountValue || 0)) : 0;
 
       const groupList = attendees.map((att: any, attIndex: number) => {
         const isMem = Boolean(att.isMember) && !att.isExpiredMember && Boolean(att.memberNo?.trim());
@@ -351,7 +353,7 @@ function PaymentContent() {
               isDiscounted: itemDisc > 0,
             };
           });
-        } else if (couponData && (couponData.discountType === 'free' || couponData.isFullFree)) {
+        } else if (couponData && (couponData.discountType?.toLowerCase() === 'free' || couponData.isFullFree)) {
           discountNotice = lang === 'th'
             ? '⚠️ เกินโควตาสิทธิ์ฟรีของคูปอง (คิดค่าธรรมเนียมตามปกติ)'
             : '⚠️ Exceeded Free Pass Quota (Standard Rate)';
@@ -469,7 +471,7 @@ function PaymentContent() {
     let isCouponSponsored = false;
 
     if (regData.couponData) {
-      const isFree = regData.couponData.isFullFree || regData.couponData.discountType === 'free';
+      const isFree = regData.couponData.isFullFree || regData.couponData.discountType?.toLowerCase() === 'free';
       if (isFree) {
         // Free coupon waives ONLY the Main Program
         let freeMainDiscount = 0;
@@ -487,7 +489,7 @@ function PaymentContent() {
         });
         discountAmount = freeMainDiscount;
         isCouponSponsored = (originalAmount - discountAmount) === 0 && originalAmount > 0;
-      } else if (regData.couponData.discountType === 'fixed') {
+      } else if (regData.couponData.discountType?.toLowerCase() === 'fixed') {
         const pool = Math.min(originalAmount, regData.couponData.discountValue || 0);
         discountAmount = pool;
         let poolLeft = pool;
@@ -503,7 +505,7 @@ function PaymentContent() {
           };
         });
         isCouponSponsored = discountAmount >= originalAmount && originalAmount > 0;
-      } else if (regData.couponData.discountType === 'percent') {
+      } else if (regData.couponData.discountType?.toLowerCase() === 'percent') {
         const pct = Math.min(100, Math.max(0, regData.couponData.discountValue || 0));
         discountAmount = Math.round((originalAmount * pct) / 100);
         calculatedItems = calculatedItems.map(item => {
@@ -769,6 +771,7 @@ function PaymentContent() {
         <PaymentView
           paymentType={paymentType}
           customAmount={calculationResult.totalAmount}
+          originalAmount={calculationResult.originalAmount}
           isGroup={Boolean(paymentType === 'registration' ? regData?.isGroup : membershipRegData?.isGroup)}
           companyName={paymentType === 'registration' ? regData?.companyName : membershipRegData?.companyName}
           groupAttendees={calculationResult.groupSummary}

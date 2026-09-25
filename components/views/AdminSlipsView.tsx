@@ -24,6 +24,8 @@ import {
   User,
   Users,
   FileText,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { PaginationControls } from '@/components/PaginationControls';
@@ -39,6 +41,52 @@ export interface SlipActivityItem {
   rateBadgeEn?: string;
 }
 
+export function getAttendeeActivities(att: any): { name: string; price?: number }[] {
+  if (!att) return [];
+
+  // 1. Array of activity objects
+  if (Array.isArray(att.selectedActivityObjects) && att.selectedActivityObjects.length > 0) {
+    return att.selectedActivityObjects.map((act: any) => ({
+      name: typeof act === 'object' && act !== null ? (act.name || act.title || 'กิจกรรมการประชุม') : String(act),
+      price: typeof act === 'object' && act !== null ? (act.price || 0) : 0,
+    }));
+  }
+
+  // 2. selectedActivities
+  if (Array.isArray(att.selectedActivities) && att.selectedActivities.length > 0) {
+    return att.selectedActivities.map((act: any) => {
+      if (typeof act === 'object' && act !== null) {
+        return {
+          name: act.name || act.title || act.id || 'กิจกรรมการประชุม',
+          price: act.price || 0,
+        };
+      }
+      return {
+        name: String(act),
+        price: 0,
+      };
+    });
+  }
+
+  // 3. programNameTh
+  if (att.programNameTh) {
+    return [{
+      name: att.programNameTh,
+      price: att.subtotal || att.price || 0,
+    }];
+  }
+
+  // 4. selectedPackage
+  if (att.selectedPackage) {
+    return [{
+      name: att.selectedPackage,
+      price: att.subtotal || att.price || 0,
+    }];
+  }
+
+  return [];
+}
+
 export interface SlipRecord {
   id: string;
   dbId?: string;
@@ -48,6 +96,7 @@ export interface SlipRecord {
   isMember: boolean;
   isMembershipRegistration?: boolean;
   isGroupMembership?: boolean;
+  isGroupConference?: boolean;
   groupPayload?: any;
   companyName?: string;
   isFormatChange?: boolean;
@@ -71,15 +120,81 @@ export interface SlipRecord {
   resubmitToken?: string | null;
   selectedActivities?: SlipActivityItem[] | string;
   createdAt?: string;
+  coordinatorName?: string | null;
+  coordinatorEmail?: string | null;
+  coordinatorPhone?: string | null;
+  couponCode?: string | null;
+  couponInfo?: {
+    code: string;
+    companyName?: string;
+    discountType?: string;
+    discountValue?: number;
+    remarks?: string;
+    usedCount?: number;
+  } | null;
+  couponUsages?: Array<{
+    id: string;
+    couponCode?: string;
+    memberNo?: string | null;
+    attendeeName?: string;
+    attendeeEmail?: string;
+    attendeePhone?: string;
+    workplace?: string;
+    discountApplied?: number;
+    finalAmount?: number;
+  }>;
+  discountTotal?: number;
 }
 
-export function parseSlipActivities(raw?: SlipActivityItem[] | string): SlipActivityItem[] {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
+export function parseSlipActivities(raw?: SlipActivityItem[] | string | any, fallbackAmount?: number): SlipActivityItem[] {
+  if (!raw) {
+    if (fallbackAmount !== undefined && Number(fallbackAmount) > 0) {
+      return [{
+        name: 'การลงทะเบียน',
+        price: Number(fallbackAmount),
+      }];
+    }
+    return [];
+  }
+  if (Array.isArray(raw)) {
+    return raw.map((item: any) => ({
+      ...item,
+      price: (item.price !== undefined && Number(item.price) > 0)
+        ? Number(item.price)
+        : (raw.length === 1 && fallbackAmount !== undefined && Number(fallbackAmount) > 0
+            ? Number(fallbackAmount)
+            : Number(item.price || 0)),
+    }));
+  }
+  if (typeof raw === 'object') {
+    if (raw.attendees && Array.isArray(raw.attendees)) {
+      const attendeeCount = raw.attendees.length;
+      const attendeesSum = raw.attendees.reduce((sum: number, a: any) => sum + Number(a.subtotal || a.price || 0), 0);
+      const effectivePrice = (fallbackAmount !== undefined && Number(fallbackAmount) > 0)
+        ? Number(fallbackAmount)
+        : (Number(raw.amount) || attendeesSum || 0);
+      const hasMemberAttendees = raw.attendees.some((a: any) => a.isMember || a.memberNo);
+
+      return [{
+        id: 'conference_group_registration',
+        name: hasMemberAttendees
+          ? `ลงทะเบียนประชุมแบบกลุ่ม - สมาชิกสมาคม (${raw.companyName || 'Corporate'} - รวม ${attendeeCount} ท่าน)`
+          : `ลงทะเบียนประชุมแบบกลุ่ม (${raw.companyName || 'Corporate'} - รวม ${attendeeCount} ท่าน)`,
+        type: 'conference_group',
+        price: effectivePrice,
+        rateBadgeTh: hasMemberAttendees ? `กลุ่มสมาชิก ${attendeeCount} ท่าน` : `กลุ่ม ${attendeeCount} ท่าน`,
+        rateBadgeEn: hasMemberAttendees ? `Member Group (${attendeeCount})` : `Group (${attendeeCount})`,
+      }];
+    }
+    if (raw.activities && Array.isArray(raw.activities)) {
+      return parseSlipActivities(raw.activities, fallbackAmount);
+    }
+  }
   if (typeof raw === 'string') {
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) return parseSlipActivities(parsed, fallbackAmount);
+      if (typeof parsed === 'object') return parseSlipActivities(parsed, fallbackAmount);
     } catch {
       return [];
     }
@@ -97,7 +212,13 @@ export function AdminSlipsView() {
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'individual' | 'corporate' | 'corporate_pay_later'>('all');
   const [selectedSlip, setSelectedSlip] = useState<SlipRecord | null>(null);
   const [viewingApplicant, setViewingApplicant] = useState<any | null>(null);
+  const [viewingAttendee, setViewingAttendee] = useState<any | null>(null);
+  const [showAllGroupAttendees, setShowAllGroupAttendees] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setShowAllGroupAttendees(false);
+  }, [selectedSlip?.id]);
 
   // Pagination state (Default 5 items per page)
   const [currentPage, setCurrentPage] = useState(1);
@@ -258,7 +379,14 @@ export function AdminSlipsView() {
   };
 
   const isCorporateSlip = (s: SlipRecord) =>
-    Boolean(s.isGroupMembership || s.groupPayload || s.ticketCode?.startsWith('MEMGRP'));
+    Boolean(
+      s.isGroupMembership ||
+      s.isGroupConference ||
+      s.groupPayload?.attendees ||
+      s.groupPayload?.applicants ||
+      s.ticketCode?.startsWith('MEMGRP') ||
+      s.ticketCode?.startsWith('GRP-')
+    );
 
   const isPayLaterSlip = (s: SlipRecord) =>
     Boolean(
@@ -766,82 +894,116 @@ export function AdminSlipsView() {
                 </div>
 
                 {/* Main Information */}
-                <div className="space-y-1 min-w-0">
+                <div className="space-y-1.5 min-w-0">
+                  {/* Row 1: Name & Ticket Code */}
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-extrabold text-sm sm:text-base text-slate-900 leading-tight">
-                      {slip.isGroupMembership || slip.groupPayload || slip.ticketCode?.startsWith('MEMGRP')
-                        ? (slip.companyName || slip.workplace || (lang === 'th' ? slip.nameTh : slip.nameEn || slip.nameTh))
+                      {slip.isGroupMembership || slip.isGroupConference || slip.groupPayload || slip.ticketCode?.startsWith('MEMGRP') || slip.ticketCode?.startsWith('GRP-')
+                        ? (slip.companyName || (lang === 'th' ? slip.nameTh : slip.nameEn || slip.nameTh))
                         : (lang === 'th' ? slip.nameTh : slip.nameEn || slip.nameTh)}
                     </h3>
 
-                    {/* Member vs Non-Member vs New Membership Badge */}
-                    {slip.isMembershipRegistration ? (
-                      slip.isMember ? (
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] font-black bg-blue-50 text-[#0026b3] px-2 py-0.5 rounded-md border border-blue-200 flex items-center gap-1">
-                            <UserCheck className="w-3 h-3" />
-                            <span>Member #{slip.memberNo}</span>
-                          </span>
-                          <span className="text-[10px] font-black bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md border border-purple-200">
-                            {lang === 'th' ? 'สมัครสมาชิกใหม่' : 'New Member'}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-[10px] font-black bg-purple-50 text-purple-800 px-2.5 py-0.5 rounded-md border border-purple-300 flex items-center gap-1 shadow-2xs">
-                          <Sparkles className="w-3 h-3 text-purple-600" />
-                          <span>{lang === 'th' ? 'คำขอสมัครสมาชิกใหม่' : 'New Member Application'}</span>
-                        </span>
-                      )
-                    ) : slip.isMember ? (
-                      <span className="text-[10px] font-black bg-blue-50 text-[#0026b3] px-2 py-0.5 rounded-md border border-blue-200 flex items-center gap-1">
-                        <UserCheck className="w-3 h-3" />
-                        <span>Member #{slip.memberNo}</span>
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-black bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
-                        <UserX className="w-3 h-3" />
-                        <span>Non-Member</span>
-                      </span>
-                    )}
-
-                    <span className="text-[10px] font-black bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200 font-mono">
+                    <span className="text-[10px] font-black bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200 font-mono tracking-wide">
                       {slip.ticketCode}
                     </span>
+                  </div>
 
+                  {/* Row 2: Status & Essential Badges directly UNDER the name */}
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                    {/* Primary Approval / Payment Status */}
                     {(() => {
                       const isPayLater = slip.bank?.includes('ชำระเงินภายหลัง') || slip.bank?.toLowerCase().includes('pay later') || slip.slipUrl === 'PAY_LATER' || slip.slipUrl === '/placeholder-slip.png' || !slip.slipUrl;
                       return (
                         <span
-                          className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
+                          className={`text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 ${
                             slip.status === 'approved'
                               ? isPayLater
                                 ? 'bg-sky-100 text-sky-900 border border-sky-300 shadow-2xs'
-                                : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs'
                               : slip.status === 'pending'
                               ? isPayLater
-                                ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                                : 'bg-amber-100 text-amber-800 border border-amber-300'
-                              : 'bg-rose-100 text-rose-800 border border-rose-300'
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs'
+                                : 'bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs'
+                              : 'bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs'
                           }`}
                         >
                           {slip.status === 'approved' && (
                             isPayLater
-                              ? (lang === 'th' ? '✓ อนุมัติสิทธิ์แล้ว (รอชำระเงิน/รอสลิป)' : '✓ Access Approved (Awaiting Payment)')
-                              : (lang === 'th' ? '✓ อนุมัติแล้ว (ชำระเงินเรียบร้อย)' : '✓ Approved & Paid')
+                              ? (lang === 'th' ? '✓ อนุมัติสิทธิ์แล้ว (รอชำระเงิน)' : '✓ Access Approved (Awaiting Payment)')
+                              : (lang === 'th' ? '✓ อนุมัติแล้ว' : '✓ Approved')
                           )}
                           {slip.status === 'pending' && (
                             isPayLater
-                              ? (lang === 'th' ? '⏳ รออนุมัติสิทธิ์ (รอชำระเงิน)' : '⏳ Awaiting Access Approval')
+                              ? (lang === 'th' ? '⏳ รออนุมัติสิทธิ์' : '⏳ Awaiting Approval')
                               : (lang === 'th' ? '⏳ รอตรวจสอบ' : '⏳ Pending')
                           )}
                           {slip.status === 'rejected' && (lang === 'th' ? '✕ ปฏิเสธ' : '✕ Rejected')}
                         </span>
                       );
                     })()}
+
+                    {/* Essential Participant Role Badge (แสดงเฉพาะสถานะสำคัญ) */}
+                    {slip.isMembershipRegistration ? (
+                      <span className="text-[10px] font-black bg-purple-50 text-purple-800 px-2 py-0.5 rounded-md border border-purple-200 flex items-center gap-1 shadow-2xs">
+                        <Sparkles className="w-3 h-3 text-purple-600" />
+                        <span>{lang === 'th' ? 'คำขอสมัครสมาชิกใหม่' : 'New Member'}</span>
+                      </span>
+                    ) : (slip.isGroupConference || slip.ticketCode?.startsWith('GRP-') || (slip.groupPayload?.attendees && slip.groupPayload.attendees.length > 0)) ? (
+                      (() => {
+                        const attendees = slip.groupPayload?.attendees;
+                        const isMemberGroup = Boolean(
+                          slip.isMember ||
+                          (Array.isArray(attendees) && attendees.some((a: any) => a.isMember || a.memberNo))
+                        );
+                        const count = attendees?.length || 1;
+                        return (
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border flex items-center gap-1 shadow-2xs ${
+                            isMemberGroup
+                              ? 'bg-blue-50 text-[#0026b3] border-blue-200'
+                              : 'bg-sky-50 text-sky-800 border-sky-200'
+                          }`}>
+                            <Building2 className={`w-3 h-3 ${isMemberGroup ? 'text-[#0026b3]' : 'text-sky-600'}`} />
+                            <span>
+                              {lang === 'th'
+                                ? (isMemberGroup ? `กลุ่มสมาชิก (${count} ท่าน)` : `กลุ่ม (${count} ท่าน)`)
+                                : (isMemberGroup ? `Member Group (${count})` : `Group (${count})`)}
+                            </span>
+                          </span>
+                        );
+                      })()
+                    ) : (slip.isGroupMembership || slip.ticketCode?.startsWith('MEMGRP') || (slip.groupPayload?.applicants && slip.groupPayload.applicants.length > 0)) ? (
+                      <span className="text-[10px] font-black bg-indigo-50 text-indigo-800 px-2 py-0.5 rounded-md border border-indigo-200 flex items-center gap-1 shadow-2xs">
+                        <Building2 className="w-3 h-3 text-indigo-600" />
+                        <span>{lang === 'th' ? `กลุ่มสมาชิก (${slip.groupPayload?.applicants?.length || 1} ท่าน)` : `Group Mem (${slip.groupPayload?.applicants?.length || 1})`}</span>
+                      </span>
+                    ) : slip.isMember ? (
+                      <span className="text-[10px] font-black bg-blue-50 text-[#0026b3] px-2 py-0.5 rounded-md border border-blue-200 flex items-center gap-1 shadow-2xs">
+                        <UserCheck className="w-3 h-3" />
+                        <span>Member #{slip.memberNo}</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-black bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
+                        Non-Member
+                      </span>
+                    )}
+
+                    {/* Applied Coupon Badge (ข้อ 4) */}
+                    {(slip.couponCode || slip.couponInfo?.code) && (
+                      <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-800 px-2.5 py-0.5 rounded-md border border-emerald-300 flex items-center gap-1 shadow-2xs">
+                        <span>🎟️ คูปอง: {slip.couponCode || slip.couponInfo?.code}</span>
+                        {slip.discountTotal && slip.discountTotal > 0 ? (
+                          <span className="text-emerald-700 font-black font-mono">
+                            (-฿{slip.discountTotal.toLocaleString()})
+                          </span>
+                        ) : null}
+                      </span>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-3 text-xs text-slate-600 flex-wrap">
-                    {slip.workplace && (!slip.isGroupMembership && slip.workplace !== slip.nameTh) && (
+                  {/* Row 3: Meta Info (ธนาคาร, ชื่องานประชุม, หน่วยงานบุคคล) */}
+                  <div className="flex items-center gap-3 text-xs text-slate-600 flex-wrap pt-0.5">
+                    {/* ไม่แสดง workplace ส่วนบุคคลมาปนกับบริษัท (ข้อ 2) */}
+                    {slip.workplace && !slip.isGroupMembership && !slip.isGroupConference && !slip.ticketCode?.startsWith('GRP-') && !slip.ticketCode?.startsWith('MEMGRP') && slip.workplace !== slip.nameTh && (
                       <>
                         <span className="flex items-center gap-1 font-medium">
                           <Building2 className="w-3.5 h-3.5 text-slate-400" />
@@ -864,42 +1026,57 @@ export function AdminSlipsView() {
 
                   {/* Registered Courses / Activities Badges */}
                   {(() => {
-                    const acts = parseSlipActivities(slip.selectedActivities);
+                    const acts = parseSlipActivities(slip.selectedActivities, slip.amount);
                     if (acts.length > 0) {
                       return (
                         <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                          {acts.map((act, i) => (
-                            <span
-                              key={act.id || i}
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold shadow-2xs ${
-                                act.type === 'format_change' || slip.isFormatChange
-                                  ? 'bg-amber-50 text-amber-950 border border-amber-300 ring-1 ring-amber-400/30'
-                                  : act.type === 'membership_registration' || act.type === 'membership_group_registration'
-                                  ? 'bg-purple-50 text-purple-900 border border-purple-200'
-                                  : 'bg-indigo-50 text-indigo-900 border border-indigo-200'
-                              }`}
-                            >
-                              <BookOpen className={`w-3 h-3 shrink-0 ${
-                                act.type === 'format_change' || slip.isFormatChange
-                                  ? 'text-amber-600'
-                                  : act.type === 'membership_registration' || act.type === 'membership_group_registration'
-                                  ? 'text-purple-600'
-                                  : 'text-indigo-600'
-                              }`} />
-                              <span>{act.name}</span>
-                              {act.price !== undefined && (
-                                <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border font-mono ${
+                          {acts.map((act, i) => {
+                            const rawPrice = act.price !== undefined ? Number(act.price) : 0;
+                            const effectivePrice = rawPrice > 0 ? rawPrice : Number(slip.amount || 0);
+
+                            return (
+                              <span
+                                key={act.id || i}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold shadow-2xs ${
                                   act.type === 'format_change' || slip.isFormatChange
-                                    ? 'text-amber-800 bg-white border-amber-200'
+                                    ? 'bg-amber-50 text-amber-950 border border-amber-300 ring-1 ring-amber-400/30'
                                     : act.type === 'membership_registration' || act.type === 'membership_group_registration'
-                                    ? 'text-purple-700 bg-white border-purple-100'
-                                    : 'text-indigo-700 bg-white border-indigo-100'
-                                }`}>
-                                  ฿{Number(act.price).toLocaleString()}
-                                </span>
-                              )}
-                            </span>
-                          ))}
+                                    ? 'bg-purple-50 text-purple-900 border border-purple-200'
+                                    : 'bg-indigo-50 text-indigo-900 border border-indigo-200'
+                                }`}
+                              >
+                                <BookOpen className={`w-3 h-3 shrink-0 ${
+                                  act.type === 'format_change' || slip.isFormatChange
+                                    ? 'text-amber-600'
+                                    : act.type === 'membership_registration' || act.type === 'membership_group_registration'
+                                    ? 'text-purple-600'
+                                    : 'text-indigo-600'
+                                }`} />
+                                <span>{act.name}</span>
+                                {effectivePrice > 0 ? (
+                                  <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border font-mono ${
+                                    act.type === 'format_change' || slip.isFormatChange
+                                      ? 'text-amber-800 bg-white border-amber-200'
+                                      : act.type === 'membership_registration' || act.type === 'membership_group_registration'
+                                      ? 'text-purple-700 bg-white border-purple-100'
+                                      : 'text-indigo-700 bg-white border-indigo-100'
+                                  }`}>
+                                    ฿{effectivePrice.toLocaleString()}
+                                  </span>
+                                ) : act.price !== undefined ? (
+                                  <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border font-mono ${
+                                    act.type === 'format_change' || slip.isFormatChange
+                                      ? 'text-amber-800 bg-white border-amber-200'
+                                      : act.type === 'membership_registration' || act.type === 'membership_group_registration'
+                                      ? 'text-purple-700 bg-white border-purple-100'
+                                      : 'text-indigo-700 bg-white border-indigo-100'
+                                  }`}>
+                                    ฿{Number(act.price).toLocaleString()}
+                                  </span>
+                                ) : null}
+                              </span>
+                            );
+                          })}
                         </div>
                       );
                     }
@@ -925,20 +1102,20 @@ export function AdminSlipsView() {
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {slip.isGroupMembership || slip.groupPayload || slip.ticketCode?.startsWith('MEMGRP') ? (
+                  {slip.isGroupMembership || slip.isGroupConference || slip.groupPayload?.attendees || slip.groupPayload?.applicants || slip.ticketCode?.startsWith('MEMGRP') || slip.ticketCode?.startsWith('GRP-') ? (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedSlip(slip);
                       }}
                       className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
-                      title={lang === 'th' ? 'ดูรายชื่อผู้สมัครในกลุ่ม' : 'View Applicants List'}
+                      title={lang === 'th' ? 'ดูรายชื่อผู้ลงทะเบียนในกลุ่ม' : 'View Group List'}
                     >
                       <Users className="w-4 h-4 text-indigo-600" />
                       <span>
                         {lang === 'th'
-                          ? `ดูรายชื่อ (${slip.groupPayload?.applicants?.length || 1} ท่าน)`
-                          : `View List (${slip.groupPayload?.applicants?.length || 1})`}
+                          ? `ดูรายชื่อ (${slip.groupPayload?.attendees?.length || slip.groupPayload?.applicants?.length || 1} ท่าน)`
+                          : `View List (${slip.groupPayload?.attendees?.length || slip.groupPayload?.applicants?.length || 1})`}
                       </span>
                     </button>
                   ) : !(slip.bank?.includes('ชำระเงินภายหลัง') || slip.bank?.toLowerCase().includes('pay later') || !slip.slipUrl || slip.slipUrl === '/placeholder-slip.png' || slip.slipUrl === 'PAY_LATER') ? (
@@ -1036,6 +1213,10 @@ export function AdminSlipsView() {
                     <h3 className="font-extrabold text-slate-900 text-sm sm:text-base leading-tight">
                       {selectedSlip.isMembershipRegistration
                         ? (lang === 'th' ? 'คำขอสมัครสมาชิกสมาคม & สลิปโอนเงิน' : 'Membership Application & Slip')
+                        : (selectedSlip.isGroupConference || selectedSlip.groupPayload?.attendees || selectedSlip.ticketCode?.startsWith('GRP-'))
+                        ? (lang === 'th' ? 'คำขอลงทะเบียนประชุมแบบกลุ่ม & สลิปโอนเงิน' : 'Group Conference Registration & Slip')
+                        : (selectedSlip.isGroupMembership || selectedSlip.groupPayload?.applicants || selectedSlip.ticketCode?.startsWith('MEMGRP'))
+                        ? (lang === 'th' ? 'คำขอสมัครสมาชิกแบบกลุ่ม & สลิปโอนเงิน' : 'Group Membership Application & Slip')
                         : (lang === 'th' ? 'รายละเอียดสลิปโอนเงิน' : 'Slip Details')}
                     </h3>
                     <p className="text-xs text-slate-500 font-mono">Ref: {selectedSlip.refNo}</p>
@@ -1187,9 +1368,9 @@ export function AdminSlipsView() {
                       {selectedSlip.groupPayload.applicants.map((app: any, idx: number) => (
                         <div
                           key={idx}
-                          className="bg-white border border-indigo-100/90 rounded-2xl p-3 text-xs text-slate-800 shadow-2xs hover:border-indigo-300 transition flex items-center justify-between gap-3"
+                          className="bg-white border border-indigo-100/90 rounded-2xl p-3 text-xs text-slate-800 shadow-2xs hover:border-indigo-300 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5"
                         >
-                          <div className="min-w-0 flex-1 space-y-0.5">
+                          <div className="min-w-0 flex-1 w-full space-y-0.5">
                             <div className="flex items-center gap-2 font-bold text-slate-900 flex-wrap">
                               <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-black shrink-0">
                                 {idx + 1}
@@ -1199,8 +1380,8 @@ export function AdminSlipsView() {
                                 <span className="text-slate-400 font-normal truncate">({app.full_name_en})</span>
                               )}
                             </div>
-                            <div className="pl-7 flex items-center gap-2 flex-wrap">
-                              <span className="text-[11px] text-indigo-600 font-mono">
+                            <div className="pl-6 sm:pl-7 flex items-center gap-2 flex-wrap">
+                              <span className="text-[11px] text-indigo-600 font-mono break-all">
                                 {app.email || app.mobile || '-'}
                               </span>
                               {Boolean(
@@ -1209,7 +1390,7 @@ export function AdminSlipsView() {
                                 (selectedSlip.email &&
                                   app.email?.trim().toLowerCase() === selectedSlip.email.trim().toLowerCase())
                               ) && (
-                                <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded shadow-2xs">
+                                <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded shadow-2xs whitespace-nowrap">
                                   ⚠️ ใช้อีเมลเดียวกับบริษัท
                                 </span>
                               )}
@@ -1231,7 +1412,7 @@ export function AdminSlipsView() {
                                 workplace: app.workplace || selectedSlip.companyName || selectedSlip.workplace,
                               })
                             }
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-900 border border-indigo-200 font-bold text-xs shadow-2xs transition active:scale-95 cursor-pointer shrink-0"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-900 border border-indigo-200 font-bold text-[11px] sm:text-xs shadow-2xs transition active:scale-95 cursor-pointer shrink-0 self-end sm:self-auto whitespace-nowrap"
                             title="ดูข้อมูลทั้งหมดที่กรอกมา"
                           >
                             <Eye className="w-3.5 h-3.5 text-indigo-600" />
@@ -1249,11 +1430,266 @@ export function AdminSlipsView() {
                   </div>
                 )}
 
+                {/* Corporate / Group Conference Attendees Detailed List (If Corporate Group Conference Application) */}
+                {(selectedSlip.isGroupConference || selectedSlip.groupPayload?.attendees || selectedSlip.ticketCode?.startsWith('GRP-')) &&
+                  selectedSlip.groupPayload?.attendees &&
+                  Array.isArray(selectedSlip.groupPayload.attendees) && (
+                    <div className="bg-sky-50/70 border border-sky-200 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between border-b border-sky-200/80 pb-2">
+                        <div className="flex items-center gap-2 text-sky-950 font-extrabold text-xs sm:text-sm">
+                          <Users className="w-4 h-4 text-[#0026b3]" />
+                          <span>
+                            {lang === 'th'
+                              ? `รายชื่อผู้ลงทะเบียนเข้าร่วมประชุมในกลุ่ม (${selectedSlip.groupPayload.attendees.length} ท่าน)`
+                              : `Group Conference Attendees (${selectedSlip.groupPayload.attendees.length})`}
+                          </span>
+                        </div>
+                        {(selectedSlip.companyName || selectedSlip.groupPayload.companyName) && (
+                          <span className="text-[11px] font-bold text-[#0026b3] bg-white px-2 py-0.5 rounded-md border border-sky-200 shadow-2xs">
+                            {selectedSlip.companyName || selectedSlip.groupPayload.companyName}
+                          </span>
+                        )}
+                      </div>
+
+                      {selectedSlip.groupPayload.groupContact && (
+                        <div className="text-[11px] text-slate-600 bg-white/90 p-2.5 rounded-xl border border-sky-100 flex flex-wrap gap-x-4 gap-y-1">
+                          <span><strong>{lang === 'th' ? 'ผู้ประสานงาน:' : 'Coordinator:'}</strong> {selectedSlip.groupPayload.groupContact.coordinatorName || '-'}</span>
+                          <span><strong>{lang === 'th' ? 'อีเมล:' : 'Email:'}</strong> {selectedSlip.groupPayload.groupContact.coordinatorEmail || '-'}</span>
+                          <span><strong>{lang === 'th' ? 'เบอร์โทร:' : 'Phone:'}</strong> {selectedSlip.groupPayload.groupContact.coordinatorPhone || '-'}</span>
+                        </div>
+                      )}
+
+                      {(() => {
+                        const totalAttendees = selectedSlip.groupPayload.attendees;
+                        const displayedAttendees = showAllGroupAttendees ? totalAttendees : totalAttendees.slice(0, 2);
+                        return (
+                          <>
+                            <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                              {displayedAttendees.map((att: any, idx: number) => {
+                                const attName = att.nameTh || att.nameEn || `ผู้เข้าร่วมคนที่ ${idx + 1}`;
+                                const isAttMember = Boolean(att.isMember || att.memberNo);
+                                const attActivities = getAttendeeActivities(att);
+
+                                // Check coupon discount for this attendee (ข้อ 3 & 4)
+                                const attUsage = selectedSlip.couponUsages?.find(
+                                  (cu) => (att.memberNo && cu.memberNo === att.memberNo) ||
+                                          (att.email && cu.attendeeEmail?.toLowerCase() === att.email.toLowerCase()) ||
+                                          (att.nameTh && cu.attendeeName === att.nameTh)
+                                );
+
+                                const isCouponActive = Boolean(selectedSlip.couponCode || selectedSlip.couponInfo?.code);
+                                const isFreeCoupon = selectedSlip.couponInfo?.discountType === 'free';
+                                const hasMainProgram = attActivities.some(a => 
+                                  a.name.toLowerCase().includes('main') || 
+                                  a.name.includes('การประชุมหลัก') || 
+                                  a.name.includes('Main Program')
+                                );
+
+                                const attDiscount = attUsage?.discountApplied 
+                                  ? Number(attUsage.discountApplied) 
+                                  : (Number(att.discountTotal) || Number(att.discountAmount) || (isFreeCoupon && hasMainProgram ? 4000 : 0));
+
+                                const hasDiscount = attDiscount > 0 || (isFreeCoupon && hasMainProgram) || Boolean(att.discountAppliedNotice);
+                                const originalPrice = Number(att.originalTotal || att.subtotal || att.price || 0);
+                                const netPrice = hasDiscount && originalPrice > 0 ? Math.max(0, originalPrice - attDiscount) : (att.subtotal || att.price || 0);
+
+                                return (
+                                  <div
+                                    key={idx}
+                                    className={`bg-white border rounded-2xl p-3 sm:p-3.5 text-xs text-slate-800 shadow-2xs transition flex flex-col sm:flex-row items-start justify-between gap-3 ${
+                                      hasDiscount ? 'border-emerald-200 hover:border-emerald-400 bg-emerald-50/20' : 'border-sky-100 hover:border-sky-300'
+                                    }`}
+                                  >
+                                    <div className="min-w-0 flex-1 w-full space-y-1.5">
+                                      {/* Row 1: Number + Thai Name + Member Badge + Mobile Action */}
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2 font-bold text-slate-900 flex-wrap min-w-0">
+                                          <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
+                                            hasDiscount ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-[#0026b3]'
+                                          }`}>
+                                            {idx + 1}
+                                          </span>
+                                          <span className="text-sm font-extrabold text-slate-900 truncate">{attName}</span>
+
+                                          {/* Member Badge Beside Thai Name */}
+                                          {isAttMember ? (
+                                            <span className="text-[10px] font-bold bg-blue-50 text-[#0026b3] border border-blue-200 px-2 py-0.5 rounded-md shadow-2xs whitespace-nowrap">
+                                              {att.memberNo ? `สมาชิก (#${att.memberNo})` : 'สมาชิกสมาคม'}
+                                            </span>
+                                          ) : (
+                                            <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-md shadow-2xs whitespace-nowrap">
+                                              บุคคลทั่วไป
+                                            </span>
+                                          )}
+
+                                          {(att.selectedFormat || att.format || att.selectedPackage) && (
+                                            <span className="text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs whitespace-nowrap">
+                                              {att.selectedFormat || att.format || att.selectedPackage}
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        {/* View All Button on Top Right (Always accessible) */}
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setViewingAttendee({
+                                              ...att,
+                                              meetingName: selectedSlip.meetingName,
+                                              companyName: selectedSlip.companyName || selectedSlip.groupPayload.companyName,
+                                              ticketCode: selectedSlip.ticketCode,
+                                              submittedAt: selectedSlip.createdAt,
+                                            })
+                                          }
+                                          className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-bold text-[11px] sm:text-xs shadow-2xs transition active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
+                                          title="ดูรายละเอียดข้อมูลผู้ลงทะเบียน"
+                                        >
+                                          <Eye className="w-3.5 h-3.5 text-[#0026b3]" />
+                                          <span>{lang === 'th' ? 'ดูทั้งหมด' : 'View'}</span>
+                                        </button>
+                                      </div>
+
+                                      {/* Row 2: English Name Below Thai Name */}
+                                      {att.nameEn && att.nameTh && (
+                                        <div className="pl-6 sm:pl-7 -mt-1">
+                                          <span className="text-xs text-slate-500 font-medium">({att.nameEn})</span>
+                                        </div>
+                                      )}
+
+                                      {/* Row 3: Contact & Price (Responsive Row) */}
+                                      <div className="pl-6 sm:pl-7 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-slate-500 pt-0.5">
+                                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                          <span className="text-sky-700 font-mono font-medium break-all">
+                                            {att.email || att.mobile || '-'}
+                                          </span>
+                                          {att.workplace && att.workplace !== selectedSlip.companyName && (
+                                            <span className="truncate max-w-[200px]">🏢 {att.workplace}</span>
+                                          )}
+                                          {att.dietaryPreference && (
+                                            <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 whitespace-nowrap">
+                                              🍽️ {att.dietaryPreference}
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        {originalPrice > 0 ? (
+                                          <div className="flex items-center gap-1.5 font-mono text-xs shrink-0">
+                                            {hasDiscount && attDiscount > 0 ? (
+                                              <>
+                                                <span className="line-through text-slate-400 text-[11px]">
+                                                  ฿{originalPrice.toLocaleString()}
+                                                </span>
+                                                <span className="font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                                  ฿{Number(netPrice).toLocaleString()}
+                                                </span>
+                                              </>
+                                            ) : (
+                                              <span className="font-bold text-slate-800">
+                                                ฿{originalPrice.toLocaleString()}
+                                              </span>
+                                            )}
+                                          </div>
+                                        ) : null}
+                                      </div>
+
+                                      {/* Row 4: Individual Activities / Programs with Discounted Prices directly (ข้อ 3) */}
+                                      {attActivities.length > 0 && (
+                                        <div className="pl-6 sm:pl-7 pt-1.5 space-y-1">
+                                          <span className="text-[10px] text-slate-400 font-bold block">
+                                            {lang === 'th' ? 'หลักสูตร / กิจกรรมที่ลงทะเบียน:' : 'Registered Courses & Activities:'}
+                                          </span>
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            {attActivities.map((act, actIdx) => {
+                                              const isMainProgram = act.name.toLowerCase().includes('main') || 
+                                                act.name.includes('การประชุมหลัก') || 
+                                                act.name.includes('Main Program');
+                                              const isActDiscounted = hasDiscount && isMainProgram && (isFreeCoupon || attDiscount >= (act.price || 4000));
+                                              const rawActPrice = Number(act.price) || (isMainProgram ? 4000 : 0);
+                                              const discountedActPrice = isActDiscounted ? Math.max(0, rawActPrice - attDiscount) : rawActPrice;
+
+                                              return (
+                                                <span
+                                                  key={actIdx}
+                                                  className={`text-[10px] font-bold border px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-2xs ${
+                                                    isActDiscounted
+                                                      ? 'bg-emerald-50 text-emerald-950 border-emerald-300 ring-1 ring-emerald-400/20'
+                                                      : 'bg-sky-50 text-[#0026b3] border-sky-200'
+                                                  }`}
+                                                >
+                                                  <BookOpen className={`w-3 h-3 shrink-0 ${isActDiscounted ? 'text-emerald-600' : 'text-[#0026b3]'}`} />
+                                                  <span className="truncate max-w-[200px]">{act.name}</span>
+                                                  {isActDiscounted ? (
+                                                    <span className="font-mono font-extrabold flex items-center gap-1 shrink-0 whitespace-nowrap">
+                                                      {rawActPrice > 0 && (
+                                                        <span className="line-through text-slate-400 font-normal">
+                                                          ฿{rawActPrice.toLocaleString()}
+                                                        </span>
+                                                      )}
+                                                      <span className="text-emerald-700 font-black">
+                                                        {discountedActPrice === 0 ? '฿0' : `฿${discountedActPrice.toLocaleString()}`}
+                                                      </span>
+                                                    </span>
+                                                  ) : rawActPrice > 0 ? (
+                                                    <span className="font-mono text-sky-800 font-black shrink-0 whitespace-nowrap">
+                                                      (฿{rawActPrice.toLocaleString()})
+                                                    </span>
+                                                  ) : null}
+                                                </span>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Show More / Show Less Toggle (Starts at 2) */}
+                            {totalAttendees.length > 2 && (
+                              <div className="pt-1.5 flex justify-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowAllGroupAttendees((prev) => !prev)}
+                                  className="px-4 py-1.5 rounded-xl bg-white hover:bg-sky-100/70 text-[#0026b3] border border-sky-200 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+                                >
+                                  {showAllGroupAttendees ? (
+                                    <>
+                                      <ChevronUp className="w-3.5 h-3.5 text-[#0026b3]" />
+                                      <span>{lang === 'th' ? 'ย่อรายชื่อ (แสดง 2 ท่าน)' : 'Show Less (2 Attendees)'}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ChevronDown className="w-3.5 h-3.5 text-[#0026b3]" />
+                                      <span>
+                                        {lang === 'th'
+                                          ? `แสดงทั้งหมด (${totalAttendees.length} ท่าน)`
+                                          : `Show All (${totalAttendees.length} Attendees)`}
+                                      </span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+
+                      {selectedSlip.status === 'pending' && isPayLaterSlip(selectedSlip) && (
+                        <p className="text-[11px] text-sky-950 bg-sky-100/80 p-3 rounded-xl font-medium leading-relaxed border border-sky-200">
+                          🏢 เมื่อกด <strong>&ldquo;อนุมัติ&rdquo;</strong> ระบบจะทำการอนุมัติสิทธิ์การเข้าร่วมประชุมให้กับผู้ลงทะเบียนทุกคนในกลุ่ม
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                 {/* Participant & Ticket Info */}
                 <div className="bg-slate-50/90 rounded-2xl p-4 sm:p-5 space-y-3 border border-slate-200 text-sm">
+                  {/* ชื่อบริษัท / หน่วยงาน หรือชื่อผู้เข้าร่วม */}
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
                     <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
-                      {selectedSlip.isGroupMembership || selectedSlip.groupPayload || selectedSlip.ticketCode?.startsWith('MEMGRP')
+                      {selectedSlip.isGroupMembership || selectedSlip.isGroupConference || selectedSlip.groupPayload?.attendees || selectedSlip.groupPayload?.applicants || selectedSlip.ticketCode?.startsWith('MEMGRP') || selectedSlip.ticketCode?.startsWith('GRP-')
                         ? (lang === 'th' ? 'ชื่อบริษัท / หน่วยงาน' : 'Company / Organization')
                         : (lang === 'th' ? 'ชื่อผู้เข้าร่วม' : 'Attendee Name')}
                     </span>
@@ -1261,22 +1697,54 @@ export function AdminSlipsView() {
                       {selectedSlip.companyName || selectedSlip.nameTh}
                     </span>
                   </div>
+
+                  {/* สถานะผู้สมัคร */}
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
                     <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
                       {lang === 'th' ? 'สถานะผู้สมัคร' : 'Status'}
                     </span>
                     <span
                       className={`font-black text-xs sm:text-sm text-right ${
-                        selectedSlip.isMember ? 'text-[#0026b3]' : selectedSlip.isMembershipRegistration ? 'text-purple-700' : 'text-amber-800'
+                        selectedSlip.isGroupConference || selectedSlip.ticketCode?.startsWith('GRP-')
+                          ? 'text-[#0026b3]'
+                          : selectedSlip.isGroupMembership || selectedSlip.groupPayload?.applicants
+                          ? 'text-indigo-800'
+                          : selectedSlip.isMember
+                          ? 'text-[#0026b3]'
+                          : selectedSlip.isMembershipRegistration
+                          ? 'text-purple-700'
+                          : 'text-amber-800'
                       }`}
                     >
-                      {selectedSlip.isMember
-                        ? `สมาชิกสมาคม (#${selectedSlip.memberNo})`
-                        : selectedSlip.isMembershipRegistration
-                        ? (lang === 'th' ? 'คำขอสมัครสมาชิกใหม่ (รออนุมัติ)' : 'New Member Applicant (Pending)')
-                        : (lang === 'th' ? 'บุคคลทั่วไป' : 'Non-Member')}
+                      {(() => {
+                        const attendees = selectedSlip.groupPayload?.attendees;
+                        const isMemberGroup = Boolean(
+                          selectedSlip.isMember ||
+                          (Array.isArray(attendees) && attendees.some((a: any) => a.isMember || a.memberNo))
+                        );
+                        const count = attendees?.length || 1;
+                        if (selectedSlip.isGroupConference || (attendees && attendees.length > 0) || selectedSlip.ticketCode?.startsWith('GRP-')) {
+                          return lang === 'th'
+                            ? (isMemberGroup ? `ลงทะเบียนประชุมแบบกลุ่ม - สมาชิกสมาคม (${count} ท่าน)` : `ลงทะเบียนประชุมแบบกลุ่ม (${count} ท่าน)`)
+                            : (isMemberGroup ? `Corporate Member Group (${count} Attendees)` : `Group Conference (${count} Attendees)`);
+                        }
+                        if (selectedSlip.isGroupMembership || selectedSlip.groupPayload?.applicants) {
+                          return lang === 'th'
+                            ? `สมัครสมาชิกสมาคมแบบกลุ่ม (${selectedSlip.groupPayload?.applicants?.length || ''} ท่าน)`
+                            : `Group Membership (${selectedSlip.groupPayload?.applicants?.length || ''})`;
+                        }
+                        if (selectedSlip.isMember) {
+                          return `สมาชิกสมาคม (#${selectedSlip.memberNo})`;
+                        }
+                        if (selectedSlip.isMembershipRegistration) {
+                          return lang === 'th' ? 'คำขอสมัครสมาชิกใหม่ (รออนุมัติ)' : 'New Member Applicant (Pending)';
+                        }
+                        return lang === 'th' ? 'บุคคลทั่วไป' : 'Non-Member';
+                      })()}
                     </span>
                   </div>
+
+                  {/* รหัสตั๋ว / คำขอ */}
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
                     <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
                       {lang === 'th' ? 'รหัสตั๋ว / คำขอ' : 'Ticket / Request ID'}
@@ -1285,27 +1753,96 @@ export function AdminSlipsView() {
                       {selectedSlip.ticketCode}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
-                    <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
-                      {lang === 'th' ? 'หน่วยงาน' : 'Workplace'}
-                    </span>
-                    <span className="font-bold text-xs sm:text-sm text-slate-800 text-right">
-                      {selectedSlip.workplace || '-'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between py-1.5 gap-3">
-                    <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
-                      {lang === 'th' ? 'อีเมล / เบอร์ติดต่อ' : 'Contact'}
-                    </span>
-                    <span className="font-bold text-xs sm:text-sm text-slate-800 text-right break-all">
-                      {selectedSlip.email} {selectedSlip.phone ? `(${selectedSlip.phone})` : ''}
-                    </span>
-                  </div>
+
+                  {/* หน่วยงาน (แสดงเฉพาะกรณีบุคคลทั่วไป หรือสมาชิกรายบุคคล ไม่แสดงซ้ำในกรณีบริษัท - ข้อ 2) */}
+                  {!selectedSlip.isGroupMembership && !selectedSlip.isGroupConference && !selectedSlip.groupPayload?.attendees && !selectedSlip.groupPayload?.applicants && !selectedSlip.ticketCode?.startsWith('GRP-') && !selectedSlip.ticketCode?.startsWith('MEMGRP') && (
+                    <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
+                      <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
+                        {lang === 'th' ? 'หน่วยงาน' : 'Workplace'}
+                      </span>
+                      <span className="font-bold text-xs sm:text-sm text-slate-800 text-right">
+                        {selectedSlip.workplace || '-'}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* ข้อมูลติดต่อ (กรณีบริษัท: แสดงข้อมูลผู้ประสานงานบริษัทเท่านั้น อย่านำอีเมลส่วนบุคคลมาปน - ข้อ 2) */}
+                  {selectedSlip.isGroupMembership || selectedSlip.isGroupConference || selectedSlip.groupPayload?.attendees || selectedSlip.groupPayload?.applicants || selectedSlip.ticketCode?.startsWith('GRP-') || selectedSlip.ticketCode?.startsWith('MEMGRP') ? (
+                    <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
+                      <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
+                        {lang === 'th' ? 'ผู้ประสานงานบริษัท' : 'Company Coordinator'}
+                      </span>
+                      <span className="font-bold text-xs sm:text-sm text-slate-800 text-right break-all">
+                        {selectedSlip.coordinatorName || selectedSlip.groupPayload?.groupContact?.coordinatorName || 'ตัวแทนบริษัทสปอนเซอร์'}
+                        {(selectedSlip.coordinatorEmail || selectedSlip.groupPayload?.groupContact?.coordinatorEmail) ? (
+                          <span className="text-sky-700 block font-mono text-[11px] font-normal">
+                            {selectedSlip.coordinatorEmail || selectedSlip.groupPayload?.groupContact?.coordinatorEmail}
+                            {(selectedSlip.coordinatorPhone || selectedSlip.groupPayload?.groupContact?.coordinatorPhone) ? ` (${selectedSlip.coordinatorPhone || selectedSlip.groupPayload?.groupContact?.coordinatorPhone})` : ''}
+                          </span>
+                        ) : null}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
+                      <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
+                        {lang === 'th' ? 'อีเมล / เบอร์ติดต่อ' : 'Contact'}
+                      </span>
+                      <span className="font-bold text-xs sm:text-sm text-slate-800 text-right break-all">
+                        {selectedSlip.email} {selectedSlip.phone ? `(${selectedSlip.phone})` : ''}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* คูปองที่ใช้ (ข้อ 4) */}
+                  {(selectedSlip.couponCode || selectedSlip.couponInfo?.code) && (
+                    <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
+                      <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
+                        {lang === 'th' ? 'คูปองที่ใช้' : 'Applied Coupon'}
+                      </span>
+                      <div className="text-right">
+                        <span className="font-mono font-black text-xs sm:text-sm px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1.5 shadow-2xs">
+                          <span>🎟️ {selectedSlip.couponCode || selectedSlip.couponInfo?.code}</span>
+                          <span className="text-[11px] text-emerald-700 font-medium">
+                            {selectedSlip.couponInfo?.discountType === 'free'
+                              ? '(สิทธิ์ฟรี Main Congress)'
+                              : selectedSlip.couponInfo?.discountValue
+                              ? `(ส่วนลด ${selectedSlip.couponInfo.discountValue})`
+                              : ''}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ส่วนลดที่ได้รับ (ข้อ 3) */}
+                  {((selectedSlip.discountTotal && selectedSlip.discountTotal > 0) || selectedSlip.couponInfo?.discountType === 'free') && (
+                    <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
+                      <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
+                        {lang === 'th' ? 'ส่วนลดที่ได้รับ' : 'Discount Applied'}
+                      </span>
+                      <span className="font-black font-mono text-sm sm:text-base text-emerald-700 text-right">
+                        -฿{(selectedSlip.discountTotal || ((selectedSlip.groupPayload?.attendees?.length || 1) * 4000)).toLocaleString()} THB
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Registered Courses & Activities Section */}
                 {(() => {
-                  const acts = parseSlipActivities(selectedSlip.selectedActivities);
+                  const isGroupConf = Boolean(
+                    selectedSlip.isGroupConference ||
+                    (selectedSlip.groupPayload?.attendees && selectedSlip.groupPayload.attendees.length > 0) ||
+                    selectedSlip.ticketCode?.startsWith('GRP-')
+                  );
+                  const isGroupMem = Boolean(
+                    selectedSlip.isGroupMembership ||
+                    (selectedSlip.groupPayload?.applicants && selectedSlip.groupPayload.applicants.length > 0) ||
+                    selectedSlip.ticketCode?.startsWith('MEMGRP')
+                  );
+                  const isGroup = isGroupConf || isGroupMem;
+                  const attendeesCount = selectedSlip.groupPayload?.attendees?.length || selectedSlip.groupPayload?.applicants?.length || 1;
+                  const acts = parseSlipActivities(selectedSlip.selectedActivities, selectedSlip.amount);
+
                   return (
                     <div className="bg-slate-50/90 rounded-2xl p-4 sm:p-5 space-y-2.5 border border-slate-200 text-sm">
                       <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/80">
@@ -1323,11 +1860,35 @@ export function AdminSlipsView() {
                           </div>
                         </div>
                         <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
-                          {acts.length} {lang === 'th' ? 'รายการ' : 'items'}
+                          {isGroup ? (lang === 'th' ? 'แพ็กเกจกลุ่ม' : 'Group Pass') : `${acts.length} ${lang === 'th' ? 'รายการ' : 'items'}`}
                         </span>
                       </div>
 
-                      {acts.length > 0 ? (
+                      {isGroup ? (
+                        /* สำหรับการสมัครแบบกลุ่ม: ไม่ต้องแสดงลิสต์แยกย่อยของทุกคน ให้แสดงสรุปแพ็กเกจกลุ่มภาพรวม 1 กล่อง */
+                        <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 text-xs shadow-2xs space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-sky-100 text-[#0026b3] border border-sky-200">
+                                {isGroupConf ? 'CONFERENCE GROUP' : 'MEMBERSHIP GROUP'}
+                              </span>
+                              <p className="font-extrabold text-slate-900 text-xs sm:text-sm">
+                                {selectedSlip.meetingName || (lang === 'th' ? 'การประชุมวิชาการประจำปี' : 'Conference Registration')}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="font-black text-indigo-700 font-mono text-sm sm:text-base">
+                                ฿{selectedSlip.amount.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">THB</span>
+                              </span>
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                            {lang === 'th'
+                              ? `สรุปรวมสำหรับผู้ลงทะเบียนทั้งหมด ${attendeesCount} ท่าน (ดูรายละเอียดกิจกรรมที่แต่ละท่านเลือกลงทะเบียนได้ที่การ์ดรายชื่อด้านบน)`
+                              : `Combined package for all ${attendeesCount} attendees (See individual activities listed under each attendee card above)`}
+                          </p>
+                        </div>
+                      ) : acts.length > 0 ? (
                         <div className="space-y-1.5 pt-1">
                           {acts.map((act, i) => (
                             <div
@@ -1346,8 +1907,8 @@ export function AdminSlipsView() {
                                 {act.date && <p className="text-[10px] text-slate-500 font-medium">{act.date}</p>}
                               </div>
                               <div className="text-right shrink-0">
-                                <span className="font-black text-indigo-700 font-mono text-xs sm:text-sm">
-                                  ฿{Number(act.price || 0).toLocaleString()}
+                                <span className="font-black text-indigo-700 font-mono text-xs sm:text-base">
+                                  ฿{Number((act.price && Number(act.price) > 0) ? act.price : (acts.length === 1 ? selectedSlip.amount : (act.price || 0))).toLocaleString()}
                                 </span>
                               </div>
                             </div>
@@ -1540,6 +2101,162 @@ export function AdminSlipsView() {
         isApplicant={true}
         zIndexClass="z-[10000]"
       />
+
+      {/* Conference Attendee Detail Modal */}
+      {mounted &&
+        viewingAttendee &&
+        createPortal(
+          <div className="fixed inset-0 z-[10000] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+            <div className="bg-white rounded-3xl max-w-md sm:max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 flex flex-col">
+              {/* Header */}
+              <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-10">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-sky-50 text-[#0026b3]">
+                    <User className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-sm sm:text-base leading-tight">
+                      {lang === 'th' ? 'ข้อมูลผู้ลงทะเบียนเข้าร่วมประชุม' : 'Attendee Details'}
+                    </h3>
+                    <p className="text-xs text-slate-500 font-mono">
+                      {viewingAttendee.ticketCode || 'Group Conference Attendee'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setViewingAttendee(null)}
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-4 sm:p-5 space-y-4">
+                {/* Profile Overview Card */}
+                <div className="bg-gradient-to-br from-sky-50 to-indigo-50/40 p-4 rounded-2xl border border-sky-100 flex items-start gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-[#0026b3] text-white flex items-center justify-center font-black text-lg shrink-0 shadow-md">
+                    {(viewingAttendee.nameTh || viewingAttendee.nameEn || 'A').charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-black text-slate-900 text-base leading-snug">
+                      {viewingAttendee.nameTh || viewingAttendee.nameEn}
+                    </h4>
+                    {viewingAttendee.nameEn && viewingAttendee.nameTh && (
+                      <p className="text-xs text-slate-500 font-medium">({viewingAttendee.nameEn})</p>
+                    )}
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      {Boolean(viewingAttendee.isMember || viewingAttendee.memberNo) ? (
+                        <span className="text-[10px] font-black bg-blue-100 text-[#0026b3] px-2 py-0.5 rounded-md border border-blue-200">
+                          {viewingAttendee.memberNo ? `สมาชิก (#${viewingAttendee.memberNo})` : 'สมาชิกสมาคม'}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-black bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200">
+                          บุคคลทั่วไป (Non-Member)
+                        </span>
+                      )}
+                      {(viewingAttendee.selectedFormat || viewingAttendee.format || viewingAttendee.selectedPackage) && (
+                        <span className="text-[10px] font-black bg-white text-slate-700 px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
+                          {viewingAttendee.selectedFormat || viewingAttendee.format || viewingAttendee.selectedPackage}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Info Fields */}
+                <div className="bg-slate-50 rounded-2xl p-4 space-y-2.5 border border-slate-200 text-xs">
+                  <div className="flex justify-between py-1 border-b border-slate-200/80 gap-2">
+                    <span className="text-slate-500 font-bold shrink-0">บริษัท / หน่วยงาน:</span>
+                    <span className="font-bold text-slate-800 text-right">{viewingAttendee.companyName || viewingAttendee.workplace || '-'}</span>
+                  </div>
+                  {viewingAttendee.position && (
+                    <div className="flex justify-between py-1 border-b border-slate-200/80 gap-2">
+                      <span className="text-slate-500 font-bold shrink-0">ตำแหน่ง:</span>
+                      <span className="font-bold text-slate-800 text-right">{viewingAttendee.position}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-1 border-b border-slate-200/80 gap-2">
+                    <span className="text-slate-500 font-bold shrink-0">อีเมล:</span>
+                    <span className="font-bold text-slate-800 text-right font-mono">{viewingAttendee.email || '-'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-200/80 gap-2">
+                    <span className="text-slate-500 font-bold shrink-0">เบอร์โทรศัพท์:</span>
+                    <span className="font-bold text-slate-800 text-right font-mono">{viewingAttendee.mobile || '-'}</span>
+                  </div>
+                  {viewingAttendee.lineId && (
+                    <div className="flex justify-between py-1 border-b border-slate-200/80 gap-2">
+                      <span className="text-slate-500 font-bold shrink-0">LINE ID:</span>
+                      <span className="font-bold text-slate-800 text-right font-mono">{viewingAttendee.lineId}</span>
+                    </div>
+                  )}
+                  {viewingAttendee.dietaryPreference && (
+                    <div className="flex justify-between py-1 border-b border-slate-200/80 gap-2">
+                      <span className="text-slate-500 font-bold shrink-0">ข้อกำหนดอาหาร:</span>
+                      <span className="font-bold text-emerald-700 text-right">🍽️ {viewingAttendee.dietaryPreference}</span>
+                    </div>
+                  )}
+                  {viewingAttendee.foodAllergies && (
+                    <div className="flex justify-between py-1 border-b border-slate-200/80 gap-2">
+                      <span className="text-slate-500 font-bold shrink-0">อาหารที่แพ้:</span>
+                      <span className="font-bold text-rose-600 text-right">⚠️ {viewingAttendee.foodAllergies}</span>
+                    </div>
+                  )}
+                  {viewingAttendee.specialRequirements && (
+                    <div className="flex justify-between py-1 border-b border-slate-200/80 gap-2">
+                      <span className="text-slate-500 font-bold shrink-0">ความต้องการพิเศษ:</span>
+                      <span className="font-bold text-slate-800 text-right">{viewingAttendee.specialRequirements}</span>
+                    </div>
+                  )}
+                  {viewingAttendee.subtotal ? (
+                    <div className="flex justify-between py-1 gap-2 pt-1 border-t border-slate-200">
+                      <span className="text-slate-500 font-bold shrink-0">ค่าลงทะเบียน:</span>
+                      <span className="font-black text-indigo-700 font-mono text-sm">฿{Number(viewingAttendee.subtotal).toLocaleString()} THB</span>
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Selected Activities / Workshops */}
+                {(() => {
+                  const attendeeActs = getAttendeeActivities(viewingAttendee);
+                  if (attendeeActs.length === 0) return null;
+                  return (
+                    <div className="bg-slate-50 rounded-2xl p-4 space-y-2 border border-slate-200 text-xs">
+                      <h5 className="font-extrabold text-slate-800 text-xs flex items-center gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5 text-[#0026b3]" />
+                        <span>กิจกรรมและหลักสูตรที่เลือก ({attendeeActs.length} รายการ)</span>
+                      </h5>
+                      <div className="space-y-1.5 pt-1">
+                        {attendeeActs.map((act: any, idx: number) => (
+                          <div key={idx} className="bg-white p-2.5 rounded-xl border border-slate-200 flex justify-between items-center gap-2">
+                            <span className="font-bold text-slate-800 truncate">{act.name}</span>
+                            {act.price ? (
+                              <span className="font-black text-indigo-700 font-mono shrink-0">฿{Number(act.price).toLocaleString()}</span>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setViewingAttendee(null)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded-xl transition cursor-pointer"
+                >
+                  {lang === 'th' ? 'ปิดหน้าต่าง' : 'Close'}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {/* Toast Notification (Portal at z-[10000]) */}
       {mounted &&
