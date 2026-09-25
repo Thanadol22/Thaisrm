@@ -32,7 +32,23 @@ export async function compressImage(
     return file instanceof File ? file : new File([file], 'image.jpg', { type: mimeType });
   }
 
-  return new Promise((resolve, reject) => {
+  // If file is PDF or not an image, return original file directly without attempting image/canvas decoding
+  const isPdf =
+    file.type === 'application/pdf' ||
+    (file instanceof File && file.name.toLowerCase().endsWith('.pdf'));
+  const isNotImage =
+    isPdf || (file.type && !file.type.startsWith('image/'));
+
+  if (isNotImage) {
+    if (file instanceof File) {
+      return file;
+    }
+    return new File([file], isPdf ? 'document.pdf' : 'file', {
+      type: file.type || (isPdf ? 'application/pdf' : 'application/octet-stream'),
+    });
+  }
+
+  return new Promise((resolve) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
 
@@ -87,14 +103,13 @@ export async function compressImage(
         );
       };
 
-      img.onerror = (err) => {
-        console.error('Error loading image for compression:', err);
+      img.onerror = () => {
+        // Fallback: If image cannot be decoded, return original file cleanly
         resolve(file instanceof File ? file : new File([file], 'image.jpg', { type: mimeType }));
       };
     };
 
-    reader.onerror = (err) => {
-      console.error('FileReader error during compression:', err);
+    reader.onerror = () => {
       resolve(file instanceof File ? file : new File([file], 'image.jpg', { type: mimeType }));
     };
   });

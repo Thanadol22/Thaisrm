@@ -176,15 +176,34 @@ export function SlipRejectionPreviewModal({
                     </div>
                   </div>
 
+                  {/* Mockup Registration Details */}
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1.5">
+                    <div className="font-bold text-slate-800 border-b border-slate-200 pb-1 text-[11px] uppercase text-slate-500">
+                      📋 ข้อมูลแบบฟอร์มรายการที่ลงทะเบียน:
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>งานประชุม:</span>
+                      <span className="font-bold text-slate-800">การประชุมวิชาการประจำปี 2569</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>ชื่อผู้ลงทะเบียน:</span>
+                      <span className="font-bold text-slate-800">นพ. สมชาย ใจดี</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>ยอดเงิน:</span>
+                      <span className="font-bold text-[#0026b3]">฿ 4,000</span>
+                    </div>
+                  </div>
+
                   {/* Next Step & Button */}
-                  <div className="text-xs text-slate-600 space-y-3 pt-2">
+                  <div className="text-xs text-slate-600 space-y-3 pt-1">
                     <p>
-                      กรุณากดปุ่มด้านล่างเพื่อเข้าสู่หน้าระบบและทำการแนบหลักฐานการโอนเงิน (สลิป) ใหม่อีกครั้ง:
+                      ท่านสามารถกดปุ่มด้านล่างเพื่อเข้าสู่หน้าระบบ เพื่อ<strong>ตรวจสอบ แก้ไขข้อมูลที่ไม่ถูกต้อง และแนบหลักฐานการโอนเงินใหม่</strong>ได้ทันที:
                     </p>
                     <div className="flex justify-center py-2">
                       <div className="px-6 py-3 rounded-xl bg-[#0026b3] text-white text-xs font-bold shadow-md flex items-center gap-2">
                         <UploadCloud className="w-4 h-4 text-emerald-400" />
-                        <span>คลิกเพื่อแนบสลิปใหม่</span>
+                        <span>คลิกเพื่อตรวจสอบ แก้ไขข้อมูล และแนบสลิปใหม่</span>
                       </div>
                     </div>
                     <p className="text-[11px] text-slate-400 text-center">

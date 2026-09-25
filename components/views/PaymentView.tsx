@@ -647,7 +647,12 @@ export function PaymentView({
               {/* Option 2: Pay Later */}
               <button
                 type="button"
-                onClick={() => setPaymentMode('pay_later')}
+                onClick={() => {
+                  setPaymentMode('pay_later');
+                  if (onRemoveSlip) {
+                    onRemoveSlip();
+                  }
+                }}
                 className={`p-3 sm:p-3.5 rounded-2xl border-2 text-left transition flex items-start gap-3 cursor-pointer ${
                   paymentMode === 'pay_later'
                     ? 'border-amber-500 bg-amber-50/60 text-slate-900 ring-2 ring-amber-500/25'

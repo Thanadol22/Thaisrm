@@ -23,9 +23,11 @@ import {
   Sparkles,
   User,
   Users,
+  FileText,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { PaginationControls } from '@/components/PaginationControls';
+import { MemberDetailModal } from '@/components/MemberDetailModal';
 
 export interface SlipActivityItem {
   id?: string;
@@ -94,6 +96,7 @@ export function AdminSlipsView() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'pay_later'>('all');
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'individual' | 'corporate' | 'corporate_pay_later'>('all');
   const [selectedSlip, setSelectedSlip] = useState<SlipRecord | null>(null);
+  const [viewingApplicant, setViewingApplicant] = useState<any | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Pagination state (Default 5 items per page)
@@ -102,8 +105,10 @@ export function AdminSlipsView() {
 
   // Reject modal state
   const [rejectingSlipId, setRejectingSlipId] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState('โปรดแนบสลิปที่มียอดเงินและรายละเอียดตรงกับรายการลงทะเบียน');
+  const [rejectType, setRejectType] = useState<'info' | 'slip'>('info');
+  const [rejectReason, setRejectReason] = useState('ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบและแก้ไขข้อมูลให้ถูกต้อง');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingSlipId, setProcessingSlipId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -147,6 +152,7 @@ export function AdminSlipsView() {
     if (e) e.stopPropagation();
     try {
       setIsProcessing(true);
+      setProcessingSlipId(id);
       const res = await fetch('/api/admin/slips', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -181,27 +187,34 @@ export function AdminSlipsView() {
               : null
           );
         }
-        const isPayLaterSlip = selectedSlip?.bank?.includes('ชำระเงินภายหลัง') || selectedSlip?.bank?.toLowerCase().includes('pay later');
+        const targetSlip = slips.find((s) => s.id === id) || selectedSlip;
+        const isPayLaterSlip =
+          targetSlip?.bank?.includes('ชำระเงินภายหลัง') ||
+          targetSlip?.bank?.toLowerCase().includes('pay later') ||
+          targetSlip?.slipUrl === 'PAY_LATER';
         showToast(
           approvedMemberNo
-            ? (lang === 'th' ? `อนุมัติสิทธิ์และสร้างบัญชีสมาชิกเรียบร้อยแล้ว (รหัส: ${approvedMemberNo})` : `Access approved and member created (No: ${approvedMemberNo})`)
+            ? (lang === 'th' ? `✓ อนุมัติสิทธิ์และสร้างบัญชีสมาชิกเรียบร้อยแล้ว (รหัส: ${approvedMemberNo})` : `✓ Access approved and member created (No: ${approvedMemberNo})`)
             : isPayLaterSlip
-            ? (lang === 'th' ? 'อนุมัติคำขอและสร้างบัญชีสมาชิกเรียบร้อยแล้ว (สถานะ: รอชำระเงิน/รอสลิป)' : 'Request approved (Awaiting Payment)')
-            : (lang === 'th' ? 'อนุมัติรายการเรียบร้อยแล้ว' : 'Approved successfully')
+            ? (lang === 'th' ? '✓ อนุมัติคำขอและสร้างบัญชีสมาชิกเรียบร้อยแล้ว (สถานะ: รอชำระเงิน/รอสลิป)' : '✓ Request approved (Awaiting Payment)')
+            : (lang === 'th' ? '✓ อนุมัติรายการเรียบร้อยแล้ว' : '✓ Approved successfully')
         );
       } else {
-        showToast(json.error || 'เกิดข้อผิดพลาดในการอนุมัติ');
+        showToast(`✕ ${json.error || 'เกิดข้อผิดพลาดในการอนุมัติ'}`);
       }
     } catch (err: any) {
-      showToast(err.message || 'Error approving slip');
+      showToast(`✕ ${err.message || 'Error approving slip'}`);
     } finally {
       setIsProcessing(false);
+      setProcessingSlipId(null);
     }
   };
 
   const openRejectModal = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setRejectingSlipId(id);
+    setRejectType('info');
+    setRejectReason('ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบและแก้ไขข้อมูลให้ถูกต้อง');
   };
 
   const handleConfirmReject = async () => {
@@ -215,6 +228,7 @@ export function AdminSlipsView() {
           slipId: rejectingSlipId,
           action: 'reject',
           notes: rejectReason,
+          rejectType,
         }),
       });
       const json = await res.json();
@@ -958,11 +972,24 @@ export function AdminSlipsView() {
                       <button
                         onClick={(e) => handleApprove(slip.id, e)}
                         disabled={isProcessing}
-                        className="px-3 py-2 bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] rounded-xl text-xs font-black transition flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
+                        className={`px-3 py-2 text-[#061d08] rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 ${
+                          processingSlipId === slip.id
+                            ? 'bg-emerald-300 opacity-90 cursor-wait'
+                            : 'bg-[#4ade80] hover:bg-[#3ec424]'
+                        }`}
                         title={lang === 'th' ? 'อนุมัติ' : 'Approve'}
                       >
-                        <Check className="w-4 h-4 stroke-[3]" />
-                        <span>{lang === 'th' ? 'อนุมัติ' : 'Approve'}</span>
+                        {processingSlipId === slip.id ? (
+                          <>
+                            <RotateCw className="w-4 h-4 animate-spin text-[#061d08]" />
+                            <span>{lang === 'th' ? 'กำลังอนุมัติ...' : 'Approving...'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-4 h-4 stroke-[3]" />
+                            <span>{lang === 'th' ? 'อนุมัติ' : 'Approve'}</span>
+                          </>
+                        )}
                       </button>
 
                       <button
@@ -1082,63 +1109,48 @@ export function AdminSlipsView() {
                 {/* Membership Applicant Detailed Profile (If Membership Application) */}
                 {selectedSlip.isMembershipRegistration && selectedSlip.memberPayload ? (
                   <div className="bg-purple-50/70 border border-purple-200 rounded-2xl p-4 space-y-3">
-                    <div className="flex items-center gap-2 text-purple-900 font-extrabold text-xs sm:text-sm border-b border-purple-200/80 pb-2">
-                      <Sparkles className="w-4 h-4 text-purple-600" />
-                      <span>ข้อมูลผู้สมัครสมาชิกใหม่</span>
+                    <div className="flex items-center justify-between border-b border-purple-200/80 pb-2">
+                      <div className="flex items-center gap-2 text-purple-900 font-extrabold text-xs sm:text-sm">
+                        <Sparkles className="w-4 h-4 text-purple-600" />
+                        <span>ข้อมูลผู้สมัครสมาชิกใหม่</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setViewingApplicant({
+                            ...selectedSlip.memberPayload,
+                            submittedAt:
+                              selectedSlip.memberPayload.submittedAt ||
+                              selectedSlip.memberPayload.submitted_at ||
+                              selectedSlip.createdAt ||
+                              (selectedSlip.transferDate ? `${selectedSlip.transferDate}T${selectedSlip.transferTime || '00:00:00'}` : undefined) ||
+                              new Date().toISOString(),
+                            workplace: selectedSlip.memberPayload.workplace || selectedSlip.companyName || selectedSlip.workplace,
+                          })
+                        }
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-purple-100 text-purple-700 hover:text-purple-900 font-bold text-xs border border-purple-200 shadow-2xs transition active:scale-95 cursor-pointer shrink-0"
+                        title="ดูข้อมูลทั้งหมดที่กรอกมา"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-purple-600" />
+                        <span>{lang === 'th' ? 'ดูทั้งหมด' : 'View All'}</span>
+                      </button>
                     </div>
 
-                    <div className="flex items-start gap-3">
-                      {selectedSlip.memberPayload.photo_path ? (
-                        <img
-                          src={selectedSlip.memberPayload.photo_path}
-                          alt="Applicant Photo"
-                          className="w-16 h-20 rounded-xl object-cover border border-purple-300 shrink-0 bg-white shadow-xs"
-                        />
-                      ) : (
-                        <div className="w-16 h-20 rounded-xl bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-400 shrink-0">
-                          <UserCheck className="w-6 h-6" />
-                        </div>
-                      )}
-
-                      <div className="space-y-1 text-xs text-slate-700 min-w-0 flex-1">
-                        <p className="font-extrabold text-slate-900 text-sm">{selectedSlip.memberPayload.full_name_th}</p>
-                        {selectedSlip.memberPayload.full_name_en && (
-                          <p className="font-semibold text-slate-600">{selectedSlip.memberPayload.full_name_en}</p>
-                        )}
-                        <p className="text-slate-600">
-                          <span className="font-bold">ตำแหน่ง/วิชาชีพ:</span> {selectedSlip.memberPayload.position || selectedSlip.memberPayload.job_category || '-'}
+                    <div className="flex items-center justify-between gap-3 text-xs bg-white p-3 rounded-xl border border-purple-100/90 shadow-2xs">
+                      <div className="min-w-0">
+                        <p className="font-extrabold text-slate-900 text-sm truncate">
+                          {selectedSlip.memberPayload.full_name_th || selectedSlip.memberPayload.fullNameTh}
                         </p>
-                        {selectedSlip.memberPayload.scientist_reg_no && (
-                          <p className="text-slate-600">
-                            <span className="font-bold">เลขที่ใบอนุญาต:</span> {selectedSlip.memberPayload.scientist_reg_no}
-                          </p>
-                        )}
-                        {selectedSlip.memberPayload.workplace && (
-                          <p className="text-slate-600 truncate">
-                            <span className="font-bold">สถานที่ทำงาน:</span> {selectedSlip.memberPayload.workplace}
+                        {(selectedSlip.memberPayload.full_name_en || selectedSlip.memberPayload.fullNameEn) && (
+                          <p className="text-slate-500 font-normal truncate">
+                            ({selectedSlip.memberPayload.full_name_en || selectedSlip.memberPayload.fullNameEn})
                           </p>
                         )}
                       </div>
+                      <span className="text-[11px] text-purple-700 font-mono font-bold shrink-0">
+                        {selectedSlip.memberPayload.email || '-'}
+                      </span>
                     </div>
-
-                    {/* Educations */}
-                    {Array.isArray(selectedSlip.memberPayload.educations) && selectedSlip.memberPayload.educations.length > 0 && (
-                      <div className="pt-2 border-t border-purple-200/80 space-y-1.5">
-                        <span className="text-[11px] font-bold text-purple-900 block">ประวัติการศึกษา:</span>
-                        <div className="space-y-1">
-                          {selectedSlip.memberPayload.educations.map((edu: any, idx: number) => (
-                            <div key={idx} className="bg-white/80 border border-purple-100 rounded-lg p-2 text-[11px] text-slate-700 flex justify-between gap-2">
-                              <div>
-                                <span className="font-bold">{edu.degree || '-'}</span> - {edu.institution || '-'}
-                              </div>
-                              {edu.graduation_year && (
-                                <span className="text-slate-500 shrink-0 font-mono">({edu.graduation_year})</span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
 
                     {selectedSlip.status === 'pending' && (
                       <p className="text-[11px] text-purple-700 bg-purple-100/70 p-2.5 rounded-xl font-medium leading-relaxed">
@@ -1171,20 +1183,26 @@ export function AdminSlipsView() {
                       </div>
                     )}
 
-                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                       {selectedSlip.groupPayload.applicants.map((app: any, idx: number) => (
-                        <div key={idx} className="bg-white border border-indigo-100/90 rounded-xl p-3 text-xs text-slate-800 space-y-1 shadow-2xs">
-                          <div className="flex items-center justify-between font-bold text-slate-900">
-                            <span className="flex items-center gap-2">
+                        <div
+                          key={idx}
+                          className="bg-white border border-indigo-100/90 rounded-2xl p-3 text-xs text-slate-800 shadow-2xs hover:border-indigo-300 transition flex items-center justify-between gap-3"
+                        >
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="flex items-center gap-2 font-bold text-slate-900 flex-wrap">
                               <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-black shrink-0">
                                 {idx + 1}
                               </span>
-                              <span>{app.full_name_th || app.full_name_en}</span>
+                              <span className="truncate">{app.full_name_th || app.full_name_en}</span>
                               {app.full_name_en && app.full_name_th && (
-                                <span className="text-slate-400 font-normal">({app.full_name_en})</span>
+                                <span className="text-slate-400 font-normal truncate">({app.full_name_en})</span>
                               )}
-                            </span>
-                            <span className="flex items-center gap-1.5">
+                            </div>
+                            <div className="pl-7 flex items-center gap-2 flex-wrap">
+                              <span className="text-[11px] text-indigo-600 font-mono">
+                                {app.email || app.mobile || '-'}
+                              </span>
                               {Boolean(
                                 (selectedSlip.groupPayload?.groupContact?.coordinatorEmail &&
                                   app.email?.trim().toLowerCase() === selectedSlip.groupPayload.groupContact.coordinatorEmail.trim().toLowerCase()) ||
@@ -1195,17 +1213,30 @@ export function AdminSlipsView() {
                                   ⚠️ ใช้อีเมลเดียวกับบริษัท
                                 </span>
                               )}
-                              <span className="text-[11px] text-indigo-600 font-mono">
-                                {app.email || app.mobile || '-'}
-                              </span>
-                            </span>
+                            </div>
                           </div>
-                          <div className="text-[11px] text-slate-500 pl-7 flex flex-wrap gap-x-3 gap-y-0.5">
-                            <span>ตำแหน่ง: {app.position || app.job_category || '-'}</span>
-                            {app.scientist_reg_no && <span>เลขใบอนุญาต: {app.scientist_reg_no}</span>}
-                            {app.id_last4 && <span>เลขท้ายบัตร: {app.id_last4}</span>}
-                            {app.mobile && <span>เบอร์โทร: {app.mobile}</span>}
-                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setViewingApplicant({
+                                ...app,
+                                submittedAt:
+                                  app.submittedAt ||
+                                  app.submitted_at ||
+                                  selectedSlip.groupPayload?.submittedAt ||
+                                  selectedSlip.createdAt ||
+                                  (selectedSlip.transferDate ? `${selectedSlip.transferDate}T${selectedSlip.transferTime || '00:00:00'}` : undefined) ||
+                                  new Date().toISOString(),
+                                workplace: app.workplace || selectedSlip.companyName || selectedSlip.workplace,
+                              })
+                            }
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-900 border border-indigo-200 font-bold text-xs shadow-2xs transition active:scale-95 cursor-pointer shrink-0"
+                            title="ดูข้อมูลทั้งหมดที่กรอกมา"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>{lang === 'th' ? 'ดูทั้งหมด' : 'View All'}</span>
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -1370,11 +1401,24 @@ export function AdminSlipsView() {
                     <button
                       onClick={() => handleApprove(selectedSlip.id)}
                       disabled={isProcessing}
-                      className="px-3 sm:px-5 py-2 sm:py-2.5 bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] text-xs font-black rounded-xl transition cursor-pointer shadow-md flex items-center gap-1.5 active:scale-95 whitespace-nowrap"
+                      className={`px-3 sm:px-5 py-2 sm:py-2.5 text-[#061d08] text-xs font-black rounded-xl transition cursor-pointer shadow-md flex items-center gap-1.5 active:scale-95 whitespace-nowrap ${
+                        processingSlipId === selectedSlip.id
+                          ? 'bg-emerald-300 opacity-90 cursor-wait'
+                          : 'bg-[#4ade80] hover:bg-[#3ec424]'
+                      }`}
                       title={lang === 'th' ? 'อนุมัติการชำระเงิน' : 'Approve Payment'}
                     >
-                      <CheckCircle2 className="w-4 h-4 text-[#061d08] shrink-0" />
-                      <span className="hidden sm:inline">{lang === 'th' ? 'อนุมัติการชำระเงิน' : 'Approve'}</span>
+                      {processingSlipId === selectedSlip.id ? (
+                        <>
+                          <RotateCw className="w-4 h-4 animate-spin text-[#061d08] shrink-0" />
+                          <span>{lang === 'th' ? 'กำลังอนุมัติ...' : 'Approving...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4 text-[#061d08] shrink-0" />
+                          <span className="hidden sm:inline">{lang === 'th' ? 'อนุมัติการชำระเงิน' : 'Approve'}</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 )}
@@ -1394,14 +1438,67 @@ export function AdminSlipsView() {
                 <div className="p-2 rounded-xl bg-rose-50">
                   <AlertCircle className="w-5 h-5" />
                 </div>
-                <h3 className="font-extrabold text-slate-900 text-base">ระบุเหตุผลการปฏิเสธสลิป</h3>
+                <h3 className="font-extrabold text-slate-900 text-base">ระบุเหตุผลการปฏิเสธ / ส่งกลับแก้ไข</h3>
               </div>
 
               <p className="text-xs text-slate-500 leading-relaxed">
-                ระบบจะส่งอีเมลแจ้งเหตุผลนี้ไปยังผู้ลงทะเบียน พร้อมแนบลิงก์ให้ผู้ลงทะเบียนเข้ามากดแนบสลิปใหม่
+                ระบบจะส่งอีเมลแจ้งเหตุผลนี้ไปยังผู้ลงทะเบียน พร้อมแบบฟอร์มรายการและลิงก์ให้ผู้ลงทะเบียนเข้ามากดตรวจสอบ แก้ไขข้อมูล หรือแนบสลิปใหม่ได้ทันที
               </p>
 
               <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  เลือกเหตุผลด่วน (คลิกเพื่อเลือกรูปแบบการส่งกลับ):
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRejectType('info');
+                      setRejectReason('ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบและแก้ไขข้อมูลให้ถูกต้อง');
+                    }}
+                    className={`p-2.5 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                      rejectType === 'info'
+                        ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-300 text-rose-950 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-extrabold text-xs">
+                      <span>⚠️</span>
+                      <span className="leading-snug">ข้อมูลไม่ถูกต้อง</span>
+                    </div>
+                    <span className="inline-block mt-1 text-[11px] font-bold text-rose-700 bg-rose-100/80 px-2 py-0.5 rounded-md w-fit">
+                      แนบการแก้ไขข้อมูลกลับไป
+                    </span>
+                    <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                      ส่งลิงก์แบบฟอร์มให้ผู้ลงทะเบียนเข้ามากรอกแก้ไขข้อมูลส่วนตัว
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRejectType('slip');
+                      setRejectReason('หลักฐานการโอนเงิน (สลิป) ไม่ถูกต้อง หรือไม่ชัดเจน กรุณาแนบสลิปใหม่');
+                    }}
+                    className={`p-2.5 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                      rejectType === 'slip'
+                        ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-300 text-rose-950 shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-extrabold text-xs">
+                      <span>🧾</span>
+                      <span className="leading-snug">สลิปไม่ถูกต้อง</span>
+                    </div>
+                    <span className="inline-block mt-1 text-[11px] font-bold text-rose-700 bg-rose-100/80 px-2 py-0.5 rounded-md w-fit">
+                      แนบฟอร์มแนบสลิปกลับไป
+                    </span>
+                    <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                      ส่งลิงก์แบบฟอร์มให้ผู้ลงทะเบียนเข้ามากดอัปโหลดสลิปใหม่
+                    </p>
+                  </button>
+                </div>
+
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">เหตุผล / คำแนะนำเพิ่มเติม:</label>
                 <textarea
                   value={rejectReason}
@@ -1431,6 +1528,26 @@ export function AdminSlipsView() {
                 </button>
               </div>
             </div>
+          </div>,
+          document.body
+        )}
+
+      {/* Member / Applicant Detail Modal */}
+      <MemberDetailModal
+        member={viewingApplicant}
+        isOpen={Boolean(viewingApplicant)}
+        onClose={() => setViewingApplicant(null)}
+        isApplicant={true}
+        zIndexClass="z-[10000]"
+      />
+
+      {/* Toast Notification (Portal at z-[10000]) */}
+      {mounted &&
+        toastMessage &&
+        createPortal(
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[10000] max-w-lg w-[92%] sm:w-auto bg-slate-900/95 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-white/10 flex items-center gap-3 animate-fade-in backdrop-blur-md">
+            <div className="w-2.5 h-2.5 rounded-full bg-[#4ade80] animate-pulse shrink-0" />
+            <span className="text-xs sm:text-sm font-bold flex-1 leading-snug">{toastMessage}</span>
           </div>,
           document.body
         )}

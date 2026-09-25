@@ -3,8 +3,10 @@ import QRCode from 'qrcode';
 import {
   renderMembershipApprovedEmail,
   renderMeetingApprovedEmail,
+  renderCompanyGroupMembershipApprovedEmail,
   MembershipApprovalEmailOptions,
   MeetingApprovalEmailOptions,
+  CompanyGroupMembershipApprovalEmailOptions,
 } from './emailTemplates/approvalTemplate';
 import {
   renderSlipRejectionEmail,
@@ -65,11 +67,22 @@ export function getMailTransporter(customConfig?: SmtpConfig) {
     tls: {
       rejectUnauthorized: process.env.NODE_ENV === 'production',
     },
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 10000,
   });
 }
 
 export function getDefaultFromAddress(): string {
-  return process.env.SMTP_FROM || 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (TSRM) <tsrm.info@gmail.com>';
+  const fromEnv = process.env.SMTP_FROM;
+  const userEnv = process.env.SMTP_USER || 'tsrm.support2026@gmail.com';
+  if (!fromEnv) {
+    return `สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (TSRM) <${userEnv}>`;
+  }
+  if (!fromEnv.includes('<') && !fromEnv.includes('@')) {
+    return `${fromEnv.replace(/"/g, '')} <${userEnv}>`;
+  }
+  return fromEnv;
 }
 
 /**
@@ -168,9 +181,11 @@ async function dispatchEmail({
   }
 
   try {
+    const replyTo = process.env.SMTP_REPLY_TO || process.env.SMTP_USER || 'tsrm.support2026@gmail.com';
     const info = await transporter.sendMail({
       from,
       to,
+      replyTo,
       subject,
       html,
       text: text || subject,
@@ -228,7 +243,47 @@ export async function sendMembershipApprovedEmail(params: SendMembershipApproved
       filename: `member-qr-${params.memberNo}.png`,
       content: qrBuffer,
       cid,
+      contentType: 'image/png',
+      contentDisposition: 'inline',
+      headers: {
+        'Content-ID': `<${cid}>`,
+        'X-Attachment-Id': cid,
+      },
     }] : undefined,
+  });
+}
+
+export interface SendCompanyGroupApprovalParams {
+  to: string;
+  companyName: string;
+  coordinatorName?: string;
+  ticketCode: string;
+  amountPaid: number;
+  isPayLater: boolean;
+  applicants: Array<{
+    name: string;
+    email: string;
+    memberNo: string;
+  }>;
+}
+
+/**
+ * Send email to company / coordinator when group membership application is approved
+ */
+export async function sendCompanyGroupMembershipApprovedEmail(params: SendCompanyGroupApprovalParams): Promise<EmailSendResult> {
+  const html = renderCompanyGroupMembershipApprovedEmail({
+    companyName: params.companyName,
+    coordinatorName: params.coordinatorName || params.companyName,
+    ticketCode: params.ticketCode,
+    amountPaid: params.amountPaid,
+    isPayLater: params.isPayLater,
+    applicants: params.applicants,
+  });
+
+  return dispatchEmail({
+    to: params.to,
+    subject: `[TSRM] แจ้งผลการอนุมัติสมาชิกแบบกลุ่ม - ${params.companyName} (${params.applicants.length} ท่าน)`,
+    html,
   });
 }
 
@@ -268,22 +323,41 @@ export interface SendSlipRejectionParams {
   meetingName: string;
   rejectionReason: string;
   resubmitUrl: string;
+  ticketCode?: string;
+  amount?: number;
+  applicantEmail?: string;
+  applicantPhone?: string;
+  applicantWorkplace?: string;
+  isCorporate?: boolean;
+  companyName?: string;
+  rejectType?: 'info' | 'slip';
 }
 
 /**
  * Send email when payment slip is rejected with a direct resubmit link
  */
 export async function sendSlipRejectionEmail(params: SendSlipRejectionParams): Promise<EmailSendResult> {
+  const isInfoMode = params.rejectType === 'info' || (params.rejectionReason?.includes('ข้อมูล') && !params.rejectionReason?.includes('สลิป'));
   const html = renderSlipRejectionEmail({
     recipientName: params.recipientName,
     meetingName: params.meetingName,
     rejectionReason: params.rejectionReason,
     resubmitUrl: params.resubmitUrl,
+    ticketCode: params.ticketCode,
+    amount: params.amount,
+    applicantEmail: params.applicantEmail,
+    applicantPhone: params.applicantPhone,
+    applicantWorkplace: params.applicantWorkplace,
+    isCorporate: params.isCorporate,
+    companyName: params.companyName,
+    rejectType: params.rejectType,
   });
+
+  const subjectPrefix = isInfoMode ? '[โปรดแก้ไขข้อมูล]' : '[โปรดแนบสลิปใหม่]';
 
   return dispatchEmail({
     to: params.to,
-    subject: `[โปรดตรวจสอบ] แจ้งผลการตรวจสอบหลักฐานการชำระเงิน - ${params.meetingName}`,
+    subject: `${subjectPrefix} แจ้งผลการตรวจสอบสำหรับรายการ - ${params.meetingName}`,
     html,
   });
 }
@@ -333,6 +407,12 @@ export async function sendAttendeeTicketEmail(params: SendAttendeeTicketParams):
       filename: `pass-qr-${params.ticketCode}.png`,
       content: qrBuffer,
       cid,
+      contentType: 'image/png',
+      contentDisposition: 'inline',
+      headers: {
+        'Content-ID': `<${cid}>`,
+        'X-Attachment-Id': cid,
+      },
     }] : undefined,
     customConfig: params.customConfig,
   });

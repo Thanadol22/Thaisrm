@@ -604,9 +604,11 @@ function PaymentContent() {
               bank: isFreeOrSponsored
                 ? `สิทธิ์สปอนเซอร์: ${regData?.couponData?.companyName || (regData as any).companyName || 'Corporate Pass'}`
                 : (isPayLater ? 'ชำระเงินภายหลัง (Pay Later)' : systemSettings.bank_name),
-              slipUrl: uploadedSlipData?.fileUrl || (isFreeOrSponsored
-                ? `SPONSORED:${regData?.couponData?.companyName || (regData as any).companyName || 'COUPON'}`
-                : (isPayLater ? 'PAY_LATER' : undefined)),
+              slipUrl: isPayLater
+                ? 'PAY_LATER'
+                : (isFreeOrSponsored
+                    ? `SPONSORED:${regData?.couponData?.companyName || (regData as any).companyName || 'COUPON'}`
+                    : (uploadedSlipData?.fileUrl || undefined)),
             }),
           });
 
@@ -638,8 +640,12 @@ function PaymentContent() {
               amount: calculationResult.totalAmount,
               originalAmount: calculationResult.originalAmount,
               couponCode: regData?.couponData?.code || undefined,
-              bank: isFreeOrSponsored ? `สิทธิ์สปอนเซอร์: ${regData?.couponData?.companyName || 'Corporate Pass'}` : systemSettings.bank_name,
-              slipUrl: uploadedSlipData?.fileUrl || (isFreeOrSponsored ? `SPONSORED:${regData?.couponData?.companyName || 'COUPON'}` : undefined),
+              bank: isPayLater
+                ? 'ชำระเงินภายหลัง (Pay Later)'
+                : (isFreeOrSponsored ? `สิทธิ์สปอนเซอร์: ${regData?.couponData?.companyName || 'Corporate Pass'}` : systemSettings.bank_name),
+              slipUrl: isPayLater
+                ? 'PAY_LATER'
+                : (isFreeOrSponsored ? `SPONSORED:${regData?.couponData?.companyName || 'COUPON'}` : (uploadedSlipData?.fileUrl || undefined)),
               selectedActivities: selectedActivitiesPayload,
             }),
           });
@@ -685,7 +691,7 @@ function PaymentContent() {
             memberPayload: isGroupMembership ? undefined : membershipRegData,
             amount: calculationResult.totalAmount,
             bank: isPayLater ? 'ชำระเงินภายหลัง (Pay Later)' : systemSettings.bank_name,
-            slipUrl: uploadedSlipData?.fileUrl || (isPayLater ? 'PAY_LATER' : ''),
+            slipUrl: isPayLater ? 'PAY_LATER' : (uploadedSlipData?.fileUrl || ''),
           }),
         });
 

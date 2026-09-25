@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import crypto from 'crypto';
-import { sendRegistrationApprovedEmail, sendSlipRejectionEmail, sendMembershipApprovedEmail } from '@/lib/email';
+import { sendRegistrationApprovedEmail, sendSlipRejectionEmail, sendMembershipApprovedEmail, sendCompanyGroupMembershipApprovedEmail } from '@/lib/email';
 import { createMember } from '@/lib/services/memberService';
 import { getSystemSettings } from '@/lib/services/settingsService';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
@@ -136,13 +136,13 @@ export async function GET(request: NextRequest) {
         const nameTh = parsedAct.isGroupMembership && companyName
           ? companyName
           : isMember
-          ? s.members?.fullNameTh || 'สมาชิก'
-          : s.guest_name || parsedAct.memberPayload?.full_name_th || 'ผู้สมัครทั่วไป';
+            ? s.members?.fullNameTh || 'สมาชิก'
+            : s.guest_name || parsedAct.memberPayload?.full_name_th || 'ผู้สมัครทั่วไป';
         const nameEn = parsedAct.isGroupMembership && companyName
           ? companyName
           : isMember
-          ? s.members?.fullNameEn || ''
-          : parsedAct.memberPayload?.full_name_en || '';
+            ? s.members?.fullNameEn || ''
+            : parsedAct.memberPayload?.full_name_en || '';
         const email = isMember
           ? s.members?.email || ''
           : s.guest_email || parsedAct.memberPayload?.email || '';
@@ -156,10 +156,10 @@ export async function GET(request: NextRequest) {
         const ticketType = parsedAct.isFormatChange
           ? `🔄 ขอเปลี่ยนเป็น ${parsedAct.formatChangePayload?.targetFormat === 'onsite' ? 'Onsite' : 'Online'}`
           : parsedAct.isMembership
-          ? 'Membership Registration'
-          : s.is_member
-          ? 'Member Pass'
-          : 'Non-Member Pass';
+            ? 'Membership Registration'
+            : s.is_member
+              ? 'Member Pass'
+              : 'Non-Member Pass';
 
         return {
           id: s.slip_id,
@@ -168,8 +168,8 @@ export async function GET(request: NextRequest) {
           meetingName: parsedAct.isMembership
             ? 'สมัครสมาชิกสมาคม (Membership Registration)'
             : parsedAct.isFormatChange
-            ? `แจ้งเปลี่ยนรูปแบบ - ${s.meetings?.meeting_name || ''}`
-            : (s.meetings?.meeting_name || ''),
+              ? `แจ้งเปลี่ยนรูปแบบ - ${s.meetings?.meeting_name || ''}`
+              : (s.meetings?.meeting_name || ''),
           memberNo: s.member_no,
           isMember: s.is_member,
           isMembershipRegistration: parsedAct.isMembership,
@@ -239,13 +239,13 @@ export async function GET(request: NextRequest) {
         const nameTh = parsedAct.isGroupMembership && companyName
           ? companyName
           : isMember
-          ? s.member_full_name_th
-          : s.guest_name || parsedAct.memberPayload?.full_name_th || 'ผู้สมัครทั่วไป';
+            ? s.member_full_name_th
+            : s.guest_name || parsedAct.memberPayload?.full_name_th || 'ผู้สมัครทั่วไป';
         const nameEn = parsedAct.isGroupMembership && companyName
           ? companyName
           : isMember
-          ? s.member_full_name_en || ''
-          : parsedAct.memberPayload?.full_name_en || '';
+            ? s.member_full_name_en || ''
+            : parsedAct.memberPayload?.full_name_en || '';
         const email = isMember
           ? s.member_email || ''
           : s.guest_email || parsedAct.memberPayload?.email || '';
@@ -259,8 +259,8 @@ export async function GET(request: NextRequest) {
         const ticketType = parsedAct.isMembership
           ? 'Membership Registration'
           : s.is_member
-          ? 'Member Pass'
-          : 'Non-Member Pass';
+            ? 'Member Pass'
+            : 'Non-Member Pass';
 
         return {
           id: s.slip_id,
@@ -317,7 +317,7 @@ export async function POST(request: NextRequest) {
   }
   try {
     const body = await request.json();
-    const { slipId, action, notes, reviewer } = body;
+    const { slipId, action, notes, reviewer, rejectType } = body;
 
     if (!slipId || !action || !['approve', 'reject', 'reset'].includes(action)) {
       return NextResponse.json(
@@ -392,7 +392,7 @@ export async function POST(request: NextRequest) {
     if (slip.selected_activities) {
       let actObj = slip.selected_activities;
       if (typeof actObj === 'string') {
-        try { actObj = JSON.parse(actObj); } catch {}
+        try { actObj = JSON.parse(actObj); } catch { }
       }
       if (actObj && typeof actObj === 'object') {
         if (actObj.type === 'membership_group_registration' || (actObj.isGroup && actObj.applicants)) {
@@ -439,25 +439,81 @@ export async function POST(request: NextRequest) {
         }
 
         try {
+          const approvedApplicants: Array<{ name: string; email: string; memberNo: string }> = [];
+
           for (const applicant of groupPayload.applicants) {
             const cleanEmail = applicant.email?.trim()?.toLowerCase();
             const existing = cleanEmail ? await prisma.member.findFirst({
               where: { email: { equals: cleanEmail, mode: 'insensitive' } },
             }) : null;
 
+            let applicantMemberNo = existing?.member_no || '';
+
             if (!existing) {
               const created = await createMember(applicant);
+              applicantMemberNo = created.member_no || '';
               if (applicant.email) {
-                try {
-                  await sendMembershipApprovedEmail({
-                    to: applicant.email,
-                    recipientName: applicant.full_name_th || applicant.full_name_en || 'สมาชิก',
-                    memberNo: created.member_no || '',
-                    amountPaid: 1000,
-                  });
-                } catch (e) {}
+                // Send approval email to individual member in background without blocking response
+                sendMembershipApprovedEmail({
+                  to: applicant.email,
+                  recipientName: applicant.full_name_th || applicant.full_name_en || 'สมาชิก',
+                  memberNo: applicantMemberNo,
+                  amountPaid: 1000,
+                }).catch((e) => console.error('Failed to send group member approval email:', e));
               }
             }
+
+            approvedApplicants.push({
+              name: applicant.full_name_th || applicant.full_name_en || 'ผู้สมัคร',
+              email: applicant.email || '',
+              memberNo: applicantMemberNo,
+            });
+          }
+
+          // Send approval summary email to company / coordinator
+          let companyEmail =
+            groupPayload.groupContact?.coordinatorEmail?.trim() ||
+            groupPayload.companyEmail?.trim();
+
+          const companyName =
+            groupPayload.companyName?.trim() ||
+            slip.guest_workplace?.trim() ||
+            'บริษัท / องค์กร';
+
+          if (!companyEmail && companyName) {
+            const sp = await (prisma as any).sponsors.findFirst({
+              where: { name: { equals: companyName, mode: 'insensitive' } },
+              select: { contact_email: true },
+            });
+            if (sp?.contact_email) {
+              companyEmail = sp.contact_email.trim();
+            }
+          }
+
+          if (!companyEmail && slip.guest_email) {
+            companyEmail = slip.guest_email.trim();
+          }
+
+          const coordinatorName =
+            groupPayload.groupContact?.coordinatorName?.trim() ||
+            companyName;
+
+          const isPayLater =
+            slip.slip_url === 'PAY_LATER' ||
+            (typeof slip.bank === 'string' && slip.bank.includes('ชำระเงินภายหลัง'));
+
+          if (companyEmail && approvedApplicants.length > 0) {
+            sendCompanyGroupMembershipApprovedEmail({
+              to: companyEmail,
+              companyName,
+              coordinatorName,
+              ticketCode: slip.ticket_code || slip.slip_id,
+              amountPaid: slip.amount || approvedApplicants.length * 1000,
+              isPayLater,
+              applicants: approvedApplicants,
+            }).catch((companyMailErr) =>
+              console.error('Failed to send company group approval email:', companyMailErr)
+            );
           }
         } catch (grpCreateErr: any) {
           console.error('Failed to create group members on slip approval:', grpCreateErr);
@@ -551,7 +607,7 @@ export async function POST(request: NextRequest) {
           if (origSlip) {
             let origActs = origSlip.selected_activities;
             if (typeof origActs === 'string') {
-              try { origActs = JSON.parse(origActs); } catch {}
+              try { origActs = JSON.parse(origActs); } catch { }
             }
 
             if (Array.isArray(origActs)) {
@@ -612,44 +668,35 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 5. Send approval confirmation email
+      // 5. Send approval confirmation email (asynchronously in background)
       if (isMembershipRegistration) {
         // Individual membership registration
         if (!isGroupMembership) {
           const recipientEmail = slip.members?.email || slip.guest_email || memberPayload?.email || '';
           const recipientName = slip.members?.fullNameTh || slip.guest_name || memberPayload?.full_name_th || 'ผู้สมัครสมาชิก';
           if (recipientEmail) {
-            try {
-              await sendMembershipApprovedEmail({
-                to: recipientEmail,
-                recipientName,
-                memberNo: assignedMemberNo || '',
-                amountPaid: slip.amount,
-              });
-            } catch (mailErr) {
-              console.error('Failed to send membership approval email:', mailErr);
-            }
+            sendMembershipApprovedEmail({
+              to: recipientEmail,
+              recipientName,
+              memberNo: assignedMemberNo || '',
+              amountPaid: slip.amount,
+            }).catch((mailErr) => console.error('Failed to send membership approval email:', mailErr));
           }
         }
-        // (For group membership, individual sendMembershipApprovedEmail was already sent to each applicant in the group creation loop above)
       } else {
         // ONLY for conference/meeting registrations
         const recipientEmail = slip.members?.email || slip.guest_email || '';
         const recipientName = slip.members?.fullNameTh || slip.guest_name || 'ผู้ลงทะเบียน';
 
         if (recipientEmail) {
-          try {
-            await sendRegistrationApprovedEmail({
-              to: recipientEmail,
-              recipientName,
-              meetingName: slip.meetings?.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
-              ticketCode: slip.ticket_code || '',
-              amountPaid: slip.amount,
-              isMember: slip.is_member,
-            });
-          } catch (mailErr) {
-            console.error('Failed to send conference registration approval email:', mailErr);
-          }
+          sendRegistrationApprovedEmail({
+            to: recipientEmail,
+            recipientName,
+            meetingName: slip.meetings?.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
+            ticketCode: slip.ticket_code || '',
+            amountPaid: slip.amount,
+            isMember: slip.is_member,
+          }).catch((mailErr) => console.error('Failed to send conference registration approval email:', mailErr));
         }
       }
 
@@ -712,7 +759,25 @@ export async function POST(request: NextRequest) {
     } else {
       // Reject action
       const resubmitToken = crypto.randomBytes(24).toString('hex');
-      const rejectionReason = notes || 'โปรดแนบสลิปที่มียอดเงินและวันเวลาตรงตามที่กำหนด';
+      const rejectionReason = notes || 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบและแก้ไขข้อมูลให้ถูกต้อง';
+      const effectiveRejectType: 'info' | 'slip' = rejectType || (rejectionReason.includes('ข้อมูล') && !rejectionReason.includes('สลิป') ? 'info' : 'slip');
+
+      // Update selected_activities to include rejectType
+      let updatedActivities = slip.selected_activities;
+      try {
+        let act = typeof slip.selected_activities === 'string'
+          ? JSON.parse(slip.selected_activities)
+          : (slip.selected_activities || {});
+        if (typeof act === 'object' && !Array.isArray(act)) {
+          act.rejectType = effectiveRejectType;
+          updatedActivities = act;
+        } else if (Array.isArray(act)) {
+          updatedActivities = {
+            activities: act,
+            rejectType: effectiveRejectType,
+          };
+        }
+      } catch {}
 
       if ((prisma as any).payment_slips) {
         await (prisma as any).payment_slips.update({
@@ -723,6 +788,7 @@ export async function POST(request: NextRequest) {
             resubmit_token: resubmitToken,
             reviewed_by: reviewer || 'Admin',
             reviewed_at: new Date(),
+            selected_activities: updatedActivities,
           },
         });
       } else {
@@ -777,9 +843,27 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Determine if corporate/group registration
+      const isCorporate = Boolean(
+        isGroupMembership ||
+        isGroupConference ||
+        slip.ticket_code?.startsWith('MEMGRP') ||
+        groupPayload ||
+        slip.guest_name?.includes('ท่าน')
+      );
+
+      const effectiveCompanyName = groupPayload?.companyName || slip.guest_workplace || slip.members?.workplace || (isCorporate ? slip.guest_name?.replace(/\s*\(\d+\s*ท่าน\)/, '') : '');
+
       // Send rejection & resubmit email stub
       const recipientEmail = slip.members?.email || slip.guest_email || memberPayload?.email || '';
-      const recipientName = slip.members?.fullNameTh || slip.guest_name || memberPayload?.full_name_th || 'ผู้สมัคร';
+      const recipientName = isCorporate && effectiveCompanyName
+        ? effectiveCompanyName
+        : (slip.members?.fullNameTh || slip.guest_name || memberPayload?.full_name_th || 'ผู้สมัคร');
+
+      // แสดงแค่ข้อมูลบริษัท ถ้าเป็นองค์กร/กลุ่ม อย่าดึงเบอร์โทรของผู้สมัครมาปน
+      const applicantPhone = isCorporate ? undefined : (slip.members?.mobile || slip.guest_phone || memberPayload?.mobile || '');
+      const applicantWorkplace = isCorporate ? undefined : (slip.members?.workplace || slip.guest_workplace || memberPayload?.workplace || '');
+
       const origin = request.headers.get('origin') || (request.headers.get('host') ? `https://${request.headers.get('host')}` : '');
       const baseUrl = process.env.FRONTEND_URL || process.env.NEXTAUTH_URL || process.env.AUTH_URL || origin || 'http://localhost:3000';
       const resubmitUrl = `${baseUrl}/resubmit-slip/${resubmitToken}`;
@@ -794,6 +878,14 @@ export async function POST(request: NextRequest) {
               : (slip.meetings?.meeting_name || 'การประชุมวิชาการ สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (TSRM)'),
             rejectionReason,
             resubmitUrl,
+            ticketCode: slip.ticket_code || '',
+            amount: slip.amount,
+            applicantEmail: recipientEmail,
+            applicantPhone,
+            applicantWorkplace,
+            isCorporate,
+            companyName: effectiveCompanyName || undefined,
+            rejectType: effectiveRejectType,
           });
         } catch (mailErr) {
           console.error('Failed to send rejection email:', mailErr);

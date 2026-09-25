@@ -35,6 +35,7 @@ import {
   Layers,
   FileCheck,
   UserCheck,
+  Eye,
 } from 'lucide-react';
 import { PositionSelect, isScientistPosition } from '@/components/PositionSelect';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
@@ -108,6 +109,19 @@ const createInitialApplicant = (id: string, workplace = ''): ApplicantFormData =
   workCertPreview: null,
   selectedWorkCertFile: null,
 });
+
+/** Helper to check whether an attached file or URL is a PDF */
+const isPdfFile = (file: File | null | undefined, previewUrl: string | null | undefined): boolean => {
+  if (file) {
+    if (file.type === 'application/pdf') return true;
+    if (file.name.toLowerCase().endsWith('.pdf')) return true;
+  }
+  if (previewUrl) {
+    const cleanUrl = previewUrl.split('?')[0].toLowerCase();
+    if (cleanUrl.endsWith('.pdf') || cleanUrl.includes('.pdf')) return true;
+  }
+  return false;
+};
 
 export function SignupView({
   onNavigateToLogin,
@@ -311,12 +325,14 @@ export function SignupView({
 
     if (file.size > 5 * 1024 * 1024) {
       alert(lang === 'th' ? 'ขนาดรูปถ่ายเกิน 5MB กรุณาเลือกไฟล์ใหม่' : 'Photo size exceeds 5MB');
+      e.target.value = '';
       return;
     }
 
     const objectUrl = URL.createObjectURL(file);
     updateCurrentApplicant('photoPreview', objectUrl);
     updateCurrentApplicant('selectedPhotoFile', file);
+    e.target.value = '';
   };
 
   const handleDegreeCertUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -325,12 +341,14 @@ export function SignupView({
 
     if (file.size > 10 * 1024 * 1024) {
       alert(lang === 'th' ? 'ขนาดไฟล์เกิน 10MB กรุณาเลือกไฟล์ใหม่' : 'File size exceeds 10MB');
+      e.target.value = '';
       return;
     }
 
     const objectUrl = URL.createObjectURL(file);
     updateCurrentApplicant('degreeCertPreview', objectUrl);
     updateCurrentApplicant('selectedDegreeCertFile', file);
+    e.target.value = '';
   };
 
   const handleWorkCertUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -339,12 +357,14 @@ export function SignupView({
 
     if (file.size > 10 * 1024 * 1024) {
       alert(lang === 'th' ? 'ขนาดไฟล์เกิน 10MB กรุณาเลือกไฟล์ใหม่' : 'File size exceeds 10MB');
+      e.target.value = '';
       return;
     }
 
     const objectUrl = URL.createObjectURL(file);
     updateCurrentApplicant('workCertPreview', objectUrl);
     updateCurrentApplicant('selectedWorkCertFile', file);
+    e.target.value = '';
   };
 
   const handleClearForm = () => {
@@ -1133,69 +1153,110 @@ export function SignupView({
               })()}
 
               {/* Embedded Work Certificate Upload Box (Mandatory) */}
-              <div className="p-3.5 sm:p-4 rounded-2xl border border-indigo-200 bg-indigo-50/50 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Building className="w-4 h-4 text-[#0026b3]" />
-                    <span>{lang === 'th' ? 'รูปหลักฐานใบรับรองการทำงาน' : 'Work Certificate Document'}</span>
-                    <span className="text-red-500 font-black">*</span>
-                  </span>
-                  <span className="text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded-md">
-                    {lang === 'th' ? 'บังคับแนบเอกสาร *' : 'Required *'}
-                  </span>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-3 rounded-xl border border-slate-200/80">
-                  {currentApplicant.workCertPreview ? (
-                    <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-slate-300 bg-slate-50 shrink-0 shadow-2xs">
-                      <img
-                        src={currentApplicant.workCertPreview}
-                        alt="Work Cert"
-                        className="w-full h-full object-cover"
-                      />
+              {(() => {
+                const isWorkCertPdf = isPdfFile(currentApplicant.selectedWorkCertFile, currentApplicant.workCertPreview);
+                return (
+                  <div className="p-3.5 sm:p-4 rounded-2xl border border-indigo-200 bg-indigo-50/50 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Building className="w-4 h-4 text-[#0026b3]" />
+                        <span>{lang === 'th' ? 'รูปหลักฐานใบรับรองการทำงาน' : 'Work Certificate Document'}</span>
+                        <span className="text-red-500 font-black">*</span>
+                      </span>
+                      <span className="text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded-md">
+                        {lang === 'th' ? 'บังคับแนบเอกสาร *' : 'Required *'}
+                      </span>
                     </div>
-                  ) : (
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-indigo-500 shrink-0">
-                      <FileCheck className="w-6 h-6" />
-                    </div>
-                  )}
 
-                  <div className="flex-1 space-y-1 min-w-0">
-                    <p className="text-[11px] text-slate-600 leading-tight font-medium">
-                      {currentApplicant.workCertPreview
-                        ? (lang === 'th' ? 'แนบรูปหลักฐานใบรับรองการทำงานเรียบร้อยแล้ว' : 'Work certificate attached')
-                        : (lang === 'th' ? 'อัปโหลดใบรับรองการทำงาน (JPG, PNG หรือ PDF ไม่เกิน 10MB) *จำเป็นต้องแนบ' : 'Upload work certificate (JPG, PNG, PDF max 10MB) *Required')}
-                    </p>
-
-                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                      <label className="relative cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-900 text-xs font-bold border border-indigo-200 shadow-2xs transition active:scale-95">
-                        <Upload className="w-3.5 h-3.5 text-[#0026b3]" />
-                        <span>{currentApplicant.workCertPreview ? (lang === 'th' ? 'เปลี่ยนไฟล์' : 'Change') : (lang === 'th' ? 'อัปโหลดใบรับรองงาน *' : 'Upload Work Cert *')}</span>
-                        <input
-                          type="file"
-                          accept="image/*,.pdf"
-                          onChange={handleWorkCertUpload}
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                        />
-                      </label>
-
-                      {currentApplicant.workCertPreview && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            updateCurrentApplicant('workCertPreview', null);
-                            updateCurrentApplicant('selectedWorkCertFile', null);
-                          }}
-                          className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg border border-red-200 transition cursor-pointer"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          <span>{lang === 'th' ? 'ลบเอกสาร' : 'Remove'}</span>
-                        </button>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-3 rounded-xl border border-slate-200/80">
+                      {currentApplicant.workCertPreview ? (
+                        isWorkCertPdf ? (
+                          <div className="relative w-14 h-14 rounded-xl border border-rose-200 bg-rose-50 flex flex-col items-center justify-center text-rose-600 shrink-0 shadow-2xs">
+                            <FileText className="w-6 h-6 text-rose-500" />
+                            <span className="text-[9px] font-black uppercase tracking-wider text-rose-700 mt-0.5">PDF</span>
+                          </div>
+                        ) : (
+                          <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-slate-300 bg-slate-50 shrink-0 shadow-2xs">
+                            <img
+                              src={currentApplicant.workCertPreview}
+                              alt="Work Cert"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )
+                      ) : (
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-indigo-500 shrink-0">
+                          <FileCheck className="w-6 h-6" />
+                        </div>
                       )}
+
+                      <div className="flex-1 space-y-1 min-w-0">
+                        {currentApplicant.workCertPreview ? (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>
+                                {isWorkCertPdf
+                                  ? (lang === 'th' ? 'แนบเอกสาร PDF ใบรับรองการทำงานแล้ว' : 'PDF work certificate attached')
+                                  : (lang === 'th' ? 'แนบรูปหลักฐานใบรับรองการทำงานเรียบร้อยแล้ว' : 'Work certificate attached')}
+                              </span>
+                            </div>
+                            {currentApplicant.selectedWorkCertFile?.name && (
+                              <p className="text-[11px] text-slate-500 font-mono truncate max-w-xs sm:max-w-md">
+                                {currentApplicant.selectedWorkCertFile.name}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-600 leading-tight font-medium">
+                            {lang === 'th' ? 'อัปโหลดใบรับรองการทำงาน (JPG, PNG หรือ PDF ไม่เกิน 10MB) *จำเป็นต้องแนบ' : 'Upload work certificate (JPG, PNG, PDF max 10MB) *Required'}
+                          </p>
+                        )}
+
+                        <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                          {currentApplicant.workCertPreview && (
+                            <a
+                              href={currentApplicant.workCertPreview}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#0026b3] text-xs font-bold border border-blue-200 shadow-2xs transition active:scale-95"
+                              title="เปิดดูไฟล์ในแท็บใหม่"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-[#0026b3]" />
+                              <span>{isWorkCertPdf ? (lang === 'th' ? 'เปิดดู PDF' : 'View PDF') : (lang === 'th' ? 'ดูรูปภาพ' : 'View Photo')}</span>
+                            </a>
+                          )}
+
+                          <label className="relative cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-900 text-xs font-bold border border-indigo-200 shadow-2xs transition active:scale-95">
+                            <Upload className="w-3.5 h-3.5 text-[#0026b3]" />
+                            <span>{currentApplicant.workCertPreview ? (lang === 'th' ? 'เปลี่ยนไฟล์' : 'Change') : (lang === 'th' ? 'อัปโหลดใบรับรองงาน *' : 'Upload Work Cert *')}</span>
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf,.pdf"
+                              onChange={handleWorkCertUpload}
+                              className="absolute inset-0 opacity-0 cursor-pointer"
+                            />
+                          </label>
+
+                          {currentApplicant.workCertPreview && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateCurrentApplicant('workCertPreview', null);
+                                updateCurrentApplicant('selectedWorkCertFile', null);
+                              }}
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg border border-red-200 transition cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>{lang === 'th' ? 'ลบเอกสาร' : 'Remove'}</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
 
             {/* 3. ประวัติการศึกษาและหลักฐานปริญญาบัตร (Education Background & Degree Certificate) */}
@@ -1284,68 +1345,109 @@ export function SignupView({
               </div>
 
               {/* Embedded Degree Certificate Upload Box */}
-              <div className="p-3.5 sm:p-4 rounded-2xl border border-blue-100 bg-blue-50/40 space-y-2 pt-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <GraduationCap className="w-4 h-4 text-[#0026b3]" />
-                    <span>{lang === 'th' ? 'รูปหลักฐานปริญญาบัตร' : 'Degree Certificate Document'}</span>
-                  </span>
-                  <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md">
-                    {lang === 'th' ? 'ปริญญาบัตร' : 'Degree'}
-                  </span>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-3 rounded-xl border border-slate-200/80">
-                  {currentApplicant.degreeCertPreview ? (
-                    <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-slate-300 bg-slate-50 shrink-0 shadow-2xs">
-                      <img
-                        src={currentApplicant.degreeCertPreview}
-                        alt="Degree Cert"
-                        className="w-full h-full object-cover"
-                      />
+              {(() => {
+                const isDegreeCertPdf = isPdfFile(currentApplicant.selectedDegreeCertFile, currentApplicant.degreeCertPreview);
+                return (
+                  <div className="p-3.5 sm:p-4 rounded-2xl border border-blue-100 bg-blue-50/40 space-y-2 pt-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <GraduationCap className="w-4 h-4 text-[#0026b3]" />
+                        <span>{lang === 'th' ? 'รูปหลักฐานปริญญาบัตร' : 'Degree Certificate Document'}</span>
+                      </span>
+                      <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md">
+                        {lang === 'th' ? 'ปริญญาบัตร' : 'Degree'}
+                      </span>
                     </div>
-                  ) : (
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/50 flex items-center justify-center text-blue-500 shrink-0">
-                      <FileCheck className="w-6 h-6" />
-                    </div>
-                  )}
 
-                  <div className="flex-1 space-y-1 min-w-0">
-                    <p className="text-[11px] text-slate-600 leading-tight font-medium">
-                      {currentApplicant.degreeCertPreview
-                        ? (lang === 'th' ? 'แนบรูปหลักฐานปริญญาบัตรแล้ว' : 'Degree certificate attached')
-                        : (lang === 'th' ? 'อัปโหลดรูปหลักฐานปริญญาบัตร (JPG, PNG หรือ PDF ไม่เกิน 10MB)' : 'Upload degree certificate (JPG, PNG, PDF max 10MB)')}
-                    </p>
-
-                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                      <label className="relative cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 text-xs font-bold border border-blue-200 shadow-2xs transition active:scale-95">
-                        <Upload className="w-3.5 h-3.5 text-[#0026b3]" />
-                        <span>{currentApplicant.degreeCertPreview ? (lang === 'th' ? 'เปลี่ยนไฟล์' : 'Change') : (lang === 'th' ? 'อัปโหลดปริญญาบัตร' : 'Upload Degree')}</span>
-                        <input
-                          type="file"
-                          accept="image/*,.pdf"
-                          onChange={handleDegreeCertUpload}
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                        />
-                      </label>
-
-                      {currentApplicant.degreeCertPreview && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            updateCurrentApplicant('degreeCertPreview', null);
-                            updateCurrentApplicant('selectedDegreeCertFile', null);
-                          }}
-                          className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg border border-red-200 transition cursor-pointer"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          <span>{lang === 'th' ? 'ลบเอกสาร' : 'Remove'}</span>
-                        </button>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-3 rounded-xl border border-slate-200/80">
+                      {currentApplicant.degreeCertPreview ? (
+                        isDegreeCertPdf ? (
+                          <div className="relative w-14 h-14 rounded-xl border border-rose-200 bg-rose-50 flex flex-col items-center justify-center text-rose-600 shrink-0 shadow-2xs">
+                            <FileText className="w-6 h-6 text-rose-500" />
+                            <span className="text-[9px] font-black uppercase tracking-wider text-rose-700 mt-0.5">PDF</span>
+                          </div>
+                        ) : (
+                          <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-slate-300 bg-slate-50 shrink-0 shadow-2xs">
+                            <img
+                              src={currentApplicant.degreeCertPreview}
+                              alt="Degree Cert"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )
+                      ) : (
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/50 flex items-center justify-center text-blue-500 shrink-0">
+                          <FileCheck className="w-6 h-6" />
+                        </div>
                       )}
+
+                      <div className="flex-1 space-y-1 min-w-0">
+                        {currentApplicant.degreeCertPreview ? (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>
+                                {isDegreeCertPdf
+                                  ? (lang === 'th' ? 'แนบเอกสาร PDF ปริญญาบัตรแล้ว' : 'PDF degree certificate attached')
+                                  : (lang === 'th' ? 'แนบรูปหลักฐานปริญญาบัตรแล้ว' : 'Degree certificate attached')}
+                              </span>
+                            </div>
+                            {currentApplicant.selectedDegreeCertFile?.name && (
+                              <p className="text-[11px] text-slate-500 font-mono truncate max-w-xs sm:max-w-md">
+                                {currentApplicant.selectedDegreeCertFile.name}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-600 leading-tight font-medium">
+                            {lang === 'th' ? 'อัปโหลดรูปหลักฐานปริญญาบัตร (JPG, PNG หรือ PDF ไม่เกิน 10MB)' : 'Upload degree certificate (JPG, PNG, PDF max 10MB)'}
+                          </p>
+                        )}
+
+                        <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                          {currentApplicant.degreeCertPreview && (
+                            <a
+                              href={currentApplicant.degreeCertPreview}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#0026b3] text-xs font-bold border border-blue-200 shadow-2xs transition active:scale-95"
+                              title="เปิดดูไฟล์ในแท็บใหม่"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-[#0026b3]" />
+                              <span>{isDegreeCertPdf ? (lang === 'th' ? 'เปิดดู PDF' : 'View PDF') : (lang === 'th' ? 'ดูรูปภาพ' : 'View Photo')}</span>
+                            </a>
+                          )}
+
+                          <label className="relative cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 text-xs font-bold border border-blue-200 shadow-2xs transition active:scale-95">
+                            <Upload className="w-3.5 h-3.5 text-[#0026b3]" />
+                            <span>{currentApplicant.degreeCertPreview ? (lang === 'th' ? 'เปลี่ยนไฟล์' : 'Change') : (lang === 'th' ? 'อัปโหลดปริญญาบัตร' : 'Upload Degree')}</span>
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf,.pdf"
+                              onChange={handleDegreeCertUpload}
+                              className="absolute inset-0 opacity-0 cursor-pointer"
+                            />
+                          </label>
+
+                          {currentApplicant.degreeCertPreview && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateCurrentApplicant('degreeCertPreview', null);
+                                updateCurrentApplicant('selectedDegreeCertFile', null);
+                              }}
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg border border-red-200 transition cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>{lang === 'th' ? 'ลบเอกสาร' : 'Remove'}</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
 
             {/* 5. Clause 10.5 Notice Banner & Terms Consent */}
