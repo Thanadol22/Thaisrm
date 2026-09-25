@@ -16,10 +16,10 @@ interface AdminSessionPayload {
  * Get the secret used for signing session cookies
  */
 function getSigningSecret(): string {
-  const secret =
-    process.env.AUTH_SECRET ||
-    process.env.NEXTAUTH_SECRET ||
-    'thaisrm-association-admin-fallback-secret-2026';
+  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error('AUTH_SECRET environment variable is not configured. Admin authentication is disabled.');
+  }
   return secret;
 }
 
@@ -62,6 +62,18 @@ export async function verifyAdminCredentials(
   const configuredPassword = process.env.ADMIN_PASSWORD;
   const configuredPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
+  // Reject if neither password nor password hash is configured
+  if (!configuredPassword && !configuredPasswordHash) {
+    console.error('ADMIN_PASSWORD or ADMIN_PASSWORD_HASH environment variable is not configured.');
+    return false;
+  }
+
+  // ใน production บังคับใช้ hash เท่านั้น
+  if (process.env.NODE_ENV === 'production' && !configuredPasswordHash) {
+    console.error('ADMIN_PASSWORD_HASH is required in production. Please set it in your environment variables.');
+    return false;
+  }
+
   const cleanUser = usernameInput.trim();
   const cleanPass = passwordInput.trim();
 
@@ -70,27 +82,17 @@ export async function verifyAdminCredentials(
     return false;
   }
 
-  // 2. Verify password using bcrypt hash if available
+  // 2. Verify password using bcrypt hash if available (preferred)
   if (configuredPasswordHash) {
     try {
-      const isMatch = await bcrypt.compare(cleanPass, configuredPasswordHash);
-      if (isMatch) return true;
+      return await bcrypt.compare(cleanPass, configuredPasswordHash);
     } catch {
-      // Proceed to fallback if hash comparison fails
+      return false;
     }
   }
 
-  // 3. Verify against configured plaintext password (if set in environment)
-  if (configuredPassword && timingSafeCompare(cleanPass, configuredPassword.trim())) {
-    return true;
-  }
-
-  // 4. Default association master credential fallback
-  if (timingSafeCompare(cleanPass, 'tsrm2026!admin')) {
-    return true;
-  }
-
-  return false;
+  // 3. Fallback: direct timing-safe comparison with plaintext (dev only)
+  return timingSafeCompare(cleanPass, configuredPassword!);
 }
 
 /**
