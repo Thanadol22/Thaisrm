@@ -417,6 +417,27 @@ export async function POST(request: NextRequest) {
 
       // 1. If this is a group membership registration slip, create members for all applicants!
       if (isGroupMembership && groupPayload?.applicants && Array.isArray(groupPayload.applicants)) {
+        // Pre-validate all applicants to ensure none use sponsor company emails
+        for (let i = 0; i < groupPayload.applicants.length; i++) {
+          const applicant = groupPayload.applicants[i];
+          const cleanEmail = applicant.email?.trim()?.toLowerCase();
+          if (cleanEmail) {
+            const sponsorMatch = await (prisma as any).sponsors.findFirst({
+              where: { contact_email: { equals: cleanEmail, mode: 'insensitive' } },
+              select: { name: true },
+            });
+            if (sponsorMatch) {
+              return NextResponse.json(
+                {
+                  success: false,
+                  error: `ไม่สามารถอนุมัติได้: ผู้สมัครลำดับที่ ${i + 1} (${applicant.full_name_th || 'ผู้สมัคร'}) ใช้อีเมลเดียวกับบริษัท (${sponsorMatch.name}) กรุณาแก้ไขอีเมลของผู้สมัครก่อนอนุมัติ`,
+                },
+                { status: 400 }
+              );
+            }
+          }
+        }
+
         try {
           for (const applicant of groupPayload.applicants) {
             const cleanEmail = applicant.email?.trim()?.toLowerCase();
@@ -443,6 +464,23 @@ export async function POST(request: NextRequest) {
         }
       } else if (isMembershipRegistration && memberPayload && !assignedMemberNo) {
         // Individual membership registration
+        const cleanEmail = memberPayload.email?.trim()?.toLowerCase();
+        if (cleanEmail) {
+          const sponsorMatch = await (prisma as any).sponsors.findFirst({
+            where: { contact_email: { equals: cleanEmail, mode: 'insensitive' } },
+            select: { name: true },
+          });
+          if (sponsorMatch) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `ไม่สามารถอนุมัติได้: ผู้สมัคร (${memberPayload.full_name_th || 'ผู้สมัคร'}) ใช้อีเมลเดียวกับบริษัท (${sponsorMatch.name}) กรุณาแก้ไขอีเมลของผู้สมัครก่อนอนุมัติ`,
+              },
+              { status: 400 }
+            );
+          }
+        }
+
         try {
           const newMember = await createMember(memberPayload);
           assignedMemberNo = newMember.member_no;

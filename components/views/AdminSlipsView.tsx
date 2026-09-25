@@ -1184,8 +1184,20 @@ export function AdminSlipsView() {
                                 <span className="text-slate-400 font-normal">({app.full_name_en})</span>
                               )}
                             </span>
-                            <span className="text-[11px] text-indigo-600 font-mono">
-                              {app.email || app.mobile || '-'}
+                            <span className="flex items-center gap-1.5">
+                              {Boolean(
+                                (selectedSlip.groupPayload?.groupContact?.coordinatorEmail &&
+                                  app.email?.trim().toLowerCase() === selectedSlip.groupPayload.groupContact.coordinatorEmail.trim().toLowerCase()) ||
+                                (selectedSlip.email &&
+                                  app.email?.trim().toLowerCase() === selectedSlip.email.trim().toLowerCase())
+                              ) && (
+                                <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded shadow-2xs">
+                                  ⚠️ ใช้อีเมลเดียวกับบริษัท
+                                </span>
+                              )}
+                              <span className="text-[11px] text-indigo-600 font-mono">
+                                {app.email || app.mobile || '-'}
+                              </span>
                             </span>
                           </div>
                           <div className="text-[11px] text-slate-500 pl-7 flex flex-wrap gap-x-3 gap-y-0.5">

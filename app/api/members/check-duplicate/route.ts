@@ -36,6 +36,22 @@ export async function POST(req: NextRequest) {
           });
         }
 
+        // Check if email belongs to a corporate sponsor
+        const existingSponsor = await (prisma as any).sponsors.findFirst({
+          where: { contact_email: { equals: targetEmail, mode: 'insensitive' } },
+          select: { name: true, contact_email: true },
+        });
+
+        if (existingSponsor) {
+          return NextResponse.json({
+            success: true,
+            isDuplicate: true,
+            field: 'email',
+            email: targetEmail,
+            message: `ไม่สามารถใช้อีเมลนี้สมัครสมาชิกได้ เนื่องจากเป็นอีเมลของบริษัท (${existingSponsor.name}) กรุณาใช้อีเมลส่วนตัวของผู้สมัคร`,
+          });
+        }
+
         // Check pending slips
         const pendingSlip = await prisma.payment_slips.findFirst({
           where: {

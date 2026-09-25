@@ -445,6 +445,17 @@ export function SignupView({
         return;
       }
 
+      // 1.5.1 Check if email matches sponsor company / coordinator email
+      if (sponsorSession?.contactEmail && cleanEmail === sponsorSession.contactEmail.trim().toLowerCase()) {
+        setSubmitError(
+          lang === 'th'
+            ? `ไม่สามารถใช้อีเมลเดียวกับบริษัท/ผู้ประสานงาน ${personLabel} ได้ กรุณาระบุอีเมลส่วนบุคคลของผู้สมัคร`
+            : `Applicant ${personLabel} cannot use the company contact email. Please provide individual applicant's email.`
+        );
+        triggerPersonSwitch(i);
+        return;
+      }
+
       // 1.6 Workplace
       if (!app.workplace || !app.workplace.trim()) {
         setSubmitError(lang === 'th' ? `กรุณากรอกสถานที่ทำงาน/หน่วยงาน ${personLabel}` : `Please enter workplace ${personLabel}`);
@@ -636,7 +647,13 @@ export function SignupView({
         // Group Membership Application
         const groupPayload = {
           isGroup: true,
-          companyName: processedApplicants[0]?.workplace || 'Corporate Membership',
+          companyName: sponsorSession?.sponsorName || processedApplicants[0]?.workplace || 'Corporate Membership',
+          sponsorId: sponsorSession?.sponsorId || undefined,
+          groupContact: sponsorSession ? {
+            sponsorId: sponsorSession.sponsorId,
+            coordinatorName: sponsorSession.contactName || sponsorSession.sponsorName,
+            coordinatorEmail: sponsorSession.contactEmail,
+          } : undefined,
           applicants: processedApplicants,
           totalAmount: 1000 * processedApplicants.length,
           submittedAt: new Date().toISOString(),
@@ -1000,6 +1017,17 @@ export function SignupView({
                   placeholder={t.signup.emailPlaceholder}
                   required
                 />
+                {sponsorSession?.contactEmail &&
+                  currentApplicant.email.trim().toLowerCase() === sponsorSession.contactEmail.trim().toLowerCase() && (
+                    <div className="mt-1.5 p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-1.5 animate-fade-in font-medium">
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                      <span>
+                        {lang === 'th'
+                          ? 'ไม่อนุญาตให้ใช้อีเมลเดียวกับบริษัท/ผู้ประสานงานในการสมัครสมาชิก กรุณากรอกอีเมลส่วนบุคคลของผู้สมัครแต่ละท่าน'
+                          : "Cannot use the company contact email. Please provide the applicant's personal email."}
+                      </span>
+                    </div>
+                  )}
               </div>
             </div>
 

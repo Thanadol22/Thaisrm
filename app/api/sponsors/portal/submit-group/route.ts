@@ -131,6 +131,13 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
+      if (entry.email && sponsor.contact_email && entry.email.trim().toLowerCase() === sponsor.contact_email.trim().toLowerCase()) {
+        errors.push(
+          `ลำดับที่ ${i + 1}: ไม่สามารถใช้อีเมลเดียวกับตัวแทนบริษัทสปอนเซอร์ในการลงทะเบียนได้ กรุณาระบุอีเมลของผู้เข้าร่วม`
+        );
+        continue;
+      }
+
       // สุ่มรหัส Ticket Code ที่ไม่ซ้ำ
       const randomSuffix = crypto.randomBytes(3).toString('hex').toUpperCase();
       const ticketCode = `TSRM-${meetingId.substring(0, 4).toUpperCase()}-SP${randomSuffix}`;

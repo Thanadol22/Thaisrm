@@ -63,10 +63,41 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check duplicates for each applicant's email
-      for (const app of applicants) {
+      // Check duplicates and sponsor company email conflict for each applicant
+      for (let i = 0; i < applicants.length; i++) {
+        const app = applicants[i];
         const appEmail = app.email?.trim()?.toLowerCase();
         if (appEmail) {
+          // 1. Check if applicant email matches coordinator/sponsor email submitted
+          const coordEmail = groupContact?.coordinatorEmail?.trim()?.toLowerCase();
+          if (coordEmail && appEmail === coordEmail) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `ผู้สมัครลำดับที่ ${i + 1} (${app.full_name_th || 'ผู้สมัคร'}): ไม่สามารถใช้อีเมลเดียวกับบริษัท/ผู้ประสานงานในการสมัครสมาชิกได้ กรุณาระบุอีเมลส่วนตัวของผู้สมัคร`,
+                code: 'SPONSOR_EMAIL_NOT_ALLOWED',
+              },
+              { status: 400 }
+            );
+          }
+
+          // 2. Check if applicant email matches any registered sponsor company in database
+          const sponsorMatch = await (prisma as any).sponsors.findFirst({
+            where: { contact_email: { equals: appEmail, mode: 'insensitive' } },
+            select: { name: true },
+          });
+          if (sponsorMatch) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `ผู้สมัครลำดับที่ ${i + 1} (${app.full_name_th || 'ผู้สมัคร'}): ไม่สามารถใช้อีเมลนี้ได้ เนื่องจากเป็นอีเมลของบริษัท (${sponsorMatch.name}) กรุณาระบุอีเมลส่วนตัวของผู้สมัคร`,
+                code: 'SPONSOR_EMAIL_NOT_ALLOWED',
+              },
+              { status: 400 }
+            );
+          }
+
+          // 3. Check existing member duplicate
           const existing = await prisma.member.findFirst({
             where: { email: { equals: appEmail, mode: 'insensitive' } },
             select: { member_no: true, fullNameTh: true },
@@ -143,8 +174,25 @@ export async function POST(request: NextRequest) {
 
     const email = memberPayload.email?.trim()?.toLowerCase();
 
-    // 1. ตรวจสอบอีเมลซ้ำกับสมาชิกที่มีอยู่ในระบบแล้ว
+    // 1. ตรวจสอบว่าไม่ใช่อีเมลเดียวกับบริษัทสปอนเซอร์
     if (email) {
+      const sponsorMatch = await (prisma as any).sponsors.findFirst({
+        where: { contact_email: { equals: email, mode: 'insensitive' } },
+        select: { name: true },
+      });
+
+      if (sponsorMatch) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `ไม่สามารถใช้อีเมลนี้ในการสมัครสมาชิกได้ เนื่องจากเป็นอีเมลของบริษัท (${sponsorMatch.name}) กรุณาระบุอีเมลส่วนตัวของผู้สมัคร`,
+            code: 'SPONSOR_EMAIL_NOT_ALLOWED',
+          },
+          { status: 400 }
+        );
+      }
+
+      // ตรวจสอบอีเมลซ้ำกับสมาชิกที่มีอยู่ในระบบแล้ว
       const existingMember = await prisma.member.findFirst({
         where: { email: { equals: email, mode: 'insensitive' } },
         select: { member_no: true, fullNameTh: true, email: true, membership_status: true },

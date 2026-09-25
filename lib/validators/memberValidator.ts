@@ -230,6 +230,19 @@ export async function validateCreateMember(
     if (!EMAIL_REGEX.test(input.email)) {
       errors.push({ field: 'email', message: 'รูปแบบอีเมลไม่ถูกต้อง (เช่น user@example.com)' });
     } else if (options.checkDuplicates) {
+      // ตรวจสอบว่าไม่ใช่อีเมลของบริษัทสปอนเซอร์
+      const sponsorWithEmail = await (prisma as any).sponsors.findFirst({
+        where: { contact_email: { equals: input.email, mode: 'insensitive' } },
+        select: { name: true },
+      });
+
+      if (sponsorWithEmail) {
+        errors.push({
+          field: 'email',
+          message: `ไม่สามารถใช้อีเมลนี้สมัครสมาชิกได้ เนื่องจากเป็นอีเมลของบริษัท (${sponsorWithEmail.name}) กรุณาใช้อีเมลส่วนตัวของผู้สมัคร`,
+        });
+      }
+
       // ตรวจสอบอีเมลซ้ำในระบบ (ใช้ Prisma Parameterized Query ปลอดภัยจาก SQLi)
       const existingEmail = await prisma.member.findFirst({
         where: { email: { equals: input.email, mode: 'insensitive' } },
