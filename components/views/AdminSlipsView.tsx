@@ -998,11 +998,26 @@ export function AdminSlipsView() {
                     {(slip.couponCode || slip.couponInfo?.code) && (
                       <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-800 px-2.5 py-0.5 rounded-md border border-emerald-300 flex items-center gap-1 shadow-2xs">
                         <span>🎟️ คูปอง: {slip.couponCode || slip.couponInfo?.code}</span>
-                        {slip.discountTotal && slip.discountTotal > 0 ? (
-                          <span className="text-emerald-700 font-black font-mono">
-                            (-฿{slip.discountTotal.toLocaleString()})
-                          </span>
-                        ) : null}
+                        {(() => {
+                          const effDisc = (() => {
+                            const attendees = slip.groupPayload?.attendees;
+                            if (Array.isArray(attendees) && attendees.length > 0) {
+                              const sumAtt = attendees.reduce((sum: number, att: any) => {
+                                return sum + (Number(att.discountTotal) || Number(att.discountAmount) || 4000);
+                              }, 0);
+                              return Math.max(slip.discountTotal || 0, sumAtt, Number(slip.groupPayload?.discountAmount) || 0);
+                            }
+                            return slip.discountTotal || 0;
+                          })();
+                          if (effDisc > 0) {
+                            return (
+                              <span className="text-emerald-700 font-black font-mono">
+                                (-฿{effDisc.toLocaleString()})
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                       </span>
                     )}
                   </div>
@@ -1901,7 +1916,26 @@ export function AdminSlipsView() {
                         {lang === 'th' ? 'ส่วนลดที่ได้รับ' : 'Discount Applied'}
                       </span>
                       <span className="font-black font-mono text-sm sm:text-base text-emerald-700 text-right">
-                        -฿{(selectedSlip.discountTotal || ((selectedSlip.groupPayload?.attendees?.length || 1) * 4000)).toLocaleString()} THB
+                        -฿{(() => {
+                          const attendees = selectedSlip.groupPayload?.attendees;
+                          if (Array.isArray(attendees) && attendees.length > 0) {
+                            const sumAttDiscount = attendees.reduce((sum: number, att: any) => {
+                              const attUsage = selectedSlip.couponUsages?.find(
+                                (cu) => (att.memberNo && cu.memberNo === att.memberNo) ||
+                                  (att.email && cu.attendeeEmail?.toLowerCase() === att.email.toLowerCase()) ||
+                                  (att.nameTh && cu.attendeeName === att.nameTh)
+                              );
+                              const isCouponActive = Boolean(selectedSlip.couponCode || selectedSlip.couponInfo?.code);
+                              const isFreeCoupon = selectedSlip.couponInfo?.discountType === 'free';
+                              const attDisc = (attUsage?.discountApplied && Number(attUsage.discountApplied) > 0)
+                                ? Number(attUsage.discountApplied)
+                                : (Number(att.discountTotal) || Number(att.discountAmount) || ((isFreeCoupon || isCouponActive) ? 4000 : 0));
+                              return sum + attDisc;
+                            }, 0);
+                            return Math.max(selectedSlip.discountTotal || 0, sumAttDiscount, Number(selectedSlip.groupPayload?.discountAmount) || 0).toLocaleString();
+                          }
+                          return (selectedSlip.discountTotal || 4000).toLocaleString();
+                        })()} THB
                       </span>
                     </div>
                   )}
@@ -1958,9 +1992,29 @@ export function AdminSlipsView() {
                             </div>
                             <div className="text-right shrink-0">
                               {(() => {
-                                const effGroupDiscount = (selectedSlip.discountTotal && selectedSlip.discountTotal > 0)
-                                  ? selectedSlip.discountTotal
-                                  : (selectedSlip.couponInfo?.discountType === 'free' || Boolean(selectedSlip.couponCode) ? attendeesCount * 4000 : 0);
+                                const attendees = selectedSlip.groupPayload?.attendees;
+                                const effGroupDiscount = (() => {
+                                  if (Array.isArray(attendees) && attendees.length > 0) {
+                                    const sumAttDiscount = attendees.reduce((sum: number, att: any) => {
+                                      const attUsage = selectedSlip.couponUsages?.find(
+                                        (cu) => (att.memberNo && cu.memberNo === att.memberNo) ||
+                                          (att.email && cu.attendeeEmail?.toLowerCase() === att.email.toLowerCase()) ||
+                                          (att.nameTh && cu.attendeeName === att.nameTh)
+                                      );
+                                      const isCouponActive = Boolean(selectedSlip.couponCode || selectedSlip.couponInfo?.code);
+                                      const isFreeCoupon = selectedSlip.couponInfo?.discountType === 'free';
+                                      const attDisc = (attUsage?.discountApplied && Number(attUsage.discountApplied) > 0)
+                                        ? Number(attUsage.discountApplied)
+                                        : (Number(att.discountTotal) || Number(att.discountAmount) || ((isFreeCoupon || isCouponActive) ? 4000 : 0));
+                                      return sum + attDisc;
+                                    }, 0);
+                                    return Math.max(selectedSlip.discountTotal || 0, sumAttDiscount, Number(selectedSlip.groupPayload?.discountAmount) || 0);
+                                  }
+                                  return (selectedSlip.discountTotal && selectedSlip.discountTotal > 0)
+                                    ? selectedSlip.discountTotal
+                                    : (selectedSlip.couponInfo?.discountType === 'free' || Boolean(selectedSlip.couponCode) ? attendeesCount * 4000 : 0);
+                                })();
+
                                 if (effGroupDiscount > 0) {
                                   return (
                                     <div className="flex items-center gap-1.5 justify-end">

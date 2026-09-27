@@ -289,59 +289,80 @@ export async function GET(request: NextRequest) {
               }
             : null));
 
-      let discountTotal = 0;
-      if (matchedUsages.length > 0) {
-        const usageSum = matchedUsages.reduce((sum: number, cu: any) => sum + (Number(cu.discount_applied) || 0), 0);
-        if (usageSum > 0) {
-          discountTotal = usageSum;
-        } else if (couponRecord?.discount_type === 'free') {
-          discountTotal = matchedUsages.length * 4000;
-        }
-      }
-
-      // Calculate discountTotal for group or attendees if matchedUsages was empty
-      if (!discountTotal && (couponRecord || couponCode)) {
-        if (Array.isArray(attendees) && attendees.length > 0) {
-          let calculatedDiscount = 0;
-          attendees.forEach((att: any) => {
-            const attActs = att.selectedActivities || [];
-            const hasMain = attActs.some((a: any) =>
-              a.name?.toLowerCase().includes('main') ||
-              a.name?.includes('Main Program') ||
-              a.name?.includes('การประชุมหลัก')
-            ) || att.programNameTh?.includes('Main') || att.programNameEn?.includes('Main') || true;
-
-            if (couponRecord?.discount_type === 'free' || !couponRecord?.discount_type) {
-              if (hasMain) {
-                calculatedDiscount += 4000;
-              }
-            } else if (couponRecord?.discount_type === 'fixed') {
-              calculatedDiscount += Number(couponRecord.discount_value) || 0;
-            } else if (couponRecord?.discount_type === 'percent') {
-              const attPrice = Number(att.subtotal || att.price || 0);
-              calculatedDiscount += attPrice * ((Number(couponRecord.discount_value) || 0) / 100);
-            }
-          });
-
-          if (calculatedDiscount > 0) {
-            discountTotal = calculatedDiscount;
+      // 1. Calculate discount across attendees if group attendees are present
+      let calculatedAttendeesDiscount = 0;
+      if (Array.isArray(attendees) && attendees.length > 0) {
+        calculatedAttendeesDiscount = attendees.reduce((sum: number, att: any) => {
+          const matchedCu = matchedUsages.find(
+            (cu: any) => (att.memberNo && cu.member_no === att.memberNo) ||
+              (att.email && cu.attendee_email?.toLowerCase() === att.email.toLowerCase()) ||
+              (att.nameTh && cu.attendee_name === att.nameTh)
+          );
+          if (matchedCu?.discount_applied && Number(matchedCu.discount_applied) > 0) {
+            return sum + Number(matchedCu.discount_applied);
           }
-        } else if (couponRecord?.discount_type === 'free' || couponInfo?.discountType === 'free') {
-          discountTotal = 4000;
+          if (att.discountTotal && Number(att.discountTotal) > 0) {
+            return sum + Number(att.discountTotal);
+          }
+          if (att.discountAmount && Number(att.discountAmount) > 0) {
+            return sum + Number(att.discountAmount);
+          }
+          const attActs = att.selectedActivities || [];
+          const hasMain = attActs.some((a: any) =>
+            a.name?.toLowerCase().includes('main') ||
+            a.name?.includes('Main Program') ||
+            a.name?.includes('การประชุมหลัก')
+          ) || att.programNameTh?.includes('Main') || att.programNameEn?.includes('Main') || true;
+
+          if (couponRecord?.discount_type === 'free' || couponInfo?.discountType === 'free' || couponCode) {
+            return sum + (hasMain ? 4000 : 0);
+          } else if (couponRecord?.discount_type === 'fixed') {
+            return sum + (Number(couponRecord.discount_value) || 0);
+          } else if (couponRecord?.discount_type === 'percent') {
+            const attPrice = Number(att.subtotal || att.price || 0);
+            return sum + (attPrice * ((Number(couponRecord.discount_value) || 0) / 100));
+          }
+          return sum;
+        }, 0);
+      }
+
+      // 2. Sum from matchedUsages directly
+      let usageSum = 0;
+      if (matchedUsages.length > 0) {
+        usageSum = matchedUsages.reduce((sum: number, cu: any) => sum + (Number(cu.discount_applied) || 0), 0);
+        if (usageSum === 0 && (couponRecord?.discount_type === 'free' || couponInfo?.discountType === 'free')) {
+          usageSum = matchedUsages.length * 4000;
         }
       }
 
-      if (!discountTotal && parsedAct.groupPayload?.discountAmount) {
-        discountTotal = Number(parsedAct.groupPayload.discountAmount) || 0;
-      }
+      // 3. Payload discount amount
+      const payloadDiscount = Number(parsedAct.groupPayload?.discountAmount) || 0;
 
-      // Compare original sum against actual slip.amount
-      if (!discountTotal && (couponRecord || couponCode) && Array.isArray(attendees) && attendees.length > 0) {
-        const origSum = attendees.reduce((sum: number, a: any) => sum + Number(a.subtotal || a.price || 0), 0);
+      // 4. Difference from original total
+      let diffDiscount = 0;
+      if (Array.isArray(attendees) && attendees.length > 0) {
+        const origSum = attendees.reduce((sum: number, a: any) => sum + Number(a.originalTotal || a.subtotal || a.price || 0), 0);
         if (origSum > Number(s.amount)) {
-          discountTotal = origSum - Number(s.amount);
+          diffDiscount = origSum - Number(s.amount);
         }
       }
+
+      // 5. If individual registration with free coupon
+      let singleFreeDiscount = 0;
+      if (!Array.isArray(attendees) || attendees.length <= 1) {
+        if (couponRecord?.discount_type === 'free' || couponInfo?.discountType === 'free' || Boolean(couponCode)) {
+          singleFreeDiscount = 4000;
+        }
+      }
+
+      // Combine by taking the most accurate and complete discount value
+      const discountTotal = Math.max(
+        calculatedAttendeesDiscount,
+        usageSum,
+        payloadDiscount,
+        diffDiscount,
+        singleFreeDiscount
+      );
 
       const couponUsagesList: any[] = matchedUsages.map((cu: any) => ({
         id: cu.id.toString(),
@@ -407,6 +428,39 @@ export async function GET(request: NextRequest) {
             });
           });
         }
+      } else if (Array.isArray(attendees) && attendees.length > couponUsagesList.length && (couponRecord || couponCode)) {
+        // Supplement any missing group attendees to couponUsagesList
+        attendees.forEach((att: any, idx: number) => {
+          const alreadyInList = couponUsagesList.some(
+            (cu: any) => (att.memberNo && cu.memberNo === att.memberNo) ||
+              (att.email && cu.attendeeEmail?.toLowerCase() === att.email.toLowerCase()) ||
+              (att.nameTh && cu.attendeeName === att.nameTh)
+          );
+          if (!alreadyInList) {
+            const acts = att.selectedActivities || [];
+            const hasMain = acts.some((a: any) =>
+              a.name?.toLowerCase().includes('main') ||
+              a.name?.includes('Main Program') ||
+              a.name?.includes('การประชุมหลัก')
+            ) || att.programNameTh?.includes('Main') || true;
+
+            const discount = Number(att.discountTotal || att.discountAmount || 0) > 0
+              ? Number(att.discountTotal || att.discountAmount)
+              : ((couponRecord?.discount_type === 'free' || couponInfo?.discountType === 'free') && hasMain ? 4000 : (Number(couponRecord?.discount_value) || 4000));
+
+            couponUsagesList.push({
+              id: `att-supp-${idx}`,
+              couponCode: couponCode,
+              memberNo: att.memberNo || null,
+              attendeeName: att.nameTh || att.nameEn || '',
+              attendeeEmail: att.email || '',
+              attendeePhone: att.mobile || att.phone || '',
+              workplace: att.workplace || companyName || '',
+              discountApplied: discount,
+              finalAmount: Math.max(0, Number(att.subtotal || att.price || 0) - discount),
+            });
+          }
+        });
       }
 
       return {
