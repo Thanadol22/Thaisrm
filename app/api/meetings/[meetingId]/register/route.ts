@@ -684,12 +684,23 @@ export async function POST(
       sendRegistrationApprovedEmail({
         to: effectiveAttendeeEmail,
         recipientName: effectiveAttendeeName || 'ผู้ลงทะเบียน',
+        nameEn: body.guestNameEn || body.nameEn || (effectiveSelectedActivities as any)?.nameEn || undefined,
+        memberNo: validMemberNo || undefined,
+        position: body.guestPosition || body.position || (effectiveSelectedActivities as any)?.position || undefined,
+        workplace: effectiveAttendeeWorkplace || undefined,
+        email: effectiveAttendeeEmail,
+        phone: effectiveAttendeePhone || undefined,
+        attendanceType: body.attendanceType || (effectiveSelectedActivities as any)?.attendanceType || undefined,
+        sponsorCompanyName: couponRecord?.company_name || undefined,
+        couponCode: couponRecord?.code || undefined,
+        isCouponSponsored: Boolean(couponRecord),
+        isFreeRegistration: true,
         meetingName: meeting.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
         meetingDate: meetingDateStr,
         ticketCode: ticketCode,
         amountPaid: numericAmount,
         isMember: Boolean(isMember),
-        selectedActivities: selectedActivities,
+        selectedActivities: effectiveSelectedActivities,
       }).catch((mailErr) => console.error('Failed to send free individual registration confirmation email:', mailErr));
     }
 

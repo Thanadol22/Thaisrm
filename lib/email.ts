@@ -298,13 +298,24 @@ export interface SendRegistrationApprovedParams {
   ticketCode?: string;
   amountPaid: number;
   isMember: boolean;
+  nameEn?: string;
+  memberNo?: string;
+  position?: string;
+  workplace?: string;
+  email?: string;
+  phone?: string;
+  attendanceType?: string;
+  sponsorCompanyName?: string;
+  isCouponSponsored?: boolean;
+  couponCode?: string;
+  isFreeRegistration?: boolean;
   qrCodeData?: string;
   selectedActivities?: any;
   items?: MeetingApprovalItem[];
 }
 
 /**
- * Send email when meeting registration payment slip is approved
+ * Send email when meeting registration payment slip is approved or free registration completed
  */
 export async function sendRegistrationApprovedEmail(params: SendRegistrationApprovedParams): Promise<EmailSendResult> {
   const html = renderMeetingApprovedEmail({
@@ -314,13 +325,24 @@ export async function sendRegistrationApprovedEmail(params: SendRegistrationAppr
     ticketCode: params.ticketCode,
     amountPaid: params.amountPaid,
     isMember: params.isMember,
+    nameEn: params.nameEn,
+    memberNo: params.memberNo,
+    position: params.position,
+    workplace: params.workplace,
+    email: params.email || params.to,
+    phone: params.phone,
+    attendanceType: params.attendanceType,
+    sponsorCompanyName: params.sponsorCompanyName,
+    isCouponSponsored: params.isCouponSponsored,
+    couponCode: params.couponCode,
+    isFreeRegistration: params.isFreeRegistration,
     selectedActivities: params.selectedActivities,
     items: params.items,
   });
 
   return dispatchEmail({
     to: params.to,
-    subject: `ยืนยันการลงทะเบียนและการชำระเงิน ${params.meetingName} - TSRM`,
+    subject: `ยืนยันการลงทะเบียนเข้าร่วมประชุม ${params.meetingName} - TSRM`,
     html,
   });
 }

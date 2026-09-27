@@ -524,9 +524,10 @@ export function ChangeFormatModal({
                     </label>
 
                     <input
+                      id="change-format-upload-input"
                       ref={fileInputRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/*,application/pdf"
                       onChange={handleFileChange}
                       className="hidden"
                     />
@@ -548,18 +549,17 @@ export function ChangeFormatModal({
                             </span>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold rounded-xl text-xs shrink-0 cursor-pointer shadow-2xs min-h-[38px]"
+                        <label
+                          htmlFor="change-format-upload-input"
+                          className="px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold rounded-xl text-xs shrink-0 cursor-pointer shadow-2xs min-h-[38px] flex items-center"
                         >
                           {lang === 'th' ? 'เปลี่ยนไฟล์' : 'Change'}
-                        </button>
+                        </label>
                       </div>
                     ) : (
-                      <div
-                        onClick={() => fileInputRef.current?.click()}
-                        className="border-2 border-dashed border-blue-300 hover:border-blue-500 bg-blue-50/30 hover:bg-blue-50/60 rounded-xl p-4 sm:p-5 text-center cursor-pointer transition-all active:scale-[0.99]"
+                      <label
+                        htmlFor="change-format-upload-input"
+                        className="border-2 border-dashed border-blue-300 hover:border-blue-500 bg-blue-50/30 hover:bg-blue-50/60 rounded-xl p-4 sm:p-5 text-center cursor-pointer transition-all active:scale-[0.99] block select-none"
                       >
                         <Upload className="w-7 h-7 text-blue-600 mx-auto mb-1.5" />
                         <p className="text-xs sm:text-sm font-bold text-slate-800">
@@ -568,7 +568,7 @@ export function ChangeFormatModal({
                         <p className="text-[11px] text-slate-500 mt-0.5">
                           {lang === 'th' ? 'รองรับรูปภาพ JPG, PNG (สลิปโอนเงินค่าธรรมเนียม)' : 'Supports JPG, PNG'}
                         </p>
-                      </div>
+                      </label>
                     )}
                   </div>
 

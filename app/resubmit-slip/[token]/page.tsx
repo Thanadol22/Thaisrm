@@ -834,28 +834,24 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
             ) : (
               <div className="space-y-3">
                 <input
+                  id="resubmit-slip-upload-input"
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,image/*"
+                  accept="image/*,application/pdf"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-rose-300 hover:border-[#0026b3] rounded-3xl p-7 flex flex-col items-center justify-center cursor-pointer bg-rose-50/30 hover:bg-blue-50/30 transition group select-none active:scale-[0.99]"
+
+                <label
+                  htmlFor="resubmit-slip-upload-input"
+                  className="border-2 border-dashed border-rose-300 hover:border-[#0026b3] rounded-3xl p-7 flex flex-col items-center justify-center cursor-pointer bg-rose-50/30 hover:bg-blue-50/30 transition group select-none active:scale-[0.99] block text-center"
                 >
-                  <Upload className="w-8 h-8 text-rose-500 group-hover:text-[#0026b3] group-hover:scale-110 transition mb-2" />
+                  <Upload className="w-8 h-8 text-rose-500 group-hover:text-[#0026b3] group-hover:scale-110 transition mb-2 mx-auto" />
                   <p className="text-sm font-bold text-slate-800 group-hover:text-[#0026b3] text-center">
-                    แตะเพื่อเลือกภาพจากแกลเลอรี หรือ ถ่ายภาพสลิปใหม่
+                    แตะเพื่อเลือกภาพสลิปการโอนเงินใหม่
                   </p>
                   <p className="text-xs text-slate-400 mt-1 text-center">รองรับไฟล์รูปภาพ JPG, PNG, HEIC (ขนาดไม่เกิน 10MB)</p>
-                  <button
-                    type="button"
-                    className="mt-3 px-4 py-2 bg-rose-100 text-rose-700 group-hover:bg-[#0026b3] group-hover:text-white rounded-xl text-xs font-bold transition shadow-sm"
-                  >
-                    📁 เลือกรูปภาพสลิป
-                  </button>
-                </div>
+                </label>
               </div>
             )}
 

@@ -1738,13 +1738,29 @@ export async function POST(request: NextRequest) {
           }
         } else {
           // Individual conference registration
-          const recipientEmail = slip.members?.email || slip.guest_email || '';
-          const recipientName = slip.members?.fullNameTh || slip.guest_name || 'ผู้ลงทะเบียน';
+          let parsedActObj: any = null;
+          if (typeof slip.selected_activities === 'string') {
+            try {
+              parsedActObj = JSON.parse(slip.selected_activities);
+            } catch {}
+          } else if (typeof slip.selected_activities === 'object' && slip.selected_activities !== null) {
+            parsedActObj = slip.selected_activities;
+          }
+
+          const recipientEmail = slip.members?.email || slip.guest_email || parsedActObj?.email || '';
+          const recipientName = slip.members?.fullNameTh || slip.guest_name || parsedActObj?.nameTh || 'ผู้ลงทะเบียน';
 
           if (recipientEmail) {
             sendRegistrationApprovedEmail({
               to: recipientEmail,
               recipientName,
+              nameEn: slip.members?.fullNameEn || parsedActObj?.nameEn || undefined,
+              memberNo: slip.member_no || undefined,
+              position: slip.members?.position || parsedActObj?.position || undefined,
+              workplace: slip.members?.workplace || slip.guest_workplace || parsedActObj?.workplace || undefined,
+              email: recipientEmail,
+              phone: slip.members?.mobile || slip.guest_phone || parsedActObj?.phone || undefined,
+              attendanceType: parsedActObj?.attendanceType || undefined,
               meetingName: slip.meetings?.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
               meetingDate: meetingDateStr,
               ticketCode: slip.ticket_code || '',

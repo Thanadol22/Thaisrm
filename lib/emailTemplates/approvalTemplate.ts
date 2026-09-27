@@ -169,30 +169,76 @@ export interface MeetingApprovalEmailOptions {
   ticketCode?: string;
   amountPaid: number;
   isMember: boolean;
+  nameEn?: string;
+  memberNo?: string;
+  position?: string;
+  workplace?: string;
+  email?: string;
+  phone?: string;
+  attendanceType?: string;
+  sponsorCompanyName?: string;
+  isCouponSponsored?: boolean;
+  couponCode?: string;
+  isFreeRegistration?: boolean;
   items?: MeetingApprovalItem[];
   selectedActivities?: any;
 }
 
 export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions): string {
+  // Extract extra fields from selectedActivities payload if not passed at root
+  let actObj: any = null;
+  if (typeof options.selectedActivities === 'string') {
+    try {
+      actObj = JSON.parse(options.selectedActivities);
+    } catch {}
+  } else if (typeof options.selectedActivities === 'object' && options.selectedActivities !== null) {
+    actObj = options.selectedActivities;
+  }
+
+  const effectiveNameEn = options.nameEn || actObj?.nameEn || actObj?.guestNameEn || (actObj?.attendees?.[0]?.nameEn);
+  const effectiveMemberNo = options.memberNo || actObj?.memberNo || (actObj?.attendees?.[0]?.memberNo);
+  const effectivePosition = options.position || actObj?.position || actObj?.guestPosition || (actObj?.attendees?.[0]?.position);
+  const effectiveWorkplace = options.workplace || actObj?.workplace || actObj?.guestWorkplace || (actObj?.attendees?.[0]?.workplace);
+  const effectiveEmail = options.email || actObj?.email || actObj?.guestEmail || (actObj?.attendees?.[0]?.email);
+  const effectivePhone = options.phone || actObj?.phone || actObj?.guestPhone || actObj?.mobile || (actObj?.attendees?.[0]?.phone);
+  const rawAttendanceType = options.attendanceType || actObj?.attendanceType || (actObj?.attendees?.[0]?.attendanceType);
+  const effectiveAttendanceType = rawAttendanceType === 'online' ? 'Online' : (rawAttendanceType === 'onsite' ? 'Onsite' : rawAttendanceType);
+
+  const effectiveSponsorCompany = options.sponsorCompanyName || actObj?.companyName || actObj?.sponsorCompanyName;
+
   const items = (options.items && options.items.length > 0)
     ? options.items
     : parseMeetingActivities(options.selectedActivities, options.amountPaid);
 
+  const isFree = options.isFreeRegistration || options.amountPaid === 0 || Boolean(options.isCouponSponsored);
+
   const content = `
     <div style="text-align: center; margin-bottom: 24px;">
-      <div style="font-size: 44px; margin-bottom: 8px;">✅</div>
-      <span class="badge-success">การลงทะเบียนและการชำระเงินสำเร็จ</span>
+      <div style="font-size: 44px; margin-bottom: 8px;">🎉</div>
+      <span class="badge-success">การลงทะเบียนสำเร็จเรียบร้อยแล้ว</span>
       <h2 style="color: #0f172a; margin: 12px 0 6px 0; font-size: 22px; font-weight: 800;">
         ยืนยันการลงทะเบียนเข้าร่วมประชุม
       </h2>
       <p style="color: #64748b; font-size: 14px; margin: 0;">
-        สมาคมฯ ได้ตรวจสอบหลักฐานการชำระเงินของท่านเรียบร้อยแล้ว
+        สมาคมเวชศาสตร์การเจริญพันธุ์ไทยได้บันทึกและยืนยันข้อมูลการลงทะเบียนของท่านเรียบร้อยแล้ว
       </p>
     </div>
 
+    ${effectiveSponsorCompany ? `
+      <!-- Sponsor Banner Card -->
+      <div style="background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%); border: 1.5px solid #86efac; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; text-align: center;">
+        <div style="font-size: 12px; font-weight: 700; color: #15803d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">
+          🏢 ผู้สนับสนุนการลงทะเบียน
+        </div>
+        <div style="font-size: 17px; font-weight: 800; color: #0f172a;">
+          ${effectiveSponsorCompany}
+        </div>
+      </div>
+    ` : ''}
+
     <div class="info-card">
       <div style="font-size: 13px; font-weight: 800; color: #0026b3; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px;">
-        รายละเอียดการลงทะเบียน
+        ข้อมูลการลงทะเบียนของท่าน
       </div>
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr style="border-bottom: 1px dashed #e2e8f0;">
@@ -202,7 +248,7 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
         ${options.ticketCode ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
           <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสการลงทะเบียน</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 14px; font-family: monospace;">${options.ticketCode}</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 15px; font-family: monospace;">${options.ticketCode}</td>
         </tr>
         ` : ''}
         ${options.meetingDate ? `
@@ -212,25 +258,80 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
         </tr>
         ` : ''}
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ผู้ลงทะเบียน</td>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่อ-นามสกุล</td>
           <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.recipientName}</td>
         </tr>
+        ${effectiveNameEn ? `
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่อภาษาอังกฤษ</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${effectiveNameEn}</td>
+        </tr>
+        ` : ''}
+        ${effectiveMemberNo ? `
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสสมาชิก</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 14px;">#${effectiveMemberNo}</td>
+        </tr>
+        ` : ''}
+        ${effectivePosition ? `
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ตำแหน่ง</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${effectivePosition}</td>
+        </tr>
+        ` : ''}
+        ${effectiveWorkplace ? `
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">หน่วยงาน / โรงพยาบาล</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${effectiveWorkplace}</td>
+        </tr>
+        ` : ''}
+        ${effectiveEmail ? `
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">อีเมล</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #0026b3; font-size: 13.5px; font-family: monospace;">${effectiveEmail}</td>
+        </tr>
+        ` : ''}
+        ${effectivePhone ? `
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">เบอร์โทรศัพท์</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${effectivePhone}</td>
+        </tr>
+        ` : ''}
         <tr style="border-bottom: 1px dashed #e2e8f0;">
           <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ประเภทผู้เข้าร่วม</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.isMember ? 'สมาชิกสมาคม' : 'บุคคลทั่วไป'}</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: ${options.isMember ? '#0026b3' : '#b45309'}; font-size: 14px;">
+            ${options.isMember ? 'สมาชิกสมาคม' : 'บุคคลทั่วไป'}
+          </td>
+        </tr>
+        ${effectiveAttendanceType ? `
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รูปแบบการเข้าร่วม</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">
+            <span style="background-color: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 800;">
+              ${effectiveAttendanceType}
+            </span>
+          </td>
+        </tr>
+        ` : ''}
+        <tr>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">สถานะการลงทะเบียน</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">ยืนยันสิทธิ์เรียบร้อย</td>
         </tr>
 
         ${items.length > 0 ? `
-        <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td colspan="2" style="padding: 12px 0 10px 0;">
+        <tr style="border-top: 1px dashed #e2e8f0;">
+          <td colspan="2" style="padding: 14px 0 8px 0;">
             <div style="font-size: 12.5px; font-weight: 800; color: #0026b3; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
-              📋 รายการที่ลงทะเบียน (${items.length} รายการ)
+              📋 รายการกิจกรรมที่ท่านลงทะเบียน (${items.length} รายการ)
             </div>
-            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px;">
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px;">
               <table width="100%" cellpadding="0" cellspacing="0">
-                ${items.map((item, idx) => `
+                ${items.map((item, idx) => {
+                  let itemFmt = item.format || effectiveAttendanceType;
+                  if (itemFmt === 'both') itemFmt = effectiveAttendanceType || 'Onsite';
+                  return `
                   <tr style="${idx < items.length - 1 ? 'border-bottom: 1px dashed #e2e8f0;' : ''}">
-                    <td style="padding: 7px 0; vertical-align: top;">
+                    <td style="padding: 8px 0; vertical-align: top;">
                       <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; line-height: 1.4;">
                         ${item.name}
                       </div>
@@ -240,28 +341,36 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
                         </div>
                       ` : ''}
                     </td>
-                    <td style="padding: 7px 0 7px 12px; text-align: right; vertical-align: top; white-space: nowrap;">
+                    <td style="padding: 8px 0 8px 12px; text-align: right; vertical-align: top; white-space: nowrap;">
+                      ${itemFmt ? `
+                        <span style="font-size: 11px; font-weight: 700; color: #1e40af; background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 2px 6px; border-radius: 4px; margin-right: 6px;">
+                          ${itemFmt}
+                        </span>
+                      ` : ''}
                       ${item.price !== undefined && Number(item.price) > 0 ? `
                         <span style="font-size: 13.5px; font-weight: 700; color: #0f172a;">
                           ${Number(item.price).toLocaleString()} บาท
                         </span>
-                      ` : (item.price === 0 ? `
+                      ` : (item.price === 0 || isFree ? `
                         <span style="font-size: 12px; font-weight: 700; color: #16a34a; background-color: #dcfce7; padding: 2px 8px; border-radius: 4px;">
                           ฟรี
                         </span>
                       ` : '')}
                     </td>
                   </tr>
-                `).join('')}
+                `;
+                }).join('')}
               </table>
             </div>
           </td>
         </tr>
         ` : ''}
 
-        <tr>
-          <td style="padding: 10px 0 2px 0; color: #0f172a; font-size: 14px; font-weight: 700;">ยอดเงินที่ชำระ</td>
-          <td style="padding: 10px 0 2px 0; text-align: right; font-weight: 800; color: #16a34a; font-size: 16px;">${options.amountPaid.toLocaleString()} บาท</td>
+        <tr style="border-top: 1px dashed #e2e8f0;">
+          <td style="padding: 12px 0 4px 0; color: #0f172a; font-size: 14px; font-weight: 700;">ยอดเงินที่ชำระ</td>
+          <td style="padding: 12px 0 4px 0; text-align: right; font-weight: 800; color: #16a34a; font-size: 17px;">
+            ${options.amountPaid > 0 ? `${options.amountPaid.toLocaleString()} บาท` : '0 บาท (ได้รับสิทธิ์ฟรี)'}
+          </td>
         </tr>
       </table>
     </div>
