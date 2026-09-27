@@ -261,7 +261,7 @@ export async function POST(req: NextRequest) {
         }
 
         const defaultRemarks = JSON.stringify({
-          programs: ['การประชุมหลัก (Main Congress)'],
+          programs: ['การประชุมหลัก'],
           allPrograms: false,
           note: 'คูปองโควต้าสิทธิ์ฟรีเริ่มต้นสำหรับบริษัท',
         });
@@ -309,7 +309,7 @@ export async function POST(req: NextRequest) {
         }
 
         const defaultRemarks = JSON.stringify({
-          programs: ['การประชุมหลัก (Main Congress)'],
+          programs: ['การประชุมหลัก'],
           allPrograms: false,
           note: 'คูปองโควต้าสิทธิ์ฟรีเริ่มต้นสำหรับบริษัท',
         });

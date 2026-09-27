@@ -52,15 +52,127 @@ export async function GET(
       );
     }
 
-    const formattedUsages = (coupon.usages || []).map((u: any) => ({
-      ...u,
-      id: u.id ? u.id.toString() : '',
-    }));
+    const usageMap = new Map<string, any>();
+
+    // 1. จาก coupon_usages table
+    (coupon.usages || []).forEach((u: any) => {
+      const key = `${u.ticket_code || ''}_${u.member_no || ''}_${(u.attendee_email || '').toLowerCase()}`;
+      usageMap.set(key, {
+        id: u.id ? u.id.toString() : `cu-${Date.now()}`,
+        attendee_name: u.attendee_name || u.member?.fullNameTh || u.member?.fullNameEn || 'ผู้เข้าร่วมประชุม',
+        attendee_email: u.attendee_email || u.member?.email || '',
+        attendee_phone: u.attendee_phone || u.member?.mobile || null,
+        workplace: u.workplace || u.member?.workplace || coupon.company_name || null,
+        member_no: u.member_no || u.member?.member_no || null,
+        ticket_code: u.ticket_code || null,
+        discount_applied: Number(u.discount_applied) || 0,
+        final_amount: Number(u.final_amount) || 0,
+        used_at: u.used_at ? new Date(u.used_at).toISOString() : new Date().toISOString(),
+      });
+    });
+
+    // 2. Fallback จาก sponsor_group_members table
+    try {
+      const sgmList = await (prisma as any).sponsor_group_members.findMany({
+        where: {
+          OR: [
+            { coupon_code: coupon.code },
+            { coupon_code: { equals: coupon.code, mode: 'insensitive' } },
+            ...(coupon.company_name ? [{ sponsor: { name: { equals: coupon.company_name, mode: 'insensitive' } } }] : []),
+          ],
+        },
+        orderBy: { created_at: 'desc' },
+      });
+
+      sgmList.forEach((sgm: any) => {
+        const key = `${sgm.ticket_code || ''}_${sgm.member_no || ''}_${(sgm.attendee_email || '').toLowerCase()}`;
+        if (!usageMap.has(key)) {
+          usageMap.set(key, {
+            id: sgm.id ? sgm.id.toString() : `sgm-${sgm.member_no}`,
+            attendee_name: sgm.attendee_name || 'ผู้เข้าร่วมประชุม',
+            attendee_email: sgm.attendee_email || '',
+            attendee_phone: sgm.attendee_phone || null,
+            workplace: sgm.workplace || coupon.company_name || null,
+            member_no: sgm.member_no || null,
+            ticket_code: sgm.ticket_code || null,
+            discount_applied: Number(sgm.discount_amount) || 0,
+            final_amount: Number(sgm.net_price) || 0,
+            used_at: sgm.created_at ? new Date(sgm.created_at).toISOString() : new Date().toISOString(),
+          });
+        }
+      });
+    } catch (sgmErr) {
+      console.warn('[Coupon Usages] SGM query fallback warning:', sgmErr);
+    }
+
+    // 3. Fallback จาก meeting_attendances table
+    try {
+      const attList = await (prisma as any).meeting_attendances.findMany({
+        where: {
+          meeting_id: coupon.meeting_id,
+          OR: [
+            { coupon_code: coupon.code },
+            { coupon_code: { equals: coupon.code, mode: 'insensitive' } },
+            ...(coupon.company_name ? [{ sponsor_company_name: { equals: coupon.company_name, mode: 'insensitive' } }] : []),
+          ],
+        },
+        include: {
+          members: {
+            select: {
+              member_no: true,
+              fullNameTh: true,
+              fullNameEn: true,
+              email: true,
+              mobile: true,
+              workplace: true,
+            },
+          },
+        },
+        orderBy: { attendance_id: 'desc' },
+      });
+
+      attList.forEach((att: any) => {
+        const memNo = att.member_no || att.members?.member_no || '';
+        const em = att.attendee_email || att.members?.email || '';
+        const key = `att_${memNo}_${em.toLowerCase()}`;
+        
+        // Check if already covered
+        let alreadyCovered = false;
+        for (const existingVal of Array.from(usageMap.values())) {
+          if ((memNo && existingVal.member_no === memNo) || (em && existingVal.attendee_email?.toLowerCase() === em.toLowerCase())) {
+            alreadyCovered = true;
+            break;
+          }
+        }
+
+        if (!alreadyCovered && (memNo || em)) {
+          usageMap.set(key, {
+            id: att.attendance_id ? att.attendance_id.toString() : `att-${Date.now()}`,
+            attendee_name: att.attendee_name || att.members?.fullNameTh || att.members?.fullNameEn || 'ผู้เข้าร่วมประชุม',
+            attendee_email: em,
+            attendee_phone: att.attendee_phone || att.members?.mobile || null,
+            workplace: att.workplace || att.members?.workplace || coupon.company_name || null,
+            member_no: memNo || null,
+            ticket_code: null,
+            discount_applied: coupon.discount_type === 'free' ? 4000 : (coupon.discount_value || 0),
+            final_amount: 0,
+            used_at: att.checkin_time ? new Date(att.checkin_time).toISOString() : new Date().toISOString(),
+          });
+        }
+      });
+    } catch (attErr) {
+      console.warn('[Coupon Usages] Attendance query fallback warning:', attErr);
+    }
+
+    const formattedUsages = Array.from(usageMap.values()).sort((a, b) => {
+      return new Date(b.used_at).getTime() - new Date(a.used_at).getTime();
+    });
 
     return NextResponse.json({
       success: true,
       data: {
         ...coupon,
+        used_count: Math.max(coupon.used_count || 0, formattedUsages.length),
         usages: formattedUsages,
       },
     });

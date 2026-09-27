@@ -298,9 +298,33 @@ export async function POST(
         const effectiveCompanyName = companyName || 'บริษัทผู้สนับสนุน';
         if (Array.isArray(attendees) && attendees.length > 0) {
           for (const att of attendees) {
-            const attEmail = (att.email || att.attendee_email)?.trim();
-            const attName = att.nameTh || att.nameEn || att.attendee_name || 'ผู้เข้าร่วมประชุม';
-            if (attEmail) {
+            let attEmail = (att.email || att.attendee_email)?.trim();
+            let attName = att.nameTh || att.nameEn || att.fullName || att.fullNameTh || att.attendee_name || '';
+            let attMemberNo = att.memberNo ? String(att.memberNo).trim() : undefined;
+            let attWorkplace = att.workplace || undefined;
+
+            if ((!attEmail || !attName || !attWorkplace) && attMemberNo) {
+              try {
+                const cleanNo = attMemberNo.padStart(4, '0');
+                const dbMem = await prisma.member.findFirst({
+                  where: {
+                    OR: [
+                      { member_no: attMemberNo },
+                      { member_no: cleanNo },
+                    ],
+                  },
+                });
+                if (dbMem) {
+                  attEmail = attEmail || dbMem.email?.trim();
+                  attName = attName || dbMem.fullNameTh || dbMem.fullNameEn || '';
+                  attWorkplace = attWorkplace || dbMem.workplace || undefined;
+                }
+              } catch (memErr) {
+                console.warn('Failed to query member details for free attendee email:', memErr);
+              }
+            }
+
+            if (attEmail && attEmail.includes('@')) {
               let attItems: any[] = [];
               if (Array.isArray(att.selectedActivities) && att.selectedActivities.length > 0) {
                 attItems = att.selectedActivities.map((a: any) => {
@@ -323,10 +347,10 @@ export async function POST(
 
               sendAttendeeSponsoredRegistrationEmail({
                 to: attEmail,
-                recipientName: attName,
+                recipientName: attName || 'ผู้เข้าร่วมประชุม',
                 recipientEmail: attEmail,
-                memberNo: att.memberNo || undefined,
-                workplace: att.workplace || undefined,
+                memberNo: attMemberNo,
+                workplace: attWorkplace || undefined,
                 companyName: effectiveCompanyName,
                 meetingName: meeting.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
                 meetingDate: meetingDateStr,
@@ -336,6 +360,8 @@ export async function POST(
               }).catch((attMailErr) =>
                 console.error(`Failed to send free sponsored registration email to attendee ${attEmail}:`, attMailErr)
               );
+            } else {
+              console.warn(`⚠️ [Free Group Reg] Skipping attendee email: No email found for attendee "${attName || attMemberNo}"`);
             }
           }
         }

@@ -1357,14 +1357,19 @@ export async function POST(request: NextRequest) {
         try { actObj = JSON.parse(actObj); } catch { }
       }
       if (actObj && typeof actObj === 'object') {
-        if (actObj.type === 'membership_group_registration' || (actObj.isGroup && actObj.applicants && Array.isArray(actObj.applicants) && actObj.applicants.length > 1)) {
+        if (actObj.type === 'membership_group_registration' || (actObj.isGroup && actObj.applicants && Array.isArray(actObj.applicants))) {
           isMembershipRegistration = true;
           isGroupMembership = true;
           groupPayload = actObj;
         } else if (actObj.type === 'membership_registration') {
           isMembershipRegistration = true;
           memberPayload = actObj.memberPayload;
-        } else if (actObj.type === 'conference_group_registration' || (actObj.isGroup === true && Array.isArray(actObj.attendees) && actObj.attendees.length > 1) || (Array.isArray(actObj.attendees) && actObj.attendees.length > 1 && (actObj.isGroup || actObj.companyName))) {
+        } else if (
+          actObj.type === 'conference_group_registration' ||
+          actObj.isGroup === true ||
+          (Array.isArray(actObj.attendees) && actObj.attendees.length > 0) ||
+          (actObj.attendees && (actObj.isGroup || actObj.companyName))
+        ) {
           isGroupConference = true;
           groupPayload = actObj;
         } else if (actObj.isFormatChange) {
@@ -1382,8 +1387,8 @@ export async function POST(request: NextRequest) {
       slip.ticket_code?.startsWith('GRP_') ||
       slip.slip_id?.includes('GRP') ||
       (groupPayload?.isGroup === true && (
-        (Array.isArray(groupPayload?.attendees) && groupPayload.attendees.length > 1) ||
-        (Array.isArray(groupPayload?.applicants) && groupPayload.applicants.length > 1)
+        (Array.isArray(groupPayload?.attendees) && groupPayload.attendees.length > 0) ||
+        (Array.isArray(groupPayload?.applicants) && groupPayload.applicants.length > 0)
       )) ||
       Boolean(slip.guest_name?.includes('ท่าน') && (slip.ticket_code?.startsWith('GRP') || slip.slip_id?.includes('GRP'))) ||
       Boolean(slip.guest_workplace && (slip.ticket_code?.startsWith('GRP') || slip.slip_id?.includes('GRP')))
@@ -1613,53 +1618,169 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 4. If conference meeting attendance exists, update meeting_attendances
-      if (!isMembershipRegistration) {
+      // Look up member data if member_no or assignedMemberNo exists
+      let effectiveMemberRec: any = slip.members || null;
+      const targetMemberNo = assignedMemberNo || slip.member_no;
+      if (!effectiveMemberRec && targetMemberNo) {
+        try {
+          effectiveMemberRec = await prisma.member.findUnique({
+            where: { member_no: targetMemberNo },
+          });
+        } catch (memFindErr) {
+          console.warn('[Slip Approval] Failed to fetch member by member_no:', targetMemberNo, memFindErr);
+        }
+      }
+
+      // 4. If conference meeting attendance exists, upsert into meeting_attendances
+      if (!isMembershipRegistration && slip.meeting_id) {
+        let actsObj = slip.selected_activities;
+        if (typeof actsObj === 'string') {
+          try { actsObj = JSON.parse(actsObj); } catch { actsObj = null; }
+        }
+
+        const effectiveSponsorId = (slip as any).sponsor_id || actsObj?.sponsorId || actsObj?.groupContact?.sponsorId || null;
+        const effectiveSponsorName = (slip as any).sponsor_company_name || actsObj?.companyName || actsObj?.sponsorName || null;
+        const effectiveCouponCode = (slip as any).coupon_code || actsObj?.couponCode || null;
+
         if (isGroupConference && groupPayload?.attendees && Array.isArray(groupPayload.attendees)) {
           for (const att of groupPayload.attendees) {
-            if (att.isMember && att.memberNo) {
+            const attMemberNo = att.memberNo ? att.memberNo.trim() : null;
+            const attEmail = att.email ? att.email.trim().toLowerCase() : null;
+            const attName = att.nameTh || att.nameEn || att.fullNameTh || att.fullNameEn || 'ผู้เข้าร่วมประชุม';
+            const attPhone = att.phone || att.mobile || null;
+            const attWorkplace = att.workplace || groupPayload.companyName || null;
+
+            if (attMemberNo) {
               await prisma.$executeRaw`
-                UPDATE meeting_attendances
-                SET attendance_status = 'Registered'
-                WHERE meeting_id = ${slip.meeting_id} AND member_no = ${att.memberNo.trim()}
+                INSERT INTO meeting_attendances (
+                  meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status, sponsor_id, sponsor_company_name, coupon_code
+                ) VALUES (
+                  ${slip.meeting_id}, ${attMemberNo}, ${attName}, ${attEmail}, ${attPhone}, ${attWorkplace}, 'Registered', ${effectiveSponsorId}, ${effectiveSponsorName}, ${effectiveCouponCode}
+                )
+                ON CONFLICT (meeting_id, member_no)
+                DO UPDATE SET
+                  attendance_status = 'Registered',
+                  attendee_name = COALESCE(meeting_attendances.attendee_name, ${attName}),
+                  attendee_email = COALESCE(meeting_attendances.attendee_email, ${attEmail}),
+                  attendee_phone = COALESCE(meeting_attendances.attendee_phone, ${attPhone}),
+                  workplace = COALESCE(meeting_attendances.workplace, ${attWorkplace}),
+                  sponsor_id = COALESCE(meeting_attendances.sponsor_id, ${effectiveSponsorId}),
+                  sponsor_company_name = COALESCE(meeting_attendances.sponsor_company_name, ${effectiveSponsorName}),
+                  coupon_code = COALESCE(meeting_attendances.coupon_code, ${effectiveCouponCode})
               `;
-            } else if (att.email) {
-              await prisma.$executeRaw`
-                UPDATE meeting_attendances
-                SET attendance_status = 'Non-Member'
-                WHERE meeting_id = ${slip.meeting_id} AND attendee_email = ${att.email.trim().toLowerCase()}
-              `;
+            } else if (attEmail) {
+              const existingAtt = await (prisma as any).meeting_attendances.findFirst({
+                where: {
+                  meeting_id: slip.meeting_id,
+                  attendee_email: { equals: attEmail, mode: 'insensitive' },
+                },
+              });
+              if (existingAtt) {
+                await (prisma as any).meeting_attendances.update({
+                  where: { attendance_id: existingAtt.attendance_id },
+                  data: {
+                    attendance_status: 'Non-Member',
+                    attendee_name: attName,
+                    attendee_phone: attPhone || existingAtt.attendee_phone,
+                    workplace: attWorkplace || existingAtt.workplace,
+                    sponsor_id: effectiveSponsorId || existingAtt.sponsor_id,
+                    sponsor_company_name: effectiveSponsorName || existingAtt.sponsor_company_name,
+                    coupon_code: effectiveCouponCode || existingAtt.coupon_code,
+                  },
+                });
+              } else {
+                await (prisma as any).meeting_attendances.create({
+                  data: {
+                    meeting_id: slip.meeting_id,
+                    member_no: null,
+                    attendee_name: attName,
+                    attendee_email: attEmail,
+                    attendee_phone: attPhone,
+                    workplace: attWorkplace,
+                    attendance_status: 'Non-Member',
+                    sponsor_id: effectiveSponsorId,
+                    sponsor_company_name: effectiveSponsorName,
+                    coupon_code: effectiveCouponCode,
+                  },
+                });
+              }
             }
           }
-        } else if (assignedMemberNo) {
+        } else if (assignedMemberNo || slip.member_no) {
+          const targetMemNo = (assignedMemberNo || slip.member_no).trim();
+          let memberRec: any = effectiveMemberRec;
+          if (!memberRec) {
+            memberRec = await prisma.member.findUnique({ where: { member_no: targetMemNo } });
+          }
+          const memName = memberRec?.fullNameTh || memberRec?.fullNameEn || slip.guest_name || 'สมาชิก';
+          const memEmail = memberRec?.email || slip.guest_email || null;
+          const memPhone = memberRec?.mobile || slip.guest_phone || null;
+          const memWorkplace = memberRec?.workplace || slip.guest_workplace || null;
+
           await prisma.$executeRaw`
-            UPDATE meeting_attendances
-            SET attendance_status = 'Registered'
-            WHERE meeting_id = ${slip.meeting_id} AND member_no = ${assignedMemberNo}
+            INSERT INTO meeting_attendances (
+              meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status, sponsor_id, sponsor_company_name, coupon_code
+            ) VALUES (
+              ${slip.meeting_id}, ${targetMemNo}, ${memName}, ${memEmail}, ${memPhone}, ${memWorkplace}, 'Registered', ${effectiveSponsorId}, ${effectiveSponsorName}, ${effectiveCouponCode}
+            )
+            ON CONFLICT (meeting_id, member_no)
+            DO UPDATE SET
+              attendance_status = 'Registered',
+              attendee_name = COALESCE(meeting_attendances.attendee_name, ${memName}),
+              attendee_email = COALESCE(meeting_attendances.attendee_email, ${memEmail}),
+              attendee_phone = COALESCE(meeting_attendances.attendee_phone, ${memPhone}),
+              workplace = COALESCE(meeting_attendances.workplace, ${memWorkplace})
           `;
-        } else if (slip.guest_email) {
-          await prisma.$executeRaw`
-            UPDATE meeting_attendances
-            SET attendance_status = 'Non-Member'
-            WHERE meeting_id = ${slip.meeting_id} AND attendee_email = ${slip.guest_email}
-          `;
+        } else {
+          // Individual non-member conference registration (e.g. SLIP-MUJOERWK)
+          const guestName = slip.guest_name || actsObj?.nameTh || actsObj?.fullNameTh || actsObj?.attendees?.[0]?.nameTh || actsObj?.attendees?.[0]?.fullNameTh || 'ผู้สมัครทั่วไป';
+          const guestEmail = slip.guest_email || actsObj?.email || actsObj?.attendees?.[0]?.email || null;
+          const guestPhone = slip.guest_phone || actsObj?.phone || actsObj?.mobile || actsObj?.attendees?.[0]?.phone || null;
+          const guestWorkplace = slip.guest_workplace || actsObj?.workplace || actsObj?.attendees?.[0]?.workplace || null;
+
+          let existingAtt: any = null;
+          if (guestEmail) {
+            existingAtt = await (prisma as any).meeting_attendances.findFirst({
+              where: {
+                meeting_id: slip.meeting_id,
+                attendee_email: { equals: guestEmail.trim(), mode: 'insensitive' },
+              },
+            });
+          }
+          if (existingAtt) {
+            await (prisma as any).meeting_attendances.update({
+              where: { attendance_id: existingAtt.attendance_id },
+              data: {
+                attendance_status: 'Non-Member',
+                attendee_name: guestName,
+                attendee_phone: guestPhone || existingAtt.attendee_phone,
+                workplace: guestWorkplace || existingAtt.workplace,
+                sponsor_id: effectiveSponsorId || existingAtt.sponsor_id,
+                sponsor_company_name: effectiveSponsorName || existingAtt.sponsor_company_name,
+                coupon_code: effectiveCouponCode || existingAtt.coupon_code,
+              },
+            });
+          } else {
+            await (prisma as any).meeting_attendances.create({
+              data: {
+                meeting_id: slip.meeting_id,
+                member_no: null,
+                attendee_name: guestName,
+                attendee_email: guestEmail,
+                attendee_phone: guestPhone,
+                workplace: guestWorkplace,
+                attendance_status: 'Non-Member',
+                sponsor_id: effectiveSponsorId,
+                sponsor_company_name: effectiveSponsorName,
+                coupon_code: effectiveCouponCode,
+              },
+            });
+          }
         }
       }
 
       // 5. Send approval confirmation email (Reliable Awaited Dispatch with DB Fallbacks)
       try {
-        // Look up member data if member_no or assignedMemberNo exists
-        let effectiveMemberRec: any = slip.members || null;
-        const targetMemberNo = assignedMemberNo || slip.member_no;
-        if (!effectiveMemberRec && targetMemberNo) {
-          try {
-            effectiveMemberRec = await prisma.member.findUnique({
-              where: { member_no: targetMemberNo },
-            });
-          } catch (memFindErr) {
-            console.warn('[Slip Approval] Failed to fetch member by member_no:', targetMemberNo, memFindErr);
-          }
-        }
 
         if (isMembershipRegistration) {
           // Individual membership registration
@@ -1738,8 +1859,30 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          const attendeesList = groupPayload?.attendees || [];
-          const hasCorporateAttendees = isCorporate && Array.isArray(attendeesList) && attendeesList.length > 0;
+          let attendeesList = Array.isArray(groupPayload?.attendees) ? [...groupPayload.attendees] : [];
+
+          // Fallback: If attendeesList is empty in groupPayload but this is a group slip, lookup sponsor_group_members or meeting_attendances
+          if (isCorporate && attendeesList.length === 0 && (slip.ticket_code || slip.slip_id)) {
+            try {
+              const sgmList = await (prisma as any).sponsor_group_members.findMany({
+                where: { ticket_code: slip.ticket_code },
+              });
+              if (sgmList && sgmList.length > 0) {
+                attendeesList = sgmList.map((sgm: any) => ({
+                  memberNo: sgm.member_no,
+                  nameTh: sgm.attendee_name,
+                  email: sgm.attendee_email,
+                  phone: sgm.attendee_phone,
+                  workplace: sgm.workplace,
+                  ticketCode: sgm.ticket_code,
+                }));
+              }
+            } catch (sgmErr) {
+              console.warn('[Slip Approval] Failed to fallback query sponsor_group_members:', sgmErr);
+            }
+          }
+
+          const hasCorporateAttendees = isCorporate && attendeesList.length > 0;
 
           if (isCorporate && hasCorporateAttendees) {
             // 1. For Corporate Group Conference: Send summary approval confirmation to the corporate coordinator
@@ -1755,7 +1898,9 @@ export async function POST(request: NextRequest) {
                 amountPaid: slip.amount,
                 isMember: slip.is_member,
                 selectedActivities: slip.selected_activities,
-              });
+              }).catch((coordMailErr) =>
+                console.error(`Failed to send coordinator approval email to ${resolved.email}:`, coordMailErr)
+              );
             } else {
               console.warn(`[Conference Group Approval] Could not resolve corporate coordinator email for slip ${slip.slip_id}`);
             }
@@ -1764,10 +1909,36 @@ export async function POST(request: NextRequest) {
             const companyName = groupPayload?.companyName?.trim() || slip.guest_workplace?.trim() || resolved.name || 'บริษัทผู้สนับสนุน';
 
             for (const att of attendeesList) {
-              const attEmail = (att.email || att.attendee_email)?.trim();
-              const attName = att.nameTh || att.nameEn || att.attendee_name || 'ผู้เข้าร่วมประชุม';
-              
-              if (attEmail) {
+              let attEmail = (att.email || att.attendee_email)?.trim();
+              let attName = att.nameTh || att.nameEn || att.fullName || att.fullNameTh || att.attendee_name || '';
+              let attMemberNo = att.memberNo ? String(att.memberNo).trim() : undefined;
+              let attWorkplace = att.workplace || undefined;
+              let attPhone = att.phone || att.mobile || undefined;
+
+              // If attendee email or name is missing, look up the member in the database
+              if ((!attEmail || !attName || !attWorkplace) && attMemberNo) {
+                try {
+                  const cleanNo = attMemberNo.padStart(4, '0');
+                  const dbMem = await prisma.member.findFirst({
+                    where: {
+                      OR: [
+                        { member_no: attMemberNo },
+                        { member_no: cleanNo },
+                      ],
+                    },
+                  });
+                  if (dbMem) {
+                    attEmail = attEmail || dbMem.email?.trim();
+                    attName = attName || dbMem.fullNameTh || dbMem.fullNameEn || '';
+                    attWorkplace = attWorkplace || dbMem.workplace || undefined;
+                    attPhone = attPhone || dbMem.mobile || undefined;
+                  }
+                } catch (dbMemErr) {
+                  console.warn('[Slip Approval] Failed to lookup member by member_no:', attMemberNo, dbMemErr);
+                }
+              }
+
+              if (attEmail && attEmail.includes('@')) {
                 let attItems: any[] = [];
                 if (Array.isArray(att.selectedActivities) && att.selectedActivities.length > 0) {
                   attItems = att.selectedActivities.map((a: any) => {
@@ -1786,22 +1957,33 @@ export async function POST(request: NextRequest) {
                     name: att.programNameTh || att.programNameEn,
                     format: att.attendanceType || 'onsite',
                   }];
+                } else if (effectiveMeetingRec?.meeting_name) {
+                  attItems = [{
+                    name: effectiveMeetingRec.meeting_name,
+                    format: att.attendanceType || 'onsite',
+                  }];
                 }
 
-                console.log(`📧 [SLIP APPROVAL] Sending sponsored registration approval email to attendee: ${attEmail}`);
-                await sendAttendeeSponsoredRegistrationEmail({
-                  to: attEmail,
-                  recipientName: attName,
-                  recipientEmail: attEmail,
-                  memberNo: att.memberNo || undefined,
-                  workplace: att.workplace || undefined,
-                  companyName,
-                  meetingName: meetingNameStr,
-                  meetingDate: meetingDateStr,
-                  ticketCode: slip.ticket_code || '',
-                  items: attItems,
-                  format: att.attendanceType || undefined,
-                });
+                console.log(`📧 [SLIP APPROVAL] Sending sponsored registration approval email to attendee: ${attEmail} (${attName || 'Attendee'})`);
+                try {
+                  await sendAttendeeSponsoredRegistrationEmail({
+                    to: attEmail,
+                    recipientName: attName || 'ผู้เข้าร่วมประชุม',
+                    recipientEmail: attEmail,
+                    memberNo: attMemberNo,
+                    workplace: attWorkplace || companyName,
+                    companyName,
+                    meetingName: meetingNameStr,
+                    meetingDate: meetingDateStr,
+                    ticketCode: att.ticketCode || slip.ticket_code || '',
+                    items: attItems,
+                    format: att.attendanceType || undefined,
+                  });
+                } catch (mailErr) {
+                  console.error(`❌ [SLIP APPROVAL] Failed to send email to attendee ${attEmail}:`, mailErr);
+                }
+              } else {
+                console.warn(`⚠️ [SLIP APPROVAL] Skipping attendee email: No valid email found for attendee "${attName || attMemberNo || 'unknown'}"`);
               }
             }
           } else {

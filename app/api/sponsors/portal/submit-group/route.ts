@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import crypto from 'crypto';
-import { sendAttendeeTicketEmail } from '@/lib/email';
+import { sendAttendeeTicketEmail, sendAttendeeSponsoredRegistrationEmail, sendRegistrationApprovedEmail } from '@/lib/email';
 
 interface MemberEntry {
   memberNo: string;
@@ -205,22 +205,47 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // ส่งอีเมลตั๋วให้สมาชิก (ถ้ามีอีเมล)
-      const recipientEmail = dbMember.email || entry.email;
+      // จัดการ format วันที่ของงานประชุมอย่างปลอดภัย
+      let meetingDateStr: string | undefined = undefined;
+      if (meeting) {
+        if (meeting.start_date && meeting.end_date) {
+          const start = new Date(meeting.start_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+          const end = new Date(meeting.end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+          meetingDateStr = start === end ? start : `${start} - ${end}`;
+        } else if (meeting.meeting_date) {
+          meetingDateStr = new Date(meeting.meeting_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+        }
+      }
+
+      // ส่งอีเมลแจ้งผลการลงทะเบียนให้สมาชิกแต่ละท่าน (ถ้ามีอีเมล)
+      const recipientEmail = (dbMember.email || entry.email)?.trim();
+      const recipientName = dbMember.fullNameTh || entry.fullName || 'ผู้เข้าร่วมประชุม';
+      const attendeeWorkplace = dbMember.workplace || entry.workplace || sponsor.name || undefined;
+
       if (recipientEmail && recipientEmail.includes('@')) {
         try {
-          await sendAttendeeTicketEmail({
+          console.log(`📧 [SPONSOR PORTAL] Sending sponsored registration email to attendee: ${recipientEmail} (${recipientName})`);
+          await sendAttendeeSponsoredRegistrationEmail({
             to: recipientEmail,
-            recipientName: dbMember.fullNameTh || entry.fullName,
-            meetingName: meeting.meeting_name,
-            meetingDate: meeting.meeting_date.toLocaleDateString('th-TH'),
-            location: meeting.location || 'ดูรายละเอียดในกำหนดการ',
-            ticketCode,
+            recipientName,
+            recipientEmail,
             memberNo: dbMember.member_no,
+            workplace: attendeeWorkplace,
+            companyName: sponsor.name,
+            meetingName: meeting.meeting_name,
+            meetingDate: meetingDateStr,
+            ticketCode,
+            items: [{
+              name: meeting.meeting_name,
+              format: 'onsite',
+            }],
+            format: 'onsite',
           });
         } catch (mailErr) {
-          console.error(`Failed to send ticket email to ${recipientEmail}:`, mailErr);
+          console.error(`Failed to send sponsored registration email to ${recipientEmail}:`, mailErr);
         }
+      } else {
+        console.warn(`⚠️ [SPONSOR PORTAL] Skipping email for member ${dbMember.member_no}: No email found.`);
       }
 
       results.push({
@@ -240,6 +265,43 @@ export async function POST(req: NextRequest) {
         },
         { status: 400 }
       );
+    }
+
+    // ส่งอีเมลสรุปยืนยันการลงทะเบียนให้ตัวแทนบริษัทผู้ส่ง
+    const coordinatorEmail = sponsor.contact_email?.trim() || cleanEmail;
+    if (coordinatorEmail && results.length > 0) {
+      try {
+        let meetingDateStr: string | undefined = undefined;
+        if (meeting) {
+          if (meeting.start_date && meeting.end_date) {
+            const start = new Date(meeting.start_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+            const end = new Date(meeting.end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+            meetingDateStr = start === end ? start : `${start} - ${end}`;
+          } else if (meeting.meeting_date) {
+            meetingDateStr = new Date(meeting.meeting_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+          }
+        }
+
+        console.log(`📧 [SPONSOR PORTAL] Sending group registration summary email to sponsor coordinator: ${coordinatorEmail}`);
+        await sendRegistrationApprovedEmail({
+          to: coordinatorEmail,
+          recipientName: sponsor.contact_name || sponsor.name || 'ตัวแทนบริษัท',
+          meetingName: meeting.meeting_name,
+          meetingDate: meetingDateStr,
+          ticketCode: `GRP-${sponsor.name}`,
+          amountPaid: 0,
+          isMember: true,
+          sponsorCompanyName: sponsor.name,
+          isFreeRegistration: true,
+          selectedActivities: {
+            isGroup: true,
+            companyName: sponsor.name,
+            attendees: results,
+          },
+        });
+      } catch (coordMailErr) {
+        console.error('Failed to send sponsor coordinator summary email:', coordMailErr);
+      }
     }
 
     // 6. อัปเดตโควต้าที่ใช้ไปใน sponsor_quotas

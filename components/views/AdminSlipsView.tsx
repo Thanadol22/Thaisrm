@@ -1882,7 +1882,7 @@ export function AdminSlipsView() {
                           <span>🎟️ {selectedSlip.couponCode || selectedSlip.couponInfo?.code}</span>
                           <span className="text-[11px] text-emerald-700 font-medium">
                             {selectedSlip.couponInfo?.discountType === 'free' || !selectedSlip.couponInfo?.discountValue
-                              ? '(สิทธิ์ฟรี Main Congress)'
+                              ? '(สิทธิ์ฟรี)'
                               : selectedSlip.couponInfo?.discountValue
                                 ? `(ส่วนลด ${selectedSlip.couponInfo.discountValue})`
                                 : ''}

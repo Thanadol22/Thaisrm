@@ -246,8 +246,8 @@ export async function GET(request: NextRequest) {
 
       const ticketCode = matchingSlip?.ticket_code || `TSRM-${att.meeting_id}-${code || att.attendance_id}`;
       const ticketType = isMember
-        ? `${mem?.membership_type === 'Lifelong' ? 'สมาชิกตลอดชีพ' : 'สมาชิกสามัญ'} Pass`
-        : 'บุคคลทั่วไป (Walk-in / Non-Member Pass)';
+        ? `${mem?.membership_type === 'Lifelong' ? 'สมาชิกตลอดชีพ' : 'สมาชิกสามัญ'}`
+        : 'บุคคลทั่วไป';
 
       const isCheckedIn = att.checkin_time !== null || att.attendance_status === 'Attended';
       const checkInTimeFormatted = att.checkin_time

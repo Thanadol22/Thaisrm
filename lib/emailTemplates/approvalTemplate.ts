@@ -638,7 +638,7 @@ export function renderAttendeeSponsoredRegistrationEmail(options: AttendeeSponso
         🎟️ การรับบัตรเข้างาน
       </div>
       <p style="font-size: 13px; color: #1e3a8a; margin: 0; line-height: 1.6;">
-        ระบบจะจัดส่ง <strong>บัตรเข้างาน (QR Code สำหรับ Onsite)</strong> หรือ <strong>ลิงก์ห้องประชุม (สำหรับ Online)</strong> ให้ท่านทางอีเมลนี้อีกครั้ง ก่อนถึงกำหนดวันเริ่มงานประชุม
+        ระบบจะจัดส่ง <strong>บัตรเข้างานสำหรับเข้างานสถานที่จริง</strong> หรือ <strong>ลิงก์ห้องประชุมสำหรับการประชุมออนไลน์</strong> ให้ท่านทางอีเมลนี้อีกครั้ง ก่อนถึงกำหนดวันเริ่มงานประชุม
       </p>
     </div>
 

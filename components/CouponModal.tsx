@@ -105,7 +105,7 @@ export function CouponModal({
   const [applicableType, setApplicableType] = useState<'registration' | 'membership' | 'all'>('registration');
   // 2. Selectable Programs / Activities (Default to Main Program only)
   const [allPrograms, setAllPrograms] = useState<boolean>(false);
-  const [selectedPrograms, setSelectedPrograms] = useState<string[]>(['การประชุมหลัก (Main Congress)']);
+  const [selectedPrograms, setSelectedPrograms] = useState<string[]>(['การประชุมหลัก']);
 
   useEffect(() => {
     setMounted(true);
@@ -191,7 +191,7 @@ export function CouponModal({
           (a.name || a.titleTh || a.nameTh || '').toLowerCase().includes('main') ||
           (a.name || a.titleTh || a.nameTh || '').includes('หลัก')
         ) || editActs[0];
-        const defaultProgName = editMainAct ? (editMainAct.name || editMainAct.titleTh || editMainAct.nameTh || 'การประชุมหลัก (Main Congress)') : 'การประชุมหลัก (Main Congress)';
+        const defaultProgName = editMainAct ? (editMainAct.name || editMainAct.titleTh || editMainAct.nameTh || 'การประชุมหลัก') : 'การประชุมหลัก';
 
         // Parse selected programs if stored in remarks
         try {
@@ -241,7 +241,7 @@ export function CouponModal({
           (a.name || a.titleTh || a.nameTh || '').includes('หลัก')
         ) || acts[0];
         
-        const defaultProgName = mainAct ? (mainAct.name || mainAct.titleTh || mainAct.nameTh || 'การประชุมหลัก (Main Congress)') : 'การประชุมหลัก (Main Congress)';
+        const defaultProgName = mainAct ? (mainAct.name || mainAct.titleTh || mainAct.nameTh || 'การประชุมหลัก') : 'การประชุมหลัก';
         setAllPrograms(false);
         setSelectedPrograms([defaultProgName]);
 
@@ -345,7 +345,7 @@ export function CouponModal({
       let finalRemarks = remarks.trim();
       if (!allPrograms) {
         finalRemarks = JSON.stringify({
-          programs: selectedPrograms.length > 0 ? selectedPrograms : ['การประชุมหลัก (Main Congress)'],
+          programs: selectedPrograms.length > 0 ? selectedPrograms : ['การประชุมหลัก'],
           note: remarks.trim() || undefined,
         });
       } else {
@@ -588,7 +588,7 @@ export function CouponModal({
                     if (nextAll) {
                       setSelectedPrograms([]);
                     } else {
-                      const defaultProg = availableActivities[0]?.name || 'การประชุมหลัก (Main Congress)';
+                      const defaultProg = availableActivities[0]?.name || 'การประชุมหลัก';
                       setSelectedPrograms([defaultProg]);
                     }
                   }}
@@ -633,7 +633,7 @@ export function CouponModal({
                 </div>
               ) : (
                 <div className="space-y-1.5 pt-1">
-                  {['การประชุมหลัก (Main Congress)', 'Pre-Congress Workshop', 'Dinner Symposium'].map((prog) => {
+                  {['การประชุมหลัก', 'Pre-Congress Workshop', 'Dinner Symposium'].map((prog) => {
                     const isChecked = selectedPrograms.includes(prog);
                     return (
                       <button

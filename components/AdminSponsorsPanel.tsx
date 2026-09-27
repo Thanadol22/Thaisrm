@@ -1924,6 +1924,19 @@ export default function AdminSponsorsPanel({
       />
 
       {/* ======================================================= */}
+      {/* MODAL: COUPON USAGES DETAIL */}
+      {/* ======================================================= */}
+      <CouponUsagesModal
+        isOpen={couponUsagesModalOpen}
+        onClose={() => setCouponUsagesModalOpen(false)}
+        coupon={selectedCouponForUsages}
+        onQuotaRefunded={() => {
+          fetchCoupons();
+          fetchSponsors();
+        }}
+      />
+
+      {/* ======================================================= */}
       {/* MODAL: SPONSOR COUPON GENERATION HISTORY */}
       {/* ======================================================= */}
       <SponsorCouponHistoryModal
@@ -1944,6 +1957,10 @@ export default function AdminSponsorsPanel({
         onDeleteCoupon={(couponId, couponCode) => {
           handleDeleteCoupon(couponId, couponCode);
           setSponsorCouponHistoryOpen(false);
+        }}
+        onQuotaRefunded={() => {
+          fetchCoupons();
+          fetchSponsors();
         }}
       />
     </div>
