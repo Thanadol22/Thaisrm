@@ -174,6 +174,63 @@ export async function GET(request: NextRequest) {
     const address = slip.members?.address || memberPayload?.address || '';
     const jobCategory = slip.members?.job_category || memberPayload?.job_category || '';
 
+    // Resolve coupon information for resubmit page
+    let couponCode = groupPayload?.couponCode || groupPayload?.couponData?.code || null;
+    let couponInfo: any = null;
+    let discountTotal = Number(groupPayload?.discountAmount) || 0;
+
+    try {
+      if (!couponCode && slip.ticket_code) {
+        const sgm = await (prisma as any).sponsor_group_members.findFirst({
+          where: { ticket_code: slip.ticket_code, coupon_code: { not: null } },
+        });
+        if (sgm?.coupon_code) couponCode = sgm.coupon_code;
+      }
+      if (!couponCode && slip.meeting_id) {
+        const att = await prisma.meeting_attendances.findFirst({
+          where: {
+            meeting_id: slip.meeting_id,
+            coupon_code: { not: null },
+            OR: [
+              { member_no: slip.member_no },
+              { sponsor_company_name: companyName || undefined },
+            ],
+          },
+        });
+        if (att?.coupon_code) couponCode = att.coupon_code;
+      }
+
+      if (couponCode) {
+        const cRec = await prisma.coupons.findFirst({
+          where: { code: { equals: couponCode.trim(), mode: 'insensitive' } },
+        });
+        if (cRec) {
+          couponInfo = {
+            code: cRec.code,
+            companyName: cRec.company_name,
+            discountType: cRec.discount_type,
+            discountValue: Number(cRec.discount_value) || 0,
+            remarks: cRec.remarks,
+          };
+          if (!discountTotal) {
+            const attendees = groupPayload?.attendees || [];
+            if (attendees.length > 0) {
+              const origSum = attendees.reduce((sum: number, a: any) => sum + Number(a.subtotal || a.price || 0), 0);
+              if (origSum > Number(slip.amount)) {
+                discountTotal = origSum - Number(slip.amount);
+              } else if (cRec.discount_type === 'free') {
+                discountTotal = attendees.length * 4000;
+              }
+            } else if (cRec.discount_type === 'free') {
+              discountTotal = 4000;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error resolving coupon for resubmit slip:', e);
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -218,6 +275,9 @@ export async function GET(request: NextRequest) {
         ticketCode: slip.ticket_code,
         memberPayload,
         rejectType,
+        couponCode: couponCode || null,
+        couponInfo: couponInfo || null,
+        discountTotal: discountTotal || 0,
       },
     });
   } catch (error: any) {

@@ -62,6 +62,9 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
     status: string;
     oldSlipUrl: string;
     ticketCode: string;
+    couponCode?: string | null;
+    couponInfo?: any;
+    discountTotal?: number;
   } | null>(null);
 
   // Form states for editing
@@ -357,9 +360,34 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
                 {slipData.isCorporate ? (slipData.companyName || slipData.applicantName) : slipData.applicantName}
               </span>
             </div>
-            <div className="flex justify-between py-1.5">
+            {slipData.couponCode && (
+              <div className="flex justify-between py-1.5 items-center">
+                <span className="text-slate-500">คูปองที่ใช้:</span>
+                <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  🎟️ {slipData.couponCode} {slipData.couponInfo?.discountType === 'free' ? '(สิทธิ์ฟรี Main Congress)' : ''}
+                </span>
+              </div>
+            )}
+            {((slipData.discountTotal && slipData.discountTotal > 0) || slipData.couponInfo?.discountType === 'free' || slipData.couponCode) && (
+              <div className="flex justify-between py-1.5 items-center">
+                <span className="text-slate-500">ส่วนลดที่ได้รับ:</span>
+                <span className="font-extrabold text-emerald-700 text-xs sm:text-sm font-mono">
+                  -฿{(slipData.discountTotal || 8000).toLocaleString()} THB
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between py-1.5 items-center">
               <span className="text-slate-500">ยอดเงินที่ต้องชำระ:</span>
-              <span className="font-extrabold text-[#0026b3] text-sm">฿ {slipData.amount.toLocaleString()}</span>
+              <div className="text-right">
+                {slipData.discountTotal && slipData.discountTotal > 0 ? (
+                  <span className="line-through text-slate-400 text-xs font-mono mr-2">
+                    ฿ {(slipData.amount + slipData.discountTotal).toLocaleString()}
+                  </span>
+                ) : null}
+                <span className="font-extrabold text-[#0026b3] text-sm sm:text-base font-mono">
+                  ฿ {slipData.amount.toLocaleString()}
+                </span>
+              </div>
             </div>
           </div>
         </div>

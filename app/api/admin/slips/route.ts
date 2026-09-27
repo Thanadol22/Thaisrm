@@ -142,6 +142,211 @@ export async function GET(request: NextRequest) {
       return { activities: [], isMembership: false, isFormatChange: false, formatChangePayload: null, memberPayload: null };
     };
 
+    const resolveSlipCouponAndDiscount = (
+      s: any,
+      parsedAct: any,
+      companyName: string,
+      ctx: {
+        allCoupons: any[];
+        allCouponUsages: any[];
+        allSponsorGroupMembers: any[];
+        allMeetingAttendances: any[];
+      }
+    ) => {
+      const { allCoupons, allCouponUsages, allSponsorGroupMembers, allMeetingAttendances } = ctx;
+
+      const matchedUsages = allCouponUsages.filter(
+        (cu: any) => (s.ticket_code && cu.ticket_code === s.ticket_code) || (s.slip_id && cu.slip_id === s.slip_id)
+      );
+
+      const matchedSgm = allSponsorGroupMembers.filter(
+        (sgm: any) => s.ticket_code && sgm.ticket_code === s.ticket_code
+      );
+
+      let couponCode = parsedAct.groupPayload?.couponCode || parsedAct.groupPayload?.couponData?.code || null;
+      if (!couponCode && matchedUsages.length > 0) {
+        couponCode = matchedUsages[0]?.coupon?.code || null;
+      }
+      if (!couponCode && matchedSgm.length > 0) {
+        couponCode = matchedSgm.find((m: any) => m.coupon_code)?.coupon_code || null;
+      }
+      if (!couponCode) {
+        const matchedAtt = allMeetingAttendances.find(
+          (a: any) => a.meeting_id === s.meeting_id && (
+            (s.member_no && a.member_no === s.member_no) ||
+            (parsedAct.groupPayload?.attendees && Array.isArray(parsedAct.groupPayload.attendees) &&
+             parsedAct.groupPayload.attendees.some((att: any) => att.memberNo && att.memberNo === a.member_no))
+          )
+        );
+        if (matchedAtt?.coupon_code) {
+          couponCode = matchedAtt.coupon_code;
+        }
+      }
+
+      const couponRecord = couponCode
+        ? allCoupons.find((c: any) => c.code?.toUpperCase() === couponCode?.toUpperCase()) || matchedUsages[0]?.coupon || null
+        : null;
+
+      const attendees = parsedAct.groupPayload?.attendees || [];
+      const attendeesCount = Array.isArray(attendees) ? attendees.length : 1;
+
+      const couponInfo = couponRecord
+        ? {
+            code: couponRecord.code,
+            companyName: couponRecord.company_name,
+            discountType: couponRecord.discount_type,
+            discountValue: Number(couponRecord.discount_value) || 0,
+            remarks: couponRecord.remarks,
+            usedCount: matchedUsages.length || matchedSgm.length || attendeesCount,
+          }
+        : (parsedAct.groupPayload?.couponData
+          ? {
+              code: parsedAct.groupPayload.couponData.code || couponCode,
+              companyName: parsedAct.groupPayload.couponData.companyName,
+              discountType: parsedAct.groupPayload.couponData.discountType || 'free',
+              discountValue: Number(parsedAct.groupPayload.couponData.discountValue) || 0,
+              remarks: parsedAct.groupPayload.couponData.description,
+              usedCount: attendeesCount,
+            }
+          : (couponCode
+            ? {
+                code: couponCode,
+                companyName: companyName,
+                discountType: 'free',
+                discountValue: 0,
+                remarks: null,
+                usedCount: matchedSgm.length || attendeesCount,
+              }
+            : null));
+
+      let discountTotal = 0;
+      if (matchedUsages.length > 0) {
+        const usageSum = matchedUsages.reduce((sum: number, cu: any) => sum + (Number(cu.discount_applied) || 0), 0);
+        if (usageSum > 0) {
+          discountTotal = usageSum;
+        } else if (couponRecord?.discount_type === 'free') {
+          discountTotal = matchedUsages.length * 4000;
+        }
+      }
+
+      // Calculate discountTotal for group or attendees if matchedUsages was empty
+      if (!discountTotal && (couponRecord || couponCode)) {
+        if (Array.isArray(attendees) && attendees.length > 0) {
+          let calculatedDiscount = 0;
+          attendees.forEach((att: any) => {
+            const attActs = att.selectedActivities || [];
+            const hasMain = attActs.some((a: any) =>
+              a.name?.toLowerCase().includes('main') ||
+              a.name?.includes('Main Program') ||
+              a.name?.includes('การประชุมหลัก')
+            ) || att.programNameTh?.includes('Main') || att.programNameEn?.includes('Main') || true;
+
+            if (couponRecord?.discount_type === 'free' || !couponRecord?.discount_type) {
+              if (hasMain) {
+                calculatedDiscount += 4000;
+              }
+            } else if (couponRecord?.discount_type === 'fixed') {
+              calculatedDiscount += Number(couponRecord.discount_value) || 0;
+            } else if (couponRecord?.discount_type === 'percent') {
+              const attPrice = Number(att.subtotal || att.price || 0);
+              calculatedDiscount += attPrice * ((Number(couponRecord.discount_value) || 0) / 100);
+            }
+          });
+
+          if (calculatedDiscount > 0) {
+            discountTotal = calculatedDiscount;
+          }
+        } else if (couponRecord?.discount_type === 'free' || couponInfo?.discountType === 'free') {
+          discountTotal = 4000;
+        }
+      }
+
+      if (!discountTotal && parsedAct.groupPayload?.discountAmount) {
+        discountTotal = Number(parsedAct.groupPayload.discountAmount) || 0;
+      }
+
+      // Compare original sum against actual slip.amount
+      if (!discountTotal && (couponRecord || couponCode) && Array.isArray(attendees) && attendees.length > 0) {
+        const origSum = attendees.reduce((sum: number, a: any) => sum + Number(a.subtotal || a.price || 0), 0);
+        if (origSum > Number(s.amount)) {
+          discountTotal = origSum - Number(s.amount);
+        }
+      }
+
+      const couponUsagesList: any[] = matchedUsages.map((cu: any) => ({
+        id: cu.id.toString(),
+        couponCode: cu.coupon?.code || couponCode,
+        memberNo: cu.member_no,
+        attendeeName: cu.attendee_name,
+        attendeeEmail: cu.attendee_email,
+        attendeePhone: cu.attendee_phone,
+        workplace: cu.workplace,
+        discountApplied: Number(cu.discount_applied) > 0 ? Number(cu.discount_applied) : (couponRecord?.discount_type === 'free' ? 4000 : 0),
+        finalAmount: Number(cu.final_amount) || 0,
+      }));
+
+      if (couponUsagesList.length === 0 && (couponRecord || couponCode)) {
+        if (matchedSgm.length > 0) {
+          matchedSgm.forEach((sgm: any) => {
+            const attInGroup = attendees.find(
+              (a: any) => (a.memberNo && a.memberNo === sgm.member_no) || (a.email && a.email.toLowerCase() === sgm.attendee_email?.toLowerCase())
+            );
+            const acts = attInGroup?.selectedActivities || [];
+            const hasMain = acts.some((a: any) =>
+              a.name?.toLowerCase().includes('main') ||
+              a.name?.includes('Main Program') ||
+              a.name?.includes('การประชุมหลัก')
+            ) || attInGroup?.programNameTh?.includes('Main') || true;
+
+            const discount = Number(sgm.discount_amount) > 0
+              ? Number(sgm.discount_amount)
+              : (couponRecord?.discount_type === 'free' && hasMain ? 4000 : (Number(couponRecord?.discount_value) || 4000));
+
+            couponUsagesList.push({
+              id: sgm.id ? sgm.id.toString() : `sgm-${sgm.member_no}`,
+              couponCode: sgm.coupon_code || couponCode,
+              memberNo: sgm.member_no,
+              attendeeName: sgm.attendee_name,
+              attendeeEmail: sgm.attendee_email,
+              attendeePhone: sgm.attendee_phone,
+              workplace: sgm.workplace,
+              discountApplied: discount,
+              finalAmount: Number(sgm.net_price) || 0,
+            });
+          });
+        } else if (Array.isArray(attendees) && attendees.length > 0) {
+          attendees.forEach((att: any, idx: number) => {
+            const acts = att.selectedActivities || [];
+            const hasMain = acts.some((a: any) =>
+              a.name?.toLowerCase().includes('main') ||
+              a.name?.includes('Main Program') ||
+              a.name?.includes('การประชุมหลัก')
+            ) || att.programNameTh?.includes('Main') || true;
+
+            const discount = couponRecord?.discount_type === 'free' && hasMain ? 4000 : (Number(couponRecord?.discount_value) || 4000);
+            couponUsagesList.push({
+              id: `att-${idx}`,
+              couponCode: couponCode,
+              memberNo: att.memberNo || null,
+              attendeeName: att.nameTh || att.nameEn || '',
+              attendeeEmail: att.email || '',
+              attendeePhone: att.mobile || '',
+              workplace: att.workplace || companyName || '',
+              discountApplied: discount,
+              finalAmount: Math.max(0, Number(att.subtotal || att.price || 0) - discount),
+            });
+          });
+        }
+      }
+
+      return {
+        couponCode,
+        couponInfo,
+        discountTotal,
+        couponUsagesList,
+      };
+    };
+
     if (slipsModel) {
       const whereClause: any = {};
       if (meetingId) whereClause.meeting_id = meetingId;
@@ -179,6 +384,8 @@ export async function GET(request: NextRequest) {
       let allCouponUsages: any[] = [];
       let allCoupons: any[] = [];
       let allSponsors: any[] = [];
+      let allSponsorGroupMembers: any[] = [];
+      let allMeetingAttendances: any[] = [];
       try {
         allCouponUsages = await prisma.coupon_usages.findMany({
           where: {
@@ -193,6 +400,30 @@ export async function GET(request: NextRequest) {
         });
         allCoupons = await prisma.coupons.findMany();
         allSponsors = await (prisma as any).sponsors.findMany();
+        try {
+          allSponsorGroupMembers = await (prisma as any).sponsor_group_members.findMany({
+            where: { ticket_code: { in: allTicketCodes } },
+          });
+        } catch {
+          allSponsorGroupMembers = await prisma.$queryRawUnsafe(
+            `SELECT * FROM sponsor_group_members WHERE ticket_code = ANY($1::varchar[])`,
+            allTicketCodes
+          );
+        }
+        allMeetingAttendances = await prisma.meeting_attendances.findMany({
+          where: {
+            meeting_id: { in: slips.map((s: any) => s.meeting_id).filter(Boolean) },
+            coupon_code: { not: null },
+          },
+          select: {
+            attendance_id: true,
+            meeting_id: true,
+            member_no: true,
+            coupon_code: true,
+            sponsor_id: true,
+            sponsor_company_name: true,
+          },
+        });
       } catch (cErr) {
         console.warn('Could not query coupon data for slips:', cErr);
       }
@@ -255,66 +486,18 @@ export async function GET(request: NextRequest) {
             ? s.members?.workplace || ''
             : s.guest_workplace || parsedAct.memberPayload?.workplace || '';
 
-        // Match coupon usages
-        const matchedUsages = allCouponUsages.filter(
-          (cu) => (s.ticket_code && cu.ticket_code === s.ticket_code) || (s.slip_id && cu.slip_id === s.slip_id)
-        );
-
-        let couponCode = parsedAct.groupPayload?.couponCode || parsedAct.groupPayload?.couponData?.code || null;
-        if (!couponCode && matchedUsages.length > 0) {
-          couponCode = matchedUsages[0]?.coupon?.code || null;
-        }
-
-        const couponRecord = couponCode
-          ? allCoupons.find((c) => c.code?.toUpperCase() === couponCode?.toUpperCase()) || matchedUsages[0]?.coupon || null
-          : null;
-
-        const couponInfo = couponRecord
-          ? {
-              code: couponRecord.code,
-              companyName: couponRecord.company_name,
-              discountType: couponRecord.discount_type,
-              discountValue: Number(couponRecord.discount_value) || 0,
-              remarks: couponRecord.remarks,
-              usedCount: matchedUsages.length,
-            }
-          : (parsedAct.groupPayload?.couponData
-            ? {
-                code: parsedAct.groupPayload.couponData.code || couponCode,
-                companyName: parsedAct.groupPayload.couponData.companyName,
-                discountType: parsedAct.groupPayload.couponData.discountType || 'free',
-                discountValue: Number(parsedAct.groupPayload.couponData.discountValue) || 0,
-                remarks: parsedAct.groupPayload.couponData.description,
-                usedCount: parsedAct.groupPayload?.attendees?.length || 1,
-              }
-            : null);
-
-        // Calculate total discount applied
-        let discountTotal = 0;
-        if (matchedUsages.length > 0) {
-          const usageSum = matchedUsages.reduce((sum, cu) => sum + (Number(cu.discount_applied) || 0), 0);
-          if (usageSum > 0) {
-            discountTotal = usageSum;
-          } else if (couponRecord?.discount_type === 'free') {
-            // Free Main Program pass for each attendee
-            discountTotal = matchedUsages.length * 4000;
+        // Resolve coupon and discount
+        const { couponCode, couponInfo, discountTotal, couponUsagesList } = resolveSlipCouponAndDiscount(
+          s,
+          parsedAct,
+          companyName,
+          {
+            allCoupons,
+            allCouponUsages,
+            allSponsorGroupMembers,
+            allMeetingAttendances,
           }
-        }
-        if (!discountTotal && parsedAct.groupPayload?.discountAmount) {
-          discountTotal = Number(parsedAct.groupPayload.discountAmount) || 0;
-        }
-
-        const couponUsagesList = matchedUsages.map((cu) => ({
-          id: cu.id.toString(),
-          couponCode: cu.coupon?.code || couponCode,
-          memberNo: cu.member_no,
-          attendeeName: cu.attendee_name,
-          attendeeEmail: cu.attendee_email,
-          attendeePhone: cu.attendee_phone,
-          workplace: cu.workplace,
-          discountApplied: Number(cu.discount_applied) > 0 ? Number(cu.discount_applied) : (couponRecord?.discount_type === 'free' ? 4000 : 0),
-          finalAmount: Number(cu.final_amount) || 0,
-        }));
+        );
 
         const ticketType = parsedAct.isFormatChange
           ? `🔄 ขอเปลี่ยนเป็น ${parsedAct.formatChangePayload?.targetFormat === 'onsite' ? 'Onsite' : 'Online'}`
@@ -412,6 +595,8 @@ export async function GET(request: NextRequest) {
 
       let allCouponUsages: any[] = [];
       let allCoupons: any[] = [];
+      let allSponsorGroupMembers: any[] = [];
+      let allMeetingAttendances: any[] = [];
       try {
         allCouponUsages = await prisma.coupon_usages.findMany({
           where: {
@@ -425,6 +610,30 @@ export async function GET(request: NextRequest) {
           },
         });
         allCoupons = await prisma.coupons.findMany();
+        try {
+          allSponsorGroupMembers = await (prisma as any).sponsor_group_members.findMany({
+            where: { ticket_code: { in: allTicketCodes } },
+          });
+        } catch {
+          allSponsorGroupMembers = await prisma.$queryRawUnsafe(
+            `SELECT * FROM sponsor_group_members WHERE ticket_code = ANY($1::varchar[])`,
+            allTicketCodes
+          );
+        }
+        allMeetingAttendances = await prisma.meeting_attendances.findMany({
+          where: {
+            meeting_id: { in: slips.map((s: any) => s.meeting_id).filter(Boolean) },
+            coupon_code: { not: null },
+          },
+          select: {
+            attendance_id: true,
+            meeting_id: true,
+            member_no: true,
+            coupon_code: true,
+            sponsor_id: true,
+            sponsor_company_name: true,
+          },
+        });
       } catch (cErr) {
         console.warn('Could not query coupon data for fallback slips:', cErr);
       }
@@ -471,63 +680,18 @@ export async function GET(request: NextRequest) {
             ? s.member_workplace || ''
             : s.guest_workplace || parsedAct.memberPayload?.workplace || '';
 
-        const matchedUsages = allCouponUsages.filter(
-          (cu) => (s.ticket_code && cu.ticket_code === s.ticket_code) || (s.slip_id && cu.slip_id === s.slip_id)
-        );
-
-        let couponCode = parsedAct.groupPayload?.couponCode || parsedAct.groupPayload?.couponData?.code || null;
-        if (!couponCode && matchedUsages.length > 0) {
-          couponCode = matchedUsages[0]?.coupon?.code || null;
-        }
-
-        const couponRecord = couponCode
-          ? allCoupons.find((c) => c.code?.toUpperCase() === couponCode?.toUpperCase()) || matchedUsages[0]?.coupon || null
-          : null;
-
-        const couponInfo = couponRecord
-          ? {
-              code: couponRecord.code,
-              companyName: couponRecord.company_name,
-              discountType: couponRecord.discount_type,
-              discountValue: Number(couponRecord.discount_value) || 0,
-              remarks: couponRecord.remarks,
-              usedCount: matchedUsages.length,
-            }
-          : (parsedAct.groupPayload?.couponData
-            ? {
-                code: parsedAct.groupPayload.couponData.code || couponCode,
-                companyName: parsedAct.groupPayload.couponData.companyName,
-                discountType: parsedAct.groupPayload.couponData.discountType || 'free',
-                discountValue: Number(parsedAct.groupPayload.couponData.discountValue) || 0,
-                remarks: parsedAct.groupPayload.couponData.description,
-                usedCount: parsedAct.groupPayload?.attendees?.length || 1,
-              }
-            : null);
-
-        let discountTotal = 0;
-        if (matchedUsages.length > 0) {
-          const usageSum = matchedUsages.reduce((sum, cu) => sum + (Number(cu.discount_applied) || 0), 0);
-          if (usageSum > 0) {
-            discountTotal = usageSum;
-          } else if (couponRecord?.discount_type === 'free') {
-            discountTotal = matchedUsages.length * 4000;
+        // Resolve coupon and discount
+        const { couponCode, couponInfo, discountTotal, couponUsagesList } = resolveSlipCouponAndDiscount(
+          s,
+          parsedAct,
+          companyName,
+          {
+            allCoupons,
+            allCouponUsages,
+            allSponsorGroupMembers,
+            allMeetingAttendances,
           }
-        }
-        if (!discountTotal && parsedAct.groupPayload?.discountAmount) {
-          discountTotal = Number(parsedAct.groupPayload.discountAmount) || 0;
-        }
-
-        const couponUsagesList = matchedUsages.map((cu) => ({
-          id: cu.id.toString(),
-          couponCode: cu.coupon?.code || couponCode,
-          memberNo: cu.member_no,
-          attendeeName: cu.attendee_name,
-          attendeeEmail: cu.attendee_email,
-          attendeePhone: cu.attendee_phone,
-          workplace: cu.workplace,
-          discountApplied: Number(cu.discount_applied) > 0 ? Number(cu.discount_applied) : (couponRecord?.discount_type === 'free' ? 4000 : 0),
-          finalAmount: Number(cu.final_amount) || 0,
-        }));
+        );
 
         const ticketType = parsedAct.isMembership
           ? (parsedAct.isGroupMembership ? 'Group Membership' : 'Membership Registration')

@@ -1454,11 +1454,11 @@ export function AdminSlipsView() {
                                   a.name.includes('Main Program')
                                 );
 
-                                const attDiscount = attUsage?.discountApplied
+                                const attDiscount = (attUsage?.discountApplied && Number(attUsage.discountApplied) > 0)
                                   ? Number(attUsage.discountApplied)
-                                  : (Number(att.discountTotal) || Number(att.discountAmount) || (isFreeCoupon && hasMainProgram ? 4000 : 0));
+                                  : (Number(att.discountTotal) || Number(att.discountAmount) || ((isFreeCoupon || isCouponActive) && hasMainProgram ? 4000 : 0));
 
-                                const hasDiscount = attDiscount > 0 || (isFreeCoupon && hasMainProgram) || Boolean(att.discountAppliedNotice);
+                                const hasDiscount = attDiscount > 0 || ((isFreeCoupon || isCouponActive) && hasMainProgram) || Boolean(att.discountAppliedNotice);
                                 const originalPrice = Number(att.originalTotal || att.subtotal || att.price || 0);
                                 const netPrice = hasDiscount && originalPrice > 0 ? Math.max(0, originalPrice - attDiscount) : (att.subtotal || att.price || 0);
 
@@ -1506,6 +1506,12 @@ export function AdminSlipsView() {
                                               companyName: selectedSlip.companyName || selectedSlip.groupPayload.companyName,
                                               ticketCode: selectedSlip.ticketCode,
                                               submittedAt: selectedSlip.createdAt,
+                                              couponCode: selectedSlip.couponCode || selectedSlip.couponInfo?.code,
+                                              couponInfo: selectedSlip.couponInfo,
+                                              attDiscount,
+                                              hasDiscount,
+                                              originalPrice,
+                                              netPrice,
                                             })
                                           }
                                           className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-bold text-[11px] sm:text-xs shadow-2xs transition active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
@@ -1570,9 +1576,9 @@ export function AdminSlipsView() {
                                               const isMainProgram = act.name.toLowerCase().includes('main') ||
                                                 act.name.includes('การประชุมหลัก') ||
                                                 act.name.includes('Main Program');
-                                              const isActDiscounted = hasDiscount && isMainProgram && (isFreeCoupon || attDiscount >= (act.price || 4000));
+                                              const isActDiscounted = hasDiscount && isMainProgram && (isFreeCoupon || isCouponActive || attDiscount >= (act.price || 4000));
                                               const rawActPrice = Number(act.price) || (isMainProgram ? 4000 : 0);
-                                              const discountedActPrice = isActDiscounted ? Math.max(0, rawActPrice - attDiscount) : rawActPrice;
+                                              const discountedActPrice = isActDiscounted ? Math.max(0, rawActPrice - (attDiscount > 0 ? Math.min(attDiscount, rawActPrice) : 4000)) : rawActPrice;
 
                                               return (
                                                 <span
@@ -1768,7 +1774,7 @@ export function AdminSlipsView() {
                         <span className="font-mono font-black text-xs sm:text-sm px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1.5 shadow-2xs">
                           <span>🎟️ {selectedSlip.couponCode || selectedSlip.couponInfo?.code}</span>
                           <span className="text-[11px] text-emerald-700 font-medium">
-                            {selectedSlip.couponInfo?.discountType === 'free'
+                            {selectedSlip.couponInfo?.discountType === 'free' || !selectedSlip.couponInfo?.discountValue
                               ? '(สิทธิ์ฟรี Main Congress)'
                               : selectedSlip.couponInfo?.discountValue
                                 ? `(ส่วนลด ${selectedSlip.couponInfo.discountValue})`
@@ -1780,7 +1786,7 @@ export function AdminSlipsView() {
                   )}
 
                   {/* ส่วนลดที่ได้รับ (ข้อ 3) */}
-                  {((selectedSlip.discountTotal && selectedSlip.discountTotal > 0) || selectedSlip.couponInfo?.discountType === 'free') && (
+                  {((selectedSlip.discountTotal && selectedSlip.discountTotal > 0) || selectedSlip.couponInfo?.discountType === 'free' || Boolean(selectedSlip.couponCode)) && (
                     <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
                       <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
                         {lang === 'th' ? 'ส่วนลดที่ได้รับ' : 'Discount Applied'}
@@ -1842,9 +1848,20 @@ export function AdminSlipsView() {
                               </p>
                             </div>
                             <div className="text-right shrink-0">
-                              <span className="font-black text-indigo-700 font-mono text-sm sm:text-base">
-                                ฿{selectedSlip.amount.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">THB</span>
-                              </span>
+                              {selectedSlip.discountTotal && selectedSlip.discountTotal > 0 ? (
+                                <div className="flex items-center gap-1.5 justify-end">
+                                  <span className="line-through text-slate-400 font-mono text-xs">
+                                    ฿{(selectedSlip.amount + selectedSlip.discountTotal).toLocaleString()}
+                                  </span>
+                                  <span className="font-black text-emerald-700 font-mono text-sm sm:text-base">
+                                    ฿{selectedSlip.amount.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">THB</span>
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="font-black text-indigo-700 font-mono text-sm sm:text-base">
+                                  ฿{selectedSlip.amount.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">THB</span>
+                                </span>
+                              )}
                             </div>
                           </div>
                           <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
@@ -2172,7 +2189,24 @@ export function AdminSlipsView() {
                       <span className="font-bold text-slate-800 text-right">{viewingAttendee.specialRequirements}</span>
                     </div>
                   )}
-                  {viewingAttendee.subtotal ? (
+                  {viewingAttendee.hasDiscount && viewingAttendee.attDiscount > 0 ? (
+                    <div className="py-1 gap-2 pt-1 border-t border-slate-200 space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 font-bold shrink-0">ราคาเต็ม:</span>
+                        <span className="line-through text-slate-400 font-mono text-xs">฿{Number(viewingAttendee.originalPrice || viewingAttendee.subtotal).toLocaleString()} THB</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-emerald-700 font-bold shrink-0">
+                          ส่วนลดคูปอง{viewingAttendee.couponCode ? ` (🎟️ ${viewingAttendee.couponCode})` : ''}:
+                        </span>
+                        <span className="font-extrabold text-emerald-700 font-mono text-xs">-฿{Number(viewingAttendee.attDiscount).toLocaleString()} THB</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-1 border-t border-slate-100">
+                        <span className="text-slate-900 font-extrabold shrink-0">ยอดสุทธิ:</span>
+                        <span className="font-black text-emerald-700 font-mono text-sm">฿{Number(viewingAttendee.netPrice).toLocaleString()} THB</span>
+                      </div>
+                    </div>
+                  ) : viewingAttendee.subtotal ? (
                     <div className="flex justify-between py-1 gap-2 pt-1 border-t border-slate-200">
                       <span className="text-slate-500 font-bold shrink-0">ค่าลงทะเบียน:</span>
                       <span className="font-black text-indigo-700 font-mono text-sm">฿{Number(viewingAttendee.subtotal).toLocaleString()} THB</span>
@@ -2191,14 +2225,26 @@ export function AdminSlipsView() {
                         <span>กิจกรรมและหลักสูตรที่เลือก ({attendeeActs.length} รายการ)</span>
                       </h5>
                       <div className="space-y-1.5 pt-1">
-                        {attendeeActs.map((act: any, idx: number) => (
-                          <div key={idx} className="bg-white p-2.5 rounded-xl border border-slate-200 flex justify-between items-center gap-2">
-                            <span className="font-bold text-slate-800 truncate">{act.name}</span>
-                            {act.price ? (
-                              <span className="font-black text-indigo-700 font-mono shrink-0">฿{Number(act.price).toLocaleString()}</span>
-                            ) : null}
-                          </div>
-                        ))}
+                        {attendeeActs.map((act: any, idx: number) => {
+                          const isMain = act.name?.toLowerCase().includes('main') || act.name?.includes('Main Program') || act.name?.includes('การประชุมหลัก');
+                          const isActDisc = viewingAttendee.hasDiscount && isMain && (viewingAttendee.attDiscount >= 4000 || viewingAttendee.couponCode);
+                          const rawPrice = Number(act.price) || (isMain ? 4000 : 0);
+                          const discPrice = isActDisc ? Math.max(0, rawPrice - (viewingAttendee.attDiscount > 0 ? Math.min(viewingAttendee.attDiscount, rawPrice) : 4000)) : rawPrice;
+
+                          return (
+                            <div key={idx} className={`p-2.5 rounded-xl border flex justify-between items-center gap-2 ${isActDisc ? 'bg-emerald-50/50 border-emerald-200' : 'bg-white border-slate-200'}`}>
+                              <span className="font-bold text-slate-800 truncate">{act.name}</span>
+                              {isActDisc ? (
+                                <span className="font-mono font-black text-xs shrink-0 flex items-center gap-1.5">
+                                  {rawPrice > 0 && <span className="line-through text-slate-400 font-normal">฿{rawPrice.toLocaleString()}</span>}
+                                  <span className="text-emerald-700">{discPrice === 0 ? '฿0 (สิทธิ์ฟรี)' : `฿${discPrice.toLocaleString()}`}</span>
+                                </span>
+                              ) : rawPrice > 0 ? (
+                                <span className="font-black text-indigo-700 font-mono shrink-0">฿{rawPrice.toLocaleString()}</span>
+                              ) : null}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
