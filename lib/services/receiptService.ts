@@ -51,6 +51,15 @@ function mapRowToReceiptData(row: DbReceiptRow): ReceiptData {
     }
   }
 
+  // Sanitize subDetails to ensure member number is not displayed in receipts
+  const sanitizedItems = items.map((item) => ({
+    ...item,
+    subDetails: (item.subDetails || []).filter((line) => {
+      const trimmed = (line || '').trim();
+      return !/^รหัสสมาชิก/i.test(trimmed) && !/^Member No/i.test(trimmed);
+    }),
+  }));
+
   return {
     id: row.id,
     receiptNo: row.receipt_no,
@@ -63,7 +72,7 @@ function mapRowToReceiptData(row: DbReceiptRow): ReceiptData {
     payerAddressLine2: row.payer_address_line2 || '',
     payerPhone: row.payer_phone || undefined,
     payerTaxId: row.payer_tax_id || undefined,
-    items,
+    items: sanitizedItems,
     totalAmount: Number(row.total_amount) || 0,
     thaiBahtTextOverride: row.thai_baht_text_override || undefined,
     payerSignerName: row.payer_signer_name || undefined,
@@ -198,7 +207,6 @@ export async function syncApprovedSlipsToReceipts(): Promise<void> {
           subDetails.push(companyName || payerName);
         } else {
           subDetails.push(payerName);
-          if (slip.member_no) subDetails.push(`รหัสสมาชิก: ${slip.member_no}`);
         }
       } else {
         if (slip.meeting_name) subDetails.push(slip.meeting_name);
@@ -246,30 +254,44 @@ export async function syncApprovedSlipsToReceipts(): Promise<void> {
               purposeText,
               existingRow.id
             );
-          } else if (payerType === 'company' || isGroup) {
+          } else {
+            let hasChanges = false;
             const updatedItems = curItems.map((item) => {
               const cleanedSubDetails = (item.subDetails || []).filter((line) => {
                 const trimmed = (line || '').trim();
                 if (!trimmed) return false;
-                if (/^\d+(\.|\))\s*/.test(trimmed) || /^\d+\.?$/.test(trimmed)) return false;
+                if (/^รหัสสมาชิก/i.test(trimmed) || /^Member No/i.test(trimmed)) {
+                  hasChanges = true;
+                  return false;
+                }
+                if (payerType === 'company' || isGroup) {
+                  if (/^\d+(\.|\))\s*/.test(trimmed) || /^\d+\.?$/.test(trimmed)) {
+                    hasChanges = true;
+                    return false;
+                  }
+                }
                 return true;
               });
-              if (!cleanedSubDetails.includes(companyName) && !cleanedSubDetails.includes(payerName)) {
+              if ((payerType === 'company' || isGroup) && !cleanedSubDetails.includes(companyName) && !cleanedSubDetails.includes(payerName)) {
                 cleanedSubDetails.push(companyName || payerName);
+                hasChanges = true;
               }
               return { 
                 ...item, 
-                title: itemTitle || item.title,
+                title: (payerType === 'company' || isGroup) ? (itemTitle || item.title) : item.title,
                 subDetails: cleanedSubDetails.filter(Boolean) 
               };
             });
-            await prisma.$executeRawUnsafe(
-              `UPDATE receipts SET items = $1::jsonb, payer_name = $2, purpose_text = $3, updated_at = NOW() WHERE id = $4`,
-              JSON.stringify(updatedItems),
-              payerName,
-              purposeText,
-              existingRow.id
-            );
+
+            if (hasChanges || payerType === 'company' || isGroup) {
+              await prisma.$executeRawUnsafe(
+                `UPDATE receipts SET items = $1::jsonb, payer_name = $2, purpose_text = $3, updated_at = NOW() WHERE id = $4`,
+                JSON.stringify(updatedItems),
+                payerName,
+                purposeText,
+                existingRow.id
+              );
+            }
           }
         }
         continue;

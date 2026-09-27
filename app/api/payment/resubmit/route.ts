@@ -78,22 +78,24 @@ export async function GET(request: NextRequest) {
         if (actObj.rejectType) {
           rejectType = actObj.rejectType;
         }
-        if (actObj.type === 'membership_registration' || actObj.memberPayload) {
-          isMembershipRegistration = true;
-          memberPayload = actObj.memberPayload;
-        } else if (
+        if (
           actObj.type === 'membership_group_registration' ||
-          (actObj.isGroup === true && actObj.applicants && Array.isArray(actObj.applicants) && actObj.applicants.length > 1)
+          (actObj.isGroup === true && actObj.applicants) ||
+          (Array.isArray(actObj.applicants) && actObj.applicants.length > 0)
         ) {
           isGroup = true;
-          groupPayload = actObj;
+          isMembershipRegistration = true;
+          groupPayload = actObj.groupPayload || actObj;
         } else if (
           actObj.type === 'conference_group_registration' ||
-          (actObj.isGroup === true && Array.isArray(actObj.attendees) && actObj.attendees.length > 1) ||
-          (Array.isArray(actObj.attendees) && actObj.attendees.length > 1 && (actObj.isGroup || actObj.companyName))
+          (actObj.isGroup === true && Array.isArray(actObj.attendees)) ||
+          (Array.isArray(actObj.attendees) && actObj.attendees.length > 0 && (actObj.isGroup || actObj.companyName))
         ) {
           isGroup = true;
-          groupPayload = actObj;
+          groupPayload = actObj.groupPayload || actObj;
+        } else if (actObj.type === 'membership_registration' || actObj.memberPayload) {
+          isMembershipRegistration = true;
+          memberPayload = actObj.memberPayload;
         }
       }
     }
@@ -110,6 +112,9 @@ export async function GET(request: NextRequest) {
     if (slip.ticket_code?.startsWith('MEMGRP')) {
       isGroup = true;
       isMembershipRegistration = true;
+      if (!groupPayload && actObj) {
+        groupPayload = actObj.groupPayload || actObj;
+      }
     }
 
     const isCorporate = Boolean(
@@ -119,8 +124,8 @@ export async function GET(request: NextRequest) {
       slip.ticket_code?.startsWith('GRP_') ||
       slip.slip_id?.includes('GRP') ||
       (groupPayload?.isGroup === true && (
-        (Array.isArray(groupPayload?.attendees) && groupPayload.attendees.length > 1) ||
-        (Array.isArray(groupPayload?.applicants) && groupPayload.applicants.length > 1)
+        (Array.isArray(groupPayload?.attendees) && groupPayload.attendees.length > 0) ||
+        (Array.isArray(groupPayload?.applicants) && groupPayload.applicants.length > 0)
       )) ||
       Boolean(slip.guest_name?.includes('ท่าน') && (slip.ticket_code?.startsWith('GRP') || slip.slip_id?.includes('GRP')))
     );

@@ -158,6 +158,9 @@ export function ReceiptDocument({ data, className = '', isPrintOnly = false }: R
                       .filter((line) => {
                         const trimmed = (line || '').trim();
                         if (!trimmed) return false;
+                        if (/^รหัสสมาชิก/i.test(trimmed) || /^Member No/i.test(trimmed)) {
+                          return false;
+                        }
                         if (data.payerType === 'company' && (/^\d+(\.|\))\s*$/.test(trimmed) || /^\d+\.?$/.test(trimmed))) {
                           return false;
                         }

@@ -107,6 +107,10 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
     companyName: '',
     coordinatorEmail: '',
     coordinatorPhone: '',
+    isMembershipGroup: false,
+    applicants: [],
+    attendees: [],
+    activePersonIndex: 0,
   });
 
   // Shared slip state
@@ -139,7 +143,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
             resolvedPosOther = rawPos;
           }
 
-          // Populate Membership Data
+          // 1. Populate Single Membership Data
           if (d.isMembershipRegistration || d.memberPayload) {
             const mp = d.memberPayload || {};
             setMembershipData({
@@ -167,7 +171,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
             });
           }
 
-          // Populate Conference Data
+          // 2. Populate Single Conference Data
           setConferenceData({
             nameTh: d.nameTh || d.applicantName || '',
             nameEn: d.nameEn || '',
@@ -178,11 +182,130 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
             positionOther: resolvedPosOther,
           });
 
-          // Populate Corporate Data
+          // 3. Populate Corporate / Group Roster Data
+          let initialApplicants: MembershipFormData[] = [];
+          if (Array.isArray(d.groupPayload?.applicants) && d.groupPayload.applicants.length > 0) {
+            initialApplicants = d.groupPayload.applicants.map((app: any, idx: number) => {
+              const appRawPos = app.position || '';
+              const appNormPos = normalizePosition(appRawPos);
+              let appResPos = '';
+              let appResPosOther = '';
+              if (POSITION_CATEGORY_OPTIONS.some((o) => o.value === appNormPos)) {
+                appResPos = appNormPos;
+              } else if (appRawPos) {
+                appResPos = '0 อื่นๆ';
+                appResPosOther = appRawPos;
+              }
+
+              return {
+                nameTh: app.full_name_th || app.nameTh || '',
+                nameEn: app.full_name_en || app.nameEn || '',
+                id4Digits: app.id_last4 || app.idLast4 || app.id4Digits || '',
+                mobile: app.mobile || app.phone || '',
+                email: app.email || '',
+                workplace: app.workplace || d.companyName || d.workplace || '',
+                startDate: app.start_date || app.startDate || '',
+                position: appResPos,
+                positionOther: app.member_type_other || app.positionOther || appResPosOther,
+                scientistNo: app.scientist_reg_no || app.scientistNo || '',
+                referees: app.referees || '',
+                address: app.address || '',
+                educations: Array.isArray(app.educations) && app.educations.length > 0
+                  ? app.educations.map((e: any, eIdx: number) => ({
+                      id: String(e.id || e.edu_id || eIdx + 1),
+                      degree: e.degree || '',
+                      institution: e.institution || '',
+                      year: e.graduation_year || e.year ? String(e.graduation_year || e.year) : '',
+                    }))
+                  : [{ id: '1', degree: '', institution: '', year: '' }],
+                photoPreview: app.photo_path || app.photo_url || app.photoPreview || null,
+                selectedPhotoFile: null,
+                degreeCertPreview: app.degree_cert_doc || app.degreeCertPreview || null,
+                selectedDegreeCertFile: null,
+                workCertPreview: app.work_cert_doc || app.workCertPreview || null,
+                selectedWorkCertFile: null,
+              };
+            });
+          }
+
+          let initialAttendees: ConferenceFormData[] = [];
+          if (Array.isArray(d.groupPayload?.attendees) && d.groupPayload.attendees.length > 0) {
+            initialAttendees = d.groupPayload.attendees.map((att: any) => {
+              const attRawPos = att.position || '';
+              const attNormPos = normalizePosition(attRawPos);
+              let attResPos = '';
+              let attResPosOther = '';
+              if (POSITION_CATEGORY_OPTIONS.some((o) => o.value === attNormPos)) {
+                attResPos = attNormPos;
+              } else if (attRawPos) {
+                attResPos = '0 อื่นๆ';
+                attResPosOther = attRawPos;
+              }
+
+              return {
+                nameTh: att.nameTh || att.fullNameTh || '',
+                nameEn: att.nameEn || att.fullNameEn || '',
+                email: att.email || '',
+                phone: att.phone || att.mobile || '',
+                workplace: att.workplace || d.companyName || d.workplace || '',
+                position: attResPos,
+                positionOther: att.positionOther || attResPosOther,
+              };
+            });
+          }
+
+          const isMemGroup = Boolean(
+            d.isMembershipRegistration ||
+            (d.ticketCode && d.ticketCode.startsWith('MEMGRP')) ||
+            initialApplicants.length > 0
+          );
+
           setCorporateData({
-            companyName: d.companyName || d.workplace || d.nameTh || '',
-            coordinatorEmail: d.email || '',
-            coordinatorPhone: d.phone || '',
+            companyName: d.groupPayload?.companyName || d.companyName || d.workplace || '',
+            coordinatorEmail: d.groupPayload?.groupContact?.coordinatorEmail || d.email || '',
+            coordinatorPhone: d.groupPayload?.groupContact?.coordinatorPhone || d.phone || '',
+            isMembershipGroup: isMemGroup,
+            applicants:
+              initialApplicants.length > 0
+                ? initialApplicants
+                : [
+                    {
+                      nameTh: d.nameTh || d.applicantName || '',
+                      nameEn: d.nameEn || '',
+                      id4Digits: '',
+                      mobile: d.phone || '',
+                      email: d.email || '',
+                      workplace: d.companyName || d.workplace || '',
+                      startDate: '',
+                      position: resolvedPos,
+                      positionOther: resolvedPosOther,
+                      scientistNo: '',
+                      referees: '',
+                      address: '',
+                      educations: [{ id: '1', degree: '', institution: '', year: '' }],
+                      photoPreview: null,
+                      selectedPhotoFile: null,
+                      degreeCertPreview: null,
+                      selectedDegreeCertFile: null,
+                      workCertPreview: null,
+                      selectedWorkCertFile: null,
+                    },
+                  ],
+            attendees:
+              initialAttendees.length > 0
+                ? initialAttendees
+                : [
+                    {
+                      nameTh: d.nameTh || d.applicantName || '',
+                      nameEn: d.nameEn || '',
+                      email: d.email || '',
+                      phone: d.phone || '',
+                      workplace: d.companyName || d.workplace || '',
+                      position: resolvedPos,
+                      positionOther: resolvedPosOther,
+                    },
+                  ],
+            activePersonIndex: 0,
           });
         } else {
           setError(json.error || 'ไม่พบข้อมูลหรือลิงก์หมดอายุแล้ว');
@@ -232,14 +355,54 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
 
     // Validation
     if (isInfoMode) {
-      if (slipData.isCorporate) {
+      if (slipData.isCorporate || slipData.isGroup) {
         if (!corporateData.companyName.trim()) {
-          alert('กรุณากรอกชื่อบริษัท / นิติบุคคล');
+          alert('กรุณากรอกชื่อบริษัท / องค์กร / นิติบุคคล');
           return;
         }
         if (!corporateData.coordinatorEmail.trim()) {
-          alert('กรุณากรอกอีเมลประสานงาน');
+          alert('กรุณากรอกอีเมลประสานงานบริษัท');
           return;
+        }
+
+        if (corporateData.isMembershipGroup) {
+          for (let i = 0; i < corporateData.applicants.length; i++) {
+            const app = corporateData.applicants[i];
+            if (!app.nameTh.trim()) {
+              alert(`กรุณากรอกชื่อ-นามสกุล ภาษาไทย ของผู้สมัครคนที่ ${i + 1}`);
+              handleCorporateChange('activePersonIndex', i);
+              return;
+            }
+            if (!app.email.trim()) {
+              alert(`กรุณากรอกอีเมล ของผู้สมัครคนที่ ${i + 1}`);
+              handleCorporateChange('activePersonIndex', i);
+              return;
+            }
+            if (!app.mobile.trim()) {
+              alert(`กรุณากรอกเบอร์โทรศัพท์ ของผู้สมัครคนที่ ${i + 1}`);
+              handleCorporateChange('activePersonIndex', i);
+              return;
+            }
+            if (!app.workplace.trim()) {
+              alert(`กรุณากรอกสถานที่ทำงาน ของผู้สมัครคนที่ ${i + 1}`);
+              handleCorporateChange('activePersonIndex', i);
+              return;
+            }
+          }
+        } else {
+          for (let i = 0; i < corporateData.attendees.length; i++) {
+            const att = corporateData.attendees[i];
+            if (!att.nameTh.trim()) {
+              alert(`กรุณากรอกชื่อ-นามสกุล ของผู้เข้าร่วมคนที่ ${i + 1}`);
+              handleCorporateChange('activePersonIndex', i);
+              return;
+            }
+            if (!att.email.trim()) {
+              alert(`กรุณากรอกอีเมล ของผู้เข้าร่วมคนที่ ${i + 1}`);
+              handleCorporateChange('activePersonIndex', i);
+              return;
+            }
+          }
         }
       } else if (slipData.isMembershipRegistration) {
         if (!membershipData.nameTh.trim()) {
@@ -299,13 +462,119 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
         transferTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       };
 
-      if (slipData.isCorporate) {
+      if (slipData.isCorporate || slipData.isGroup) {
+        let processedApplicants: any[] = [];
+        if (corporateData.isMembershipGroup) {
+          processedApplicants = await Promise.all(
+            corporateData.applicants.map(async (app) => {
+              let photoUrl = app.photoPreview;
+              if (app.selectedPhotoFile) {
+                try {
+                  const uploadRes = await uploadImageToStorage(app.selectedPhotoFile, 'avatars');
+                  photoUrl = uploadRes.url;
+                } catch (e) {
+                  console.warn('Photo upload failed:', e);
+                }
+              }
+
+              let degreeUrl = app.degreeCertPreview;
+              if (app.selectedDegreeCertFile) {
+                try {
+                  const uploadRes = await uploadImageToStorage(app.selectedDegreeCertFile, 'documents');
+                  degreeUrl = uploadRes.url;
+                } catch (e) {
+                  console.warn('Degree cert upload failed:', e);
+                }
+              }
+
+              let workUrl = app.workCertPreview;
+              if (app.selectedWorkCertFile) {
+                try {
+                  const uploadRes = await uploadImageToStorage(app.selectedWorkCertFile, 'documents');
+                  workUrl = uploadRes.url;
+                } catch (e) {
+                  console.warn('Work cert upload failed:', e);
+                }
+              }
+
+              const finalPos =
+                app.position === '0 อื่นๆ' || app.position === 'อื่นๆ'
+                  ? app.positionOther.trim()
+                  : app.position.trim() || app.positionOther.trim();
+
+              return {
+                full_name_th: app.nameTh.trim(),
+                full_name_en: app.nameEn.trim() || null,
+                id_last4: app.id4Digits.trim() || null,
+                mobile: app.mobile.trim(),
+                email: app.email.trim(),
+                workplace: app.workplace.trim() || corporateData.companyName.trim(),
+                start_date: app.startDate || null,
+                position: finalPos,
+                job_category: app.position,
+                member_type_other: app.positionOther.trim() || null,
+                scientist_reg_no: app.scientistNo.trim() || null,
+                referees: app.referees.trim() || null,
+                address: app.address.trim() || null,
+                photo_path: photoUrl,
+                degree_cert_doc: degreeUrl,
+                work_cert_doc: workUrl,
+                membership_type: 'Regular',
+                membership_status: 'Active',
+                educations: app.educations
+                  .filter((edu) => edu.degree.trim() !== '' || edu.institution.trim() !== '')
+                  .map((edu, idx) => ({
+                    degree: edu.degree.trim(),
+                    institution: edu.institution.trim(),
+                    graduation_year: edu.year.trim() ? parseInt(edu.year.trim(), 10) : null,
+                    display_order: idx + 1,
+                  })),
+              };
+            })
+          );
+        }
+
+        const processedAttendees = corporateData.attendees.map((att) => {
+          const finalPos =
+            att.position === '0 อื่นๆ' || att.position === 'อื่นๆ'
+              ? att.positionOther.trim()
+              : att.position.trim() || att.positionOther.trim();
+
+          return {
+            nameTh: att.nameTh.trim(),
+            nameEn: att.nameEn?.trim() || null,
+            email: att.email.trim(),
+            phone: att.phone.trim(),
+            workplace: att.workplace.trim() || corporateData.companyName.trim(),
+            position: finalPos,
+            positionOther: att.positionOther?.trim() || null,
+          };
+        });
+
+        const customGroupPayload = {
+          isGroup: true,
+          type: corporateData.isMembershipGroup
+            ? 'membership_group_registration'
+            : 'conference_group_registration',
+          companyName: corporateData.companyName.trim(),
+          groupContact: {
+            coordinatorName: corporateData.companyName.trim(),
+            coordinatorEmail: corporateData.coordinatorEmail.trim(),
+            coordinatorPhone: corporateData.coordinatorPhone.trim(),
+          },
+          applicants: corporateData.isMembershipGroup ? processedApplicants : [],
+          attendees: !corporateData.isMembershipGroup ? processedAttendees : [],
+          totalAmount: slipData.groupPayload?.totalAmount || slipData.amount,
+          submittedAt: new Date().toISOString(),
+        };
+
         payloadToSend = {
           ...payloadToSend,
           nameTh: corporateData.companyName.trim(),
           email: corporateData.coordinatorEmail.trim(),
           phone: corporateData.coordinatorPhone.trim(),
           workplace: corporateData.companyName.trim(),
+          customGroupPayload,
         };
       } else if (slipData.isMembershipRegistration) {
         // Upload photo/docs if newly selected
