@@ -386,6 +386,7 @@ export async function GET(request: NextRequest) {
       let allSponsors: any[] = [];
       let allSponsorGroupMembers: any[] = [];
       let allMeetingAttendances: any[] = [];
+      let allAttendeeMembers: any[] = [];
       try {
         allCouponUsages = await prisma.coupon_usages.findMany({
           where: {
@@ -424,12 +425,63 @@ export async function GET(request: NextRequest) {
             sponsor_company_name: true,
           },
         });
+
+        // Query member profiles for all group attendees to enrich mobile/phone numbers
+        const allMemberNosToLookup = new Set<string>();
+        const allAttendeeEmailsToLookup = new Set<string>();
+        slips.forEach((s: any) => {
+          if (s.member_no) {
+            allMemberNosToLookup.add(String(s.member_no).trim());
+            allMemberNosToLookup.add(String(s.member_no).trim().padStart(4, '0'));
+          }
+          const parsed = typeof s.selected_activities === 'string'
+            ? (() => { try { return JSON.parse(s.selected_activities); } catch { return {}; } })()
+            : (s.selected_activities || {});
+          const attendees = parsed.attendees || parsed.applicants || [];
+          if (Array.isArray(attendees)) {
+            attendees.forEach((a: any) => {
+              if (a.memberNo) {
+                allMemberNosToLookup.add(String(a.memberNo).trim());
+                allMemberNosToLookup.add(String(a.memberNo).trim().padStart(4, '0'));
+              }
+              if (a.email) {
+                allAttendeeEmailsToLookup.add(String(a.email).trim().toLowerCase());
+              }
+            });
+          }
+        });
+
+        if (allMemberNosToLookup.size > 0 || allAttendeeEmailsToLookup.size > 0) {
+          try {
+            allAttendeeMembers = await prisma.member.findMany({
+              where: {
+                OR: [
+                  ...(allMemberNosToLookup.size > 0 ? [{ member_no: { in: Array.from(allMemberNosToLookup) } }] : []),
+                  ...(allAttendeeEmailsToLookup.size > 0 ? [{ email: { in: Array.from(allAttendeeEmailsToLookup) } }] : []),
+                ],
+              },
+              select: {
+                member_no: true,
+                fullNameTh: true,
+                fullNameEn: true,
+                email: true,
+                mobile: true,
+                lineId: true,
+                workplace: true,
+                position: true,
+              },
+            });
+          } catch (memErr) {
+            console.warn('Could not query attendee members:', memErr);
+          }
+        }
       } catch (cErr) {
         console.warn('Could not query coupon data for slips:', cErr);
       }
 
       formattedSlips = slips.map((s: any) => {
         const parsedAct = parseActivitiesData(s.selected_activities, s.amount);
+
         const hasMemberAttendees = Boolean(
           parsedAct.hasMemberAttendees ||
           (parsedAct.groupPayload?.attendees && Array.isArray(parsedAct.groupPayload.attendees) &&
@@ -439,6 +491,62 @@ export async function GET(request: NextRequest) {
         const isGroupConference = parsedAct.isGroupConference || Boolean(s.ticket_code?.startsWith('GRP-'));
         const isCorporate = parsedAct.isGroupMembership || isGroupConference || Boolean(s.ticket_code?.startsWith('GRP-')) || Boolean(s.ticket_code?.startsWith('MEMGRP'));
         const companyName = parsedAct.groupPayload?.companyName || (isCorporate ? s.guest_workplace : null) || '';
+
+        // Enrich attendees and applicants with mobile/phone from members table
+        if (parsedAct.groupPayload?.attendees && Array.isArray(parsedAct.groupPayload.attendees)) {
+          parsedAct.groupPayload.attendees.forEach((att: any) => {
+            const mem = allAttendeeMembers.find((m: any) => {
+              if (att.memberNo && (
+                String(m.member_no).trim() === String(att.memberNo).trim() ||
+                String(m.member_no).trim() === String(att.memberNo).trim().padStart(4, '0') ||
+                parseInt(m.member_no, 10) === parseInt(att.memberNo, 10)
+              )) {
+                return true;
+              }
+              if (att.email && m.email && m.email.trim().toLowerCase() === att.email.trim().toLowerCase()) {
+                return true;
+              }
+              return false;
+            });
+            const sgm = allSponsorGroupMembers.find((sg: any) => s.ticket_code && sg.ticket_code === s.ticket_code && (
+              (att.memberNo && (
+                String(sg.member_no).trim() === String(att.memberNo).trim() ||
+                String(sg.member_no).trim() === String(att.memberNo).trim().padStart(4, '0') ||
+                parseInt(sg.member_no, 10) === parseInt(att.memberNo, 10)
+              )) ||
+              (att.email && sg.attendee_email && sg.attendee_email.trim().toLowerCase() === att.email.trim().toLowerCase())
+            ));
+
+            const phoneVal = att.mobile || att.phone || att.tel || mem?.mobile || sgm?.attendee_phone || '';
+            att.mobile = phoneVal;
+            att.phone = phoneVal;
+            att.lineId = att.lineId || mem?.lineId || '';
+            att.workplace = att.workplace || mem?.workplace || companyName || '';
+            att.position = att.position || mem?.position || '';
+          });
+        }
+
+        if (parsedAct.groupPayload?.applicants && Array.isArray(parsedAct.groupPayload.applicants)) {
+          parsedAct.groupPayload.applicants.forEach((app: any) => {
+            const mem = allAttendeeMembers.find((m: any) => {
+              if (app.memberNo && (
+                String(m.member_no).trim() === String(app.memberNo).trim() ||
+                String(m.member_no).trim() === String(app.memberNo).trim().padStart(4, '0') ||
+                parseInt(m.member_no, 10) === parseInt(app.memberNo, 10)
+              )) {
+                return true;
+              }
+              if (app.email && m.email && m.email.trim().toLowerCase() === app.email.trim().toLowerCase()) {
+                return true;
+              }
+              return false;
+            });
+            const phoneVal = app.mobile || app.phone || app.tel || mem?.mobile || '';
+            app.mobile = phoneVal;
+            app.phone = phoneVal;
+            app.lineId = app.lineId || mem?.lineId || '';
+          });
+        }
         
         // Isolate company data from personal attendee data (Rule: do not mix personal with corporate)
         const nameTh = isCorporate && companyName
@@ -597,6 +705,7 @@ export async function GET(request: NextRequest) {
       let allCoupons: any[] = [];
       let allSponsorGroupMembers: any[] = [];
       let allMeetingAttendances: any[] = [];
+      let allAttendeeMembers: any[] = [];
       try {
         allCouponUsages = await prisma.coupon_usages.findMany({
           where: {
@@ -634,12 +743,62 @@ export async function GET(request: NextRequest) {
             sponsor_company_name: true,
           },
         });
+        // Query member profiles for all group attendees to enrich mobile/phone numbers
+        const allMemberNosToLookup = new Set<string>();
+        const allAttendeeEmailsToLookup = new Set<string>();
+        slips.forEach((s: any) => {
+          if (s.member_no) {
+            allMemberNosToLookup.add(String(s.member_no).trim());
+            allMemberNosToLookup.add(String(s.member_no).trim().padStart(4, '0'));
+          }
+          const parsed = typeof s.selected_activities === 'string'
+            ? (() => { try { return JSON.parse(s.selected_activities); } catch { return {}; } })()
+            : (s.selected_activities || {});
+          const attendees = parsed.attendees || parsed.applicants || [];
+          if (Array.isArray(attendees)) {
+            attendees.forEach((a: any) => {
+              if (a.memberNo) {
+                allMemberNosToLookup.add(String(a.memberNo).trim());
+                allMemberNosToLookup.add(String(a.memberNo).trim().padStart(4, '0'));
+              }
+              if (a.email) {
+                allAttendeeEmailsToLookup.add(String(a.email).trim().toLowerCase());
+              }
+            });
+          }
+        });
+
+        if (allMemberNosToLookup.size > 0 || allAttendeeEmailsToLookup.size > 0) {
+          try {
+            allAttendeeMembers = await prisma.member.findMany({
+              where: {
+                OR: [
+                  ...(allMemberNosToLookup.size > 0 ? [{ member_no: { in: Array.from(allMemberNosToLookup) } }] : []),
+                  ...(allAttendeeEmailsToLookup.size > 0 ? [{ email: { in: Array.from(allAttendeeEmailsToLookup) } }] : []),
+                ],
+              },
+              select: {
+                member_no: true,
+                fullNameTh: true,
+                fullNameEn: true,
+                email: true,
+                mobile: true,
+                lineId: true,
+                workplace: true,
+                position: true,
+              },
+            });
+          } catch (memErr) {
+            console.warn('Could not query attendee members in fallback:', memErr);
+          }
+        }
       } catch (cErr) {
         console.warn('Could not query coupon data for fallback slips:', cErr);
       }
 
       formattedSlips = slips.map((s: any) => {
         const parsedAct = parseActivitiesData(s.selected_activities, s.amount);
+
         const hasMemberAttendees = Boolean(
           parsedAct.hasMemberAttendees ||
           (parsedAct.groupPayload?.attendees && Array.isArray(parsedAct.groupPayload.attendees) &&
@@ -649,6 +808,62 @@ export async function GET(request: NextRequest) {
         const isGroupConference = parsedAct.isGroupConference || Boolean(s.ticket_code?.startsWith('GRP-'));
         const isCorporate = parsedAct.isGroupMembership || isGroupConference || Boolean(s.ticket_code?.startsWith('GRP-')) || Boolean(s.ticket_code?.startsWith('MEMGRP'));
         const companyName = parsedAct.groupPayload?.companyName || (isCorporate ? (s.guest_workplace || s.member_workplace) : null) || '';
+
+        // Enrich attendees and applicants with mobile/phone from members table
+        if (parsedAct.groupPayload?.attendees && Array.isArray(parsedAct.groupPayload.attendees)) {
+          parsedAct.groupPayload.attendees.forEach((att: any) => {
+            const mem = allAttendeeMembers.find((m: any) => {
+              if (att.memberNo && (
+                String(m.member_no).trim() === String(att.memberNo).trim() ||
+                String(m.member_no).trim() === String(att.memberNo).trim().padStart(4, '0') ||
+                parseInt(m.member_no, 10) === parseInt(att.memberNo, 10)
+              )) {
+                return true;
+              }
+              if (att.email && m.email && m.email.trim().toLowerCase() === att.email.trim().toLowerCase()) {
+                return true;
+              }
+              return false;
+            });
+            const sgm = allSponsorGroupMembers.find((sg: any) => s.ticket_code && sg.ticket_code === s.ticket_code && (
+              (att.memberNo && (
+                String(sg.member_no).trim() === String(att.memberNo).trim() ||
+                String(sg.member_no).trim() === String(att.memberNo).trim().padStart(4, '0') ||
+                parseInt(sg.member_no, 10) === parseInt(att.memberNo, 10)
+              )) ||
+              (att.email && sg.attendee_email && sg.attendee_email.trim().toLowerCase() === att.email.trim().toLowerCase())
+            ));
+
+            const phoneVal = att.mobile || att.phone || att.tel || mem?.mobile || sgm?.attendee_phone || '';
+            att.mobile = phoneVal;
+            att.phone = phoneVal;
+            att.lineId = att.lineId || mem?.lineId || '';
+            att.workplace = att.workplace || mem?.workplace || companyName || '';
+            att.position = att.position || mem?.position || '';
+          });
+        }
+
+        if (parsedAct.groupPayload?.applicants && Array.isArray(parsedAct.groupPayload.applicants)) {
+          parsedAct.groupPayload.applicants.forEach((app: any) => {
+            const mem = allAttendeeMembers.find((m: any) => {
+              if (app.memberNo && (
+                String(m.member_no).trim() === String(app.memberNo).trim() ||
+                String(m.member_no).trim() === String(app.memberNo).trim().padStart(4, '0') ||
+                parseInt(m.member_no, 10) === parseInt(app.memberNo, 10)
+              )) {
+                return true;
+              }
+              if (app.email && m.email && m.email.trim().toLowerCase() === app.email.trim().toLowerCase()) {
+                return true;
+              }
+              return false;
+            });
+            const phoneVal = app.mobile || app.phone || app.tel || mem?.mobile || '';
+            app.mobile = phoneVal;
+            app.phone = phoneVal;
+            app.lineId = app.lineId || mem?.lineId || '';
+          });
+        }
         const nameTh = isCorporate && companyName
           ? companyName
           : isMember

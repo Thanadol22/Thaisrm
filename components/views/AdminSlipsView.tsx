@@ -1502,6 +1502,8 @@ export function AdminSlipsView() {
                                           onClick={() =>
                                             setViewingAttendee({
                                               ...att,
+                                              mobile: att.mobile || att.phone || att.tel || '',
+                                              phone: att.phone || att.mobile || att.tel || '',
                                               meetingName: selectedSlip.meetingName,
                                               companyName: selectedSlip.companyName || selectedSlip.groupPayload.companyName,
                                               ticketCode: selectedSlip.ticketCode,
@@ -1533,8 +1535,13 @@ export function AdminSlipsView() {
                                       <div className="pl-6 sm:pl-7 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-slate-500 pt-0.5">
                                         <div className="flex items-center gap-2 flex-wrap min-w-0">
                                           <span className="text-sky-700 font-mono font-medium break-all">
-                                            {att.email || att.mobile || '-'}
+                                            {att.email || '-'}
                                           </span>
+                                          {(att.mobile || att.phone) && (
+                                            <span className="text-slate-600 font-mono">
+                                              📞 {att.mobile || att.phone}
+                                            </span>
+                                          )}
                                           {att.workplace && att.workplace !== selectedSlip.companyName && (
                                             <span className="truncate max-w-[200px]">🏢 {att.workplace}</span>
                                           )}
@@ -2163,7 +2170,7 @@ export function AdminSlipsView() {
                   </div>
                   <div className="flex justify-between py-1 border-b border-slate-200/80 gap-2">
                     <span className="text-slate-500 font-bold shrink-0">เบอร์โทรศัพท์:</span>
-                    <span className="font-bold text-slate-800 text-right font-mono">{viewingAttendee.mobile || '-'}</span>
+                    <span className="font-bold text-slate-800 text-right font-mono">{viewingAttendee.mobile || viewingAttendee.phone || viewingAttendee.tel || '-'}</span>
                   </div>
                   {viewingAttendee.lineId && (
                     <div className="flex justify-between py-1 border-b border-slate-200/80 gap-2">
