@@ -700,21 +700,22 @@ export function SignupView({
       <div className={isEmbedded ? "px-0 py-1 flex-1 flex flex-col space-y-3 sm:space-y-4" : "px-3 xs:px-4 sm:px-8 lg:px-12 py-2 sm:py-4 flex-1 flex flex-col space-y-3 sm:space-y-4"}>
 
         {/* Mode Selector: Individual vs Group */}
-        <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-2 sm:p-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-2 sm:p-2.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+          <div className="grid grid-cols-1 xs:grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
             <button
               type="button"
               onClick={() => {
                 setRegMode('individual');
                 triggerPersonSwitch(0);
               }}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${regMode === 'individual'
-                ? 'bg-[#0026b3] text-white shadow-sm'
-                : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-                }`}
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer min-h-[42px] ${
+                regMode === 'individual'
+                  ? 'bg-[#0026b3] text-white shadow-sm ring-1 ring-blue-900'
+                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+              }`}
             >
-              <User className="w-4 h-4" />
-              <span>{lang === 'th' ? 'สมัครสมาชิกรายบุคคล' : 'Individual'}</span>
+              <User className="w-4 h-4 shrink-0" />
+              <span className="whitespace-nowrap">{lang === 'th' ? 'สมัครสมาชิกรายบุคคล' : 'Individual'}</span>
             </button>
 
             <button
@@ -726,25 +727,25 @@ export function SignupView({
                   setRegMode('group');
                 }
               }}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer min-h-[42px] ${
                 regMode === 'group'
-                  ? 'bg-[#0026b3] text-white shadow-sm'
+                  ? 'bg-[#0026b3] text-white shadow-sm ring-1 ring-blue-900'
                   : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
               }`}
             >
-              <Building2 className="w-4 h-4 text-blue-600" />
-              <span>
+              <Building2 className={`w-4 h-4 shrink-0 ${regMode === 'group' ? 'text-white' : 'text-blue-600'}`} />
+              <span className="truncate">
                 {sponsorSession
                   ? `${sponsorSession.sponsorName} (${sponsorSession.tier})`
                   : lang === 'th'
-                  ? 'สมัครแบบกลุ่มสำหรับบริษัท (OTP)'
-                  : 'Corporate Sponsor (OTP)'}
+                  ? 'สมัครแบบกลุ่มสำหรับบริษัท'
+                  : 'Corporate Sponsor'}
               </span>
             </button>
           </div>
 
           {regMode === 'group' && (
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end pt-1 sm:pt-0">
               {workplaceCopiedNotice && (
                 <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg animate-fade-in flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
@@ -754,7 +755,7 @@ export function SignupView({
               <button
                 type="button"
                 onClick={handleCopyWorkplaceToAll}
-                className="text-[11px] sm:text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+                className="text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 w-full sm:w-auto min-h-[38px]"
                 title="คัดลอกสถานที่ทำงานไปยังทุกคน"
               >
                 <Copy className="w-3.5 h-3.5" />
@@ -1121,13 +1122,13 @@ export function SignupView({
                   <div className={`border rounded-2xl p-3 sm:p-3.5 space-y-1.5 transition-all ${
                     isDoctorOrFellow ? 'bg-blue-50/50 border-blue-300 ring-1 ring-blue-300/40' : 'bg-slate-50 border-slate-200'
                   }`}>
-                    <label className="block text-xs font-bold text-slate-700 flex items-center justify-between">
-                      <span className="flex items-center gap-1">
+                    <label className="block text-xs font-bold text-slate-700 flex flex-wrap items-center justify-between gap-1">
+                      <span className="flex items-center gap-1 min-w-0">
                         <span>{t.signup.scientistNoTitle}</span>
                         {isDoctorOrFellow && <span className="text-red-500 font-black">*</span>}
                       </span>
-                      <span className={`text-[11px] font-bold ${isDoctorOrFellow ? 'text-red-600' : 'text-slate-400'}`}>
-                        {isDoctorOrFellow ? (lang === 'th' ? '(บังคับกรอกสำหรับตำแหน่ง 1, 2) *' : '(Required for 1, 2) *') : (lang === 'th' ? '(ถ้ามี)' : '(Optional)')}
+                      <span className={`text-[11px] font-bold whitespace-nowrap shrink-0 ${isDoctorOrFellow ? 'text-red-600' : 'text-slate-400'}`}>
+                        {isDoctorOrFellow ? (lang === 'th' ? 'จำเป็นสำหรับตำแหน่ง 1 และ 2' : 'Required for 1, 2') : (lang === 'th' ? 'ถ้ามี' : 'Optional')}
                       </span>
                     </label>
                     <input
@@ -1153,15 +1154,17 @@ export function SignupView({
               {(() => {
                 const isWorkCertPdf = isPdfFile(currentApplicant.selectedWorkCertFile, currentApplicant.workCertPreview);
                 return (
-                  <div className="p-3.5 sm:p-4 rounded-2xl border border-indigo-200 bg-indigo-50/50 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <Building className="w-4 h-4 text-[#0026b3]" />
-                        <span>{lang === 'th' ? 'รูปหลักฐานใบรับรองการทำงาน' : 'Work Certificate Document'}</span>
-                        <span className="text-red-500 font-black">*</span>
-                      </span>
-                      <span className="text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded-md">
-                        {lang === 'th' ? 'บังคับแนบเอกสาร *' : 'Required *'}
+                  <div className="p-3.5 sm:p-4 rounded-2xl border border-indigo-200 bg-indigo-50/50 space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Building className="w-4 h-4 text-[#0026b3] shrink-0" />
+                        <span className="text-xs sm:text-sm font-bold text-slate-800">
+                          {lang === 'th' ? 'หลักฐานใบรับรองการทำงาน' : 'Work Certificate'}
+                        </span>
+                        <span className="text-red-500 font-black shrink-0">*</span>
+                      </div>
+                      <span className="text-[10px] sm:text-[11px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                        {lang === 'th' ? 'บังคับแนบเอกสาร' : 'Required'}
                       </span>
                     </div>
 
@@ -1205,7 +1208,7 @@ export function SignupView({
                             )}
                           </div>
                         ) : (
-                          <p className="text-[11px] text-slate-600 leading-tight font-medium">
+                          <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
                             {lang === 'th' ? 'อัปโหลดใบรับรองการทำงาน (JPG, PNG หรือ PDF ไม่เกิน 10MB) *จำเป็นต้องแนบ' : 'Upload work certificate (JPG, PNG, PDF max 10MB) *Required'}
                           </p>
                         )}
@@ -1216,7 +1219,7 @@ export function SignupView({
                               href={currentApplicant.workCertPreview}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#0026b3] text-xs font-bold border border-blue-200 shadow-2xs transition active:scale-95"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#0026b3] text-xs font-bold border border-blue-200 shadow-2xs transition active:scale-95 min-h-[34px]"
                               title="เปิดดูไฟล์ในแท็บใหม่"
                             >
                               <Eye className="w-3.5 h-3.5 text-[#0026b3]" />
@@ -1224,9 +1227,9 @@ export function SignupView({
                             </a>
                           )}
 
-                          <label className="relative cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-900 text-xs font-bold border border-indigo-200 shadow-2xs transition active:scale-95">
+                          <label className="relative cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-900 text-xs font-bold border border-indigo-200 shadow-2xs transition active:scale-95 min-h-[34px]">
                             <Upload className="w-3.5 h-3.5 text-[#0026b3]" />
-                            <span>{currentApplicant.workCertPreview ? (lang === 'th' ? 'เปลี่ยนไฟล์' : 'Change') : (lang === 'th' ? 'อัปโหลดใบรับรองงาน *' : 'Upload Work Cert *')}</span>
+                            <span>{currentApplicant.workCertPreview ? (lang === 'th' ? 'เปลี่ยนไฟล์' : 'Change') : (lang === 'th' ? 'อัปโหลดใบรับรองการทำงาน' : 'Upload Work Cert')}</span>
                             <input
                               type="file"
                               accept="image/*,application/pdf,.pdf"
@@ -1242,7 +1245,7 @@ export function SignupView({
                                 updateCurrentApplicant('workCertPreview', null);
                                 updateCurrentApplicant('selectedWorkCertFile', null);
                               }}
-                              className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg border border-red-200 transition cursor-pointer"
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-xl border border-red-200 transition cursor-pointer min-h-[34px]"
                             >
                               <Trash2 className="w-3 h-3" />
                               <span>{lang === 'th' ? 'ลบเอกสาร' : 'Remove'}</span>
@@ -1266,7 +1269,7 @@ export function SignupView({
                 <button
                   type="button"
                   onClick={addEducationRow}
-                  className="text-[11px] sm:text-xs font-bold text-[#0026b3] hover:bg-blue-50 px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 cursor-pointer border border-[#0026b3]/20 shrink-0 whitespace-nowrap shadow-2xs"
+                  className="text-[11px] sm:text-xs font-bold text-[#0026b3] hover:bg-blue-50 px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 cursor-pointer border border-[#0026b3]/20 shrink-0 whitespace-nowrap shadow-2xs min-h-[34px]"
                 >
                   <Plus className="w-3.5 h-3.5 shrink-0" />
                   <span className="whitespace-nowrap">{t.signup.educationAddRow}</span>
@@ -1345,13 +1348,15 @@ export function SignupView({
               {(() => {
                 const isDegreeCertPdf = isPdfFile(currentApplicant.selectedDegreeCertFile, currentApplicant.degreeCertPreview);
                 return (
-                  <div className="p-3.5 sm:p-4 rounded-2xl border border-blue-100 bg-blue-50/40 space-y-2 pt-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <GraduationCap className="w-4 h-4 text-[#0026b3]" />
-                        <span>{lang === 'th' ? 'รูปหลักฐานปริญญาบัตร' : 'Degree Certificate Document'}</span>
-                      </span>
-                      <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md">
+                  <div className="p-3.5 sm:p-4 rounded-2xl border border-blue-100 bg-blue-50/40 space-y-2.5 pt-3">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <GraduationCap className="w-4 h-4 text-[#0026b3] shrink-0" />
+                        <span className="text-xs sm:text-sm font-bold text-slate-800">
+                          {lang === 'th' ? 'หลักฐานปริญญาบัตร' : 'Degree Certificate'}
+                        </span>
+                      </div>
+                      <span className="text-[10px] sm:text-[11px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md whitespace-nowrap shrink-0">
                         {lang === 'th' ? 'ปริญญาบัตร' : 'Degree'}
                       </span>
                     </div>
@@ -1396,7 +1401,7 @@ export function SignupView({
                             )}
                           </div>
                         ) : (
-                          <p className="text-[11px] text-slate-600 leading-tight font-medium">
+                          <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
                             {lang === 'th' ? 'อัปโหลดรูปหลักฐานปริญญาบัตร (JPG, PNG หรือ PDF ไม่เกิน 10MB)' : 'Upload degree certificate (JPG, PNG, PDF max 10MB)'}
                           </p>
                         )}
@@ -1407,7 +1412,7 @@ export function SignupView({
                               href={currentApplicant.degreeCertPreview}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#0026b3] text-xs font-bold border border-blue-200 shadow-2xs transition active:scale-95"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#0026b3] text-xs font-bold border border-blue-200 shadow-2xs transition active:scale-95 min-h-[34px]"
                               title="เปิดดูไฟล์ในแท็บใหม่"
                             >
                               <Eye className="w-3.5 h-3.5 text-[#0026b3]" />
@@ -1415,7 +1420,7 @@ export function SignupView({
                             </a>
                           )}
 
-                          <label className="relative cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 text-xs font-bold border border-blue-200 shadow-2xs transition active:scale-95">
+                          <label className="relative cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 text-xs font-bold border border-blue-200 shadow-2xs transition active:scale-95 min-h-[34px]">
                             <Upload className="w-3.5 h-3.5 text-[#0026b3]" />
                             <span>{currentApplicant.degreeCertPreview ? (lang === 'th' ? 'เปลี่ยนไฟล์' : 'Change') : (lang === 'th' ? 'อัปโหลดปริญญาบัตร' : 'Upload Degree')}</span>
                             <input
@@ -1433,7 +1438,7 @@ export function SignupView({
                                 updateCurrentApplicant('degreeCertPreview', null);
                                 updateCurrentApplicant('selectedDegreeCertFile', null);
                               }}
-                              className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg border border-red-200 transition cursor-pointer"
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-xl border border-red-200 transition cursor-pointer min-h-[34px]"
                             >
                               <Trash2 className="w-3 h-3" />
                               <span>{lang === 'th' ? 'ลบเอกสาร' : 'Remove'}</span>

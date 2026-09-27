@@ -1198,76 +1198,103 @@ export function LoginView({
   return (
     <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[640px]">
       {/* Header Blue Card Section */}
-      <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-3.5 xs:px-4 sm:px-8 lg:px-12 pt-4 sm:pt-8 pb-6 sm:pb-9 rounded-b-[24px] sm:rounded-b-[36px] shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-3.5 xs:px-5 sm:px-8 lg:px-12 pt-3.5 sm:pt-7 pb-5 sm:pb-8 rounded-b-[24px] sm:rounded-b-[36px] shadow-xl relative overflow-hidden">
         <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute bottom-0 -left-12 w-40 h-40 bg-[#4ade80]/15 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="max-w-5xl xl:max-w-6xl mx-auto relative z-10">
-          <div className="flex items-center justify-between gap-1.5 sm:gap-3 mb-2">
-            <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 shrink-0 group hover:opacity-95 transition">
-              <TsrmLogo className="w-8 h-8 sm:w-11 sm:h-11 shrink-0 group-hover:scale-105 transition-transform" />
-              <div className="min-w-0">
-                <span className="text-[10px] xs:text-xs sm:text-[13px] md:text-sm font-bold text-blue-200 block whitespace-nowrap leading-tight">
-                  {t.associationName}
-                </span>
-                <p className="text-xs xs:text-sm sm:text-base font-extrabold text-white leading-tight">{t.brandName}</p>
+        <div className="max-w-5xl xl:max-w-6xl mx-auto relative z-10 space-y-3">
+          {/* Top Bar: Brand & Quick Actions */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+            <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-3 min-w-0">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0 group hover:opacity-95 transition">
+                <TsrmLogo className="w-8 h-8 xs:w-9 xs:h-9 sm:w-11 sm:h-11 shrink-0 group-hover:scale-105 transition-transform" />
+                <div className="min-w-0">
+                  <span className="text-[10px] xs:text-xs sm:text-[13px] md:text-sm font-bold text-blue-200 block truncate leading-tight">
+                    {t.associationName}
+                  </span>
+                  <p className="text-xs xs:text-sm sm:text-base font-extrabold text-white leading-tight truncate">{t.brandName}</p>
+                </div>
+              </div>
+
+              {/* Language Switcher on mobile (top right) */}
+              <div className="sm:hidden shrink-0">
+                <button
+                  type="button"
+                  onClick={toggleLang}
+                  className="flex items-center gap-1 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-2.5 py-1.5 rounded-xl text-xs font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shadow-2xs min-h-[34px]"
+                  title="Switch Language / สลับภาษา"
+                >
+                  <Globe className="w-3.5 h-3.5 text-blue-200 shrink-0" />
+                  <span className={lang === 'th' ? 'text-white font-black' : 'text-blue-200/60'}>TH</span>
+                  <span className="text-white/40 font-normal">|</span>
+                  <span className={lang === 'en' ? 'text-white font-black' : 'text-blue-200/60'}>EN</span>
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 shrink-0">
+            {/* Quick Action Buttons (2 Clear Full Columns on Mobile, Inline on Desktop) */}
+            <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setIsUpdateModalOpen(true)}
-                className="flex items-center gap-1 xs:gap-1.5 px-2 xs:px-2.5 sm:px-3.5 py-1 sm:py-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md rounded-xl text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-bold transition border border-white/20 cursor-pointer active:scale-95 shadow-2xs group shrink-0"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md rounded-xl text-xs sm:text-xs md:text-sm font-bold transition border border-white/20 cursor-pointer active:scale-95 shadow-2xs group min-h-[38px] sm:min-h-[36px]"
                 title={lang === 'th' ? 'อัปเดตข้อมูลสมาชิก / บริษัท' : 'Update Member / Sponsor Profile'}
                 aria-label={lang === 'th' ? 'อัปเดตข้อมูลสมาชิก / บริษัท' : 'Update Member / Sponsor Profile'}
               >
-                <UserCheck className="w-3 h-3 xs:w-3.5 xs:h-3.5 text-blue-200 group-hover:scale-110 transition-transform shrink-0" />
+                <UserCheck className="w-4 h-4 text-blue-200 group-hover:scale-110 transition-transform shrink-0" />
                 <span className="font-semibold whitespace-nowrap">{lang === 'th' ? 'อัปเดตข้อมูล' : 'Update Info'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setIsSearchOpen(true)}
-                className="flex items-center gap-1 xs:gap-1.5 px-2 xs:px-2.5 sm:px-3.5 py-1 sm:py-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md rounded-xl text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-bold transition border border-white/20 cursor-pointer active:scale-95 shadow-2xs group shrink-0"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md rounded-xl text-xs sm:text-xs md:text-sm font-bold transition border border-white/20 cursor-pointer active:scale-95 shadow-2xs group min-h-[38px] sm:min-h-[36px]"
                 title={lang === 'th' ? 'ค้นหาข้อมูลสมาชิก' : 'Search Members'}
                 aria-label={lang === 'th' ? 'ค้นหาข้อมูลสมาชิก' : 'Search Members'}
               >
-                <Search className="w-3 h-3 xs:w-3.5 xs:h-3.5 text-[#4ade80] group-hover:scale-110 transition-transform shrink-0" />
+                <Search className="w-4 h-4 text-[#4ade80] group-hover:scale-110 transition-transform shrink-0" />
                 <span className="font-semibold whitespace-nowrap">{lang === 'th' ? 'ค้นหาข้อมูลสมาชิก' : 'Search Members'}</span>
               </button>
 
-              <button
-                onClick={toggleLang}
-                className="flex items-center gap-0.5 xs:gap-1 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-1.5 xs:px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shrink-0 shadow-2xs"
-                title="Switch Language / สลับภาษา"
-              >
-                <Globe className="w-3 h-3 xs:w-3.5 xs:h-3.5 text-blue-200 shrink-0" />
-                <span className={lang === 'th' ? 'text-white font-black' : 'text-blue-200/60'}>TH</span>
-                <span className="text-white/40 font-normal">|</span>
-                <span className={lang === 'en' ? 'text-white font-black' : 'text-blue-200/60'}>EN</span>
-              </button>
+              {/* Language Switcher on Desktop */}
+              <div className="hidden sm:block shrink-0">
+                <button
+                  type="button"
+                  onClick={toggleLang}
+                  className="flex items-center gap-1 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-3 py-1.5 rounded-xl text-xs md:text-sm font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shadow-2xs min-h-[36px]"
+                  title="Switch Language / สลับภาษา"
+                >
+                  <Globe className="w-3.5 h-3.5 text-blue-200 shrink-0" />
+                  <span className={lang === 'th' ? 'text-white font-black' : 'text-blue-200/60'}>TH</span>
+                  <span className="text-white/40 font-normal">|</span>
+                  <span className={lang === 'en' ? 'text-white font-black' : 'text-blue-200/60'}>EN</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight mt-1">
-            {lang === 'th' ? 'ลงทะเบียนและสมัครสมาชิก TSRM' : 'TSRM Registration & Membership'}
-          </h1>
-          <p className="text-xs sm:text-sm lg:text-base text-blue-100/90 leading-relaxed mt-1 font-normal">
-            {lang === 'th'
-              ? 'เลือกลงทะเบียนเข้าร่วมงานประชุมวิชาการ หรือ สมัครสมาชิกสมาคมฯ'
-              : 'Register for Conference Summit or apply for TSRM membership'}
-          </p>
+          {/* Heading */}
+          <div className="pt-0.5">
+            <h1 className="text-lg xs:text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight">
+              {lang === 'th' ? 'ลงทะเบียนและสมัครสมาชิก TSRM' : 'TSRM Registration & Membership'}
+            </h1>
+            <p className="text-xs sm:text-sm lg:text-base text-blue-100/90 leading-relaxed mt-0.5 font-normal">
+              {lang === 'th'
+                ? 'เลือกลงทะเบียนเข้าร่วมงานประชุมวิชาการ หรือ สมัครสมาชิกสมาคมฯ'
+                : 'Register for Conference Summit or apply for TSRM membership'}
+            </p>
+          </div>
 
-          <div className="mt-3.5 px-3.5 sm:px-4 py-2.5 sm:py-3 bg-amber-500/20 border border-amber-400/40 rounded-xl sm:rounded-2xl backdrop-blur-md flex items-center gap-2.5 sm:gap-3 shadow-sm">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-amber-400/25 flex items-center justify-center shrink-0 border border-amber-300/40 shadow-2xs">
-              <AlertTriangle className="w-4 h-4 text-amber-300 animate-pulse" />
+          {/* Testing Notice Alert */}
+          <div className="px-3 sm:px-4 py-2 sm:py-2.5 bg-amber-500/20 border border-amber-400/40 rounded-xl sm:rounded-2xl backdrop-blur-md flex items-center gap-2.5 sm:gap-3 shadow-sm">
+            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-amber-400/25 flex items-center justify-center shrink-0 border border-amber-300/40 shadow-2xs">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs sm:text-sm font-black text-amber-200 tracking-tight leading-snug">
+              <p className="text-[11px] xs:text-xs sm:text-sm font-black text-amber-200 tracking-tight leading-snug">
                 {lang === 'th' ? 'ระบบกำลังทดสอบและพัฒนา ยังไม่เปิดให้ใช้บริการ' : 'The system is currently under testing and development (Not yet open for service)'}
               </p>
-              <p className="text-[10px] sm:text-xs text-amber-200/80 font-medium leading-tight mt-0.5">
+              <p className="text-[9.5px] xs:text-[10px] sm:text-xs text-amber-200/80 font-medium leading-tight mt-0.5">
                 {lang === 'th'
                   ? 'ข้อมูลและการทำรายการทั้งหมดในช่วงนี้ใช้เพื่อการทดสอบระบบเท่านั้น'
                   : 'All data and operations during this period are for testing and development purposes only.'}
@@ -1278,51 +1305,56 @@ export function LoginView({
       </div>
 
       {/* Content Body */}
-      <div className="px-4 sm:px-8 lg:px-12 py-5 sm:py-8 flex-1 flex flex-col justify-between max-w-5xl xl:max-w-6xl mx-auto w-full">
-        <div className="space-y-4 sm:space-y-6">
+      <div className="px-3 xs:px-4 sm:px-8 lg:px-12 py-4 sm:py-7 flex-1 flex flex-col justify-between max-w-5xl xl:max-w-6xl mx-auto w-full">
+        <div className="space-y-3.5 sm:space-y-6">
 
           {/* Main Action Segmented Buttons (Conference vs Membership) */}
-          <div className="relative grid grid-cols-2 p-1.5 bg-slate-200/80 rounded-2xl border border-slate-200/90 shadow-inner select-none max-w-xl mx-auto w-full">
+          <div className="relative grid grid-cols-2 p-1 bg-slate-200/80 rounded-2xl border border-slate-200/90 shadow-inner select-none max-w-xl mx-auto w-full">
             <div
               aria-hidden="true"
-              className={`absolute top-1.5 bottom-1.5 left-1.5 w-[calc(50%-6px)] rounded-xl bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] shadow-md shadow-blue-950/25 ring-2 ring-[#4ade80]/50 transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none will-change-transform ${activeTab === 'membership' ? 'translate-x-full' : 'translate-x-0'
-                }`}
+              className={`absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-xl bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] shadow-md shadow-blue-950/25 ring-2 ring-[#4ade80]/50 transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none will-change-transform ${
+                activeTab === 'membership' ? 'translate-x-full' : 'translate-x-0'
+              }`}
             />
 
             <button
               type="button"
               onClick={() => handleTabChange('conference')}
-              className={`relative z-10 flex items-center justify-center gap-2 py-3 px-2 rounded-xl font-black text-xs sm:text-sm transition-colors duration-200 cursor-pointer active:scale-98 ${activeTab === 'conference'
-                ? 'text-white'
-                : 'text-slate-600 hover:text-slate-900'
-                }`}
+              className={`relative z-10 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 rounded-xl font-black text-xs sm:text-sm transition-colors duration-200 cursor-pointer active:scale-98 min-h-[44px] ${
+                activeTab === 'conference'
+                  ? 'text-white'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
               <Ticket
-                className={`w-4 h-4 shrink-0 transition-colors duration-200 ${activeTab === 'conference' ? 'text-[#4ade80]' : 'text-slate-400'
-                  }`}
+                className={`w-4 h-4 shrink-0 transition-colors duration-200 ${
+                  activeTab === 'conference' ? 'text-[#4ade80]' : 'text-slate-400'
+                }`}
               />
-              <span className="truncate">{lang === 'th' ? 'ลงทะเบียนเข้าร่วมงานประชุม' : 'Register Conference'}</span>
+              <span className="leading-tight text-center">{lang === 'th' ? 'ลงทะเบียนเข้าร่วมงานประชุม' : 'Register Conference'}</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleTabChange('membership')}
-              className={`relative z-10 flex items-center justify-center gap-2 py-3 px-2 rounded-xl font-black text-xs sm:text-sm transition-colors duration-200 cursor-pointer active:scale-98 ${activeTab === 'membership'
-                ? 'text-white'
-                : 'text-slate-600 hover:text-slate-900'
-                }`}
+              className={`relative z-10 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 rounded-xl font-black text-xs sm:text-sm transition-colors duration-200 cursor-pointer active:scale-98 min-h-[44px] ${
+                activeTab === 'membership'
+                  ? 'text-white'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
               <UserPlus
-                className={`w-4 h-4 shrink-0 transition-colors duration-200 ${activeTab === 'membership' ? 'text-[#4ade80]' : 'text-slate-400'
-                  }`}
+                className={`w-4 h-4 shrink-0 transition-colors duration-200 ${
+                  activeTab === 'membership' ? 'text-[#4ade80]' : 'text-slate-400'
+                }`}
               />
-              <span className="truncate">{lang === 'th' ? 'สมัครสมาชิก TSRM' : 'TSRM Membership'}</span>
+              <span className="leading-tight text-center">{lang === 'th' ? 'สมัครสมาชิก TSRM' : 'TSRM Membership'}</span>
             </button>
           </div>
 
           {/* View 1: Conference Registration Form */}
           {activeTab === 'conference' ? (
-            <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-7 lg:p-8 border border-slate-200/90 shadow-sm space-y-4 sm:space-y-5 animate-fade-in">
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-3.5 xs:p-4.5 sm:p-7 lg:p-8 border border-slate-200/90 shadow-sm space-y-3.5 sm:space-y-5 animate-fade-in">
               {loadingMeeting ? (
                 <div className="flex flex-col items-center justify-center py-10 sm:py-14 space-y-3">
                   <div className="w-8 h-8 sm:w-10 sm:h-10 border-4 border-[#0026b3] border-t-transparent rounded-full animate-spin" />
@@ -1370,10 +1402,10 @@ export function LoginView({
                           {lang === 'th' ? 'เปิดรับลงทะเบียน' : 'Open for Registration'}
                         </span>
                       </div>
-                      <h2 className="text-sm sm:text-base lg:text-lg font-black text-slate-900 tracking-tight truncate" title={activeMeeting.meeting_name}>
+                      <h2 className="text-sm sm:text-base lg:text-lg font-black text-slate-900 tracking-tight leading-snug" title={activeMeeting.meeting_name}>
                         {activeMeeting.meeting_name}
                       </h2>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 pt-0.5">
                         {(activeMeeting.start_date || activeMeeting.meeting_date) && (
                           <span className="flex items-center gap-1 font-medium">
                             <Calendar className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
@@ -1381,7 +1413,7 @@ export function LoginView({
                           </span>
                         )}
                         {activeMeeting.location && (
-                          <span className="flex items-center gap-1 font-medium truncate max-w-xs sm:max-w-sm" title={activeMeeting.location}>
+                          <span className="flex items-center gap-1 font-medium truncate max-w-full sm:max-w-sm" title={activeMeeting.location}>
                             <MapPin className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
                             <span className="truncate">{activeMeeting.location}</span>
                           </span>
@@ -1391,21 +1423,22 @@ export function LoginView({
                   </div>
 
                   {/* Mode Selector: Individual vs Group */}
-                  <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-2 sm:p-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5">
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-2 sm:p-2.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
                       <button
                         type="button"
                         onClick={() => {
                           setRegMode('individual');
                           setActiveAttendeeIdx(0);
                         }}
-                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${regMode === 'individual'
-                          ? 'bg-[#0026b3] text-white shadow-sm'
-                          : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-                          }`}
+                        className={`flex items-center justify-center gap-1.5 py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer min-h-[42px] ${
+                          regMode === 'individual'
+                            ? 'bg-[#0026b3] text-white shadow-sm ring-1 ring-blue-900'
+                            : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                        }`}
                       >
-                        <User className="w-4 h-4" />
-                        <span>{lang === 'th' ? 'ลงทะเบียนรายบุคคล' : 'Individual'}</span>
+                        <User className="w-4 h-4 shrink-0" />
+                        <span className="whitespace-nowrap">{lang === 'th' ? 'ลงทะเบียนรายบุคคล' : 'Individual'}</span>
                       </button>
 
                       <button
@@ -1417,28 +1450,29 @@ export function LoginView({
                             setRegMode('group');
                           }
                         }}
-                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${regMode === 'group'
-                          ? 'bg-[#0026b3] text-white shadow-sm'
-                          : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
-                          }`}
+                        className={`flex items-center justify-center gap-1.5 py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer min-h-[42px] ${
+                          regMode === 'group'
+                            ? 'bg-[#0026b3] text-white shadow-sm ring-1 ring-blue-900'
+                            : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+                        }`}
                       >
-                        <Building2 className="w-4 h-4 text-blue-600" />
-                        <span>
+                        <Building2 className={`w-4 h-4 shrink-0 ${regMode === 'group' ? 'text-white' : 'text-blue-600'}`} />
+                        <span className="truncate">
                           {sponsorSession
                             ? `${sponsorSession.sponsorName} (${sponsorSession.tier})`
                             : lang === 'th'
-                              ? 'ลงทะเบียนแบบกลุ่มสำหรับบริษัท (OTP)'
-                              : 'Corporate Sponsor (OTP)'}
+                              ? 'ลงทะเบียนกลุ่มบริษัท'
+                              : 'Corporate Sponsor'}
                         </span>
                       </button>
                     </div>
 
                     {regMode === 'group' && (
-                      <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                      <div className="flex items-center gap-2 w-full sm:w-auto justify-end pt-1 sm:pt-0">
                         <button
                           type="button"
                           onClick={handleCopyWorkplaceToAll}
-                          className="text-[11px] sm:text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer active:scale-95"
+                          className="text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 w-full sm:w-auto min-h-[38px]"
                           title="คัดลอกสถานที่ทำงานไปยังทุกคน"
                         >
                           <Copy className="w-3.5 h-3.5" />
@@ -1450,16 +1484,16 @@ export function LoginView({
 
                   {/* Corporate Sponsor Active Banner */}
                   {regMode === 'group' && sponsorSession && (
-                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between gap-3 animate-fade-in">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3 flex flex-col xs:flex-row items-start xs:items-center justify-between gap-2.5 animate-fade-in">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
                           🏢
                         </div>
-                        <div>
-                          <div className="text-xs font-bold text-slate-800">
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-slate-800 truncate">
                             เข้าสู่ระบบในนาม: <span className="text-blue-700">{sponsorSession.sponsorName}</span> ({sponsorSession.tier} Sponsor)
                           </div>
-                          <div className="text-[11px] text-slate-500">
+                          <div className="text-[11px] text-slate-500 truncate">
                             ผู้ประสานงาน: {sponsorSession.contactEmail} (โควต้าคูปองฟรี)
                           </div>
                         </div>
@@ -1467,7 +1501,7 @@ export function LoginView({
                       <button
                         type="button"
                         onClick={handleSponsorLogout}
-                        className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold px-2.5 py-1 bg-white hover:bg-rose-50 rounded-lg border border-rose-200 transition-colors cursor-pointer"
+                        className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold px-2.5 py-1 bg-white hover:bg-rose-50 rounded-lg border border-rose-200 transition-colors cursor-pointer self-end xs:self-auto shrink-0"
                       >
                         ออกจากระบบบริษัท
                       </button>
@@ -1509,14 +1543,14 @@ export function LoginView({
                               setCouponSuccessMsg('');
                             }}
                             placeholder={lang === 'th' ? 'กรอกคูปองบริษัท' : 'Enter company coupon'}
-                            className="w-full pl-9 pr-3 py-2 bg-white text-slate-900 rounded-xl border border-slate-300 text-xs sm:text-sm font-mono font-bold tracking-wider placeholder:font-sans placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400 focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition uppercase"
+                            className="w-full pl-9 pr-3 py-2.5 bg-white text-slate-900 rounded-xl border border-slate-300 text-xs sm:text-sm font-mono font-bold tracking-wider placeholder:font-sans placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400 focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition uppercase min-h-[42px]"
                           />
                         </div>
                         <button
                           type="button"
                           onClick={() => handleApplyCoupon()}
                           disabled={couponLoading || !couponCodeInput.trim()}
-                          className="py-2 px-4 rounded-xl bg-[#0026b3] hover:bg-[#001f94] text-white font-bold text-xs sm:text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0 shadow-xs flex items-center gap-1.5"
+                          className="py-2.5 px-4 rounded-xl bg-[#0026b3] hover:bg-[#001f94] text-white font-bold text-xs sm:text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0 shadow-xs flex items-center gap-1.5 min-h-[42px]"
                         >
                           {couponLoading ? (
                             <>
@@ -1574,7 +1608,7 @@ export function LoginView({
                             className="text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                            <span>{lang === 'th' ? `ลบผู้ลงทะเบียนคนที่ ${activeAttendeeIdx + 1}` : `Remove Attendee #${activeAttendeeIdx + 1}`}</span>
+                            <span>{lang === 'th' ? `ลบคนที่ ${activeAttendeeIdx + 1}` : `Remove #${activeAttendeeIdx + 1}`}</span>
                           </button>
                         )}
                       </div>
@@ -1591,10 +1625,11 @@ export function LoginView({
                               key={att.id}
                               type="button"
                               onClick={() => triggerPersonSwitch(idx)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 border ${isActive
-                                ? 'bg-gradient-to-r from-[#0026b3] to-[#001c8c] text-white border-blue-900 shadow-md ring-2 ring-blue-400/40 scale-105'
-                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-                                }`}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 border ${
+                                isActive
+                                  ? 'bg-gradient-to-r from-[#0026b3] to-[#001c8c] text-white border-blue-900 shadow-md ring-2 ring-blue-400/40 scale-105'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                              }`}
                             >
                               <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black ${isActive ? 'bg-white text-[#0026b3]' : 'bg-slate-300 text-slate-700'}`}>
                                 {idx + 1}
@@ -1634,57 +1669,58 @@ export function LoginView({
 
                     <form onSubmit={handleSubmitRegistration} key={`attendee-form-${currentAttendee.id}`} className="space-y-3 sm:space-y-4 animate-fade-in">
                       {regMode === 'group' && (
-                        <div className="flex items-center justify-between bg-blue-50/70 border border-blue-100 rounded-2xl px-4 py-2.5 text-xs text-blue-900 font-bold shadow-2xs">
+                        <div className="flex items-center justify-between bg-blue-50/70 border border-blue-100 rounded-2xl px-3.5 py-2.5 text-xs text-blue-900 font-bold shadow-2xs">
                           <span className="flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-[#0026b3] animate-pulse" />
-                            {lang === 'th' ? `ข้อมูลผู้ลงทะเบียนคนที่ ${activeAttendeeIdx + 1} จากทั้งหมด ${attendees.length} ท่าน` : `Form for Attendee #${activeAttendeeIdx + 1} of ${attendees.length}`}
+                            {lang === 'th' ? `ข้อมูลคนที่ ${activeAttendeeIdx + 1} จากทั้งหมด ${attendees.length} ท่าน` : `Attendee #${activeAttendeeIdx + 1} of ${attendees.length}`}
                           </span>
-                          <span className="text-[11px] text-blue-700 font-medium">({currentAttendee.nameTh || (lang === 'th' ? 'ยังไม่ได้ระบุชื่อ' : 'No name specified')})</span>
+                          <span className="text-[11px] text-blue-700 font-medium truncate max-w-[140px] xs:max-w-xs">({currentAttendee.nameTh || (lang === 'th' ? 'ยังไม่ได้ระบุชื่อ' : 'No name')})</span>
                         </div>
                       )}
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5">
                         {/* 1. รหัสสมาชิก - ช่องแรกสุด พร้อมฟังก์ชันออโต้ฟิล */}
-                        <div className="sm:col-span-2 bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-blue-50/80 border border-blue-200/90 rounded-2xl p-3 sm:p-3.5 shadow-2xs space-y-1.5">
-                          <div className="flex items-center justify-between flex-wrap gap-1">
+                        <div className="sm:col-span-2 bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-blue-50/80 border border-blue-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-1.5 sm:space-y-2">
+                          <div className="flex items-center justify-between flex-wrap gap-1.5">
                             <label className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
                               <Hash className="w-4 h-4 text-[#0026b3]" />
                               <span>
                                 {lang === 'th'
-                                  ? `รหัสสมาชิก TSRM ${regMode === 'group' ? '(บังคับสำหรับกลุ่ม)' : ''}`
+                                  ? `รหัสสมาชิก TSRM ${regMode === 'group' ? '(จำเป็นสำหรับกลุ่ม)' : ''}`
                                   : `TSRM Member No. ${regMode === 'group' ? '(Required for Group)' : ''}`}
                               </span>
                               {regMode === 'group' && <span className="text-rose-500 font-bold ml-0.5">*</span>}
                             </label>
-                            <span className="text-[10px] sm:text-[11px] text-blue-700 font-extrabold bg-blue-100/90 border border-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <span className="text-[10px] sm:text-[11px] text-blue-700 font-extrabold bg-blue-100/90 border border-blue-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
                               <Sparkles className="w-3 h-3 text-blue-600" />
                               <span>{lang === 'th' ? 'กรอกเลขสมาชิกเพื่อดึงข้อมูลอัตโนมัติ' : 'Auto-fills profile from Member ID'}</span>
                             </span>
                           </div>
                           <div className="relative">
-                            <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none font-mono font-bold text-sm">#</span>
+                            <span className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none font-mono font-bold text-sm">#</span>
                             <input
                               type="text"
                               value={currentAttendee.memberNo}
                               onChange={(e) => updateCurrentAttendee('memberNo', e.target.value)}
                               placeholder={lang === 'th' ? 'กรอกเลขสมาชิก (เว้นว่างหากไม่ใช่สมาชิก)' : 'Enter Member No. (Leave blank if not a member)'}
-                              className={`w-full pl-9 sm:pl-10 ${currentAttendee.memberNo ? 'pr-9' : 'pr-3 sm:pr-3.5'} py-2 sm:py-2.5 bg-white text-slate-900 rounded-xl border text-xs sm:text-sm font-mono font-bold tracking-wider placeholder:font-sans placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:outline-none transition ${currentAttendee.memberCheckStatus === 'valid'
-                                ? 'border-emerald-500 focus:ring-emerald-500 ring-1 ring-emerald-400/50'
-                                : currentAttendee.memberCheckStatus === 'mismatch' || currentAttendee.memberCheckStatus === 'invalid'
-                                  ? 'border-rose-400 focus:ring-rose-500 ring-1 ring-rose-300'
-                                  : currentAttendee.memberCheckStatus === 'expired'
-                                    ? 'border-amber-400 focus:ring-amber-500 ring-1 ring-amber-300'
-                                    : 'border-slate-300 focus:ring-[#0026b3]'
-                                }`}
+                              className={`w-full pl-9 sm:pl-10 ${currentAttendee.memberNo ? 'pr-9' : 'pr-3.5'} py-2.5 bg-white text-slate-900 rounded-xl border text-sm font-mono font-bold tracking-wider placeholder:font-sans placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:outline-none transition min-h-[44px] ${
+                                currentAttendee.memberCheckStatus === 'valid'
+                                  ? 'border-emerald-500 focus:ring-emerald-500 ring-1 ring-emerald-400/50'
+                                  : currentAttendee.memberCheckStatus === 'mismatch' || currentAttendee.memberCheckStatus === 'invalid'
+                                    ? 'border-rose-400 focus:ring-rose-500 ring-1 ring-rose-300'
+                                    : currentAttendee.memberCheckStatus === 'expired'
+                                      ? 'border-amber-400 focus:ring-amber-500 ring-1 ring-amber-300'
+                                      : 'border-slate-300 focus:ring-[#0026b3]'
+                              }`}
                             />
                             {currentAttendee.memberNo && (
                               <button
                                 type="button"
                                 onClick={() => updateCurrentAttendee('memberNo', '')}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition"
                                 title={lang === 'th' ? 'ล้างเลขสมาชิกและข้อมูล' : 'Clear Member ID and Data'}
                               >
-                                <X className="w-3.5 h-3.5" />
+                                <X className="w-4 h-4" />
                               </button>
                             )}
                           </div>
@@ -1692,14 +1728,15 @@ export function LoginView({
                           {/* Debounced Member Check Message below input */}
                           {currentAttendee.memberCheckStatus && currentAttendee.memberCheckStatus !== 'idle' && (
                             <div
-                              className={`mt-1.5 text-[11px] font-bold flex items-center gap-1.5 transition-all animate-fade-in ${currentAttendee.memberCheckStatus === 'valid'
-                                ? 'text-emerald-800 bg-emerald-100/90 border border-emerald-300/80 px-2.5 py-1 rounded-lg'
-                                : currentAttendee.memberCheckStatus === 'checking'
-                                  ? 'text-blue-800 bg-blue-100/90 border border-blue-300/80 px-2.5 py-1 rounded-lg'
-                                  : currentAttendee.memberCheckStatus === 'expired'
-                                    ? 'text-amber-800 bg-amber-100/90 border border-amber-300/80 px-2.5 py-1 rounded-lg'
-                                    : 'text-rose-800 bg-rose-100/90 border border-rose-300/80 px-2.5 py-1 rounded-lg'
-                                }`}
+                              className={`mt-1.5 text-[11px] font-bold flex items-center gap-1.5 transition-all animate-fade-in ${
+                                currentAttendee.memberCheckStatus === 'valid'
+                                  ? 'text-emerald-800 bg-emerald-100/90 border border-emerald-300/80 px-2.5 py-1 rounded-lg'
+                                  : currentAttendee.memberCheckStatus === 'checking'
+                                    ? 'text-blue-800 bg-blue-100/90 border border-blue-300/80 px-2.5 py-1 rounded-lg'
+                                    : currentAttendee.memberCheckStatus === 'expired'
+                                      ? 'text-amber-800 bg-amber-100/90 border border-amber-300/80 px-2.5 py-1 rounded-lg'
+                                      : 'text-rose-800 bg-rose-100/90 border border-rose-300/80 px-2.5 py-1 rounded-lg'
+                              }`}
                             >
                               <span>{currentAttendee.memberCheckMessage}</span>
                             </div>
@@ -1730,14 +1767,14 @@ export function LoginView({
                             )}
                           </div>
                           <div className="relative">
-                            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                             <input
                               type="text"
                               value={currentAttendee.nameTh}
                               readOnly={currentAttendee.memberCheckStatus === 'valid'}
                               onChange={(e) => updateCurrentAttendee('nameTh', e.target.value)}
                               placeholder={lang === 'th' ? 'ชื่อ-นามสกุล' : 'Full Name (Thai)'}
-                              className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 rounded-xl border text-xs sm:text-sm font-medium transition ${
+                              className={`w-full pl-9 sm:pl-10 pr-3.5 py-2.5 rounded-xl border text-sm font-medium transition min-h-[44px] ${
                                 currentAttendee.memberCheckStatus === 'valid'
                                   ? 'bg-slate-100/90 text-slate-700 border-slate-200 cursor-not-allowed select-none font-semibold'
                                   : 'bg-slate-50 text-slate-900 border-slate-200 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none'
@@ -1760,14 +1797,14 @@ export function LoginView({
                             )}
                           </div>
                           <div className="relative">
-                            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                             <input
                               type="text"
                               value={currentAttendee.nameEn}
                               readOnly={currentAttendee.memberCheckStatus === 'valid'}
                               onChange={(e) => updateCurrentAttendee('nameEn', e.target.value)}
                               placeholder="Full Name (English)"
-                              className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 rounded-xl border text-xs sm:text-sm font-medium transition ${
+                              className={`w-full pl-9 sm:pl-10 pr-3.5 py-2.5 rounded-xl border text-sm font-medium transition min-h-[44px] ${
                                 currentAttendee.memberCheckStatus === 'valid'
                                   ? 'bg-slate-100/90 text-slate-700 border-slate-200 cursor-not-allowed select-none font-semibold'
                                   : 'bg-slate-50 text-slate-900 border-slate-200 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none'
@@ -1817,14 +1854,14 @@ export function LoginView({
                             )}
                           </div>
                           <div className="relative">
-                            <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                             <input
                               type="text"
                               value={currentAttendee.workplace}
                               readOnly={currentAttendee.memberCheckStatus === 'valid' || (regMode === 'group' && !!sponsorSession?.sponsorName)}
                               onChange={(e) => updateCurrentAttendee('workplace', e.target.value)}
                               placeholder={lang === 'th' ? 'โรงพยาบาล / คลินิก / บริษัท' : 'Hospital / Clinic / Company'}
-                              className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 rounded-xl border text-xs sm:text-sm font-medium transition ${
+                              className={`w-full pl-9 sm:pl-10 pr-3.5 py-2.5 rounded-xl border text-sm font-medium transition min-h-[44px] ${
                                 currentAttendee.memberCheckStatus === 'valid' || (regMode === 'group' && !!sponsorSession?.sponsorName)
                                   ? 'bg-slate-100/90 text-slate-700 border-slate-200 cursor-not-allowed select-none font-semibold'
                                   : 'bg-slate-50 text-slate-900 border-slate-200 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none'
@@ -1858,14 +1895,14 @@ export function LoginView({
                       </div>
 
                       {/* Program Selection Cards for Active Attendee */}
-                      <div className="space-y-1.5 sm:space-y-2 pt-1 sm:pt-2">
+                      <div className="space-y-2 pt-1 sm:pt-2">
                         <div className="flex items-center justify-between">
-                          <label className="text-[11px] sm:text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                            <Award className="w-3.5 h-3.5 text-[#0026b3]" />
+                          <label className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
+                            <Award className="w-4 h-4 text-[#0026b3]" />
                             <span>{lang === 'th' ? 'เลือกหลักสูตรที่ต้องการเข้าร่วม' : 'Select Program / Courses'}</span>
                             <span className="text-rose-500 font-bold">*</span>
                           </label>
-                          <span className="text-[10px] xs:text-[11px] font-semibold text-slate-500">
+                          <span className="text-[10px] xs:text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
                             {lang === 'th' ? `เลือกแล้ว ${currentAttendee.selectedPrograms.length} รายการ` : `${currentAttendee.selectedPrograms.length} selected`}
                           </span>
                         </div>
@@ -1879,29 +1916,32 @@ export function LoginView({
                                 key={act.id}
                                 type="button"
                                 onClick={() => toggleProgramForCurrentAttendee(act.id)}
-                                className={`p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 active:scale-[0.99] relative overflow-hidden ${isSelected
-                                  ? 'bg-blue-50/90 border-[#0026b3] text-slate-900 shadow-2xs ring-1.5 ring-[#0026b3]/30 font-bold'
-                                  : 'bg-slate-50/80 border-slate-200 hover:border-slate-300 text-slate-700 font-medium'
-                                  }`}
+                                className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 active:scale-[0.99] relative overflow-hidden ${
+                                  isSelected
+                                    ? 'bg-blue-50/90 border-[#0026b3] text-slate-900 shadow-2xs ring-1.5 ring-[#0026b3]/30 font-bold'
+                                    : 'bg-slate-50/80 border-slate-200 hover:border-slate-300 text-slate-700 font-medium'
+                                }`}
                               >
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                    <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded shrink-0 ${act.type === 'main'
-                                      ? (isSelected ? 'bg-[#0026b3] text-white' : 'bg-slate-200 text-slate-700')
-                                      : (isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700')
-                                      }`}>
+                                    <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded shrink-0 ${
+                                      act.type === 'main'
+                                        ? (isSelected ? 'bg-[#0026b3] text-white' : 'bg-slate-200 text-slate-700')
+                                        : (isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700')
+                                    }`}>
                                       {act.type === 'main' ? (lang === 'th' ? 'หลักสูตรหลัก' : 'Main') : (lang === 'th' ? 'เวิร์กช็อป' : 'Workshop')}
                                     </span>
 
                                     {(() => {
                                       const fmt = act.format || (act.type === 'workshop' ? 'onsite' : 'both');
                                       return (
-                                        <span className={`text-[9px] sm:text-[10px] font-extrabold px-2 py-0.5 rounded shrink-0 border ${fmt === 'online'
-                                          ? (isSelected ? 'bg-blue-100 text-[#0026b3] border-blue-300' : 'bg-blue-50 text-blue-700 border-blue-200')
-                                          : fmt === 'both'
-                                            ? (isSelected ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-purple-50 text-purple-700 border-purple-200')
-                                            : (isSelected ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
-                                          }`}>
+                                        <span className={`text-[9px] sm:text-[10px] font-extrabold px-2 py-0.5 rounded shrink-0 border ${
+                                          fmt === 'online'
+                                            ? (isSelected ? 'bg-blue-100 text-[#0026b3] border-blue-300' : 'bg-blue-50 text-blue-700 border-blue-200')
+                                            : fmt === 'both'
+                                              ? (isSelected ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-purple-50 text-purple-700 border-purple-200')
+                                              : (isSelected ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                                        }`}>
                                           {fmt === 'online' ? '💻 Online' : fmt === 'both' ? '🌐 Hybrid' : '🏢 Onsite'}
                                         </span>
                                       );
@@ -1914,13 +1954,14 @@ export function LoginView({
                                       </span>
                                     )}
                                   </div>
-                                  <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-snug truncate" title={act.name}>
+                                  <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-snug" title={act.name}>
                                     {act.name}
                                   </h4>
                                 </div>
 
-                                <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'bg-[#0026b3] text-white shadow-2xs' : 'border border-slate-300 bg-white'
-                                  }`}>
+                                <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                                  isSelected ? 'bg-[#0026b3] text-white shadow-2xs' : 'border border-slate-300 bg-white'
+                                }`}>
                                   {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                                 </div>
                               </button>
@@ -1938,27 +1979,28 @@ export function LoginView({
                         const hasOnlineOnly = onlineOnlyActs.length > 0;
 
                         return (
-                          <div className="space-y-1 sm:space-y-1.5 pt-0.5 sm:pt-1">
-                            <label className="text-[11px] sm:text-xs font-bold text-slate-700 block">
+                          <div className="space-y-1.5 pt-1">
+                            <label className="text-xs sm:text-sm font-black text-slate-800 block">
                               {lang === 'th' ? 'รูปแบบการเข้าร่วม' : 'Attendance Format'}
                             </label>
 
-                            <div className="grid grid-cols-2 gap-1.5 sm:gap-3">
+                            <div className="grid grid-cols-2 gap-2 sm:gap-3">
                               <button
                                 type="button"
                                 disabled={hasOnlineOnly}
                                 onClick={() => {
                                   if (!hasOnlineOnly) setAttendanceTypeForCurrent('onsite');
                                 }}
-                                className={`py-2.5 px-3 sm:px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${hasOnlineOnly
-                                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                                  : currentAttendee.attendanceType === 'onsite'
-                                    ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30 cursor-pointer active:scale-95'
-                                    : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-600 font-medium cursor-pointer active:scale-95'
-                                  }`}
+                                className={`py-3 px-3 sm:px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 min-h-[44px] ${
+                                  hasOnlineOnly
+                                    ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                                    : currentAttendee.attendanceType === 'onsite'
+                                      ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30 cursor-pointer active:scale-95 font-black'
+                                      : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-600 font-medium cursor-pointer active:scale-95'
+                                }`}
                               >
                                 <MapPin className="w-4 h-4 shrink-0" />
-                                <span className="truncate">{lang === 'th' ? 'Onsite (ที่งาน)' : 'Onsite'}</span>
+                                <span className="truncate">{lang === 'th' ? 'เข้าร่วมที่งาน' : 'Onsite'}</span>
                               </button>
 
                               <button
@@ -1967,21 +2009,22 @@ export function LoginView({
                                 onClick={() => {
                                   if (!hasOnsiteOnly) setAttendanceTypeForCurrent('online');
                                 }}
-                                className={`py-2.5 px-3 sm:px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${hasOnsiteOnly
-                                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                                  : currentAttendee.attendanceType === 'online'
-                                    ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30 cursor-pointer active:scale-95'
-                                    : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-600 font-medium cursor-pointer active:scale-95'
-                                  }`}
+                                className={`py-3 px-3 sm:px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 min-h-[44px] ${
+                                  hasOnsiteOnly
+                                    ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                                    : currentAttendee.attendanceType === 'online'
+                                      ? 'bg-blue-50/90 border-[#0026b3] text-[#0026b3] shadow-2xs ring-1 ring-[#0026b3]/30 cursor-pointer active:scale-95 font-black'
+                                      : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-600 font-medium cursor-pointer active:scale-95'
+                                }`}
                               >
                                 <Monitor className="w-4 h-4 shrink-0" />
-                                <span className="truncate">{lang === 'th' ? 'Online (ออนไลน์)' : 'Online'}</span>
+                                <span className="truncate">{lang === 'th' ? 'เข้าร่วมออนไลน์' : 'Online'}</span>
                               </button>
                             </div>
 
                             {hasOnsiteOnly && (
-                              <div className="flex items-start gap-1.5 p-2 rounded-lg bg-amber-50/90 border border-amber-200/70 text-amber-800 text-[10.5px] xs:text-[11px] leading-relaxed">
-                                <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                              <div className="flex items-start gap-1.5 p-2.5 rounded-xl bg-amber-50/90 border border-amber-200/70 text-amber-800 text-xs leading-relaxed">
+                                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                                 <span>
                                   {lang === 'th'
                                     ? `หลักสูตร "${onsiteOnlyActs.map(a => a.name).join(', ')}" บังคับเข้าร่วม ณ สถานที่จัดงานจริง`
@@ -1991,8 +2034,8 @@ export function LoginView({
                             )}
 
                             {hasOnlineOnly && (
-                              <div className="flex items-start gap-1.5 p-2 rounded-lg bg-blue-50/90 border border-blue-200/70 text-blue-800 text-[10.5px] xs:text-[11px] leading-relaxed">
-                                <AlertCircle className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                              <div className="flex items-start gap-1.5 p-2.5 rounded-xl bg-blue-50/90 border border-blue-200/70 text-blue-800 text-xs leading-relaxed">
+                                <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                                 <span>
                                   {lang === 'th'
                                     ? `หลักสูตร "${onlineOnlyActs.map(a => a.name).join(', ')}" จัดการเรียนผ่านระบบ Online เท่านั้น`
@@ -2000,18 +2043,56 @@ export function LoginView({
                                 </span>
                               </div>
                             )}
+
+                            {/* Format Change Fee Notice */}
+                            {(() => {
+                              const changeFeeConfig = activeMeeting?.pricing_tiers?.changeFee;
+                              const feeAmount = (activeMeeting as any)?.change_format_fee || changeFeeConfig?.onsiteMember || 1000;
+                              const conditionDate = changeFeeConfig?.conditionDate || '';
+                              const customPolicy = (activeMeeting as any)?.change_format_policy || changeFeeConfig?.policyText;
+
+                              let noticeText = '';
+                              if (customPolicy && customPolicy.trim()) {
+                                noticeText = customPolicy.trim();
+                              } else if (lang === 'th') {
+                                noticeText = `หมายเหตุ: เปลี่ยนรูปแบบการเข้าร่วม${
+                                  conditionDate ? ' หลัง ' + conditionDate : ''
+                                } มีค่าธรรมเนียม ${feeAmount.toLocaleString()} บาท`;
+                              } else {
+                                noticeText = `Note: Changing attendance format${
+                                  conditionDate ? ' after ' + conditionDate : ''
+                                } fee is ${feeAmount.toLocaleString()} THB`;
+                              }
+
+                              return (
+                                <div className="p-2.5 sm:p-3 rounded-xl bg-amber-50/90 border border-amber-200/90 text-amber-950 text-xs animate-fade-in shadow-2xs flex items-center gap-2">
+                                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                                  <div className="flex-1 flex flex-wrap items-center gap-x-2 gap-y-1.5 leading-relaxed">
+                                    <span className="font-medium">{noticeText}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setIsChangeFormatOpen(true)}
+                                      className="inline-flex items-center gap-1 font-bold text-[#0026b3] hover:text-blue-900 bg-white hover:bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg transition-all active:scale-95 shadow-2xs text-[11px] sm:text-xs cursor-pointer shrink-0"
+                                    >
+                                      <span>{lang === 'th' ? 'แจ้งเปลี่ยนรูปแบบ' : 'Change Format Request'}</span>
+                                      <ExternalLink className="w-3 h-3 text-[#0026b3] shrink-0" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                         );
                       })()}
 
                       {/* Pagination Navigation Footer (Previous Person / Next Person) */}
                       {regMode === 'group' && attendees.length > 1 && (
-                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
+                        <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 gap-2">
                           <button
                             type="button"
                             disabled={activeAttendeeIdx === 0}
                             onClick={() => setActiveAttendeeIdx(Math.max(0, activeAttendeeIdx - 1))}
-                            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1 transition cursor-pointer"
+                            className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1 transition cursor-pointer min-h-[40px]"
                           >
                             <ArrowLeft className="w-3.5 h-3.5" />
                             <span>{lang === 'th' ? 'คนก่อนหน้า' : 'Previous Person'}</span>
@@ -2025,7 +2106,7 @@ export function LoginView({
                             <button
                               type="button"
                               onClick={() => setActiveAttendeeIdx(activeAttendeeIdx + 1)}
-                              className="px-3 py-2 bg-[#0026b3] hover:bg-[#001f94] text-white text-xs font-bold rounded-xl flex items-center gap-1 transition cursor-pointer shadow-xs"
+                              className="px-3.5 py-2.5 bg-[#0026b3] hover:bg-[#001f94] text-white text-xs font-bold rounded-xl flex items-center gap-1 transition cursor-pointer shadow-xs min-h-[40px]"
                             >
                               <span>{lang === 'th' ? 'คนถัดไป' : 'Next Person'}</span>
                               <ArrowRight className="w-3.5 h-3.5" />
@@ -2034,7 +2115,7 @@ export function LoginView({
                             <button
                               type="button"
                               onClick={handleAddAttendee}
-                              className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1 transition cursor-pointer shadow-xs"
+                              className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1 transition cursor-pointer shadow-xs min-h-[40px]"
                             >
                               <Plus className="w-3.5 h-3.5" />
                               <span>{lang === 'th' ? 'เพิ่มคนถัดไป' : 'Add Next'}</span>
@@ -2047,10 +2128,11 @@ export function LoginView({
                       <button
                         type="submit"
                         disabled={verifyingMember}
-                        className={`w-full font-black py-2.5 sm:py-3.5 px-4 sm:px-6 rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl transition-all flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-base border border-blue-400/20 relative overflow-hidden mt-2 sm:mt-3 ${verifyingMember
-                          ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
-                          : 'bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] hover:brightness-110 text-white shadow-blue-900/30 hover:shadow-blue-900/40 cursor-pointer active:scale-[0.99] group'
-                          }`}
+                        className={`w-full font-black py-3 sm:py-3.5 px-4 sm:px-6 rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl transition-all flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-base border border-blue-400/20 relative overflow-hidden mt-3 sm:mt-4 min-h-[48px] sm:min-h-[52px] ${
+                          verifyingMember
+                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+                            : 'bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] hover:brightness-110 text-white shadow-blue-900/30 hover:shadow-blue-900/40 cursor-pointer active:scale-[0.99] group'
+                        }`}
                       >
                         <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#4ade80] to-transparent opacity-90" />
 
@@ -2063,7 +2145,7 @@ export function LoginView({
                           </>
                         ) : (
                           <>
-                            <span className="tracking-wide">
+                            <span className="tracking-wide truncate">
                               {regMode === 'group'
                                 ? (lang === 'th' ? `ดำเนินการชำระเงินสำหรับ ${attendees.length} ท่าน` : `Proceed to Payment (${attendees.length} Attendees)`)
                                 : (lang === 'th' ? 'ดำเนินการต่อไปยังขั้นตอนชำระเงิน' : 'Proceed to Payment')}
@@ -2092,9 +2174,9 @@ export function LoginView({
         </div>
 
         {/* Security Badge */}
-        <div className="text-center pt-5 pb-2 space-y-2.5">
+        <div className="text-center pt-4 sm:pt-6 pb-2 space-y-2">
           <div className="flex items-center justify-center gap-2">
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+            <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-slate-500">
               <Shield className="w-3.5 h-3.5 text-[#0026b3]" />
               {t.login.securityBadge}
             </span>
