@@ -1150,6 +1150,31 @@ async function resolveCorporateEmail(slip: any, groupPayload: any): Promise<{ em
     };
   }
 
+  // 8. Fallback: If no separate dedicated coordinator email was found, use slip.guest_email, member email, or first attendee email so notifications are never dropped
+  if (slip.guest_email) {
+    return {
+      email: slip.guest_email.trim(),
+      name: compNameCandidate || slip.guest_name || 'ผู้ลงทะเบียน',
+    };
+  }
+
+  if (slip.members?.email) {
+    return {
+      email: slip.members.email.trim(),
+      name: slip.members.fullNameTh || slip.members.fullNameEn || compNameCandidate || 'ผู้ลงทะเบียน',
+    };
+  }
+
+  if (attendeesList.length > 0) {
+    const fallbackEmail = (attendeesList[0]?.email || attendeesList[0]?.attendee_email)?.trim();
+    if (fallbackEmail) {
+      return {
+        email: fallbackEmail,
+        name: compNameCandidate || attendeesList[0]?.nameTh || attendeesList[0]?.nameEn || 'ผู้ลงทะเบียน',
+      };
+    }
+  }
+
   return { email: '', name: compNameCandidate || 'ตัวแทนบริษัท' };
 }
 
@@ -1236,7 +1261,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (slip.ticket_code?.startsWith('GRP-') || slip.slip_id?.includes('GRP')) {
+    if (slip.ticket_code?.startsWith('GRP-') || slip.ticket_code?.startsWith('GRP_') || slip.slip_id?.includes('GRP')) {
       isGroupConference = true;
     }
 
@@ -1246,14 +1271,14 @@ export async function POST(request: NextRequest) {
         try { actObj = JSON.parse(actObj); } catch { }
       }
       if (actObj && typeof actObj === 'object') {
-        if (actObj.type === 'membership_group_registration' || (actObj.isGroup && actObj.applicants)) {
+        if (actObj.type === 'membership_group_registration' || (actObj.isGroup && actObj.applicants && Array.isArray(actObj.applicants) && actObj.applicants.length > 1)) {
           isMembershipRegistration = true;
           isGroupMembership = true;
           groupPayload = actObj;
         } else if (actObj.type === 'membership_registration') {
           isMembershipRegistration = true;
           memberPayload = actObj.memberPayload;
-        } else if (actObj.attendees || (actObj.isGroup && (actObj.attendees || !actObj.applicants))) {
+        } else if (actObj.type === 'conference_group_registration' || (actObj.isGroup === true && Array.isArray(actObj.attendees) && actObj.attendees.length > 1) || (Array.isArray(actObj.attendees) && actObj.attendees.length > 1 && (actObj.isGroup || actObj.companyName))) {
           isGroupConference = true;
           groupPayload = actObj;
         } else if (actObj.isFormatChange) {
@@ -1267,13 +1292,15 @@ export async function POST(request: NextRequest) {
       isGroupMembership ||
       isGroupConference ||
       slip.ticket_code?.startsWith('MEMGRP') ||
-      slip.ticket_code?.startsWith('GRP') ||
+      slip.ticket_code?.startsWith('GRP-') ||
+      slip.ticket_code?.startsWith('GRP_') ||
       slip.slip_id?.includes('GRP') ||
-      groupPayload?.isGroup ||
-      (groupPayload?.attendees && Array.isArray(groupPayload.attendees) && groupPayload.attendees.length > 0) ||
-      (groupPayload?.applicants && Array.isArray(groupPayload.applicants) && groupPayload.applicants.length > 0) ||
-      slip.guest_name?.includes('ท่าน') ||
-      Boolean(slip.guest_workplace && slip.ticket_code?.startsWith('GRP'))
+      (groupPayload?.isGroup === true && (
+        (Array.isArray(groupPayload?.attendees) && groupPayload.attendees.length > 1) ||
+        (Array.isArray(groupPayload?.applicants) && groupPayload.applicants.length > 1)
+      )) ||
+      Boolean(slip.guest_name?.includes('ท่าน') && (slip.ticket_code?.startsWith('GRP') || slip.slip_id?.includes('GRP'))) ||
+      Boolean(slip.guest_workplace && (slip.ticket_code?.startsWith('GRP') || slip.slip_id?.includes('GRP')))
     );
 
     if (action === 'approve') {
@@ -1842,30 +1869,37 @@ export async function POST(request: NextRequest) {
         isGroupMembership ||
         isGroupConference ||
         slip.ticket_code?.startsWith('MEMGRP') ||
-        slip.ticket_code?.startsWith('GRP') ||
+        slip.ticket_code?.startsWith('GRP-') ||
+        slip.ticket_code?.startsWith('GRP_') ||
         slip.slip_id?.includes('GRP') ||
-        groupPayload?.isGroup ||
-        (groupPayload?.attendees && Array.isArray(groupPayload.attendees) && groupPayload.attendees.length > 0) ||
-        (groupPayload?.applicants && Array.isArray(groupPayload.applicants) && groupPayload.applicants.length > 0) ||
-        slip.guest_name?.includes('ท่าน') ||
-        Boolean(slip.guest_workplace && slip.ticket_code?.startsWith('GRP'))
+        (groupPayload?.isGroup === true && (
+          (Array.isArray(groupPayload?.attendees) && groupPayload.attendees.length > 1) ||
+          (Array.isArray(groupPayload?.applicants) && groupPayload.applicants.length > 1)
+        )) ||
+        Boolean(slip.guest_name?.includes('ท่าน') && (slip.ticket_code?.startsWith('GRP') || slip.slip_id?.includes('GRP'))) ||
+        Boolean(slip.guest_workplace && (slip.ticket_code?.startsWith('GRP') || slip.slip_id?.includes('GRP')))
       );
 
       let recipientEmail = '';
       let recipientName = '';
 
+      let actObj = slip.selected_activities;
+      if (typeof actObj === 'string') {
+        try { actObj = JSON.parse(actObj); } catch { }
+      }
+
       if (isCorporate) {
-        const resolved = await resolveCorporateEmail(slip, groupPayload);
-        recipientEmail = resolved.email;
-        recipientName = resolved.name;
+        const resolved = await resolveCorporateEmail(slip, groupPayload || actObj);
+        recipientEmail = resolved.email || slip.guest_email || slip.members?.email || (actObj?.attendees?.[0]?.email) || (groupPayload?.attendees?.[0]?.email) || (actObj?.email) || '';
+        recipientName = resolved.name || slip.guest_name || slip.members?.fullNameTh || (actObj?.attendees?.[0]?.nameTh) || (actObj?.attendees?.[0]?.fullNameTh) || (groupPayload?.attendees?.[0]?.nameTh) || 'ผู้สมัคร';
       } else {
-        recipientEmail = slip.members?.email || slip.guest_email || memberPayload?.email || '';
-        recipientName = slip.members?.fullNameTh || slip.guest_name || memberPayload?.full_name_th || 'ผู้สมัคร';
+        recipientEmail = slip.members?.email || slip.guest_email || memberPayload?.email || (actObj?.attendees?.[0]?.email) || (groupPayload?.attendees?.[0]?.email) || (actObj?.email) || '';
+        recipientName = slip.members?.fullNameTh || slip.guest_name || memberPayload?.full_name_th || (actObj?.attendees?.[0]?.nameTh) || (actObj?.attendees?.[0]?.fullNameTh) || (groupPayload?.attendees?.[0]?.nameTh) || (actObj?.nameTh) || 'ผู้สมัคร';
       }
 
       // แสดงแค่ข้อมูลบริษัท ถ้าเป็นองค์กร/กลุ่ม อย่าดึงเบอร์โทรของผู้สมัครมาปน
-      const applicantPhone = isCorporate ? undefined : (slip.members?.mobile || slip.guest_phone || memberPayload?.mobile || '');
-      const applicantWorkplace = isCorporate ? undefined : (slip.members?.workplace || slip.guest_workplace || memberPayload?.workplace || '');
+      const applicantPhone = isCorporate ? undefined : (slip.members?.mobile || slip.guest_phone || memberPayload?.mobile || actObj?.attendees?.[0]?.mobile || actObj?.attendees?.[0]?.phone || '');
+      const applicantWorkplace = isCorporate ? undefined : (slip.members?.workplace || slip.guest_workplace || memberPayload?.workplace || actObj?.attendees?.[0]?.workplace || '');
 
       const origin = request.headers.get('origin') || (request.headers.get('host') ? `https://${request.headers.get('host')}` : '');
       const baseUrl = process.env.FRONTEND_URL || process.env.NEXTAUTH_URL || process.env.AUTH_URL || origin || 'http://localhost:3000';
@@ -1873,7 +1907,7 @@ export async function POST(request: NextRequest) {
 
       if (recipientEmail) {
         try {
-          await sendSlipRejectionEmail({
+          const mailResult = await sendSlipRejectionEmail({
             to: recipientEmail,
             recipientName,
             meetingName: isMembershipRegistration
@@ -1890,8 +1924,9 @@ export async function POST(request: NextRequest) {
             companyName: isCorporate ? recipientName : undefined,
             rejectType: effectiveRejectType,
           });
+          console.log(`[Reject Slip] Rejection email sent to ${recipientEmail}, result:`, mailResult);
         } catch (mailErr) {
-          console.error('Failed to send rejection email:', mailErr);
+          console.error(`[Reject Slip] Failed to send rejection email to ${recipientEmail}:`, mailErr);
         }
       } else {
         console.warn(`[Reject Slip] Could not find recipient email for slip ${slip.slip_id}, isCorporate: ${isCorporate}`);
