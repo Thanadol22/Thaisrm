@@ -46,17 +46,16 @@ export async function POST(req: NextRequest) {
       educations,
     } = body;
 
-    if (!member_no || !otp || !email) {
+    if (!member_no || !email) {
       return NextResponse.json(
-        { success: false, message: 'กรุณาระบุรหัสสมาชิก อีเมล และรหัสชั่วคราว (OTP) ให้ครบถ้วน' },
+        { success: false, message: 'กรุณาระบุรหัสสมาชิกและอีเมลให้ครบถ้วน' },
         { status: 400 }
       );
     }
 
-    const cleanOtp = String(otp).trim();
     const cleanEmail = String(email).trim().toLowerCase();
 
-    // ─── Step 1: ยืนยันตัวตนด้วย OTP ──────────────────────────────────────
+    // ─── Step 1: ตรวจสอบข้อมูลสมาชิกในระบบ ──────────────────────────────────
     // จัดรูปแบบเลขสมาชิก
     let formattedMemberNo = String(member_no).trim();
     if (/^\d+$/.test(formattedMemberNo) && formattedMemberNo.length < 4) {
@@ -80,54 +79,6 @@ export async function POST(req: NextRequest) {
         { success: false, message: 'อีเมลไม่ตรงกับข้อมูลสมาชิกในระบบ' },
         { status: 401 }
       );
-    }
-
-    // ตรวจสอบ OTP จากฐานข้อมูล
-    const otpHash = crypto.createHash('sha256').update(cleanOtp).digest('hex');
-    const prismaAny = prisma as any;
-    let otpRecord: any = null;
-
-    if (prismaAny.member_otp_codes) {
-      otpRecord = await prismaAny.member_otp_codes.findFirst({
-        where: {
-          member_no: memberCheck.member_no,
-          otp_hash: otpHash,
-          is_used: false,
-          expires_at: { gte: new Date() },
-        },
-        orderBy: { created_at: 'desc' },
-      });
-    } else {
-      // Fallback: ใช้ sponsor_otp_codes table
-      const rows: any[] = await prisma.$queryRaw`
-        SELECT * FROM sponsor_otp_codes
-        WHERE email = ${'member:' + memberCheck.member_no}
-          AND otp_code = ${otpHash}
-          AND is_used = false
-          AND expires_at >= NOW()
-        ORDER BY created_at DESC
-        LIMIT 1
-      `;
-      otpRecord = rows[0] || null;
-    }
-
-    if (!otpRecord) {
-      return NextResponse.json(
-        { success: false, message: 'รหัสชั่วคราว (OTP) ไม่ถูกต้อง หรือหมดอายุแล้ว กรุณาขอรหัสใหม่' },
-        { status: 401 }
-      );
-    }
-
-    // Mark OTP as used ทันที (one-time use)
-    if (prismaAny.member_otp_codes) {
-      await prismaAny.member_otp_codes.update({
-        where: { id: otpRecord.id },
-        data: { is_used: true },
-      });
-    } else {
-      await prisma.$executeRaw`
-        UPDATE sponsor_otp_codes SET is_used = true WHERE id = ${otpRecord.id}
-      `;
     }
 
     // ─── Step 2: ดำเนินการอัปเดตข้อมูล ─────────────────────────────────────

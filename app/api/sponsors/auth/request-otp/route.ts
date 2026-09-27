@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     const otpHash = crypto.createHash('sha256').update(plainOtp).digest('hex');
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 นาที
 
-    // บันทึกรหัส OTP (เก็บ hash ไม่เก็บ plaintext) ลงในตาราง sponsor_otp_codes
+    // บันทึกรหัส OTP (ขนาด 6 หลัก) ลงในตาราง sponsor_otp_codes
     if (prismaAny.sponsor_otp_codes) {
       // ลบ OTP เก่าของ email นี้ก่อน (cleanup)
       await prismaAny.sponsor_otp_codes.deleteMany({
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       await prismaAny.sponsor_otp_codes.create({
         data: {
           email,
-          otp_code: otpHash,  // เก็บ hash ไม่เก็บ plaintext
+          otp_code: plainOtp,
           expires_at: expiresAt,
           is_used: false,
         },
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       `;
       await prisma.$executeRaw`
         INSERT INTO sponsor_otp_codes (id, email, otp_code, expires_at, is_used, created_at)
-        VALUES (gen_random_uuid()::text, ${email}, ${otpHash}, ${expiresAt}, false, NOW())
+        VALUES (gen_random_uuid()::text, ${email}, ${plainOtp}, ${expiresAt}, false, NOW())
       `;
     }
 

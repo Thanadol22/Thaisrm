@@ -85,12 +85,12 @@ export async function POST(req: NextRequest) {
       console.warn('[UnifiedRequestOTP] Cleanup old OTPs warning:', cleanErr);
     }
 
-    // บันทึกรหัส OTP (เก็บแบบ SHA-256 Hash) ลงในตาราง sponsor_otp_codes
+    // บันทึกรหัส OTP 6 หลักลงในตาราง sponsor_otp_codes (ขนาด VARCHAR(10))
     if (prismaAny.sponsor_otp_codes) {
       await prismaAny.sponsor_otp_codes.create({
         data: {
           email,
-          otp_code: hashedOtp,
+          otp_code: otpCode,
           expires_at: expiresAt,
           is_used: false,
         },
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     } else {
       await prisma.$executeRaw`
         INSERT INTO sponsor_otp_codes (id, email, otp_code, expires_at, is_used, created_at)
-        VALUES (gen_random_uuid()::text, ${email}, ${hashedOtp}, ${expiresAt}, false, NOW())
+        VALUES (gen_random_uuid()::text, ${email}, ${otpCode}, ${expiresAt}, false, NOW())
       `;
     }
 

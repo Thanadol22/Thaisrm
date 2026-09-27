@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
         VALUES (
           gen_random_uuid()::text,
           ${'member:' + member.member_no},
-          ${otpHash},
+          ${plainOtp},
           ${expiresAt},
           false,
           NOW()
