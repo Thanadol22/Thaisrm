@@ -434,7 +434,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Staff Check-in Error:', error);
     return NextResponse.json(
-      { success: false, error: error?.message || 'เกิดข้อผิดพลาดในการประมวลผลการสแกน', stack: error?.stack },
+      { success: false, error: 'เกิดข้อผิดพลาดในการประมวลผลการสแกน กรุณาลองใหม่อีกครั้ง' },
       { status: 500 }
     );
   }

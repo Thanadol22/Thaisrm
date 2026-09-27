@@ -67,7 +67,7 @@ export async function GET(
   } catch (error: any) {
     console.error('Error fetching coupon detail:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch coupon details', details: error.message },
+      { success: false, error: 'ไม่สามารถดึงข้อมูลรายละเอียดคูปองได้' },
       { status: 500 }
     );
   }
@@ -133,7 +133,7 @@ export async function PUT(
   } catch (error: any) {
     console.error('Error updating coupon:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to update coupon', details: error.message },
+      { success: false, error: 'ไม่สามารถอัปเดตข้อมูลคูปองได้' },
       { status: 500 }
     );
   }
@@ -179,7 +179,7 @@ export async function PATCH(
   } catch (error: any) {
     console.error('Error toggling coupon status:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to toggle coupon status', details: error.message },
+      { success: false, error: 'ไม่สามารถเปลี่ยนสถานะคูปองได้' },
       { status: 500 }
     );
   }
@@ -230,7 +230,7 @@ export async function DELETE(
   } catch (error: any) {
     console.error('Error deleting coupon:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to delete coupon', details: error.message },
+      { success: false, error: 'ไม่สามารถลบคูปองได้' },
       { status: 500 }
     );
   }

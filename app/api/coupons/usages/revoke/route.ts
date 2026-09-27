@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 
 // POST /api/coupons/usages/revoke - คืนสิทธิ์โควตาคูปองและยกเลิกการใช้สิทธิ์
 export async function POST(request: NextRequest) {
+  const session = getAdminSessionFromRequest(request);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { usageId, cancelAttendance = true, reason } = body;
@@ -90,7 +96,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error revoking coupon usage:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to revoke coupon quota', details: error.message },
+      { success: false, error: 'ไม่สามารถยกเลิกและคืนสิทธิ์คูปองได้' },
       { status: 500 }
     );
   }

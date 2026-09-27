@@ -291,7 +291,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error?.message || 'เกิดข้อผิดพลาดในการส่งใบสมัครสมาชิก กรุณาลองใหม่อีกครั้ง',
+        error: 'เกิดข้อผิดพลาดในการส่งใบสมัครสมาชิก กรุณาลองใหม่อีกครั้ง',
       },
       { status: 500 }
     );

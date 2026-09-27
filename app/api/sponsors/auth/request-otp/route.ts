@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { sendSponsorOtpEmail } from '@/lib/email';
+import crypto from 'crypto';
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -42,24 +44,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // สุ่มรหัส OTP 6 หลัก (หรือใช้ 111111 สำหรับบัญชีทดสอบ)
-    const otpCode = email === 'test@sponsor.com' ? '111111' : Math.floor(100000 + Math.random() * 900000).toString();
+    // สุ่ม OTP 6 หลัก (ไม่มี master pass hardcode)
+    const plainOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Hash OTP ก่อนเก็บใน DB (CRITICAL #3)
+    const otpHash = crypto.createHash('sha256').update(plainOtp).digest('hex');
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 นาที
 
-    // บันทึกรหัสชั่วคราวลงในตาราง sponsor_otp_codes
+    // บันทึกรหัส OTP (เก็บ hash ไม่เก็บ plaintext) ลงในตาราง sponsor_otp_codes
     if (prismaAny.sponsor_otp_codes) {
+      // ลบ OTP เก่าของ email นี้ก่อน (cleanup)
+      await prismaAny.sponsor_otp_codes.deleteMany({
+        where: { email, is_used: false },
+      });
       await prismaAny.sponsor_otp_codes.create({
         data: {
           email,
-          otp_code: otpCode,
+          otp_code: otpHash,  // เก็บ hash ไม่เก็บ plaintext
           expires_at: expiresAt,
           is_used: false,
         },
       });
     } else {
       await prisma.$executeRaw`
+        DELETE FROM sponsor_otp_codes WHERE email = ${email} AND is_used = false
+      `;
+      await prisma.$executeRaw`
         INSERT INTO sponsor_otp_codes (id, email, otp_code, expires_at, is_used, created_at)
-        VALUES (gen_random_uuid()::text, ${email}, ${otpCode}, ${expiresAt}, false, NOW())
+        VALUES (gen_random_uuid()::text, ${email}, ${otpHash}, ${expiresAt}, false, NOW())
       `;
     }
 
@@ -145,12 +156,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ส่งอีเมลไปยังตัวแทน (พร้อม OTP และรหัสคูปองล่าสุดถ้ามีสิทธิ์)
+    // ส่งอีเมล OTP ไปยังตัวแทน (ส่ง plainOtp ไม่ใช่ hash)
     try {
       await sendSponsorOtpEmail(email, {
         companyName: sponsor.name,
         contactEmail: email,
-        otpCode,
+        otpCode: plainOtp,
         expiresInMinutes: 10,
         couponCode: systemType === 'membership' ? undefined : activeRotatedCouponCode,
         remainingQuota: systemType === 'membership' ? undefined : remainingQuota,

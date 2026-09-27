@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Error fetching coupons:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch coupons', details: error.message },
+      { success: false, error: 'เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง' },
       { status: 500 }
     );
   }
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error creating coupon:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to create coupon', details: error.message },
+      { success: false, error: 'เกิดข้อผิดพลาดในการสร้างคูปอง กรุณาลองใหม่อีกครั้ง' },
       { status: 500 }
     );
   }

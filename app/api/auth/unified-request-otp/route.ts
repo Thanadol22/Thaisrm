@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import prisma from '@/lib/prisma';
 import { sendMemberOtpEmail, sendSponsorOtpEmail } from '@/lib/email';
 
@@ -60,17 +61,36 @@ export async function POST(req: NextRequest) {
     // กำหนดประเภทผู้ใช้งาน (สมาชิกบุคคล หรือ ตัวแทนบริษัท)
     const userType = member ? 'member' : 'sponsor';
 
-    // สุ่มรหัส OTP 6 หลัก (หรือใช้ 111111 สำหรับบัญชีทดสอบ)
-    const isTestAccount = email === 'test@sponsor.com' || email.startsWith('test') || email === 'test0000@thaisrm.com';
-    const otpCode = isTestAccount ? '111111' : Math.floor(100000 + Math.random() * 900000).toString();
+    // สุ่มรหัส OTP 6 หลัก
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 นาที
+    const hashedOtp = crypto.createHash('sha256').update(otpCode).digest('hex');
 
-    // บันทึกรหัส OTP ลงในตาราง sponsor_otp_codes (ใช้ตารางกลางสำหรับเก็บ OTP)
+    // ลบรหัส OTP เก่าที่ยังไม่ได้ใช้ของอีเมลนี้
+    try {
+      if (prismaAny.sponsor_otp_codes) {
+        await prismaAny.sponsor_otp_codes.deleteMany({
+          where: {
+            email: { equals: email, mode: 'insensitive' },
+            is_used: false,
+          },
+        });
+      } else {
+        await prisma.$executeRaw`
+          DELETE FROM sponsor_otp_codes
+          WHERE LOWER(email) = LOWER(${email}) AND is_used = false
+        `;
+      }
+    } catch (cleanErr) {
+      console.warn('[UnifiedRequestOTP] Cleanup old OTPs warning:', cleanErr);
+    }
+
+    // บันทึกรหัส OTP (เก็บแบบ SHA-256 Hash) ลงในตาราง sponsor_otp_codes
     if (prismaAny.sponsor_otp_codes) {
       await prismaAny.sponsor_otp_codes.create({
         data: {
           email,
-          otp_code: otpCode,
+          otp_code: hashedOtp,
           expires_at: expiresAt,
           is_used: false,
         },
@@ -78,7 +98,7 @@ export async function POST(req: NextRequest) {
     } else {
       await prisma.$executeRaw`
         INSERT INTO sponsor_otp_codes (id, email, otp_code, expires_at, is_used, created_at)
-        VALUES (gen_random_uuid()::text, ${email}, ${otpCode}, ${expiresAt}, false, NOW())
+        VALUES (gen_random_uuid()::text, ${email}, ${hashedOtp}, ${expiresAt}, false, NOW())
       `;
     }
 

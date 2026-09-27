@@ -580,6 +580,9 @@ export function LoginView({
           body: JSON.stringify({
             memberNo: memNo,
             meetingId: activeMeeting?.meeting_id,
+            // ── ยืนยันตัวตน sponsor (required) ──
+            sponsorId: sponsorSession?.sponsorId,
+            contactEmail: sponsorSession?.contactEmail,
           }),
         });
         const data = await res.json();

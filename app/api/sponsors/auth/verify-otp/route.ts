@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import crypto from 'crypto';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,59 +18,73 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const prismaAny = prisma as any;
-    const isMasterPass = otp === '111111';
-    let otpRecord: any = null;
-
-    if (!isMasterPass) {
-      if (prismaAny.sponsor_otp_codes) {
-        // 1. ค้นหา OTP ล่าสุดที่ยังไม่ถูกใช้ และยังไม่หมดอายุ
-        otpRecord = await prismaAny.sponsor_otp_codes.findFirst({
-          where: {
-            email: { equals: email, mode: 'insensitive' },
-            otp_code: otp,
-            is_used: false,
-            expires_at: { gte: new Date() },
-          },
-          orderBy: { created_at: 'desc' },
-        });
-      } else {
-        const rows: any[] = await prisma.$queryRaw`
-          SELECT * FROM sponsor_otp_codes
-          WHERE LOWER(email) = LOWER(${email})
-            AND otp_code = ${otp}
-            AND is_used = false
-            AND expires_at >= NOW()
-          ORDER BY created_at DESC
-          LIMIT 1
-        `;
-        otpRecord = rows[0] || null;
-      }
-
-      if (!otpRecord) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: 'รหัสชั่วคราว (OTP) ไม่ถูกต้อง หรือหมดอายุแล้ว กรุณาขอรหัสใหม่',
-          },
-          { status: 400 }
-        );
-      }
-
-      // 2. Mark OTP as used
-      if (prismaAny.sponsor_otp_codes) {
-        await prismaAny.sponsor_otp_codes.update({
-          where: { id: otpRecord.id },
-          data: { is_used: true },
-        });
-      } else {
-        await prisma.$executeRaw`
-          UPDATE sponsor_otp_codes SET is_used = true WHERE id = ${otpRecord.id}
-        `;
-      }
+    // ตรวจสอบรูปแบบ OTP — ต้องเป็นตัวเลข 6 หลักเท่านั้น
+    // (ยกเลิก master pass hardcode ทุกรูปแบบ)
+    if (!/^\d{6}$/.test(otp)) {
+      return NextResponse.json(
+        { success: false, message: 'รหัสชั่วคราว (OTP) ต้องเป็นตัวเลข 6 หลัก' },
+        { status: 400 }
+      );
     }
 
-    // 3. ดึงข้อมูลบริษัท
+    const prismaAny = prisma as any;
+
+    // Hash OTP เพื่อเปรียบเทียบกับค่าที่เก็บในฐานข้อมูล (CRITICAL #3)
+    const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+
+    // ค้นหา OTP ที่ยังไม่ถูกใช้ และยังไม่หมดอายุ
+    // รองรับทั้ง hashed (ใหม่) และ plaintext (backward compat สำหรับ OTP เก่าที่ยังมีอยู่ใน DB)
+    let otpRecord: any = null;
+
+    if (prismaAny.sponsor_otp_codes) {
+      otpRecord = await prismaAny.sponsor_otp_codes.findFirst({
+        where: {
+          email: { equals: email, mode: 'insensitive' },
+          OR: [
+            { otp_code: otpHash },  // hashed (ระบบใหม่)
+            { otp_code: otp },      // plaintext (backward compat)
+          ],
+          is_used: false,
+          expires_at: { gte: new Date() },
+        },
+        orderBy: { created_at: 'desc' },
+      });
+    } else {
+      const rows: any[] = await prisma.$queryRaw`
+        SELECT * FROM sponsor_otp_codes
+        WHERE LOWER(email) = LOWER(${email})
+          AND (otp_code = ${otpHash} OR otp_code = ${otp})
+          AND is_used = false
+          AND expires_at >= NOW()
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      otpRecord = rows[0] || null;
+    }
+
+    if (!otpRecord) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'รหัสชั่วคราว (OTP) ไม่ถูกต้อง หรือหมดอายุแล้ว กรุณาขอรหัสใหม่',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Mark OTP as used ทันที (one-time use)
+    if (prismaAny.sponsor_otp_codes) {
+      await prismaAny.sponsor_otp_codes.update({
+        where: { id: otpRecord.id },
+        data: { is_used: true },
+      });
+    } else {
+      await prisma.$executeRaw`
+        UPDATE sponsor_otp_codes SET is_used = true WHERE id = ${otpRecord.id}
+      `;
+    }
+
+    // ดึงข้อมูลบริษัทสปอนเซอร์
     let sponsor: any = null;
     if (prismaAny.sponsors) {
       sponsor = await prismaAny.sponsors.findFirst({
@@ -112,7 +130,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4. ดึงรายการงานประชุมที่เปิดอยู่ (upcoming)
+    // ดึงรายการงานประชุมที่เปิดอยู่ (upcoming)
     const upcomingMeetings = await prisma.meetings.findMany({
       where: {
         status: 'upcoming',
@@ -138,7 +156,7 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    // สร้าง session payload token อย่างง่าย
+    // สร้าง session payload
     const sessionData = {
       sponsorId: sponsor.id,
       sponsorName: sponsor.name,

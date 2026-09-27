@@ -379,6 +379,9 @@ export default function SponsorGroupRegisterPage() {
           memberNo: row.memberNo,
           name: row.fullName,
           meetingId: selectedMeetingId,
+          // ── ยืนยันตัวตน sponsor ──
+          sponsorId: session?.sponsorId,
+          contactEmail: session?.contactEmail,
         }),
       });
 

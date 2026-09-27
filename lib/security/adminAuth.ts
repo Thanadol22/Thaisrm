@@ -160,7 +160,7 @@ export function verifyAdminSessionToken(token: string): AdminSessionPayload | nu
  * Check admin authentication from NextRequest headers/cookies
  */
 export function getAdminSessionFromRequest(req: NextRequest): AdminSessionPayload | null {
-  const token = req.cookies.get(ADMIN_COOKIE_NAME)?.value || req.cookies.get('thaisrm_admin_session')?.value;
+  const token = req.cookies.get(ADMIN_COOKIE_NAME)?.value;
   if (!token) return null;
   return verifyAdminSessionToken(token);
 }

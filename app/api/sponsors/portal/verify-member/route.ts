@@ -18,11 +18,44 @@ function normalizeName(name: string): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+
+    // ─── Sponsor Identity Verification ────────────────────────────────────
+    // ผู้เรียก API นี้ต้องส่ง sponsorId + contactEmail ที่ตรงกับที่ผ่าน OTP มาแล้ว
+    const sponsorId = (body.sponsorId || '').toString().trim();
+    const contactEmail = (body.contactEmail || '').trim().toLowerCase();
+
+    if (!sponsorId || !contactEmail) {
+      return NextResponse.json(
+        { success: false, valid: false, message: 'Unauthorized: กรุณาเข้าสู่ระบบด้วย OTP ก่อนใช้งาน' },
+        { status: 401 }
+      );
+    }
+
+    // ตรวจสอบว่า sponsorId + contactEmail ตรงกันในฐานข้อมูล
+    const sponsor = await (prisma as any).sponsors.findFirst({
+      where: {
+        id: sponsorId,
+        contact_email: { equals: contactEmail, mode: 'insensitive' },
+        is_active: true,
+      },
+      select: { id: true, name: true },
+    });
+
+    if (!sponsor) {
+      return NextResponse.json(
+        { success: false, valid: false, message: 'Unauthorized: ข้อมูลบริษัทไม่ถูกต้อง หรือสิทธิ์หมดอายุ' },
+        { status: 401 }
+      );
+    }
+    // ──────────────────────────────────────────────────────────────────────
+
     const memberNoInput = (body.memberNo || '').toString().trim();
     const nameInput = (body.name || '').toString().trim();
     const nameThInput = (body.nameTh || '').toString().trim();
     const nameEnInput = (body.nameEn || '').toString().trim();
     const meetingId = (body.meetingId || '').toString().trim();
+
+
 
     if (!memberNoInput) {
       return NextResponse.json(

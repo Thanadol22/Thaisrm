@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import prisma from '@/lib/prisma';
 
 export async function POST(req: NextRequest) {
@@ -14,57 +15,61 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!/^\d{6}$/.test(otp)) {
+      return NextResponse.json(
+        { success: false, message: 'รูปแบบรหัส OTP ไม่ถูกต้อง กรุณากรอกตัวเลข 6 หลัก' },
+        { status: 400 }
+      );
+    }
+
     const prismaAny = prisma as any;
+    const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
 
-    // 1. ตรวจสอบรหัส OTP
-    const isPermanentPass = (email === 'test@sponsor.com' || email.startsWith('test') || email === 'test0000@thaisrm.com') && otp === '111111';
-
+    // 1. ตรวจสอบรหัส OTP (ตรวจสอบทั้ง hashed และ plaintext เพื่อ backward-compatibility)
     let otpRecord: any = null;
-    if (!isPermanentPass) {
-      if (prismaAny.sponsor_otp_codes) {
-        otpRecord = await prismaAny.sponsor_otp_codes.findFirst({
-          where: {
-            email: { equals: email, mode: 'insensitive' },
-            otp_code: otp,
-            is_used: false,
-            expires_at: { gt: new Date() },
-          },
-          orderBy: { created_at: 'desc' },
-        });
-      } else {
-        const list: any[] = await prisma.$queryRaw`
-          SELECT * FROM sponsor_otp_codes
-          WHERE LOWER(email) = LOWER(${email})
-            AND otp_code = ${otp}
-            AND is_used = false
-            AND expires_at > NOW()
-          ORDER BY created_at DESC
-          LIMIT 1
-        `;
-        otpRecord = list[0] || null;
-      }
+    if (prismaAny.sponsor_otp_codes) {
+      otpRecord = await prismaAny.sponsor_otp_codes.findFirst({
+        where: {
+          email: { equals: email, mode: 'insensitive' },
+          otp_code: { in: [hashedOtp, otp] },
+          is_used: false,
+          expires_at: { gt: new Date() },
+        },
+        orderBy: { created_at: 'desc' },
+      });
+    } else {
+      const list: any[] = await prisma.$queryRaw`
+        SELECT * FROM sponsor_otp_codes
+        WHERE LOWER(email) = LOWER(${email})
+          AND otp_code IN (${hashedOtp}, ${otp})
+          AND is_used = false
+          AND expires_at > NOW()
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      otpRecord = list[0] || null;
+    }
 
-      if (!otpRecord) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: 'รหัส OTP ไม่ถูกต้อง หรือหมดอายุแล้ว (กรุณาขอรหัสใหม่)',
-          },
-          { status: 401 }
-        );
-      }
+    if (!otpRecord) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'รหัส OTP ไม่ถูกต้อง หรือหมดอายุแล้ว (กรุณาขอรหัสใหม่)',
+        },
+        { status: 401 }
+      );
+    }
 
-      // ทำเครื่องหมายว่าใช้งานแล้ว
-      if (prismaAny.sponsor_otp_codes) {
-        await prismaAny.sponsor_otp_codes.update({
-          where: { id: otpRecord.id },
-          data: { is_used: true },
-        });
-      } else {
-        await prisma.$executeRaw`
-          UPDATE sponsor_otp_codes SET is_used = true WHERE id = ${otpRecord.id}
-        `;
-      }
+    // ทำเครื่องหมายว่าใช้งานแล้ว
+    if (prismaAny.sponsor_otp_codes) {
+      await prismaAny.sponsor_otp_codes.update({
+        where: { id: otpRecord.id },
+        data: { is_used: true },
+      });
+    } else {
+      await prisma.$executeRaw`
+        UPDATE sponsor_otp_codes SET is_used = true WHERE id = ${otpRecord.id}
+      `;
     }
 
     // 2. ตรวจสอบว่าเป็น Member หรือ Sponsor

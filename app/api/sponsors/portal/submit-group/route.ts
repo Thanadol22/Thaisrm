@@ -32,17 +32,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. ตรวจสอบข้อมูล Sponsor
-    const sponsor = await (prisma as any).sponsors.findUnique({
-      where: { id: sponsorId },
-    });
-
-    if (!sponsor || !sponsor.is_active) {
+    // ─── Sponsor Identity Verification ────────────────────────────────────
+    // ต้องส่ง submittedByEmail ที่ตรงกับ contact_email ของบริษัทในฐานข้อมูลเสมอ
+    if (!submittedByEmail || typeof submittedByEmail !== 'string') {
       return NextResponse.json(
-        { success: false, message: 'ไม่พบบริษัทสปอนเซอร์หรือบัญชีถูกระงับ' },
-        { status: 404 }
+        { success: false, message: 'Unauthorized: กรุณาระบุอีเมลตัวแทนบริษัท' },
+        { status: 401 }
       );
     }
+
+    const cleanEmail = submittedByEmail.trim().toLowerCase();
+
+    // 1. ตรวจสอบข้อมูล Sponsor + ยืนยันว่า email ตรงกัน
+    const sponsor = await (prisma as any).sponsors.findFirst({
+      where: {
+        id: sponsorId,
+        contact_email: { equals: cleanEmail, mode: 'insensitive' },
+        is_active: true,
+      },
+    });
+
+    if (!sponsor) {
+      return NextResponse.json(
+        { success: false, message: 'Unauthorized: อีเมลไม่ตรงกับข้อมูลบริษัท หรือบัญชีถูกระงับ' },
+        { status: 401 }
+      );
+    }
+    // ──────────────────────────────────────────────────────────────────────
+
+
 
     // 2. ตรวจสอบงานประชุม
     const meeting = await prisma.meetings.findUnique({

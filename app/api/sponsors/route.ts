@@ -4,11 +4,17 @@ import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 
 // GET /api/sponsors - ดึงรายชื่อบริษัททั้งหมด พร้อมข้อมูลโควต้าและสถิติการลงทะเบียน
 export async function GET(req: NextRequest) {
+  const session = getAdminSessionFromRequest(req);
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const tier = searchParams.get('tier');
     const search = searchParams.get('search');
     const meetingId = searchParams.get('meetingId');
+
 
     const whereClause: any = {};
 

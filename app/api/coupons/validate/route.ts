@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error validating coupon:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to validate coupon', details: error.message },
+      { success: false, error: 'เกิดข้อผิดพลาดในการตรวจสอบคูปอง กรุณาลองใหม่อีกครั้ง' },
       { status: 500 }
     );
   }
