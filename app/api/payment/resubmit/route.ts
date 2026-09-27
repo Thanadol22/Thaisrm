@@ -80,18 +80,21 @@ export async function GET(request: NextRequest) {
         }
         if (
           actObj.type === 'membership_group_registration' ||
-          (actObj.isGroup === true && actObj.applicants) ||
-          (Array.isArray(actObj.applicants) && actObj.applicants.length > 0)
+          (actObj.isGroup === true && Array.isArray(actObj.applicants) && actObj.applicants.length > 0) ||
+          slip.ticket_code?.startsWith('MEMGRP')
         ) {
           isGroup = true;
           isMembershipRegistration = true;
           groupPayload = actObj.groupPayload || actObj;
         } else if (
           actObj.type === 'conference_group_registration' ||
-          (actObj.isGroup === true && Array.isArray(actObj.attendees)) ||
+          (actObj.isGroup === true && Array.isArray(actObj.attendees) && actObj.attendees.length > 0) ||
+          slip.ticket_code?.startsWith('GRP-') ||
+          slip.ticket_code?.startsWith('GRP_') ||
           (Array.isArray(actObj.attendees) && actObj.attendees.length > 0 && (actObj.isGroup || actObj.companyName))
         ) {
           isGroup = true;
+          isMembershipRegistration = false;
           groupPayload = actObj.groupPayload || actObj;
         } else if (actObj.type === 'membership_registration' || actObj.memberPayload) {
           isMembershipRegistration = true;
@@ -106,12 +109,18 @@ export async function GET(request: NextRequest) {
       rejectType = reason.includes('ข้อมูล') && !reason.includes('สลิป') ? 'info' : 'slip';
     }
 
-    if (slip.ticket_code?.startsWith('MEM-') || slip.meeting_id === 'membership') {
+    if (!groupPayload && (slip.ticket_code?.startsWith('MEM-') || slip.meeting_id === 'membership')) {
       isMembershipRegistration = true;
     }
     if (slip.ticket_code?.startsWith('MEMGRP')) {
       isGroup = true;
       isMembershipRegistration = true;
+      if (!groupPayload && actObj) {
+        groupPayload = actObj.groupPayload || actObj;
+      }
+    } else if (slip.ticket_code?.startsWith('GRP-') || slip.ticket_code?.startsWith('GRP_')) {
+      isGroup = true;
+      isMembershipRegistration = false;
       if (!groupPayload && actObj) {
         groupPayload = actObj.groupPayload || actObj;
       }
@@ -122,12 +131,11 @@ export async function GET(request: NextRequest) {
       slip.ticket_code?.startsWith('MEMGRP') ||
       slip.ticket_code?.startsWith('GRP-') ||
       slip.ticket_code?.startsWith('GRP_') ||
-      slip.slip_id?.includes('GRP') ||
       (groupPayload?.isGroup === true && (
         (Array.isArray(groupPayload?.attendees) && groupPayload.attendees.length > 0) ||
         (Array.isArray(groupPayload?.applicants) && groupPayload.applicants.length > 0)
       )) ||
-      Boolean(slip.guest_name?.includes('ท่าน') && (slip.ticket_code?.startsWith('GRP') || slip.slip_id?.includes('GRP')))
+      Boolean(slip.guest_name?.includes('ท่าน') && (slip.ticket_code?.startsWith('GRP') || slip.ticket_code?.startsWith('MEMGRP')))
     );
 
     let companyName = '';
@@ -471,20 +479,32 @@ export async function POST(request: NextRequest) {
 
     if (customGroupPayload) {
       const baseAct = typeof updatedActivities === 'object' && !Array.isArray(updatedActivities) ? updatedActivities : {};
+      const isMemGroup =
+        customGroupPayload.type === 'membership_group_registration' ||
+        slip.ticket_code?.startsWith('MEMGRP') ||
+        (Array.isArray(customGroupPayload.applicants) && customGroupPayload.applicants.length > 0);
+
       updatedActivities = {
         ...baseAct,
         ...customGroupPayload,
         isGroup: true,
+        type: isMemGroup ? 'membership_group_registration' : 'conference_group_registration',
         companyName: customGroupPayload.companyName || baseAct.companyName || cleanWorkplace,
         groupContact: customGroupPayload.groupContact || baseAct.groupContact || {
           coordinatorName: cleanNameTh,
           coordinatorEmail: cleanEmail,
           coordinatorPhone: cleanPhone,
         },
-        applicants: customGroupPayload.applicants || baseAct.applicants || [],
-        attendees: customGroupPayload.attendees || baseAct.attendees || [],
         rejectType: undefined,
       };
+
+      if (isMemGroup) {
+        updatedActivities.applicants = customGroupPayload.applicants || baseAct.applicants || [];
+        delete updatedActivities.attendees;
+      } else {
+        updatedActivities.attendees = customGroupPayload.attendees || baseAct.attendees || [];
+        delete updatedActivities.applicants;
+      }
     } else if (customMemberPayload) {
       const baseAct = typeof updatedActivities === 'object' && !Array.isArray(updatedActivities) ? updatedActivities : {};
       updatedActivities = {

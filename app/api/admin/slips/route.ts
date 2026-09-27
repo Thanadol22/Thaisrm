@@ -41,7 +41,12 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && (parsed.type === 'membership_group_registration' || (parsed.isGroup && parsed.applicants))) {
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed) &&
+        (parsed.type === 'membership_group_registration' || (parsed.isGroup && Array.isArray(parsed.applicants) && parsed.applicants.length > 0))
+      ) {
         const applicantCount = parsed.applicants?.length || 1;
         const effectivePrice = Number(slipAmount) || Number(parsed.amount) || (applicantCount * 1000);
         return {
@@ -64,7 +69,12 @@ export async function GET(request: NextRequest) {
         };
       }
 
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && (parsed.type === 'conference_group_registration' || (parsed.isGroup && (parsed.attendees || !parsed.applicants)))) {
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed) &&
+        (parsed.type === 'conference_group_registration' || (parsed.isGroup && Array.isArray(parsed.attendees) && parsed.attendees.length > 0))
+      ) {
         const attendeeCount = Array.isArray(parsed.attendees) ? parsed.attendees.length : 1;
         const attendeesSum = Array.isArray(parsed.attendees)
           ? parsed.attendees.reduce((sum: number, a: any) => sum + Number(a.subtotal || a.price || 0), 0)
@@ -1347,7 +1357,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (slip.ticket_code?.startsWith('GRP-') || slip.ticket_code?.startsWith('GRP_') || slip.slip_id?.includes('GRP')) {
+    if (slip.ticket_code?.startsWith('GRP-') || slip.ticket_code?.startsWith('GRP_')) {
       isGroupConference = true;
     }
 
@@ -1357,20 +1367,22 @@ export async function POST(request: NextRequest) {
         try { actObj = JSON.parse(actObj); } catch { }
       }
       if (actObj && typeof actObj === 'object') {
-        if (actObj.type === 'membership_group_registration' || (actObj.isGroup && actObj.applicants && Array.isArray(actObj.applicants))) {
+        if (actObj.type === 'membership_group_registration' || (actObj.isGroup && Array.isArray(actObj.applicants) && actObj.applicants.length > 0)) {
           isMembershipRegistration = true;
           isGroupMembership = true;
+          isGroupConference = false;
           groupPayload = actObj;
         } else if (actObj.type === 'membership_registration') {
           isMembershipRegistration = true;
           memberPayload = actObj.memberPayload;
         } else if (
           actObj.type === 'conference_group_registration' ||
-          actObj.isGroup === true ||
-          (Array.isArray(actObj.attendees) && actObj.attendees.length > 0) ||
-          (actObj.attendees && (actObj.isGroup || actObj.companyName))
+          (actObj.isGroup === true && Array.isArray(actObj.attendees) && actObj.attendees.length > 0) ||
+          (Array.isArray(actObj.attendees) && actObj.attendees.length > 0 && (actObj.isGroup || actObj.companyName))
         ) {
           isGroupConference = true;
+          isGroupMembership = false;
+          isMembershipRegistration = false;
           groupPayload = actObj;
         } else if (actObj.isFormatChange) {
           isFormatChange = true;

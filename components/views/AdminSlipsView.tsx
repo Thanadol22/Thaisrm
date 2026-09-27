@@ -1222,12 +1222,12 @@ export function AdminSlipsView() {
                   </div>
                   <div>
                     <h3 className="font-extrabold text-slate-900 text-sm sm:text-base leading-tight">
-                      {selectedSlip.isMembershipRegistration
-                        ? (lang === 'th' ? 'คำขอสมัครสมาชิกสมาคม & สลิปโอนเงิน' : 'Membership Application & Slip')
-                        : (selectedSlip.isGroupConference || selectedSlip.groupPayload?.attendees || selectedSlip.ticketCode?.startsWith('GRP-'))
+                      {selectedSlip.isGroupMembership || (Array.isArray(selectedSlip.groupPayload?.applicants) && selectedSlip.groupPayload.applicants.length > 0) || selectedSlip.ticketCode?.startsWith('MEMGRP')
+                        ? (lang === 'th' ? 'คำขอสมัครสมาชิกแบบกลุ่ม & สลิปโอนเงิน' : 'Group Membership Application & Slip')
+                        : selectedSlip.isGroupConference || (Array.isArray(selectedSlip.groupPayload?.attendees) && selectedSlip.groupPayload.attendees.length > 0) || selectedSlip.ticketCode?.startsWith('GRP-')
                           ? (lang === 'th' ? 'คำขอลงทะเบียนประชุมแบบกลุ่ม & สลิปโอนเงิน' : 'Group Conference Registration & Slip')
-                          : (selectedSlip.isGroupMembership || selectedSlip.groupPayload?.applicants || selectedSlip.ticketCode?.startsWith('MEMGRP'))
-                            ? (lang === 'th' ? 'คำขอสมัครสมาชิกแบบกลุ่ม & สลิปโอนเงิน' : 'Group Membership Application & Slip')
+                          : selectedSlip.isMembershipRegistration
+                            ? (lang === 'th' ? 'คำขอสมัครสมาชิกสมาคม & สลิปโอนเงิน' : 'Membership Application & Slip')
                             : (lang === 'th' ? 'รายละเอียดสลิปโอนเงิน' : 'Slip Details')}
                     </h3>
                     <p className="text-xs text-slate-500 font-mono">Ref: {selectedSlip.refNo}</p>
@@ -1353,7 +1353,9 @@ export function AdminSlipsView() {
                 ) : null}
 
                 {/* Corporate / Group Membership Detailed List (If Corporate Group Application) */}
-                {(selectedSlip.isGroupMembership || selectedSlip.groupPayload) && selectedSlip.groupPayload?.applicants && (
+                {Boolean(selectedSlip.isGroupMembership || (Array.isArray(selectedSlip.groupPayload?.applicants) && selectedSlip.groupPayload.applicants.length > 0) || selectedSlip.ticketCode?.startsWith('MEMGRP')) &&
+                  Array.isArray(selectedSlip.groupPayload?.applicants) &&
+                  selectedSlip.groupPayload.applicants.length > 0 && (
                   <div className="bg-indigo-50/70 border border-indigo-200 rounded-2xl p-4 space-y-3">
                     <div className="flex items-center justify-between border-b border-indigo-200/80 pb-2">
                       <div className="flex items-center gap-2 text-indigo-950 font-extrabold text-xs sm:text-sm">
@@ -1442,9 +1444,9 @@ export function AdminSlipsView() {
                 )}
 
                 {/* Corporate / Group Conference Attendees Detailed List (If Corporate Group Conference Application) */}
-                {(selectedSlip.isGroupConference || selectedSlip.groupPayload?.attendees || selectedSlip.ticketCode?.startsWith('GRP-')) &&
-                  selectedSlip.groupPayload?.attendees &&
-                  Array.isArray(selectedSlip.groupPayload.attendees) && (
+                {Boolean(selectedSlip.isGroupConference || (Array.isArray(selectedSlip.groupPayload?.attendees) && selectedSlip.groupPayload.attendees.length > 0) || selectedSlip.ticketCode?.startsWith('GRP-')) &&
+                  Array.isArray(selectedSlip.groupPayload?.attendees) &&
+                  selectedSlip.groupPayload.attendees.length > 0 && (
                     <div className="bg-sky-50/70 border border-sky-200 rounded-2xl p-4 space-y-3">
                       <div className="flex items-center justify-between border-b border-sky-200/80 pb-2">
                         <div className="flex items-center gap-2 text-sky-950 font-extrabold text-xs sm:text-sm">

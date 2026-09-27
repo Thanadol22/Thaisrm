@@ -255,9 +255,10 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
           }
 
           const isMemGroup = Boolean(
-            d.isMembershipRegistration ||
-            (d.ticketCode && d.ticketCode.startsWith('MEMGRP')) ||
-            initialApplicants.length > 0
+            d.ticketCode?.startsWith('MEMGRP') ||
+            d.groupPayload?.type === 'membership_group_registration' ||
+            (initialApplicants.length > 0 && initialAttendees.length === 0) ||
+            (d.isMembershipRegistration && !d.ticketCode?.startsWith('GRP-') && d.groupPayload?.type !== 'conference_group_registration')
           );
 
           setCorporateData({
@@ -542,7 +543,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
           };
         });
 
-        const customGroupPayload = {
+        const customGroupPayload: any = {
           isGroup: true,
           type: corporateData.isMembershipGroup
             ? 'membership_group_registration'
@@ -553,11 +554,15 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
             coordinatorEmail: corporateData.coordinatorEmail.trim(),
             coordinatorPhone: corporateData.coordinatorPhone.trim(),
           },
-          applicants: corporateData.isMembershipGroup ? processedApplicants : [],
-          attendees: !corporateData.isMembershipGroup ? processedAttendees : [],
           totalAmount: slipData.groupPayload?.totalAmount || slipData.amount,
           submittedAt: new Date().toISOString(),
         };
+
+        if (corporateData.isMembershipGroup) {
+          customGroupPayload.applicants = processedApplicants;
+        } else {
+          customGroupPayload.attendees = processedAttendees;
+        }
 
         payloadToSend = {
           ...payloadToSend,
