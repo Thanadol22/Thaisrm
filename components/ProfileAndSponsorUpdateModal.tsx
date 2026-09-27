@@ -368,6 +368,13 @@ export function ProfileAndSponsorUpdateModal({
         return;
       }
 
+      if (data.sessionToken) {
+        setSessionToken(data.sessionToken);
+      }
+      if (data.email) {
+        setEmail(data.email);
+      }
+
       setSaveSuccess(true);
       // Re-calculate missing fields matching signup inputs
       const fieldsToCheck = [
@@ -375,6 +382,7 @@ export function ProfileAndSponsorUpdateModal({
         { key: 'fullNameEn', label: 'ชื่อ-นามสกุล (ภาษาอังกฤษ)' },
         { key: 'idLast4', label: 'เลข 4 หลักท้ายบัตรประชาชน' },
         { key: 'mobile', label: 'เบอร์โทรศัพท์มือถือ' },
+        { key: 'email', label: 'อีเมล' },
         { key: 'workplace', label: 'สถานที่ทำงาน' },
         { key: 'position', label: 'ตำแหน่งงาน' },
       ];
@@ -925,18 +933,29 @@ export function ProfileAndSponsorUpdateModal({
                   {/* อีเมลสำหรับเข้าใช้งาน */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                      <span>อีเมล</span>
-                      <span className="text-[10px] text-slate-400 font-normal flex items-center gap-0.5">
-                        <Lock className="w-3 h-3" /> บัญชีเข้าสู่ระบบ
-                      </span>
+                      <span>อีเมล <span className="text-red-500">*</span></span>
+                      {isFieldEmpty(memberData.email) ? (
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                          ⚠️ โปรดใส่ข้อมูล
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-normal">
+                          (สามารถแก้ไขได้หากเปลี่ยนอีเมลใหม่)
+                        </span>
+                      )}
                     </label>
                     <div className="relative flex items-center">
                       <Mail className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none shrink-0" />
                       <input
                         type="email"
                         value={memberData.email}
-                        disabled
-                        className="w-full text-xs sm:text-sm py-2 pl-9 pr-3 bg-slate-100 text-slate-600 rounded-xl border border-slate-200 cursor-not-allowed font-medium"
+                        onChange={(e) => setMemberData({ ...memberData, email: e.target.value.trim() })}
+                        placeholder="เช่น doctor@hospital.com"
+                        className={`w-full text-xs sm:text-sm py-2 pl-9 pr-3 rounded-xl border transition outline-none font-medium ${
+                          isFieldEmpty(memberData.email)
+                            ? 'border-amber-400 bg-amber-50/40 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
+                            : 'border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+                        }`}
                       />
                     </div>
                   </div>
@@ -1313,26 +1332,7 @@ export function ProfileAndSponsorUpdateModal({
                 </div>
               </div>
 
-              {/* 5. ข้อมูลผู้รับรอง */}
-              <div className="space-y-3 border-t border-slate-200 pt-4">
-                <h5 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-blue-600" />
-                  <span>5. ข้อมูลผู้รับรอง</span>
-                </h5>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    ชื่อแพทย์ผู้รับรอง 2 ท่าน
-                  </label>
-                  <input
-                    type="text"
-                    value={memberData.referees || ''}
-                    onChange={(e) => setMemberData({ ...memberData, referees: e.target.value })}
-                    placeholder="เช่น นพ.สมศักดิ์ รักษาดี, พญ.สมศรี มีสุข"
-                    className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-none font-medium"
-                  />
-                </div>
-              </div>
 
               {/* Save Button */}
               <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-3 sticky bottom-0 bg-white py-2">

@@ -200,6 +200,17 @@ export async function validateCreateMember(
   if (input.id_last4 && input.id_last4 !== '') {
     if (!ID_LAST4_REGEX.test(input.id_last4)) {
       errors.push({ field: 'id_last4', message: 'เลขประจำตัว 4 หลักท้ายต้องเป็นตัวเลข 4 หลักเท่านั้น (เช่น 1234)' });
+    } else if (options.checkDuplicates) {
+      const existingId = await prisma.member.findFirst({
+        where: { idLast4: input.id_last4.trim() },
+        select: { member_no: true, fullNameTh: true },
+      });
+      if (existingId) {
+        errors.push({
+          field: 'id_last4',
+          message: `เลข 4 หลักท้ายบัตรประชาชนนี้ (${input.id_last4}) มีผู้ใช้งานในระบบแล้ว (รหัสสมาชิก: ${existingId.member_no})`,
+        });
+      }
     }
   }
 
@@ -357,6 +368,37 @@ export async function validateUpdateMember(
   if (input.id_last4 !== undefined && input.id_last4 !== null && input.id_last4 !== '') {
     if (!ID_LAST4_REGEX.test(input.id_last4)) {
       errors.push({ field: 'id_last4', message: 'เลขประจำตัว 4 หลักท้ายต้องเป็นตัวเลข 4 หลักเท่านั้น' });
+    } else {
+      const notConditions: any[] = [
+        { member_no: strCurrentId },
+        { member_no: strCurrentId.padStart(4, '0') },
+      ];
+      const unpadded = strCurrentId.replace(/^0+/, '');
+      if (unpadded) {
+        notConditions.push({ member_no: unpadded });
+      }
+      if (/^\d+$/.test(strCurrentId)) {
+        try {
+          notConditions.push({ id: BigInt(strCurrentId) });
+        } catch {
+          // ignore
+        }
+      }
+
+      const duplicateIdMember = await prisma.member.findFirst({
+        where: {
+          idLast4: input.id_last4.trim(),
+          NOT: notConditions,
+        },
+        select: { member_no: true, fullNameTh: true },
+      });
+
+      if (duplicateIdMember) {
+        errors.push({
+          field: 'id_last4',
+          message: `เลข 4 หลักท้ายบัตรประชาชนนี้ (${input.id_last4}) มีสมาชิกคนอื่นใช้งานแล้ว (รหัสสมาชิก: ${duplicateIdMember.member_no})`,
+        });
+      }
     }
   }
 

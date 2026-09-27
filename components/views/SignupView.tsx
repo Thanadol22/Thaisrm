@@ -535,9 +535,10 @@ export function SignupView({
       }
     }
 
-    // 1.9 Check in-form duplicate emails in group mode
+    // 1.9 Check in-form duplicate emails & citizen IDs in group mode
     if (regMode === 'group' && applicantsToSubmit.length > 1) {
       const emailSet = new Set<string>();
+      const idSet = new Set<string>();
       for (let i = 0; i < applicantsToSubmit.length; i++) {
         const email = applicantsToSubmit[i].email?.trim()?.toLowerCase();
         if (email) {
@@ -547,6 +548,16 @@ export function SignupView({
             return;
           }
           emailSet.add(email);
+        }
+
+        const id4 = applicantsToSubmit[i].id4Digits?.trim();
+        if (id4) {
+          if (idSet.has(id4)) {
+            setSubmitError(lang === 'th' ? `พบเลข 4 หลักท้ายบัตรประชาชน ${id4} ซ้ำกันในรายการผู้สมัครกลุ่ม (ผู้สมัครคนที่ ${i + 1})` : `Duplicate ID card last 4 digits ${id4} in applicant roster (#${i + 1})`);
+            triggerPersonSwitch(i);
+            return;
+          }
+          idSet.add(id4);
         }
       }
     }
@@ -563,15 +574,16 @@ export function SignupView({
     // ── 2. Pre-check Database Duplicates (Real-time DB query) ──────────────────────
     try {
       const allEmails = applicantsToSubmit.map(a => a.email.trim().toLowerCase()).filter(Boolean);
+      const allIdLast4s = applicantsToSubmit.map(a => (a.id4Digits || '').trim()).filter(Boolean);
       const dupCheckRes = await fetch('/api/members/check-duplicate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emails: allEmails }),
+        body: JSON.stringify({ emails: allEmails, idLast4s: allIdLast4s }),
       });
       if (dupCheckRes.ok) {
         const dupData = await dupCheckRes.json();
         if (dupData.isDuplicate) {
-          setSubmitError(dupData.message || (lang === 'th' ? 'มีอีเมลนี้อยู่ในระบบสมาชิกแล้ว' : 'Email is already registered'));
+          setSubmitError(dupData.message || (lang === 'th' ? 'มีข้อมูลนี้อยู่ในระบบสมาชิกแล้ว' : 'Information is already registered'));
           setSubmitting(false);
           return;
         }

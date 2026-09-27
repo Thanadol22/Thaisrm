@@ -62,31 +62,87 @@ export async function POST(req: NextRequest) {
 
     // ─── Step 1: ตรวจสอบความถูกต้องของสิทธิ์การเข้าใช้งาน (Cryptographic OTP Session Token) ────
     const session = extractOtpSessionFromRequest(req, sessionToken);
-    if (!session || session.email !== cleanEmail || session.userType !== 'member') {
+    if (!session || session.userType !== 'member' || !session.member_no) {
       return NextResponse.json(
         { success: false, message: 'สิทธิ์การเข้าใช้งานหมดอายุหรือไม่ถูกต้อง กรุณายืนยันตัวตนด้วยรหัส OTP ใหม่อีกครั้ง' },
         { status: 401 }
       );
     }
 
-    // ─── Step 2: ตรวจสอบข้อมูลสมาชิกในระบบจากอีเมล ──────────────────────────
+    // ─── Step 2: ตรวจสอบข้อมูลสมาชิกในระบบจาก member_no ──────────────────────────
+    const verifiedMemberNo = session.member_no;
     const memberCheck = await prisma.member.findFirst({
       where: {
-        email: { equals: cleanEmail, mode: 'insensitive' },
+        member_no: verifiedMemberNo,
       },
       select: { member_no: true, email: true },
     });
 
-    if (!memberCheck || !memberCheck.email) {
+    if (!memberCheck) {
       return NextResponse.json(
-        { success: false, message: 'ไม่พบข้อมูลสมาชิกที่ผูกกับอีเมลนี้ในระบบ' },
+        { success: false, message: 'ไม่พบข้อมูลสมาชิกในระบบ' },
         { status: 404 }
       );
     }
 
-    // ─── Step 2: ดำเนินการอัปเดตข้อมูล ─────────────────────────────────────
-    // ใช้ verifiedMemberNo ที่ผ่านการยืนยัน OTP แล้วเท่านั้น (ไม่ใช่ค่าจาก body โดยตรง)
-    const verifiedMemberNo = memberCheck.member_no;
+    // ─── Step 3: ตรวจสอบและอัปเดตอีเมล (กรณีเปลี่ยนอีเมลใหม่) ───────────────────
+    let newEmailToSet: string | undefined = undefined;
+    let updatedSessionToken: string | undefined = undefined;
+
+    if (email !== undefined) {
+      const cleanEmail = String(email).trim().toLowerCase();
+      const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!cleanEmail || !EMAIL_REGEX.test(cleanEmail)) {
+        return NextResponse.json(
+          { success: false, message: 'กรุณาระบุรูปแบบอีเมลให้ถูกต้อง (เช่น user@example.com)' },
+          { status: 400 }
+        );
+      }
+
+      if (cleanEmail !== (memberCheck.email || '').toLowerCase()) {
+        const dupMember = await prisma.member.findFirst({
+          where: {
+            email: { equals: cleanEmail, mode: 'insensitive' },
+            member_no: { not: verifiedMemberNo },
+          },
+          select: { member_no: true },
+        });
+
+        if (dupMember) {
+          return NextResponse.json(
+            { success: false, message: 'อีเมลนี้ถูกใช้งานโดยสมาชิกท่านอื่นในระบบแล้ว กรุณาใช้อีเมลอื่น' },
+            { status: 409 }
+          );
+        }
+
+        newEmailToSet = cleanEmail;
+        const { createOtpSessionToken } = await import('@/lib/security/otpSessionAuth');
+        updatedSessionToken = createOtpSessionToken({
+          email: cleanEmail,
+          userType: 'member',
+          member_no: verifiedMemberNo,
+        });
+      }
+    }
+
+    // ─── Step 3.1: ตรวจสอบเลข 4 หลักท้ายบัตรประชาชน (กรณีเปลี่ยนเลขบัตร) ────────
+    if (idLast4 !== undefined && idLast4 !== null && String(idLast4).trim() !== '') {
+      const cleanIdLast4 = String(idLast4).trim();
+      const dupIdMember = await prisma.member.findFirst({
+        where: {
+          idLast4: cleanIdLast4,
+          member_no: { not: verifiedMemberNo },
+        },
+        select: { member_no: true, fullNameTh: true },
+      });
+
+      if (dupIdMember) {
+        return NextResponse.json(
+          { success: false, message: `เลข 4 หลักท้ายบัตรประชาชน (${cleanIdLast4}) ถูกใช้งานโดยสมาชิกท่านอื่นในระบบแล้ว` },
+          { status: 409 }
+        );
+      }
+    }
 
     // แปลงวันเริ่มทำงาน
     let parsedWorkStartDate: Date | null = null;
@@ -104,6 +160,7 @@ export async function POST(req: NextRequest) {
       await db.member.update({
         where: { member_no: verifiedMemberNo },
         data: {
+          email: newEmailToSet,
           fullNameTh: fullNameTh !== undefined ? (fullNameTh ? String(fullNameTh).trim() : undefined) : undefined,
           fullNameEn: fullNameEn !== undefined ? (fullNameEn ? String(fullNameEn).trim() : null) : undefined,
           idLast4: idLast4 !== undefined ? (idLast4 ? String(idLast4).trim() : null) : undefined,
@@ -126,6 +183,7 @@ export async function POST(req: NextRequest) {
     } else {
       await prisma.$executeRaw`
         UPDATE members SET
+          email = COALESCE(${newEmailToSet}, email),
           full_name_th = COALESCE(${fullNameTh ? String(fullNameTh).trim() : null}, full_name_th),
           full_name_en = ${fullNameEn ? String(fullNameEn).trim() : null},
           id_last4 = ${idLast4 ? String(idLast4).trim() : null},
@@ -184,6 +242,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'อัปเดตข้อมูลส่วนตัวของสมาชิกเรียบร้อยแล้ว',
+      sessionToken: updatedSessionToken,
+      email: newEmailToSet,
     });
   } catch (error: any) {
     console.error('[MemberProfileUpdate] Error:', error);

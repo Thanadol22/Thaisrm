@@ -73,6 +73,33 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Check citizen ID card duplicates (idLast4 / idLast4s) in members table
+    const idLast4sToCheck: string[] = Array.isArray(body.idLast4s)
+      ? body.idLast4s.map((id: string) => String(id).trim()).filter(Boolean)
+      : idLast4
+      ? [String(idLast4).trim()]
+      : [];
+
+    if (idLast4sToCheck.length > 0) {
+      for (const targetIdLast4 of idLast4sToCheck) {
+        if (!targetIdLast4) continue;
+        const existingMemberWithId = await prisma.member.findFirst({
+          where: { idLast4: targetIdLast4 },
+          select: { member_no: true, fullNameTh: true, idLast4: true },
+        });
+
+        if (existingMemberWithId) {
+          return NextResponse.json({
+            success: true,
+            isDuplicate: true,
+            field: 'idLast4',
+            idLast4: targetIdLast4,
+            message: `เลข 4 หลักท้ายบัตรประชาชน ${targetIdLast4} (${existingMemberWithId.fullNameTh || 'สมาชิก'}) มีอยู่ในระบบแล้ว (รหัสสมาชิก: ${existingMemberWithId.member_no})`,
+          });
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       isDuplicate: false,

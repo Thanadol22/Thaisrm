@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          // 3. Check existing member duplicate
+          // 3. Check existing member duplicate email
           const existing = await prisma.member.findFirst({
             where: { email: { equals: appEmail, mode: 'insensitive' } },
             select: { member_no: true, fullNameTh: true },
@@ -108,6 +108,25 @@ export async function POST(request: NextRequest) {
                 success: false,
                 error: `อีเมล ${appEmail} (${app.full_name_th || ''}) เป็นสมาชิกในระบบแล้ว (รหัส: ${existing.member_no})`,
                 code: 'DUPLICATE_MEMBER_EMAIL',
+              },
+              { status: 400 }
+            );
+          }
+        }
+
+        // 4. Check existing member duplicate citizen ID card number (idLast4)
+        const appId4 = (app.id_last4 || app.idLast4 || app.id4Digits)?.trim();
+        if (appId4) {
+          const existingMemberWithId = await prisma.member.findFirst({
+            where: { idLast4: appId4 },
+            select: { member_no: true, fullNameTh: true },
+          });
+          if (existingMemberWithId) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `เลข 4 หลักท้ายบัตรประชาชน ${appId4} (${app.full_name_th || 'ผู้สมัคร'}) มีอยู่ในระบบสมาชิกแล้ว (รหัสสมาชิก: ${existingMemberWithId.member_no})`,
+                code: 'DUPLICATE_MEMBER_ID_LAST4',
               },
               { status: 400 }
             );
@@ -236,6 +255,26 @@ export async function POST(request: NextRequest) {
             success: false,
             error: `อีเมล ${email} มีคำขอสมัครสมาชิกอยู่ระหว่างรอเจ้าหน้าที่ตรวจสอบสลิปแล้ว ไม่สามารถส่งซ้ำได้`,
             code: 'PENDING_REGISTRATION_EXISTS',
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 3. ตรวจสอบเลข 4 หลักท้ายบัตรประชาชนซ้ำกับสมาชิกที่มีอยู่ในระบบแล้ว
+    const memberIdLast4 = (memberPayload.id_last4 || memberPayload.idLast4 || memberPayload.id4Digits)?.trim();
+    if (memberIdLast4) {
+      const existingMemberWithId = await prisma.member.findFirst({
+        where: { idLast4: memberIdLast4 },
+        select: { member_no: true, fullNameTh: true },
+      });
+
+      if (existingMemberWithId) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `เลข 4 หลักท้ายบัตรประชาชน ${memberIdLast4} นี้เป็นสมาชิกในระบบแล้ว (รหัสสมาชิก: ${existingMemberWithId.member_no}) ไม่สามารถสมัครสมาชิกซ้ำได้`,
+            code: 'DUPLICATE_MEMBER_ID_LAST4',
           },
           { status: 400 }
         );
