@@ -3,35 +3,40 @@ import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 import { auth } from '@/auth';
+import { getClientIp, checkRateLimit } from '@/lib/security/rateLimiter';
+import { validateFileBuffer, sanitizeFileName } from '@/lib/security/fileValidator';
 
 export const dynamic = 'force-dynamic';
 
 // ขนาดไฟล์สูงสุด: 10 MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-// MIME types ที่อนุญาต
-const ALLOWED_MIME_TYPES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-  'application/pdf',
-]);
-
 // Folders ที่อนุญาต (whitelist — ป้องกัน path traversal)
-const ALLOWED_FOLDERS = new Set(['slips', 'photos', 'docs', 'uploads']);
+const ALLOWED_FOLDERS = new Set(['slips', 'photos', 'docs', 'uploads', 'avatars', 'documents']);
 
 export async function POST(request: NextRequest) {
-  // ─── Authentication Check ─────────────────────────────────────────────
-  const adminSession = getAdminSessionFromRequest(request);
-  const userSession = await auth();
+  // ─── Rate Limiting (สูงสุด 30 ไฟล์ / 1 นาที ต่อ IP) ──────────────────────
+  const clientIp = getClientIp(request);
+  const rateLimitRes = checkRateLimit(`upload:${clientIp}`, {
+    maxRequests: 30,
+    windowSeconds: 60,
+    banDurationSeconds: 300,
+    maxViolationsBeforeBan: 3,
+  });
 
-  if (!adminSession && !userSession) {
+  if (!rateLimitRes.success) {
     return NextResponse.json(
-      { success: false, error: 'Unauthorized: กรุณาเข้าสู่ระบบก่อนอัปโหลดไฟล์' },
-      { status: 401 }
+      { success: false, error: 'มีการอัปโหลดไฟล์ถี่เกินไป กรุณารอสักครู่แล้วลองใหม่' },
+      { status: 429, headers: { 'Retry-After': String(rateLimitRes.retryAfterSeconds) } }
     );
   }
+
+  // ─── Source Tracking ─────────────────────────────────────────────────
+  const adminSession = getAdminSessionFromRequest(request);
+  const userSession = await auth();
+  const uploaderIdentifier = adminSession
+    ? 'admin'
+    : (userSession as any)?.user?.email || 'guest_or_applicant';
   // ─────────────────────────────────────────────────────────────────────
 
   try {
@@ -54,10 +59,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ตรวจสอบ MIME type
-    if (!ALLOWED_MIME_TYPES.has(file.type)) {
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    // ─── Magic Bytes Verification (ตรวจสอบโครงสร้างไฟล์จริง) ──────────────
+    const validation = validateFileBuffer(buffer);
+    if (!validation.valid) {
       return NextResponse.json(
-        { success: false, error: 'ประเภทไฟล์ไม่รองรับ (รองรับ JPG, PNG, WEBP, GIF, PDF เท่านั้น)' },
+        { success: false, error: validation.error || 'ไฟล์ไม่ถูกต้องหรือไม่ปลอดภัย' },
         { status: 400 }
       );
     }
@@ -71,11 +79,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
     const timestamp = Date.now();
-    // Sanitize filename — อนุญาตเฉพาะตัวอักษร ตัวเลข - . _
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 100);
-    const filename = `${timestamp}_${sanitizedName}`;
+    const safeName = sanitizeFileName(file.name);
+    const filename = `${timestamp}_${safeName}`;
 
     // Target directory: public/uploads/<folder>
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', sanitizedFolder);
@@ -100,7 +106,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       url: publicUrl,
-      fileName: sanitizedName,
+      fileName: safeName,
     });
   } catch (error: any) {
     console.error('Error saving local file:', error);

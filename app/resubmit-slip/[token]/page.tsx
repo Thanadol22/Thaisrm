@@ -79,6 +79,8 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
   const [address, setAddress] = useState('');
 
   // Slip upload state
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const infoFileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [useExistingSlip, setUseExistingSlip] = useState(false);
   const [newSlipFile, setNewSlipFile] = useState<File | null>(null);
   const [newSlipUrl, setNewSlipUrl] = useState<string | null>(null);
@@ -731,16 +733,21 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
               </div>
             ) : (
               <div className="pt-1">
-                <label className="text-[11px] text-slate-500 hover:text-[#0026b3] underline font-semibold cursor-pointer flex items-center gap-1">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>ต้องการแนบหลักฐานการโอนเงินใหม่เพิ่มเติม คลิกที่นี่</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </label>
+                <input
+                  ref={infoFileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,image/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => infoFileInputRef.current?.click()}
+                  className="text-[12px] text-slate-600 hover:text-[#0026b3] underline font-semibold cursor-pointer flex items-center gap-1.5 py-1"
+                >
+                  <Upload className="w-3.5 h-3.5 text-[#0026b3]" />
+                  <span>ต้องการแนบหลักฐานการโอนเงินใหม่เพิ่มเติม คลิกที่นี่เพื่อเลือกภาพ</span>
+                </button>
               </div>
             )}
 
@@ -763,7 +770,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
               ) : (
                 <>
                   <Check className="w-4 h-4" />
-                  <span>💾 ยืนยันบันทึกข้อมูลที่แก้ไข & ส่งตรวจสอบใหม่</span>
+                  <span>💾 ยืนยันบันทึกข้อมูลที่แก้ไขและส่งตรวจสอบใหม่</span>
                 </>
               )}
             </button>
@@ -826,19 +833,29 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
               </div>
             ) : (
               <div className="space-y-3">
-                <label className="border-2 border-dashed border-rose-300 hover:border-[#0026b3] rounded-3xl p-7 flex flex-col items-center justify-center cursor-pointer bg-rose-50/30 hover:bg-blue-50/30 transition group">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,image/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-rose-300 hover:border-[#0026b3] rounded-3xl p-7 flex flex-col items-center justify-center cursor-pointer bg-rose-50/30 hover:bg-blue-50/30 transition group select-none active:scale-[0.99]"
+                >
                   <Upload className="w-8 h-8 text-rose-500 group-hover:text-[#0026b3] group-hover:scale-110 transition mb-2" />
-                  <p className="text-xs font-bold text-slate-700 group-hover:text-[#0026b3]">
-                    คลิกเพื่อเลือกไฟล์รูปภาพสลิปการโอนเงินใหม่
+                  <p className="text-sm font-bold text-slate-800 group-hover:text-[#0026b3] text-center">
+                    แตะเพื่อเลือกภาพจากแกลเลอรี หรือ ถ่ายภาพสลิปใหม่
                   </p>
-                  <p className="text-[11px] text-slate-400 mt-1">รองรับ JPG, PNG (ขนาดไม่เกิน 10MB)</p>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </label>
+                  <p className="text-xs text-slate-400 mt-1 text-center">รองรับไฟล์รูปภาพ JPG, PNG, HEIC (ขนาดไม่เกิน 10MB)</p>
+                  <button
+                    type="button"
+                    className="mt-3 px-4 py-2 bg-rose-100 text-rose-700 group-hover:bg-[#0026b3] group-hover:text-white rounded-xl text-xs font-bold transition shadow-sm"
+                  >
+                    📁 เลือกรูปภาพสลิป
+                  </button>
+                </div>
               </div>
             )}
 

@@ -114,7 +114,7 @@ export function SlipUploadModal({ isOpen, onClose, onSuccess, bankAccount, bankN
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,image/*"
                 onChange={handleFileChange}
                 className="hidden"
                 disabled={uploading}

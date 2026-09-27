@@ -2,7 +2,7 @@ import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
-
+import { getClientIp, checkRateLimit } from '@/lib/security/rateLimiter';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,21 +15,35 @@ const ALLOWED_CONTENT_TYPES = [
   'image/png',
   'image/webp',
   'image/gif',
+  'image/heic',
+  'image/heif',
   'application/pdf',
 ];
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  // ─── Authentication Check ─────────────────────────────────────────────
-  // ต้องมีสิทธิ์อย่างใดอย่างหนึ่ง: Admin session หรือ Google OAuth session
-  const adminSession = getAdminSessionFromRequest(request);
-  const userSession = await auth();
+  // ─── Rate Limiting (สูงสุด 30 คำขอ / 1 นาที ต่อ IP) ──────────────────────
+  const clientIp = getClientIp(request);
+  const rateLimitRes = checkRateLimit(`upload_blob:${clientIp}`, {
+    maxRequests: 30,
+    windowSeconds: 60,
+    banDurationSeconds: 300,
+    maxViolationsBeforeBan: 3,
+  });
 
-  if (!adminSession && !userSession) {
+  if (!rateLimitRes.success) {
     return NextResponse.json(
-      { error: 'Unauthorized: กรุณาเข้าสู่ระบบก่อนอัปโหลดไฟล์' },
-      { status: 401 }
+      { error: 'มีการอัปโหลดไฟล์ถี่เกินไป กรุณารอสักครู่แล้วลองใหม่' },
+      { status: 429, headers: { 'Retry-After': String(rateLimitRes.retryAfterSeconds) } }
     );
   }
+
+  // ─── Authentication / Source Tracking ─────────────────────────────────
+  // ตรวจสอบ session หากมี เพื่อระบุตัวตนผู้ส่ง (ถ้าไม่มี ถือเป็น public guest/registration)
+  const adminSession = getAdminSessionFromRequest(request);
+  const userSession = await auth();
+  const uploaderIdentifier = adminSession
+    ? 'admin'
+    : (userSession as any)?.user?.email || 'guest_or_applicant';
   // ─────────────────────────────────────────────────────────────────────
 
   const body = (await request.json()) as HandleUploadBody;
@@ -54,9 +68,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           maximumSizeInBytes: MAX_FILE_SIZE_BYTES,
           tokenPayload: JSON.stringify({
             uploadedAt: new Date().toISOString(),
-            uploadedBy: adminSession
-              ? 'admin'
-              : (userSession as any)?.user?.email || 'user',
+            uploadedBy: uploaderIdentifier,
           }),
         };
       },
