@@ -748,14 +748,14 @@ export function CouponModal({
                 onChange={(e) => setIsActive(e.target.value === 'true')}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs font-bold focus:border-[#0026b3] focus:outline-none bg-white cursor-pointer"
               >
-                <option value="true">✅ เปิดใช้งาน (Active)</option>
-                <option value="false">🚫 ปิดใช้งานชั่วคราว (Inactive)</option>
+                <option value="true">✅ เปิดใช้งาน</option>
+                <option value="false">🚫 ปิดใช้งานชั่วคราว</option>
               </select>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                หมายเหตุเพิ่มเติม (Optional)
+                หมายเหตุเพิ่มเติม
               </label>
               <input
                 type="text"

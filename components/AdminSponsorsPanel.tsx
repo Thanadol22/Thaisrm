@@ -1746,8 +1746,8 @@ export default function AdminSponsorsPanel({
                       onChange={(e) => setEditSponsorForm({ ...editSponsorForm, isActive: e.target.value === 'true' })}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:bg-white focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
                     >
-                      <option value="true">✅ เปิดใช้งาน (Active)</option>
-                      <option value="false">🚫 ระงับการใช้งาน (Inactive)</option>
+                      <option value="true">✅ เปิดใช้งาน</option>
+                      <option value="false">🚫 ระงับการใช้งาน</option>
                     </select>
                   </div>
                 </div>
@@ -1755,7 +1755,7 @@ export default function AdminSponsorsPanel({
                 <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-100 space-y-3">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900">
                     <Ticket className="w-4 h-4 text-blue-600" />
-                    <span>จัดการโควต้าที่นั่ง (Quota per Meeting)</span>
+                    <span>จัดการโควต้าที่นั่ง</span>
                   </div>
 
                   {meetings.length > 0 && (

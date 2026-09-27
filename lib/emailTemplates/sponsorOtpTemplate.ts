@@ -27,7 +27,7 @@ export function renderSponsorOtpEmail(options: SponsorOtpEmailOptions): string {
     ? 'รหัสชั่วคราว (OTP) สำหรับเข้าสู่ระบบสมัครสมาชิกบริษัท - TSRM'
     : 'รหัสชั่วคราวและคูปองสิทธิ์สำหรับเข้าสู่ระบบลงทะเบียนสปอนเซอร์ - TSRM';
   const headerSubtitle = isMembership
-    ? 'ระบบสมัครสมาชิกสมาคมแบบกลุ่มสำหรับบริษัท (Corporate Membership)'
+    ? 'ระบบสมัครสมาชิกสมาคมแบบกลุ่มสำหรับบริษัท'
     : 'ระบบลงทะเบียนผู้เข้าร่วมประชุมแบบกลุ่มสำหรับบริษัทสปอนเซอร์';
   const introMessage = isMembership
     ? `คุณได้ทำการร้องขอรหัสชั่วคราว (OTP) เพื่อเข้าสู่ระบบสมัครสมาชิกสมาคมแบบกลุ่มในนามบริษัท <strong>${companyName}</strong> กรุณาใช้รหัสด้านล่างนี้เพื่อยืนยันตัวตน:`

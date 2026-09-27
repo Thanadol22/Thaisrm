@@ -1,34 +1,101 @@
 import prisma from '@/lib/prisma';
 
 export interface DailyProgramInfo {
+  id?: string;
   date: string; // YYYY-MM-DD
   programName: string;
   isMainProgram: boolean;
+  type?: 'main' | 'workshop' | 'special';
+  format?: string;
+  time?: string;
+  maxSeats?: number;
+  memberPrice?: number;
+  nonMemberPrice?: number;
 }
 
-/**
- * Format a Date object to YYYY-MM-DD in Asia/Bangkok timezone
- */
-export function formatBangkokDate(date: Date | string = new Date()): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Bangkok',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(d);
-}
+const THAI_MONTHS: Record<string, number> = {
+  'ม.ค.': 1, 'มกราคม': 1, 'ม.ค': 1,
+  'ก.พ.': 2, 'กุมภาพันธ์': 2, 'ก.พ': 2,
+  'มี.ค.': 3, 'มีนาคม': 3, 'มี.ค': 3,
+  'เม.ย.': 4, 'เมษายน': 4, 'เม.ย': 4,
+  'พ.ค.': 5, 'พฤษภาคม': 5, 'พ.ค': 5,
+  'มิ.ย.': 6, 'มิถุนายน': 6, 'มิ.ย': 6,
+  'ก.ค.': 7, 'กรกฎาคม': 7, 'ก.ค': 7,
+  'ส.ค.': 8, 'สิงหาคม': 8, 'ส.ค': 8,
+  'ก.ย.': 9, 'กันยายน': 9, 'ก.ย': 9,
+  'ต.ค.': 10, 'ตุลาคม': 10, 'ต.ค': 10,
+  'พ.ย.': 11, 'พฤศจิกายน': 11, 'พ.ย': 11,
+  'ธ.ค.': 12, 'ธันวาคม': 12, 'ธ.ค': 12,
+};
 
 /**
- * Format Date to Thai full display e.g. "21 ตุลาคม 2569"
+ * Safely format a Date object or ISO string to YYYY-MM-DD in Asia/Bangkok timezone
  */
-export function formatThaiDate(dateStr: string): string {
+export function formatBangkokDate(date?: Date | string | null): string {
+  if (!date) return '';
   try {
-    const [year, month, day] = dateStr.split('-').map(Number);
+    const d = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(d.getTime())) return '';
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Bangkok',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Parse any date string (ISO, Thai text like "20 ต.ค. 2569", "15 ตุลาคม 2568") into YYYY-MM-DD
+ */
+export function parseDateStringToIso(str?: string | Date | null, baseDate?: Date | string | null): string | null {
+  if (!str) return null;
+  if (str instanceof Date && !isNaN(str.getTime())) {
+    return formatBangkokDate(str);
+  }
+  const s = String(str).trim();
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+  const match = s.match(/(?:วันที่\s*)?(\d{1,2})\s*([^\d\s,]+)\s*(?:พ\.ศ\.\s*)?(\d{4})?/);
+  if (match) {
+    const day = parseInt(match[1], 10);
+    const monthName = match[2].trim();
+    let year = match[3] ? parseInt(match[3], 10) : null;
+    const month = THAI_MONTHS[monthName];
+    if (month) {
+      if (!year && baseDate) {
+        const bd = typeof baseDate === 'string' ? new Date(baseDate) : baseDate;
+        if (!isNaN(bd.getTime())) {
+          year = bd.getFullYear();
+        }
+      }
+      if (year && year > 2400) year -= 543;
+      if (year) {
+        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Format Date to Thai full display e.g. "21 ตุลาคม 2569" or "21 ต.ค. 2569"
+ */
+export function formatThaiDate(dateStr: string, shortMonth: boolean = false): string {
+  try {
+    if (!dateStr) return '';
+    const [yearStr, monthStr, dayStr] = dateStr.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+    const day = parseInt(dayStr, 10);
+    if (!year || !month || !day) return dateStr;
     const date = new Date(year, month - 1, day);
     return date.toLocaleDateString('th-TH', {
       year: 'numeric',
-      month: 'long',
+      month: shortMonth ? 'short' : 'long',
       day: 'numeric',
     });
   } catch {
@@ -37,7 +104,7 @@ export function formatThaiDate(dateStr: string): string {
 }
 
 /**
- * Extract all valid conference dates and their associated program names
+ * Extract all valid conference dates and their associated program names, sorted chronologically
  */
 export function getMeetingProgramsAndDates(meeting: {
   meeting_id: string;
@@ -45,64 +112,111 @@ export function getMeetingProgramsAndDates(meeting: {
   meeting_date: Date | string;
   start_date?: Date | string | null;
   end_date?: Date | string | null;
+  meeting_type?: string | null;
   activities?: any;
 }): DailyProgramInfo[] {
   const programs: DailyProgramInfo[] = [];
-  const addedDates = new Set<string>();
 
-  const mainStartDate = meeting.start_date
-    ? formatBangkokDate(meeting.start_date)
-    : formatBangkokDate(meeting.meeting_date);
-  const mainEndDate = meeting.end_date
-    ? formatBangkokDate(meeting.end_date)
-    : mainStartDate;
+  const baseStart = meeting.start_date || meeting.meeting_date;
+  const baseEnd = meeting.end_date || baseStart;
 
-  // 1. Check activities for specific pre-congress/workshops with separate dates
+  const mainStartDate = formatBangkokDate(baseStart) || '2026-01-01';
+  const mainEndDate = formatBangkokDate(baseEnd) || mainStartDate;
+
   let parsedActivities: any[] = [];
   if (meeting.activities) {
-    parsedActivities = Array.isArray(meeting.activities)
-      ? meeting.activities
-      : (typeof meeting.activities === 'string' ? JSON.parse(meeting.activities) : []);
+    try {
+      parsedActivities = Array.isArray(meeting.activities)
+        ? meeting.activities
+        : (typeof meeting.activities === 'string' ? JSON.parse(meeting.activities) : []);
+    } catch {
+      parsedActivities = [];
+    }
   }
 
+  // 1. Check activities for workshops / special / main programs
   for (const act of parsedActivities) {
-    if (act.date) {
-      const actDate = formatBangkokDate(act.date);
-      if (!addedDates.has(actDate)) {
+    if (Array.isArray(act.selectedDays) && act.selectedDays.length > 0) {
+      for (const dayKey of act.selectedDays) {
+        const dayMatch = String(dayKey).match(/d-(\d+)/);
+        if (dayMatch) {
+          const dayNum = parseInt(dayMatch[1], 10);
+          const [yearStr, monthStr] = mainStartDate.split('-');
+          const actIso = `${yearStr}-${monthStr}-${String(dayNum).padStart(2, '0')}`;
+          programs.push({
+            id: act.id ? `${act.id}-${dayKey}` : undefined,
+            date: actIso,
+            programName: act.name || act.title || (act.type === 'main' ? 'Main Program' : 'Workshop'),
+            isMainProgram: act.type === 'main',
+            type: act.type || (act.isMainProgram ? 'main' : 'workshop'),
+            format: act.format || 'both',
+            maxSeats: act.maxSeats,
+            memberPrice: act.memberPrice,
+            nonMemberPrice: act.nonMemberPrice,
+          });
+        }
+      }
+    } else {
+      const actIso = parseDateStringToIso(act.date, baseStart);
+      if (actIso) {
         programs.push({
-          date: actDate,
-          programName: act.name || act.title || 'หลักสูตรพิเศษ / Workshop',
-          isMainProgram: false,
+          id: act.id,
+          date: actIso,
+          programName: act.name || act.title || (act.type === 'main' ? 'Main Program' : 'Workshop'),
+          isMainProgram: act.type === 'main',
+          type: act.type || 'workshop',
+          format: act.format || 'both',
+          maxSeats: act.maxSeats,
+          memberPrice: act.memberPrice,
+          nonMemberPrice: act.nonMemberPrice,
         });
-        addedDates.add(actDate);
       }
     }
   }
 
-  // 2. Main Program dates (spanning from mainStartDate to mainEndDate)
-  const cur = new Date(mainStartDate);
-  const end = new Date(mainEndDate);
+  // 2. Main Program dates spanning from mainStartDate to mainEndDate
+  if (mainStartDate) {
+    const cur = new Date(mainStartDate);
+    const end = new Date(mainEndDate);
+    const totalDays = Math.max(1, Math.round((end.getTime() - cur.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    let dayIndex = 1;
 
-  let dayIndex = 1;
-  const totalDays = Math.max(1, Math.round((end.getTime() - cur.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-
-  while (cur <= end) {
-    const curStr = formatBangkokDate(cur);
-    if (!addedDates.has(curStr)) {
-      const dayLabel = totalDays > 1 ? ` (Day ${dayIndex})` : '';
-      programs.push({
-        date: curStr,
-        programName: `Main Program${dayLabel}`,
-        isMainProgram: true,
-      });
-      addedDates.add(curStr);
+    while (cur <= end) {
+      const curStr = formatBangkokDate(cur);
+      const hasForDate = programs.some((p) => p.date === curStr);
+      if (!hasForDate) {
+        const dayLabel = totalDays > 1 ? ` (Day ${dayIndex})` : '';
+        programs.push({
+          date: curStr,
+          programName: `Main Program${dayLabel}`,
+          isMainProgram: true,
+          type: 'main',
+          format: meeting.meeting_type || 'both',
+        });
+      }
+      cur.setDate(cur.getDate() + 1);
+      dayIndex++;
     }
-    cur.setDate(cur.getDate() + 1);
-    dayIndex++;
   }
 
-  // Sort programs by date
-  programs.sort((a, b) => a.date.localeCompare(b.date));
+  // 3. Fallback if empty
+  if (programs.length === 0 && mainStartDate) {
+    programs.push({
+      date: mainStartDate,
+      programName: 'Main Program',
+      isMainProgram: true,
+      type: 'main',
+    });
+  }
+
+  // 4. Sort: Date ascending (earliest first: เรียงจากรายการที่เริ่มก่อน)
+  programs.sort((a, b) => {
+    if (a.date !== b.date) {
+      return a.date.localeCompare(b.date);
+    }
+    return (a.programName || '').localeCompare(b.programName || '');
+  });
+
   return programs;
 }
 
@@ -192,7 +306,10 @@ export async function ensureDailyCheckinsForMeeting(
       // Check if attendee selected specific activity matching this date if not main program
       let programName = prog.programName;
       if (matchingSlip?.selected_activities && Array.isArray(matchingSlip.selected_activities)) {
-        const actMatch = matchingSlip.selected_activities.find((a: any) => a.date && formatBangkokDate(a.date) === prog.date);
+        const actMatch = matchingSlip.selected_activities.find((a: any) => {
+          const parsed = parseDateStringToIso(a.date, meeting.meeting_date);
+          return parsed === prog.date || (a.date && formatBangkokDate(a.date) === prog.date);
+        });
         if (actMatch && actMatch.name) {
           programName = actMatch.name;
         }

@@ -708,7 +708,7 @@ export default function SponsorGroupRegisterPage() {
                     </>
                   ) : (
                     <>
-                      ขอรับรหัสชั่วคราว (Request OTP)
+                      ขอรับรหัสผ่านชั่วคราว
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -1040,7 +1040,7 @@ export default function SponsorGroupRegisterPage() {
                         type="text"
                         value={couponCodeInput}
                         onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
-                        placeholder="กรอกรหัสคูปอง (Coupon Code)"
+                        placeholder="กรอกรหัสคูปอง"
                         className="flex-1 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono uppercase text-xs focus:outline-none focus:border-indigo-500"
                       />
                       <button
@@ -1119,7 +1119,7 @@ export default function SponsorGroupRegisterPage() {
                       {/* Member No Input (บังคับใส่เลขสมาชิก) */}
                       <div className="md:col-span-3">
                         <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                          เลขสมาชิก (Member No.) <span className="text-red-400">*</span>
+                          เลขสมาชิก <span className="text-red-400">*</span>
                         </label>
                         <div className="flex gap-1.5">
                           <input
@@ -1326,7 +1326,7 @@ export default function SponsorGroupRegisterPage() {
                       <th className="py-3 px-4">เลขสมาชิก</th>
                       <th className="py-3 px-4">ชื่อ-นามสกุล</th>
                       <th className="py-3 px-4">งานประชุม</th>
-                      <th className="py-3 px-4">รหัสบัตร (Ticket)</th>
+                      <th className="py-3 px-4">รหัสบัตร</th>
                       <th className="py-3 px-4">วันที่ลงทะเบียน</th>
                       <th className="py-3 px-4">สถานะ</th>
                     </tr>

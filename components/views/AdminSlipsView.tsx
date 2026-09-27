@@ -2135,7 +2135,7 @@ export function AdminSlipsView() {
                         </span>
                       ) : (
                         <span className="text-[10px] font-black bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200">
-                          บุคคลทั่วไป (Non-Member)
+                          บุคคลทั่วไป
                         </span>
                       )}
                       {(viewingAttendee.selectedFormat || viewingAttendee.format || viewingAttendee.selectedPackage) && (

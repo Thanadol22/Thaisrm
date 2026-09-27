@@ -18,7 +18,7 @@ export function renderAttendeeOnlineEmail(options: AttendeeOnlineEmailOptions): 
   const content = `
     <div style="text-align: center; margin-bottom: 24px;">
       <span class="badge-info" style="display: inline-block; padding: 6px 16px; border-radius: 9999px; background-color: #e0f2fe; color: #0369a1; font-weight: 800; font-size: 13px; letter-spacing: 0.5px;">
-        🌐 ยืนยันสิทธิ์เข้าร่วมการประชุมแบบออนไลน์ (Online Access Pass)
+        🌐 ยืนยันสิทธิ์เข้าร่วมการประชุมแบบออนไลน์
       </span>
       <h2 style="color: #0f172a; margin: 14px 0 6px 0; font-size: 22px; font-weight: 800;">
         ${options.meetingName}
@@ -45,7 +45,7 @@ export function renderAttendeeOnlineEmail(options: AttendeeOnlineEmailOptions): 
       </div>
 
       <div style="font-size: 13px; color: #e0f2fe;">
-        ${options.memberNo ? `รหัสสมาชิก: <strong>${options.memberNo}</strong> • ` : ''}รูปแบบ: <strong>ออนไลน์ (Online Web Conference)</strong>
+        ${options.memberNo ? `รหัสสมาชิก: <strong>${options.memberNo}</strong> • ` : ''}รูปแบบ: <strong>ออนไลน์</strong>
       </div>
     </div>
 
@@ -58,7 +58,7 @@ export function renderAttendeeOnlineEmail(options: AttendeeOnlineEmailOptions): 
       ${options.zoomUrl ? `
         <div style="text-align: center; margin: 16px 0;">
           <a href="${options.zoomUrl}" target="_blank" style="display: inline-block; background-color: #0284c7; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-weight: 800; font-size: 15px; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);">
-            🎥 คลิกที่นี่เพื่อเข้าร่วมห้องประชุมออนไลน์ (Join Meeting)
+            🎥 คลิกที่นี่เพื่อเข้าร่วมห้องประชุมออนไลน์
           </a>
         </div>
       ` : `
@@ -103,7 +103,7 @@ export function renderAttendeeOnlineEmail(options: AttendeeOnlineEmailOptions): 
         ` : ''}
         <tr>
           <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รูปแบบการเข้าร่วม</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0284c7; font-size: 14px;">ถ่ายทอดสดออนไลน์ (Online Web Conference)</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0284c7; font-size: 14px;">ถ่ายทอดสดออนไลน์</td>
         </tr>
       </table>
     </div>
@@ -137,7 +137,7 @@ export function renderAttendeeOnlineEmail(options: AttendeeOnlineEmailOptions): 
   `;
 
   return renderBaseEmailLayout({
-    title: `ยืนยันสิทธิ์เข้าร่วมออนไลน์ (Online Pass) ${options.meetingName} - TSRM`,
+    title: `ยืนยันสิทธิ์เข้าร่วมออนไลน์ ${options.meetingName} - TSRM`,
     preheader: `สิทธิ์เข้าร่วมประชุมออนไลน์ของคุณ ${options.recipientName} รหัส ${options.ticketCode}`,
     contentHtml: content,
   });

@@ -31,7 +31,7 @@ export function renderMembershipApprovedEmail(options: MembershipApprovalEmailOp
           <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.recipientName}</td>
         </tr>
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสสมาชิก (Member No.)</td>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสสมาชิก</td>
           <td style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 16px;">${options.memberNo}</td>
         </tr>
         <tr style="border-bottom: 1px dashed #e2e8f0;">
@@ -40,7 +40,7 @@ export function renderMembershipApprovedEmail(options: MembershipApprovalEmailOp
         </tr>
         <tr>
           <td style="padding: 8px 0; color: #64748b; font-size: 14px;">สถานะสมาชิก</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">ปกติ (Active)</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">ปกติ</td>
         </tr>
       </table>
     </div>
@@ -195,7 +195,7 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
         </tr>
         ${options.ticketCode ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสการลงทะเบียน (Ticket Code)</td>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสการลงทะเบียน</td>
           <td style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 14px; font-family: monospace;">${options.ticketCode}</td>
         </tr>
         ` : ''}
@@ -211,7 +211,7 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
         </tr>
         <tr style="border-bottom: 1px dashed #e2e8f0;">
           <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ประเภทผู้เข้าร่วม</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.isMember ? 'สมาชิกสมาคม (Member)' : 'บุคคลทั่วไป (Non-Member)'}</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.isMember ? 'สมาชิกสมาคม' : 'บุคคลทั่วไป'}</td>
         </tr>
 
         ${items.length > 0 ? `
@@ -262,10 +262,10 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
 
     <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 18px 20px; margin-top: 24px; text-align: center;">
       <div style="font-size: 14px; font-weight: 700; color: #1e40af; margin-bottom: 6px;">
-        🎟️ การรับบัตรเข้างาน (E-Ticket / Online Pass)
+        🎟️ การรับบัตรเข้างาน
       </div>
       <p style="font-size: 13px; color: #1e3a8a; margin: 0; line-height: 1.6;">
-        ระบบจะจัดส่ง <strong>บัตรเข้างาน (E-Ticket พร้อม QR Code สำหรับ Onsite)</strong> หรือ <strong>ลิงก์ห้องประชุม (Online Pass สำหรับ Online)</strong> ให้ท่านทางอีเมลนี้อีกครั้ง ก่อนถึงกำหนดวันเริ่มงานประชุม
+        ระบบจะจัดส่ง <strong>บัตรเข้างาน (QR Code สำหรับ Onsite)</strong> หรือ <strong>ลิงก์ห้องประชุม (สำหรับ Online)</strong> ให้ท่านทางอีเมลนี้อีกครั้ง ก่อนถึงกำหนดวันเริ่มงานประชุม
       </p>
     </div>
 
@@ -334,7 +334,7 @@ export function renderCompanyGroupMembershipApprovedEmail(options: CompanyGroupM
           <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.companyName}</td>
         </tr>
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสอ้างอิง (Ref Code)</td>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสอ้างอิง</td>
           <td style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 15px; font-family: monospace;">${options.ticketCode}</td>
         </tr>
         <tr style="border-bottom: 1px dashed #e2e8f0;">
@@ -348,7 +348,7 @@ export function renderCompanyGroupMembershipApprovedEmail(options: CompanyGroupM
         <tr>
           <td style="padding: 8px 0; color: #64748b; font-size: 14px;">สถานะการชำระเงิน</td>
           <td style="padding: 8px 0; text-align: right; font-weight: 700; font-size: 14px; color: ${options.isPayLater ? '#d97706' : '#16a34a'};">
-            ${options.isPayLater ? 'รอชำระเงินภายหลัง (Awaiting Payment)' : 'ชำระเงินเรียบร้อยแล้ว (Paid)'}
+            ${options.isPayLater ? 'รอชำระเงินภายหลัง' : 'ชำระเงินเรียบร้อยแล้ว'}
           </td>
         </tr>
       </table>
@@ -392,3 +392,143 @@ export function renderCompanyGroupMembershipApprovedEmail(options: CompanyGroupM
     contentHtml: content,
   });
 }
+
+export interface AttendeeSponsoredRegistrationEmailOptions {
+  recipientName: string;
+  recipientEmail?: string;
+  memberNo?: string;
+  workplace?: string;
+  companyName: string;
+  meetingName: string;
+  meetingDate?: string;
+  ticketCode?: string;
+  items?: MeetingApprovalItem[];
+  format?: string;
+}
+
+export function renderAttendeeSponsoredRegistrationEmail(options: AttendeeSponsoredRegistrationEmailOptions): string {
+  const items = options.items || [];
+  const content = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <div style="font-size: 44px; margin-bottom: 8px;">🎉</div>
+      <span class="badge-success">ได้รับการยืนยันการลงทะเบียนแล้ว</span>
+      <h2 style="color: #0f172a; margin: 12px 0 6px 0; font-size: 22px; font-weight: 800;">
+        ยืนยันการลงทะเบียนเข้าร่วมประชุม
+      </h2>
+      <p style="color: #64748b; font-size: 14px; margin: 0;">
+        ท่านได้รับการสนับสนุนการลงทะเบียนเข้าร่วมประชุมจาก <strong>${options.companyName}</strong>
+      </p>
+    </div>
+
+    <!-- Sponsor Banner Card -->
+    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%); border: 1.5px solid #86efac; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; text-align: center;">
+      <div style="font-size: 12px; font-weight: 700; color: #15803d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+        🏢 ผู้สนับสนุนและลงทะเบียนให้ท่าน
+      </div>
+      <div style="font-size: 18px; font-weight: 800; color: #0f172a;">
+        ${options.companyName}
+      </div>
+    </div>
+
+    <div class="info-card">
+      <div style="font-size: 13px; font-weight: 800; color: #0026b3; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px;">
+        ข้อมูลการเข้าร่วมประชุมของท่าน
+      </div>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่องานประชุม</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.meetingName}</td>
+        </tr>
+        ${options.ticketCode ? `
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสการลงทะเบียน</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 14px; font-family: monospace;">${options.ticketCode}</td>
+        </tr>
+        ` : ''}
+        ${options.meetingDate ? `
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">กำหนดการจัดงาน</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.meetingDate}</td>
+        </tr>
+        ` : ''}
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่อผู้เข้าร่วม</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.recipientName}</td>
+        </tr>
+        ${options.memberNo ? `
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสสมาชิก</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0026b3; font-size: 14px;">${options.memberNo}</td>
+        </tr>
+        ` : ''}
+        ${options.workplace ? `
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">หน่วยงาน / โรงพยาบาล</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.workplace}</td>
+        </tr>
+        ` : ''}
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ผู้สนับสนุนการลงทะเบียน</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">${options.companyName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">สถานะการลงทะเบียน</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">ยืนยันสิทธิ์เรียบร้อย</td>
+        </tr>
+
+        ${items.length > 0 ? `
+        <tr style="border-top: 1px dashed #e2e8f0;">
+          <td colspan="2" style="padding: 12px 0 6px 0;">
+            <div style="font-size: 12.5px; font-weight: 800; color: #0026b3; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+              📋 รายการกิจกรรมที่ท่านได้รับการลงทะเบียน (${items.length} รายการ)
+            </div>
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                ${items.map((item, idx) => `
+                  <tr style="${idx < items.length - 1 ? 'border-bottom: 1px dashed #e2e8f0;' : ''}">
+                    <td style="padding: 7px 0; vertical-align: top;">
+                      <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; line-height: 1.4;">
+                        ${item.name}
+                      </div>
+                      ${item.date ? `
+                        <div style="font-size: 12px; color: #64748b; margin-top: 3px;">
+                          🗓️ ${item.date}
+                        </div>
+                      ` : ''}
+                    </td>
+                    <td style="padding: 7px 0 7px 12px; text-align: right; vertical-align: top; white-space: nowrap;">
+                      <span style="font-size: 12px; font-weight: 700; color: #15803d; background-color: #dcfce7; padding: 2px 8px; border-radius: 4px;">
+                        ${item.format ? item.format : 'สิทธิ์สปอนเซอร์'}
+                      </span>
+                    </td>
+                  </tr>
+                `).join('')}
+              </table>
+            </div>
+          </td>
+        </tr>
+        ` : ''}
+      </table>
+    </div>
+
+    <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 18px 20px; margin-top: 24px; text-align: center;">
+      <div style="font-size: 14px; font-weight: 700; color: #1e40af; margin-bottom: 6px;">
+        🎟️ การรับบัตรเข้างาน
+      </div>
+      <p style="font-size: 13px; color: #1e3a8a; margin: 0; line-height: 1.6;">
+        ระบบจะจัดส่ง <strong>บัตรเข้างาน (QR Code สำหรับ Onsite)</strong> หรือ <strong>ลิงก์ห้องประชุม (สำหรับ Online)</strong> ให้ท่านทางอีเมลนี้อีกครั้ง ก่อนถึงกำหนดวันเริ่มงานประชุม
+      </p>
+    </div>
+
+    <p style="font-size: 13px; color: #64748b; margin-top: 24px; text-align: center;">
+      หากมีข้อสงสัยหรือต้องการสอบถามข้อมูลเพิ่มเติม สามารถติดต่อสมาคมฯ ได้ทางอีเมลนี้
+    </p>
+  `;
+
+  return renderBaseEmailLayout({
+    title: `ยืนยันการลงทะเบียน ${options.meetingName} - โดย ${options.companyName}`,
+    preheader: `ยืนยันการลงทะเบียน ${options.recipientName} สนับสนุนโดย ${options.companyName}`,
+    contentHtml: content,
+  });
+}
+

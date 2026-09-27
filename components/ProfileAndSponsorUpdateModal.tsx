@@ -465,7 +465,7 @@ export function ProfileAndSponsorUpdateModal({
                     </>
                   ) : (
                     <>
-                      <span>{lang === 'th' ? 'ขอรับรหัสชั่วคราว (Request OTP)' : 'Send OTP Code'}</span>
+                      <span>{lang === 'th' ? 'ขอรับรหัสผ่านชั่วคราว' : 'Send OTP Code'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -619,11 +619,11 @@ export function ProfileAndSponsorUpdateModal({
                 </div>
               )}
 
-              {/* 1. ข้อมูลส่วนตัว (Personal Details) */}
+              {/* 1. ข้อมูลส่วนบุคคล */}
               <div className="space-y-3 border-t border-slate-200 pt-4">
                 <h5 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                   <User className="w-4 h-4 text-blue-600" />
-                  <span>1. ข้อมูลส่วนบุคคล (Personal Information)</span>
+                  <span>1. ข้อมูลส่วนบุคคล</span>
                 </h5>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -692,11 +692,11 @@ export function ProfileAndSponsorUpdateModal({
                 </div>
               </div>
 
-              {/* 2. ข้อมูลการติดต่อ (Contact Info) */}
+              {/* 2. ข้อมูลการติดต่อ */}
               <div className="space-y-3 border-t border-slate-200 pt-4">
                 <h5 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                   <Phone className="w-4 h-4 text-blue-600" />
-                  <span>2. ข้อมูลการติดต่อ (Contact Information)</span>
+                  <span>2. ข้อมูลการติดต่อ</span>
                 </h5>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -771,11 +771,11 @@ export function ProfileAndSponsorUpdateModal({
                 </div>
               </div>
 
-              {/* 3. สถานที่ทำงานและวิชาชีพ (Work & Profession) */}
+              {/* 3. สถานที่ทำงานและวิชาชีพ */}
               <div className="space-y-3 border-t border-slate-200 pt-4">
                 <h5 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                   <Briefcase className="w-4 h-4 text-blue-600" />
-                  <span>3. ข้อมูลสถานที่ทำงานและวิชาชีพ (Workplace & Profession)</span>
+                  <span>3. ข้อมูลสถานที่ทำงานและวิชาชีพ</span>
                 </h5>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -851,7 +851,7 @@ export function ProfileAndSponsorUpdateModal({
                   {/* สาขาวิชาชีพ */}
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1 flex items-center justify-between">
-                      <span>สาขาวิชาชีพ (Job Category)</span>
+                      <span>สาขาวิชาชีพ</span>
                       {isFieldEmpty(memberData.job_category) && (
                         <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
                           ⚠️ โปรดใส่ข้อมูล
@@ -897,12 +897,12 @@ export function ProfileAndSponsorUpdateModal({
                 </div>
               </div>
 
-              {/* 4. ประวัติการศึกษา (Educations) */}
+              {/* 4. ประวัติการศึกษา */}
               <div className="space-y-3 border-t border-slate-200 pt-4">
                 <div className="flex items-center justify-between">
                   <h5 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                     <GraduationCap className="w-4 h-4 text-blue-600" />
-                    <span>4. ประวัติการศึกษา (Educations)</span>
+                    <span>4. ประวัติการศึกษา</span>
                   </h5>
                   <button
                     type="button"

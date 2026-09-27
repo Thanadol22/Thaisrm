@@ -4,9 +4,11 @@ import {
   renderMembershipApprovedEmail,
   renderMeetingApprovedEmail,
   renderCompanyGroupMembershipApprovedEmail,
+  renderAttendeeSponsoredRegistrationEmail,
   MembershipApprovalEmailOptions,
   MeetingApprovalEmailOptions,
   CompanyGroupMembershipApprovalEmailOptions,
+  AttendeeSponsoredRegistrationEmailOptions,
   MeetingApprovalItem,
 } from './emailTemplates/approvalTemplate';
 import {
@@ -323,6 +325,44 @@ export async function sendRegistrationApprovedEmail(params: SendRegistrationAppr
   });
 }
 
+export interface SendAttendeeSponsoredRegistrationParams {
+  to: string;
+  recipientName: string;
+  recipientEmail?: string;
+  memberNo?: string;
+  workplace?: string;
+  companyName: string;
+  meetingName: string;
+  meetingDate?: string;
+  ticketCode?: string;
+  items?: MeetingApprovalItem[];
+  format?: string;
+}
+
+/**
+ * Send email to individual attendee whose registration was sponsored and registered by a corporate/sponsor
+ */
+export async function sendAttendeeSponsoredRegistrationEmail(params: SendAttendeeSponsoredRegistrationParams): Promise<EmailSendResult> {
+  const html = renderAttendeeSponsoredRegistrationEmail({
+    recipientName: params.recipientName,
+    recipientEmail: params.recipientEmail || params.to,
+    memberNo: params.memberNo,
+    workplace: params.workplace,
+    companyName: params.companyName,
+    meetingName: params.meetingName,
+    meetingDate: params.meetingDate,
+    ticketCode: params.ticketCode,
+    items: params.items,
+    format: params.format,
+  });
+
+  return dispatchEmail({
+    to: params.to,
+    subject: `[TSRM] ยืนยันการลงทะเบียนเข้าร่วมประชุม ${params.meetingName} (สนับสนุนโดย ${params.companyName})`,
+    html,
+  });
+}
+
 export interface SendSlipRejectionParams {
   to: string;
   recipientName: string;
@@ -407,7 +447,7 @@ export async function sendAttendeeTicketEmail(params: SendAttendeeTicketParams):
   const subjectPrefix = params.dailyProgram ? `🎟️ [${params.dailyProgram}] ` : `🎟️ `;
   return dispatchEmail({
     to: params.to,
-    subject: `${subjectPrefix}บัตรเข้างาน (E-Ticket) ${params.meetingName} - คุณ ${params.recipientName}`,
+    subject: `${subjectPrefix}บัตรเข้างาน ${params.meetingName} - คุณ ${params.recipientName}`,
     html,
     attachments: qrBuffer ? [{
       filename: `pass-qr-${params.ticketCode}.png`,
@@ -460,7 +500,7 @@ export async function sendAttendeeOnlineEmail(params: SendAttendeeOnlineParams):
 
   return dispatchEmail({
     to: params.to,
-    subject: `🌐 ยืนยันสิทธิ์เข้าร่วมประชุมออนไลน์ (Online Pass) ${params.meetingName} - คุณ ${params.recipientName}`,
+    subject: `🌐 ยืนยันสิทธิ์เข้าร่วมประชุมออนไลน์ ${params.meetingName} - คุณ ${params.recipientName}`,
     html,
     customConfig: params.customConfig,
   });

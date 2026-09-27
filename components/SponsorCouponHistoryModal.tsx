@@ -140,14 +140,14 @@ export function SponsorCouponHistoryModal({
                 const isFull = coupon.used_count >= coupon.max_uses;
 
                 // Parse program scope
-                let progScopeText = '🎯 การประชุมหลัก (Main Congress)';
+                let progScopeText = '🎯 การประชุมหลัก';
                 let noteText = coupon.remarks || '';
                 try {
                   if (coupon.remarks && coupon.remarks.startsWith('{')) {
                     const parsed = JSON.parse(coupon.remarks);
                     progScopeText = parsed.allPrograms
-                      ? '🌐 ทุกโปรแกรม (All Programs)'
-                      : (parsed.programs?.join(', ') || '🎯 การประชุมหลัก (Main Congress)');
+                      ? '🌐 ทุกโปรแกรม'
+                      : (parsed.programs?.join(', ') || '🎯 การประชุมหลัก');
                     noteText = parsed.note || '';
                   }
                 } catch (e) {}
@@ -177,7 +177,7 @@ export function SponsorCouponHistoryModal({
                         <div className="flex items-center gap-2 flex-wrap">
                           {isLatest && (
                             <span className="bg-blue-600 text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md shadow-2xs">
-                              🔥 ล่าสุด (Active)
+                              🔥 ล่าสุด / รหัสปัจจุบัน
                             </span>
                           )}
 

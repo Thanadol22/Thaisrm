@@ -1584,7 +1584,7 @@ export function AddMeetingPanel({ onMeetingCreated, onNavigateTab }: AddMeetingP
                 </div>
                 <div>
                   <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
-                    <span>เงื่อนไขการเปลี่ยนรูปแบบการเข้าร่วม (Online ↔ Onsite Policy)</span>
+                    <span>เงื่อนไขการเปลี่ยนรูปแบบการเข้าร่วม</span>
                     <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
                       เงื่อนไขพิเศษ
                     </span>

@@ -33,6 +33,7 @@ import { PaginationControls } from '@/components/PaginationControls';
 import { renderAttendeeTicketEmail } from '@/lib/emailTemplates/attendeeQrTemplate';
 import { renderAttendeeOnlineEmail } from '@/lib/emailTemplates/attendeeOnlineTemplate';
 import { renderCustomBroadcastEmail } from '@/lib/emailTemplates/customTemplate';
+import { formatThaiDate, DailyProgramInfo } from '@/lib/services/dailyCheckinService';
 
 interface MeetingOption {
   meeting_id: string;
@@ -63,7 +64,8 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
   const [extraNote, setExtraNote] = useState<string>('');
   const [isDailyPassMode, setIsDailyPassMode] = useState<boolean>(true);
   const [selectedDailyDate, setSelectedDailyDate] = useState<string>('');
-  const [dailyPrograms, setDailyPrograms] = useState<Array<{ date: string; programName: string; isMainProgram: boolean }>>([]);
+  const [selectedDailyProgramKey, setSelectedDailyProgramKey] = useState<string>('');
+  const [dailyPrograms, setDailyPrograms] = useState<DailyProgramInfo[]>([]);
   const [loadingDailyPrograms, setLoadingDailyPrograms] = useState(false);
   const [autoScheduling, setAutoScheduling] = useState(false);
   const [sendingTickets, setSendingTickets] = useState(false);
@@ -140,10 +142,13 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
         setLoadingDailyPrograms(true);
         const res = await fetch(`/api/meetings/${selectedMeetingId}/daily-programs`);
         const json = await res.json();
-        if (json.success && json.data?.programs) {
-          setDailyPrograms(json.data.programs);
-          if (json.data.programs.length > 0) {
-            setSelectedDailyDate(json.data.programs[0].date);
+        if (json.success && Array.isArray(json.data?.programs)) {
+          const progs: DailyProgramInfo[] = json.data.programs;
+          setDailyPrograms(progs);
+          if (progs.length > 0) {
+            const first = progs[0];
+            setSelectedDailyDate(first.date);
+            setSelectedDailyProgramKey(first.id || `${first.date}_${first.programName}`);
           }
         }
       } catch (err) {
@@ -154,6 +159,27 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
     }
     loadDailyPrograms();
   }, [selectedMeetingId]);
+
+  // Sorted programs (earliest date first)
+  const sortedDailyPrograms = React.useMemo(() => {
+    return [...dailyPrograms].sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return (a.programName || '').localeCompare(b.programName || '');
+    });
+  }, [dailyPrograms]);
+
+  // Selected Program object helper
+  const selectedProgram = React.useMemo(() => {
+    if (sortedDailyPrograms.length === 0) return null;
+    return (
+      sortedDailyPrograms.find(
+        (p) =>
+          (p.id && p.id === selectedDailyProgramKey) ||
+          `${p.date}_${p.programName}` === selectedDailyProgramKey ||
+          p.date === selectedDailyDate
+      ) || sortedDailyPrograms[0]
+    );
+  }, [sortedDailyPrograms, selectedDailyProgramKey, selectedDailyDate]);
 
   // 2. Fetch scheduled queue when opening schedule tab
   const fetchScheduledQueue = async () => {
@@ -192,9 +218,10 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
     }
 
     const meeting = meetings.find((m) => m.meeting_id === selectedMeetingId);
-    const selectedProgram = dailyPrograms.find((p) => p.date === selectedDailyDate);
+    const activeProg = selectedProgram;
+    const targetDateToUse = activeProg?.date || selectedDailyDate;
     const modeDesc = isDailyPassMode
-      ? `แบบ QR รายวัน (วันที่ ${selectedDailyDate} - ${selectedProgram?.programName || 'Main Program'})`
+      ? `แบบ QR รายวัน (วันที่ ${formatThaiDate(targetDateToUse, true)} - ${activeProg?.programName || 'Main Program'})`
       : 'แบบบัตรทั่วไป';
 
     const formatDesc = formatFilter === 'online'
@@ -217,8 +244,8 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
           formatFilter,
           extraNote,
           isDailyMode: isDailyPassMode,
-          targetDate: selectedDailyDate,
-          programName: selectedProgram?.programName,
+          targetDate: targetDateToUse,
+          programName: activeProg?.programName,
           zoomUrl: zoomUrl.trim() || undefined,
           meetingIdCredentials: meetingIdCredentials.trim() || undefined,
           passcode: passcode.trim() || undefined,
@@ -283,9 +310,10 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
   // 2. Preview Ticket Email (Supports both Onsite QR and Online Access Pass)
   const handlePreviewTicket = (previewType?: 'onsite' | 'online') => {
     const meeting = meetings.find((m) => m.meeting_id === selectedMeetingId);
-    const selectedProgram = dailyPrograms.find((p) => p.date === selectedDailyDate);
+    const activeProg = selectedProgram;
+    const targetDateToUse = activeProg?.date || selectedDailyDate;
     const dateDisplay = isDailyPassMode
-      ? `ประจำวันที่ ${selectedDailyDate || '21 ตุลาคม 2569'} (${selectedProgram?.programName || 'Main Program'})`
+      ? `ประจำวันที่ ${formatThaiDate(targetDateToUse, true) || targetDateToUse} (${activeProg?.programName || 'Main Program'})`
       : (meeting?.meeting_date ? new Date(meeting.meeting_date).toLocaleDateString('th-TH') : '21 - 22 ตุลาคม 2569');
 
     const effectiveType = previewType || (formatFilter === 'online' ? 'online' : 'onsite');
@@ -305,7 +333,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
         extraNote: extraNote || 'ลิงก์การประชุมนี้เป็นสิทธิ์เฉพาะตัวสำหรับผู้ลงทะเบียน โปรดอย่านำไปเผยแพร่ต่อสาธารณะ',
       });
 
-      setPreviewSubject(`[ตัวอย่าง - สำหรับผู้เข้าชม Online] ยืนยันสิทธิ์เข้าร่วมประชุมออนไลน์ (Online Pass) ${meeting?.meeting_name || 'TSRM 2026'}`);
+      setPreviewSubject(`[ตัวอย่าง - สำหรับผู้เข้าชม Online] ยืนยันสิทธิ์เข้าร่วมประชุมออนไลน์ ${meeting?.meeting_name || 'TSRM 2026'}`);
       setPreviewHtml(sampleHtml);
     } else {
       const sampleHtml = renderAttendeeTicketEmail({
@@ -317,10 +345,10 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
         memberNo: '0123',
         attendanceStatus: 'ยืนยันสิทธิ์เรียบร้อย',
         qrCodeUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=TSRM-PASS:TSRM-DAY-SAMPLE-PASS',
-        extraNote: extraNote || (isDailyPassMode ? `บัตรสำหรับเข้าร่วม: ${selectedProgram?.programName || 'Main Program'} • QR Code นี้ใช้ได้เฉพาะวันนี้ 1 ครั้งเท่านั้น` : 'กรุณาแสดง QR Code นี้แก่เจ้าหน้าที่ ณ จุดลงทะเบียนหน้างาน'),
+        extraNote: extraNote || (isDailyPassMode ? `บัตรสำหรับเข้าร่วม: ${activeProg?.programName || 'Main Program'} • QR Code นี้ใช้ได้เฉพาะวันนี้ 1 ครั้งเท่านั้น` : 'กรุณาแสดง QR Code นี้แก่เจ้าหน้าที่ ณ จุดลงทะเบียนหน้างาน'),
       });
 
-      setPreviewSubject(`[ตัวอย่าง - สำหรับผู้เข้าชม Onsite] บัตรเข้างาน (E-Ticket) ${meeting?.meeting_name || 'TSRM 2026'}${isDailyPassMode ? ` (${selectedProgram?.programName || 'Daily Pass'})` : ''}`);
+      setPreviewSubject(`[ตัวอย่าง - สำหรับผู้เข้าชม Onsite] บัตรเข้างาน ${meeting?.meeting_name || 'TSRM 2026'}${isDailyPassMode ? ` (${activeProg?.programName || 'Daily Pass'})` : ''}`);
       setPreviewHtml(sampleHtml);
     }
 
@@ -739,50 +767,118 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
               </div>
 
               {isDailyPassMode && (
-                <div className="pt-2 border-t border-slate-200/60 space-y-2">
-                  <label className="text-xs font-bold text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-blue-600" />
-                      <span>เลือกวันที่และหลักสูตรที่ต้องการส่ง QR Code ประจำวัน:</span>
+                <div className="pt-2 border-t border-slate-200/60 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span>เลือกรายการหลักสูตร / วันที่ที่ต้องการส่ง QR Code:</span>
+                    </label>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      (เรียงตามลำดับวันที่เริ่มก่อน ➡️ หลัง)
                     </span>
-                    {loadingDailyPrograms && <span className="text-[10px] text-slate-400">กำลังโหลด...</span>}
-                  </label>
+                  </div>
 
-                  {dailyPrograms.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {dailyPrograms.map((prog) => {
-                        const isSelected = selectedDailyDate === prog.date;
+                  {loadingDailyPrograms ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 animate-pulse">
+                      {[1, 2].map((n) => (
+                        <div key={n} className="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-2">
+                          <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+                          <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : sortedDailyPrograms.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {sortedDailyPrograms.map((prog, idx) => {
+                        const itemKey = prog.id || `${prog.date}_${prog.programName}`;
+                        const isSelected =
+                          selectedDailyProgramKey === itemKey ||
+                          (!selectedDailyProgramKey && selectedDailyDate === prog.date && idx === 0);
+
                         return (
                           <button
-                            key={prog.date}
+                            key={itemKey}
                             type="button"
-                            onClick={() => setSelectedDailyDate(prog.date)}
-                            className={`p-3 rounded-xl text-left border transition cursor-pointer ${
+                            onClick={() => {
+                              setSelectedDailyProgramKey(itemKey);
+                              setSelectedDailyDate(prog.date);
+                            }}
+                            className={`p-3.5 rounded-2xl text-left border transition-all cursor-pointer relative flex flex-col justify-between gap-2.5 group ${
                               isSelected
-                                ? 'bg-blue-50 border-[#0026b3] text-[#0026b3] ring-1 ring-[#0026b3]'
-                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                                ? 'bg-gradient-to-br from-blue-50/90 to-indigo-50/70 border-2 border-[#0026b3] shadow-md shadow-blue-900/10 ring-2 ring-[#0026b3]/20'
+                                : 'bg-white border-slate-200/90 text-slate-700 hover:border-blue-300 hover:bg-slate-50/80 hover:shadow-2xs'
                             }`}
                           >
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-black">{prog.date}</span>
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${prog.isMainProgram ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'}`}>
-                                {prog.isMainProgram ? 'Main Program' : 'Workshop / พิเศษ'}
+                            {/* Top row: Date Badge & Type Badge */}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-black">
+                                <Calendar className="w-3 h-3 text-[#0026b3]" />
+                                <span>{formatThaiDate(prog.date, true) || prog.date}</span>
+                              </div>
+
+                              <span
+                                className={`text-[10px] px-2 py-0.5 rounded-md font-black border shrink-0 ${
+                                  prog.isMainProgram
+                                    ? 'bg-blue-100/80 text-[#0026b3] border-blue-200'
+                                    : prog.type === 'workshop'
+                                    ? 'bg-purple-100/80 text-purple-800 border-purple-200'
+                                    : 'bg-amber-100/80 text-amber-800 border-amber-200'
+                                }`}
+                              >
+                                {prog.isMainProgram ? '🌟 Main Program' : '🛠️ Workshop / พิเศษ'}
                               </span>
                             </div>
-                            <div className="text-xs font-bold text-slate-800 mt-1">{prog.programName}</div>
+
+                            {/* Middle: Program Name */}
+                            <div className="min-w-0">
+                              <div
+                                className={`text-xs sm:text-sm font-black leading-snug line-clamp-2 transition ${
+                                  isSelected ? 'text-[#0026b3]' : 'text-slate-900 group-hover:text-blue-900'
+                                }`}
+                              >
+                                {prog.programName}
+                              </div>
+                            </div>
+
+                            {/* Bottom: Format / Price & Radio Check indicator */}
+                            <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/50 mt-auto">
+                              <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-bold">
+                                <span>
+                                  {prog.format === 'online' ? '💻 Online' : prog.format === 'onsite' ? '🏢 Onsite' : '🌐 Onsite & Online'}
+                                </span>
+                                {prog.maxSeats ? (
+                                  <span className="text-slate-400">• {prog.maxSeats} ที่นั่ง</span>
+                                ) : null}
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
+                                {isSelected ? (
+                                  <div className="flex items-center gap-1 text-[11px] font-black text-[#0026b3]">
+                                    <CheckCircle2 className="w-4 h-4 text-[#0026b3]" />
+                                    <span>เลือกแล้ว</span>
+                                  </div>
+                                ) : (
+                                  <div className="w-4 h-4 rounded-full border-2 border-slate-300 group-hover:border-blue-400"></div>
+                                )}
+                              </div>
+                            </div>
                           </button>
                         );
                       })}
                     </div>
                   ) : (
-                    <input
-                      type="date"
-                      value={selectedDailyDate}
-                      onChange={(e) => setSelectedDailyDate(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-hidden"
-                    />
+                    <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2 text-center">
+                      <p className="text-xs text-slate-500 font-bold">ไม่พบรายการหลักสูตรย่อยของงานประชุมนี้</p>
+                      <input
+                        type="date"
+                        value={selectedDailyDate}
+                        onChange={(e) => setSelectedDailyDate(e.target.value)}
+                        className="w-full max-w-xs mx-auto bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-[#0026b3]/20"
+                      />
+                    </div>
                   )}
-                  <p className="text-[11px] text-slate-500">
+
+                  <p className="text-[11px] text-slate-500 flex items-center gap-1">
                     💡 ระบบจะสร้างรหัส Token ประจำวันและบันทึกลงตาราง <code className="bg-slate-200 px-1 py-0.5 rounded text-[10px]">meeting_daily_checkins</code> ทันทีที่ส่ง
                   </p>
                 </div>

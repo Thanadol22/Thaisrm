@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { sendRegistrationApprovedEmail } from '@/lib/email';
+import { sendRegistrationApprovedEmail, sendAttendeeSponsoredRegistrationEmail } from '@/lib/email';
 
 export async function POST(
   request: NextRequest,
@@ -292,6 +292,46 @@ export async function POST(
             isMember: Boolean(hasMemberAttendees),
             selectedActivities: groupPayload,
           }).catch((mailErr) => console.error('Failed to send free group registration confirmation email:', mailErr));
+        }
+
+        // Send sponsored registration notification to EACH attendee
+        const effectiveCompanyName = companyName || 'บริษัทผู้สนับสนุน';
+        if (Array.isArray(attendees) && attendees.length > 0) {
+          for (const att of attendees) {
+            const attEmail = (att.email || att.attendee_email)?.trim();
+            const attName = att.nameTh || att.nameEn || att.attendee_name || 'ผู้เข้าร่วมประชุม';
+            if (attEmail) {
+              let attItems: any[] = [];
+              if (Array.isArray(att.selectedActivities) && att.selectedActivities.length > 0) {
+                attItems = att.selectedActivities.map((a: any) => ({
+                  name: a.name || a.title || a.programNameTh || a.programNameEn || 'กิจกรรมการประชุม',
+                  date: a.date || undefined,
+                  format: a.format || a.attendanceType || undefined,
+                }));
+              } else if (att.programNameTh || att.programNameEn) {
+                attItems = [{
+                  name: att.programNameTh || att.programNameEn,
+                  format: att.attendanceType || undefined,
+                }];
+              }
+
+              sendAttendeeSponsoredRegistrationEmail({
+                to: attEmail,
+                recipientName: attName,
+                recipientEmail: attEmail,
+                memberNo: att.memberNo || undefined,
+                workplace: att.workplace || undefined,
+                companyName: effectiveCompanyName,
+                meetingName: meeting.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
+                meetingDate: meetingDateStr,
+                ticketCode: ticketCode,
+                items: attItems,
+                format: att.attendanceType || undefined,
+              }).catch((attMailErr) =>
+                console.error(`Failed to send free sponsored registration email to attendee ${attEmail}:`, attMailErr)
+              );
+            }
+          }
         }
       }
 

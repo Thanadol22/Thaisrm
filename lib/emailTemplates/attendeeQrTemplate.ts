@@ -82,7 +82,7 @@ export function renderAttendeeTicketEmail(options: AttendeeTicketEmailOptions): 
   `;
 
   return renderBaseEmailLayout({
-    title: `บัตรเข้างาน (E-Ticket) ${options.meetingName} - TSRM`,
+    title: `บัตรเข้างาน ${options.meetingName} - TSRM`,
     preheader: `บัตรเข้าร่วมงานของคุณ ${options.recipientName} รหัส ${options.ticketCode}`,
     contentHtml: content,
   });

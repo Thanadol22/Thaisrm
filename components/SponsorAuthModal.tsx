@@ -213,7 +213,7 @@ export function SponsorAuthModal({
                   </>
                 ) : (
                   <>
-                    ขอรับรหัสชั่วคราว (Request OTP)
+                    ขอรับรหัสผ่านชั่วคราว
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}

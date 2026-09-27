@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import crypto from 'crypto';
-import { sendRegistrationApprovedEmail, sendSlipRejectionEmail, sendMembershipApprovedEmail, sendCompanyGroupMembershipApprovedEmail } from '@/lib/email';
+import { 
+  sendRegistrationApprovedEmail, 
+  sendSlipRejectionEmail, 
+  sendMembershipApprovedEmail, 
+  sendCompanyGroupMembershipApprovedEmail,
+  sendAttendeeSponsoredRegistrationEmail
+} from '@/lib/email';
 import { createMember } from '@/lib/services/memberService';
 import { getSystemSettings } from '@/lib/services/settingsService';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
@@ -1549,7 +1555,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (isCorporate) {
-          // For Corporate Group Conference: Send approval confirmation ONLY to the corporate coordinator
+          // 1. For Corporate Group Conference: Send summary approval confirmation to the corporate coordinator
           const resolved = await resolveCorporateEmail(slip, groupPayload);
           if (resolved.email) {
             sendRegistrationApprovedEmail({
@@ -1564,6 +1570,51 @@ export async function POST(request: NextRequest) {
             }).catch((mailErr) => console.error('Failed to send conference group approval email to corporate coordinator:', mailErr));
           } else {
             console.warn(`[Conference Group Approval] Could not resolve corporate email for slip ${slip.slip_id}`);
+          }
+
+          // 2. Send sponsored registration approval notification to EACH individual attendee
+          // Displays only the attendee's personal details and the sponsoring company's name
+          const companyName = groupPayload?.companyName?.trim() || slip.guest_workplace?.trim() || resolved.name || 'บริษัทผู้สนับสนุน';
+          const attendeesList = groupPayload?.attendees || [];
+
+          if (Array.isArray(attendeesList) && attendeesList.length > 0) {
+            for (const att of attendeesList) {
+              const attEmail = (att.email || att.attendee_email)?.trim();
+              const attName = att.nameTh || att.nameEn || att.attendee_name || 'ผู้เข้าร่วมประชุม';
+              
+              if (attEmail) {
+                // Parse individual attendee activities
+                let attItems: any[] = [];
+                if (Array.isArray(att.selectedActivities) && att.selectedActivities.length > 0) {
+                  attItems = att.selectedActivities.map((a: any) => ({
+                    name: a.name || a.title || a.programNameTh || a.programNameEn || 'กิจกรรมการประชุม',
+                    date: a.date || undefined,
+                    format: a.format || a.attendanceType || undefined,
+                  }));
+                } else if (att.programNameTh || att.programNameEn) {
+                  attItems = [{
+                    name: att.programNameTh || att.programNameEn,
+                    format: att.attendanceType || undefined,
+                  }];
+                }
+
+                sendAttendeeSponsoredRegistrationEmail({
+                  to: attEmail,
+                  recipientName: attName,
+                  recipientEmail: attEmail,
+                  memberNo: att.memberNo || undefined,
+                  workplace: att.workplace || undefined,
+                  companyName,
+                  meetingName: slip.meetings?.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
+                  meetingDate: meetingDateStr,
+                  ticketCode: slip.ticket_code || '',
+                  items: attItems,
+                  format: att.attendanceType || undefined,
+                }).catch((attMailErr) =>
+                  console.error(`Failed to send sponsored registration email to attendee ${attEmail}:`, attMailErr)
+                );
+              }
+            }
           }
         } else {
           // Individual conference registration
@@ -1619,7 +1670,30 @@ export async function POST(request: NextRequest) {
 
       // Revert attendance status to pending if conference registration
       if (!isMembershipRegistration) {
-        if (slip.member_no) {
+        if (isGroupConference && groupPayload?.attendees && Array.isArray(groupPayload.attendees)) {
+          for (const att of groupPayload.attendees) {
+            if (att.isMember && att.memberNo) {
+              await prisma.$executeRaw`
+                UPDATE meeting_attendances
+                SET attendance_status = 'Pending_Payment'
+                WHERE meeting_id = ${slip.meeting_id} AND member_no = ${att.memberNo.trim()}
+              `;
+            } else if (att.email) {
+              await prisma.$executeRaw`
+                UPDATE meeting_attendances
+                SET attendance_status = 'Non-Member-Pending'
+                WHERE meeting_id = ${slip.meeting_id} AND attendee_email = ${att.email.trim().toLowerCase()}
+              `;
+            }
+          }
+          if (slip.ticket_code) {
+            await prisma.$executeRaw`
+              UPDATE sponsor_group_members
+              SET status = 'pending', updated_at = NOW()
+              WHERE ticket_code = ${slip.ticket_code}
+            `.catch(() => {});
+          }
+        } else if (slip.member_no) {
           await prisma.$executeRaw`
             UPDATE meeting_attendances
             SET attendance_status = 'Pending_Payment'
@@ -1687,7 +1761,30 @@ export async function POST(request: NextRequest) {
 
       // Update attendance status to Rejected if conference registration
       if (!isMembershipRegistration) {
-        if (slip.member_no) {
+        if (isGroupConference && groupPayload?.attendees && Array.isArray(groupPayload.attendees)) {
+          for (const att of groupPayload.attendees) {
+            if (att.isMember && att.memberNo) {
+              await prisma.$executeRaw`
+                UPDATE meeting_attendances
+                SET attendance_status = 'Rejected'
+                WHERE meeting_id = ${slip.meeting_id} AND member_no = ${att.memberNo.trim()}
+              `;
+            } else if (att.email) {
+              await prisma.$executeRaw`
+                UPDATE meeting_attendances
+                SET attendance_status = 'Rejected'
+                WHERE meeting_id = ${slip.meeting_id} AND attendee_email = ${att.email.trim().toLowerCase()}
+              `;
+            }
+          }
+          if (slip.ticket_code) {
+            await prisma.$executeRaw`
+              UPDATE sponsor_group_members
+              SET status = 'rejected', updated_at = NOW()
+              WHERE ticket_code = ${slip.ticket_code}
+            `.catch(() => {});
+          }
+        } else if (slip.member_no) {
           await prisma.$executeRaw`
             UPDATE meeting_attendances
             SET attendance_status = 'Rejected'

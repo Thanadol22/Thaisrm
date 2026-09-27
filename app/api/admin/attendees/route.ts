@@ -76,24 +76,113 @@ export async function GET(request: NextRequest) {
           rejection_reason: true,
           transfer_date: true,
           is_member: true,
+          selected_activities: true,
         },
       });
     }
 
-    // Create a fast lookup map for slips (first occurrence is newest due to created_at: desc)
+    // Fetch sponsor group members to enrich ticket_code & slip matching
+    let sponsorGroupMembers: any[] = [];
+    try {
+      if ((prisma as any).sponsor_group_members) {
+        sponsorGroupMembers = await (prisma as any).sponsor_group_members.findMany({
+          where: meetingId && meetingId !== 'all' ? { meeting_id: meetingId } : {},
+        });
+      }
+    } catch (e) {
+      console.warn('Could not query sponsor_group_members:', e);
+    }
+
+    // Create a fast lookup map for slips by ticket_code, member_no, email, phone
+    const slipMapByTicketCode = new Map<string, any>();
     const slipMapByMember = new Map<string, any>();
     const slipMapByEmail = new Map<string, any>();
     const slipMapByPhone = new Map<string, any>();
 
     slips.forEach((s: any) => {
-      if (s.member_no && !slipMapByMember.has(`${s.meeting_id}_${s.member_no}`)) {
-        slipMapByMember.set(`${s.meeting_id}_${s.member_no}`, s);
+      if (s.ticket_code && !slipMapByTicketCode.has(s.ticket_code)) {
+        slipMapByTicketCode.set(s.ticket_code, s);
       }
-      if (s.guest_email && !slipMapByEmail.has(`${s.meeting_id}_${s.guest_email.toLowerCase()}`)) {
-        slipMapByEmail.set(`${s.meeting_id}_${s.guest_email.toLowerCase()}`, s);
+
+      const registerMemberKey = (mNo: string) => {
+        if (!mNo) return;
+        const cleanNo = String(mNo).trim();
+        const paddedNo = cleanNo.padStart(4, '0');
+        if (!slipMapByMember.has(`${s.meeting_id}_${cleanNo}`)) {
+          slipMapByMember.set(`${s.meeting_id}_${cleanNo}`, s);
+        }
+        if (!slipMapByMember.has(`${s.meeting_id}_${paddedNo}`)) {
+          slipMapByMember.set(`${s.meeting_id}_${paddedNo}`, s);
+        }
+      };
+
+      const registerEmailKey = (em: string) => {
+        if (!em) return;
+        const cleanEm = em.trim().toLowerCase();
+        if (!slipMapByEmail.has(`${s.meeting_id}_${cleanEm}`)) {
+          slipMapByEmail.set(`${s.meeting_id}_${cleanEm}`, s);
+        }
+      };
+
+      const registerPhoneKey = (ph: string) => {
+        if (!ph) return;
+        const cleanPh = ph.trim();
+        if (!slipMapByPhone.has(`${s.meeting_id}_${cleanPh}`)) {
+          slipMapByPhone.set(`${s.meeting_id}_${cleanPh}`, s);
+        }
+      };
+
+      // 1. Map top-level slip fields
+      if (s.member_no) registerMemberKey(s.member_no);
+      if (s.guest_email) registerEmailKey(s.guest_email);
+      if (s.guest_phone) registerPhoneKey(s.guest_phone);
+
+      // 2. Map all group attendees from selected_activities
+      let actObj = s.selected_activities;
+      if (typeof actObj === 'string') {
+        try {
+          actObj = JSON.parse(actObj);
+        } catch {
+          actObj = null;
+        }
       }
-      if (s.guest_phone && !slipMapByPhone.has(`${s.meeting_id}_${s.guest_phone}`)) {
-        slipMapByPhone.set(`${s.meeting_id}_${s.guest_phone}`, s);
+
+      if (actObj && typeof actObj === 'object') {
+        const attendees = actObj.attendees || actObj.applicants || [];
+        if (Array.isArray(attendees)) {
+          attendees.forEach((att: any) => {
+            if (att.memberNo) registerMemberKey(att.memberNo);
+            if (att.member_no) registerMemberKey(att.member_no);
+            if (att.email) registerEmailKey(att.email);
+            if (att.attendee_email) registerEmailKey(att.attendee_email);
+            if (att.phone) registerPhoneKey(att.phone);
+            if (att.mobile) registerPhoneKey(att.mobile);
+            if (att.attendee_phone) registerPhoneKey(att.attendee_phone);
+          });
+        }
+      }
+    });
+
+    // 3. Map from sponsor_group_members table
+    sponsorGroupMembers.forEach((sgm: any) => {
+      const s = sgm.ticket_code ? slipMapByTicketCode.get(sgm.ticket_code) : null;
+      if (s) {
+        if (sgm.member_no) {
+          const cleanNo = String(sgm.member_no).trim();
+          const paddedNo = cleanNo.padStart(4, '0');
+          if (!slipMapByMember.has(`${s.meeting_id}_${cleanNo}`)) {
+            slipMapByMember.set(`${s.meeting_id}_${cleanNo}`, s);
+          }
+          if (!slipMapByMember.has(`${s.meeting_id}_${paddedNo}`)) {
+            slipMapByMember.set(`${s.meeting_id}_${paddedNo}`, s);
+          }
+        }
+        if (sgm.attendee_email) {
+          const cleanEm = sgm.attendee_email.trim().toLowerCase();
+          if (!slipMapByEmail.has(`${s.meeting_id}_${cleanEm}`)) {
+            slipMapByEmail.set(`${s.meeting_id}_${cleanEm}`, s);
+          }
+        }
       }
     });
 
@@ -105,13 +194,32 @@ export async function GET(request: NextRequest) {
       // Find matching payment slip
       let matchingSlip: any = null;
       if (att.member_no) {
-        matchingSlip = slipMapByMember.get(`${att.meeting_id}_${att.member_no}`);
+        const cleanNo = String(att.member_no).trim();
+        const paddedNo = cleanNo.padStart(4, '0');
+        matchingSlip = slipMapByMember.get(`${att.meeting_id}_${cleanNo}`) || slipMapByMember.get(`${att.meeting_id}_${paddedNo}`);
       }
       if (!matchingSlip && att.attendee_email) {
-        matchingSlip = slipMapByEmail.get(`${att.meeting_id}_${att.attendee_email.toLowerCase()}`);
+        matchingSlip = slipMapByEmail.get(`${att.meeting_id}_${att.attendee_email.toLowerCase().trim()}`);
       }
       if (!matchingSlip && att.attendee_phone) {
-        matchingSlip = slipMapByPhone.get(`${att.meeting_id}_${att.attendee_phone}`);
+        matchingSlip = slipMapByPhone.get(`${att.meeting_id}_${att.attendee_phone.trim()}`);
+      }
+      if (!matchingSlip && mem?.email) {
+        matchingSlip = slipMapByEmail.get(`${att.meeting_id}_${mem.email.toLowerCase().trim()}`);
+      }
+      if (!matchingSlip && mem?.mobile) {
+        matchingSlip = slipMapByPhone.get(`${att.meeting_id}_${mem.mobile.trim()}`);
+      }
+
+      // If matched via sponsor_group_members
+      if (!matchingSlip) {
+        const matchedSgm = sponsorGroupMembers.find((sg: any) =>
+          (att.member_no && String(sg.member_no).trim() === String(att.member_no).trim()) ||
+          (att.attendee_email && sg.attendee_email?.trim()?.toLowerCase() === att.attendee_email.trim().toLowerCase())
+        );
+        if (matchedSgm?.ticket_code) {
+          matchingSlip = slipMapByTicketCode.get(matchedSgm.ticket_code);
+        }
       }
 
       const nameTh = isMember ? mem?.fullNameTh || 'สมาชิก' : att.attendee_name || 'ผู้สมัครทั่วไป';
@@ -132,7 +240,7 @@ export async function GET(request: NextRequest) {
         paymentStatus = 'paid';
       } else if (att.attendance_status === 'Rejected') {
         paymentStatus = 'rejected';
-      } else if (att.attendance_status === 'Pending_Payment') {
+      } else if (att.attendance_status === 'Pending_Payment' || att.attendance_status === 'Non-Member-Pending') {
         paymentStatus = 'pending';
       }
 
