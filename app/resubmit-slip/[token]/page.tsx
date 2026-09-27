@@ -3,28 +3,26 @@
 import React, { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft,
-  Upload,
   CheckCircle2,
   AlertCircle,
-  Clock,
-  RotateCw,
   FileText,
-  Building,
-  ShieldCheck,
-  Check,
-  Trash2,
-  User,
-  Mail,
-  Phone,
-  Briefcase,
-  MapPin,
-  Eye,
-  Edit3,
 } from 'lucide-react';
 import { TsrmLogo } from '@/components/TsrmLogo';
 import { uploadImageToStorage } from '@/lib/blobUpload';
-import { PositionSelect, POSITION_CATEGORY_OPTIONS, normalizePosition } from '@/components/PositionSelect';
+import { POSITION_CATEGORY_OPTIONS, normalizePosition } from '@/components/PositionSelect';
+import {
+  MembershipResubmitForm,
+  MembershipFormData,
+} from '@/components/resubmit/MembershipResubmitForm';
+import {
+  ConferenceResubmitForm,
+  ConferenceFormData,
+} from '@/components/resubmit/ConferenceResubmitForm';
+import {
+  CorporateResubmitForm,
+  CorporateFormData,
+} from '@/components/resubmit/CorporateResubmitForm';
+import { SharedSlipResubmitSection } from '@/components/resubmit/SharedSlipResubmitSection';
 
 interface ResubmitPageProps {
   params: Promise<{ token: string }>;
@@ -66,26 +64,55 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
     couponCode?: string | null;
     couponInfo?: any;
     discountTotal?: number;
+    memberPayload?: any;
+    groupPayload?: any;
   } | null>(null);
 
-  // Form states for editing
-  const [nameTh, setNameTh] = useState('');
-  const [nameEn, setNameEn] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [workplace, setWorkplace] = useState('');
-  const [position, setPosition] = useState('');
-  const [positionOther, setPositionOther] = useState('');
-  const [address, setAddress] = useState('');
+  // 1. Membership form state
+  const [membershipData, setMembershipData] = useState<MembershipFormData>({
+    nameTh: '',
+    nameEn: '',
+    id4Digits: '',
+    mobile: '',
+    email: '',
+    workplace: '',
+    startDate: '',
+    position: '',
+    positionOther: '',
+    scientistNo: '',
+    referees: '',
+    address: '',
+    educations: [{ id: '1', degree: '', institution: '', year: '' }],
+    photoPreview: null,
+    selectedPhotoFile: null,
+    degreeCertPreview: null,
+    selectedDegreeCertFile: null,
+    workCertPreview: null,
+    selectedWorkCertFile: null,
+  });
 
-  // Slip upload state
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
-  const infoFileInputRef = React.useRef<HTMLInputElement | null>(null);
-  const [useExistingSlip, setUseExistingSlip] = useState(false);
+  // 2. Conference form state
+  const [conferenceData, setConferenceData] = useState<ConferenceFormData>({
+    nameTh: '',
+    nameEn: '',
+    email: '',
+    phone: '',
+    workplace: '',
+    position: '',
+    positionOther: '',
+  });
+
+  // 3. Corporate form state
+  const [corporateData, setCorporateData] = useState<CorporateFormData>({
+    companyName: '',
+    coordinatorEmail: '',
+    coordinatorPhone: '',
+  });
+
+  // Shared slip state
   const [newSlipFile, setNewSlipFile] = useState<File | null>(null);
   const [newSlipUrl, setNewSlipUrl] = useState<string | null>(null);
   const [newSlipName, setNewSlipName] = useState<string>('');
-  const [previewOldSlip, setPreviewOldSlip] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -99,33 +126,64 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
         if (json.success && json.data) {
           const d = json.data;
           setSlipData(d);
-          setNameTh(d.nameTh || d.applicantName || '');
-          setNameEn(d.nameEn || '');
-          setEmail(d.email || '');
-          setPhone(d.phone || '');
-          setWorkplace(d.workplace || '');
 
-          const rawPos = d.position || '';
+          const rawPos = d.memberPayload?.position || d.position || '';
           const normalized = normalizePosition(rawPos);
-          if (POSITION_CATEGORY_OPTIONS.some(o => o.value === normalized)) {
-            setPosition(normalized);
-            setPositionOther('');
+          let resolvedPos = '';
+          let resolvedPosOther = '';
+          if (POSITION_CATEGORY_OPTIONS.some((o) => o.value === normalized)) {
+            resolvedPos = normalized;
+            resolvedPosOther = '';
           } else if (rawPos) {
-            setPosition('0 อื่นๆ');
-            setPositionOther(rawPos);
-          } else {
-            setPosition('');
-            setPositionOther('');
+            resolvedPos = '0 อื่นๆ';
+            resolvedPosOther = rawPos;
           }
 
-          setAddress(d.address || '');
-
-          const isInfo = d.rejectType === 'info' || (d.rejectionReason?.includes('ข้อมูล') && !d.rejectionReason?.includes('สลิป'));
-          if (isInfo) {
-            setUseExistingSlip(true);
-          } else {
-            setUseExistingSlip(false);
+          // Populate Membership Data
+          if (d.isMembershipRegistration || d.memberPayload) {
+            const mp = d.memberPayload || {};
+            setMembershipData({
+              nameTh: mp.full_name_th || d.nameTh || d.applicantName || '',
+              nameEn: mp.full_name_en || d.nameEn || '',
+              id4Digits: mp.id_last4 || mp.idLast4 || mp.id4Digits || '',
+              mobile: mp.mobile || d.phone || '',
+              email: mp.email || d.email || '',
+              workplace: mp.workplace || d.workplace || '',
+              startDate: mp.start_date || '',
+              position: resolvedPos,
+              positionOther: mp.positionOther || mp.member_type_other || resolvedPosOther,
+              scientistNo: mp.scientist_reg_no || mp.scientistNo || '',
+              referees: mp.referees || '',
+              address: mp.address || d.address || '',
+              educations: Array.isArray(mp.educations) && mp.educations.length > 0
+                ? mp.educations
+                : [{ id: '1', degree: '', institution: '', year: '' }],
+              photoPreview: mp.photo_path || mp.photo_url || null,
+              selectedPhotoFile: null,
+              degreeCertPreview: mp.degree_cert_doc || null,
+              selectedDegreeCertFile: null,
+              workCertPreview: mp.work_cert_doc || null,
+              selectedWorkCertFile: null,
+            });
           }
+
+          // Populate Conference Data
+          setConferenceData({
+            nameTh: d.nameTh || d.applicantName || '',
+            nameEn: d.nameEn || '',
+            email: d.email || '',
+            phone: d.phone || '',
+            workplace: d.workplace || '',
+            position: resolvedPos,
+            positionOther: resolvedPosOther,
+          });
+
+          // Populate Corporate Data
+          setCorporateData({
+            companyName: d.companyName || d.workplace || d.nameTh || '',
+            coordinatorEmail: d.email || '',
+            coordinatorPhone: d.phone || '',
+          });
         } else {
           setError(json.error || 'ไม่พบข้อมูลหรือลิงก์หมดอายุแล้ว');
         }
@@ -141,60 +199,75 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
     }
   }, [token]);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setNewSlipFile(file);
-      setNewSlipName(file.name);
-      const url = URL.createObjectURL(file);
-      setNewSlipUrl(url);
-      setUseExistingSlip(false);
-    }
+  const handleMembershipChange = <K extends keyof MembershipFormData>(
+    field: K,
+    value: MembershipFormData[K]
+  ) => {
+    setMembershipData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const isInfoMode = slipData?.rejectType === 'info' || (slipData?.rejectionReason?.includes('ข้อมูล') && !slipData?.rejectionReason?.includes('สลิป'));
-  const isSlipMode = slipData?.rejectType === 'slip' || (!isInfoMode && slipData?.rejectionReason?.includes('สลิป'));
+  const handleConferenceChange = <K extends keyof ConferenceFormData>(
+    field: K,
+    value: ConferenceFormData[K]
+  ) => {
+    setConferenceData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCorporateChange = <K extends keyof CorporateFormData>(
+    field: K,
+    value: CorporateFormData[K]
+  ) => {
+    setCorporateData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const isInfoMode =
+    slipData?.rejectType === 'info' ||
+    (slipData?.rejectionReason?.includes('ข้อมูล') && !slipData?.rejectionReason?.includes('สลิป'));
+  const isSlipMode =
+    slipData?.rejectType === 'slip' ||
+    (!isInfoMode && slipData?.rejectionReason?.includes('สลิป'));
 
   const handleConfirmResubmit = async () => {
     if (!slipData) return;
 
+    // Validation
     if (isInfoMode) {
       if (slipData.isCorporate) {
-        if (!nameTh.trim()) {
+        if (!corporateData.companyName.trim()) {
           alert('กรุณากรอกชื่อบริษัท / นิติบุคคล');
           return;
         }
-        if (!email.trim()) {
+        if (!corporateData.coordinatorEmail.trim()) {
           alert('กรุณากรอกอีเมลประสานงาน');
           return;
         }
       } else if (slipData.isMembershipRegistration) {
-        if (!nameTh.trim()) {
+        if (!membershipData.nameTh.trim()) {
           alert('กรุณากรอกชื่อ-นามสกุล ภาษาไทย');
           return;
         }
-        if (!email.trim()) {
+        if (!membershipData.email.trim()) {
           alert('กรุณากรอกอีเมล');
           return;
         }
-        if (!phone.trim()) {
+        if (!membershipData.mobile.trim()) {
           alert('กรุณากรอกเบอร์โทรศัพท์มือถือ');
           return;
         }
-        if (!workplace.trim()) {
+        if (!membershipData.workplace.trim()) {
           alert('กรุณากรอกหน่วยงาน / โรงพยาบาล / สถานที่ทำงาน');
           return;
         }
       } else {
-        if (!nameTh.trim()) {
+        if (!conferenceData.nameTh.trim()) {
           alert('กรุณากรอกชื่อ-นามสกุล ภาษาไทย');
           return;
         }
-        if (!email.trim()) {
+        if (!conferenceData.email.trim()) {
           alert('กรุณากรอกอีเมล');
           return;
         }
-        if (!workplace.trim()) {
+        if (!conferenceData.workplace.trim()) {
           alert('กรุณากรอกหน่วยงาน / โรงพยาบาล / สถานที่ทำงาน');
           return;
         }
@@ -204,20 +277,12 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
         alert('กรุณาแนบรูปภาพสลิปหลักฐานการชำระเงินใหม่');
         return;
       }
-    } else {
-      if (!newSlipUrl && !newSlipFile && !useExistingSlip) {
-        alert('กรุณาแนบรูปภาพสลิปใหม่ หรือเลือกใช้สลิปเดิมหากต้องการแก้ไขเฉพาะข้อมูล');
-        return;
-      }
     }
 
     try {
       setSubmitting(true);
 
-      const finalPosition = position === '0 อื่นๆ' || position === 'อื่นๆ'
-        ? positionOther.trim()
-        : (position.trim() || positionOther.trim());
-
+      // 1. Upload new slip if picked
       let finalSlipUrl = slipData.oldSlipUrl;
       if (newSlipFile) {
         const uploadResult = await uploadImageToStorage(newSlipFile, 'slips');
@@ -226,22 +291,120 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
         finalSlipUrl = newSlipUrl;
       }
 
+      // 2. Prepare payload according to registration type
+      let payloadToSend: any = {
+        token,
+        slipUrl: finalSlipUrl,
+        transferDate: new Date().toLocaleDateString('th-TH'),
+        transferTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      if (slipData.isCorporate) {
+        payloadToSend = {
+          ...payloadToSend,
+          nameTh: corporateData.companyName.trim(),
+          email: corporateData.coordinatorEmail.trim(),
+          phone: corporateData.coordinatorPhone.trim(),
+          workplace: corporateData.companyName.trim(),
+        };
+      } else if (slipData.isMembershipRegistration) {
+        // Upload photo/docs if newly selected
+        let finalPhotoUrl = membershipData.photoPreview;
+        if (membershipData.selectedPhotoFile) {
+          try {
+            const uploadRes = await uploadImageToStorage(membershipData.selectedPhotoFile, 'avatars');
+            finalPhotoUrl = uploadRes.url;
+          } catch (e) {
+            console.warn('Photo upload failed:', e);
+          }
+        }
+
+        let finalDegreeCertUrl = membershipData.degreeCertPreview;
+        if (membershipData.selectedDegreeCertFile) {
+          try {
+            const uploadRes = await uploadImageToStorage(membershipData.selectedDegreeCertFile, 'documents');
+            finalDegreeCertUrl = uploadRes.url;
+          } catch (e) {
+            console.warn('Degree cert upload failed:', e);
+          }
+        }
+
+        let finalWorkCertUrl = membershipData.workCertPreview;
+        if (membershipData.selectedWorkCertFile) {
+          try {
+            const uploadRes = await uploadImageToStorage(membershipData.selectedWorkCertFile, 'documents');
+            finalWorkCertUrl = uploadRes.url;
+          } catch (e) {
+            console.warn('Work cert upload failed:', e);
+          }
+        }
+
+        const finalPosition =
+          membershipData.position === '0 อื่นๆ' || membershipData.position === 'อื่นๆ'
+            ? membershipData.positionOther.trim()
+            : membershipData.position.trim() || membershipData.positionOther.trim();
+
+        const memberPayload = {
+          full_name_th: membershipData.nameTh.trim(),
+          full_name_en: membershipData.nameEn.trim() || null,
+          id_last4: membershipData.id4Digits.trim() || null,
+          mobile: membershipData.mobile.trim() || null,
+          email: membershipData.email.trim() || null,
+          workplace: membershipData.workplace.trim() || null,
+          start_date: membershipData.startDate || null,
+          position: finalPosition,
+          job_category: membershipData.position,
+          member_type_other: membershipData.positionOther.trim() || null,
+          scientist_reg_no: membershipData.scientistNo.trim() || null,
+          referees: membershipData.referees.trim() || null,
+          address: membershipData.address.trim() || null,
+          photo_path: finalPhotoUrl,
+          degree_cert_doc: finalDegreeCertUrl,
+          work_cert_doc: finalWorkCertUrl,
+          membership_type: 'Regular',
+          membership_status: 'Active',
+          educations: membershipData.educations
+            .filter((edu) => edu.degree.trim() !== '' || edu.institution.trim() !== '')
+            .map((edu, idx) => ({
+              degree: edu.degree.trim(),
+              institution: edu.institution.trim(),
+              graduation_year: edu.year.trim() ? parseInt(edu.year.trim(), 10) : null,
+              display_order: idx + 1,
+            })),
+        };
+
+        payloadToSend = {
+          ...payloadToSend,
+          nameTh: membershipData.nameTh.trim(),
+          nameEn: membershipData.nameEn.trim(),
+          email: membershipData.email.trim(),
+          phone: membershipData.mobile.trim(),
+          workplace: membershipData.workplace.trim(),
+          position: finalPosition,
+          address: membershipData.address.trim(),
+          memberPayload,
+        };
+      } else {
+        const finalPosition =
+          conferenceData.position === '0 อื่นๆ' || conferenceData.position === 'อื่นๆ'
+            ? conferenceData.positionOther.trim()
+            : conferenceData.position.trim() || conferenceData.positionOther.trim();
+
+        payloadToSend = {
+          ...payloadToSend,
+          nameTh: conferenceData.nameTh.trim(),
+          nameEn: conferenceData.nameEn.trim(),
+          email: conferenceData.email.trim(),
+          phone: conferenceData.phone.trim(),
+          workplace: conferenceData.workplace.trim(),
+          position: finalPosition,
+        };
+      }
+
       const res = await fetch('/api/payment/resubmit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token,
-          slipUrl: finalSlipUrl,
-          transferDate: new Date().toLocaleDateString('th-TH'),
-          transferTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-          nameTh: nameTh.trim(),
-          nameEn: nameEn.trim(),
-          email: email.trim(),
-          phone: slipData.isCorporate || !slipData.isMembershipRegistration ? '' : phone.trim(),
-          workplace: slipData.isCorporate ? nameTh.trim() : workplace.trim(),
-          position: finalPosition,
-          address: slipData.isMembershipRegistration ? address.trim() : '',
-        }),
+        body: JSON.stringify(payloadToSend),
       });
 
       const json = await res.json();
@@ -314,13 +477,23 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
               <span className="text-slate-500">
                 {slipData.isCorporate ? 'บริษัท / นิติบุคคล:' : 'ชื่อผู้สมัคร:'}
               </span>
-              <span className="font-bold text-slate-800 truncate max-w-[200px]">{nameTh}</span>
+              <span className="font-bold text-slate-800 truncate max-w-[200px]">
+                {slipData.isCorporate
+                  ? corporateData.companyName
+                  : slipData.isMembershipRegistration
+                  ? membershipData.nameTh
+                  : conferenceData.nameTh}
+              </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">
-                {slipData.isCorporate ? 'อีเมลประสานงาน:' : 'อีเมล:'}
+              <span className="text-slate-500">อีเมล:</span>
+              <span className="font-medium text-slate-700 truncate max-w-[200px]">
+                {slipData.isCorporate
+                  ? corporateData.coordinatorEmail
+                  : slipData.isMembershipRegistration
+                  ? membershipData.email
+                  : conferenceData.email}
               </span>
-              <span className="font-medium text-slate-700 truncate max-w-[200px]">{email}</span>
             </div>
           </div>
           <button
@@ -347,7 +520,9 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
               </span>
               <h1 className="font-black text-white text-base sm:text-xl tracking-tight leading-tight mt-0.5">
                 {isInfoMode
-                  ? 'ตรวจสอบและแก้ไขข้อมูลการลงทะเบียน'
+                  ? slipData.isMembershipRegistration
+                    ? 'แบบฟอร์มแก้ไขข้อมูลและเอกสารการสมัครสมาชิก'
+                    : 'ตรวจสอบและแก้ไขข้อมูลการลงทะเบียน'
                   : isSlipMode
                   ? 'แบบฟอร์มแนบหลักฐานสลิปการโอนเงินใหม่'
                   : 'ตรวจสอบและแก้ไขข้อมูลการลงทะเบียน'}
@@ -363,7 +538,8 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
             <span>เหตุผล / รายละเอียดที่เจ้าหน้าที่แจ้งกลับ</span>
           </div>
           <div className="text-xs sm:text-sm text-rose-950 font-bold bg-white/90 p-3.5 rounded-2xl border border-rose-200 leading-relaxed break-words whitespace-pre-wrap">
-            {slipData.rejectionReason || (isInfoMode ? 'ข้อมูลไม่ถูกต้อง กรุณาแก้ไขข้อมูล' : 'สลิปไม่ถูกต้อง กรุณาแนบสลิปใหม่')}
+            {slipData.rejectionReason ||
+              (isInfoMode ? 'ข้อมูลไม่ถูกต้อง กรุณาแก้ไขข้อมูล' : 'สลิปไม่ถูกต้อง กรุณาแนบสลิปใหม่')}
           </div>
           <p className="text-[11px] text-rose-700/80 font-medium">
             {isInfoMode
@@ -399,18 +575,23 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
                 {slipData.isCorporate ? 'บริษัท / นิติบุคคล:' : 'ชื่อผู้ลงทะเบียน:'}
               </span>
               <span className="font-bold text-slate-900 text-right">
-                {slipData.isCorporate ? (slipData.companyName || slipData.applicantName) : slipData.applicantName}
+                {slipData.isCorporate
+                  ? slipData.companyName || slipData.applicantName
+                  : slipData.applicantName}
               </span>
             </div>
             {slipData.couponCode && (
               <div className="flex justify-between py-1.5 items-center">
                 <span className="text-slate-500">คูปองที่ใช้:</span>
                 <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
-                  🎟️ {slipData.couponCode} {slipData.couponInfo?.discountType === 'free' ? 'สิทธิ์ฟรีเข้าร่วมประชุม' : ''}
+                  🎟️ {slipData.couponCode}{' '}
+                  {slipData.couponInfo?.discountType === 'free' ? 'สิทธิ์ฟรีเข้าร่วมประชุม' : ''}
                 </span>
               </div>
             )}
-            {((slipData.discountTotal && slipData.discountTotal > 0) || slipData.couponInfo?.discountType === 'free' || slipData.couponCode) && (
+            {((slipData.discountTotal && slipData.discountTotal > 0) ||
+              slipData.couponInfo?.discountType === 'free' ||
+              slipData.couponCode) && (
               <div className="flex justify-between py-1.5 items-center">
                 <span className="text-slate-500">ส่วนลดที่ได้รับ:</span>
                 <span className="font-extrabold text-emerald-700 text-xs sm:text-sm font-mono">
@@ -434,452 +615,41 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
           </div>
         </div>
 
-        {/* Editable Information Form (แสดงเมื่อเป็น Info Mode หรือโหมดทั่วไป) */}
+        {/* Dynamic Resubmit Form based on type (Only rendered when not purely slip re-upload mode) */}
         {!isSlipMode && (
-          <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                <Edit3 className="w-4 h-4 text-emerald-600" />
-                <span>
-                  {slipData.isCorporate
-                    ? 'แบบฟอร์มตรวจสอบและแก้ไขข้อมูลบริษัท / นิติบุคคล'
-                    : slipData.isMembershipRegistration
-                    ? 'แบบฟอร์มแก้ไขข้อมูลการสมัครสมาชิก'
-                    : 'แบบฟอร์มแก้ไขข้อมูลผู้ลงทะเบียน'}
-                </span>
-              </h3>
-              <span className="text-[11px] text-slate-400 font-medium">แก้ไขข้อมูลที่ผิดพลาดได้ทันที</span>
-            </div>
-
-            {slipData.isCorporate ? (
-              /* กรณีบริษัท / สปอนเซอร์: แสดงเฉพาะข้อมูลบริษัท ไม่นำเบอร์โทรคนสมัครมาปนเด็ดขาด */
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="font-bold text-slate-700 flex items-center gap-1">
-                    <Building className="w-3.5 h-3.5 text-slate-400" />
-                    <span>ชื่อบริษัท / องค์กร / นิติบุคคล <span className="text-rose-500">*</span></span>
-                  </label>
-                  <input
-                    type="text"
-                    value={nameTh}
-                    onChange={(e) => setNameTh(e.target.value)}
-                    placeholder="ระบุชื่อบริษัท / องค์กร"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition font-medium"
-                  />
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="font-bold text-slate-700 flex items-center gap-1">
-                    <Mail className="w-3.5 h-3.5 text-slate-400" />
-                    <span>อีเมลประสานงานบริษัท / ผู้รับเอกสาร <span className="text-rose-500">*</span></span>
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="company@mail.com"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
-                  />
-                </div>
-              </div>
-            ) : slipData.isMembershipRegistration ? (
-              /* กรณีการสมัครสมาชิก: มีเบอร์โทรศัพท์และที่อยู่ตามข้อมูลสมัครสมาชิก */
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                {/* Full Name TH */}
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700 flex items-center gap-1">
-                    <User className="w-3.5 h-3.5 text-slate-400" />
-                    <span>ชื่อ - นามสกุล ภาษาไทย <span className="text-rose-500">*</span></span>
-                  </label>
-                  <input
-                    type="text"
-                    value={nameTh}
-                    onChange={(e) => setNameTh(e.target.value)}
-                    placeholder="ระบุชื่อ-นามสกุล ภาษาไทย"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
-                  />
-                </div>
-
-                {/* Full Name EN */}
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700 flex items-center gap-1">
-                    <User className="w-3.5 h-3.5 text-slate-400" />
-                    <span>ชื่อ - นามสกุล ภาษาอังกฤษ</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={nameEn}
-                    onChange={(e) => setNameEn(e.target.value)}
-                    placeholder="Full Name English"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
-                  />
-                </div>
-
-                {/* Email */}
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700 flex items-center gap-1">
-                    <Mail className="w-3.5 h-3.5 text-slate-400" />
-                    <span>อีเมล <span className="text-rose-500">*</span></span>
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="example@mail.com"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
-                  />
-                </div>
-
-                {/* Phone */}
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700 flex items-center gap-1">
-                    <Phone className="w-3.5 h-3.5 text-slate-400" />
-                    <span>เบอร์โทรศัพท์มือถือ <span className="text-rose-500">*</span></span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="08XXXXXXXX"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
-                  />
-                </div>
-
-                {/* Workplace */}
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="font-bold text-slate-700 flex items-center gap-1">
-                    <Building className="w-3.5 h-3.5 text-slate-400" />
-                    <span>หน่วยงาน / โรงพยาบาล / สถานที่ทำงาน <span className="text-rose-500">*</span></span>
-                  </label>
-                  <input
-                    type="text"
-                    value={workplace}
-                    onChange={(e) => setWorkplace(e.target.value)}
-                    placeholder="ชื่อโรงพยาบาล หรือหน่วยงานต้นสังกัด"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
-                  />
-                </div>
-
-                {/* Position */}
-                <div className="space-y-1.5 sm:col-span-2">
-                  <PositionSelect
-                    value={position}
-                    onChange={(val) => setPosition(val)}
-                    otherValue={positionOther}
-                    onOtherChange={(val) => setPositionOther(val)}
-                    label="ตำแหน่ง / สาขาวิชาชีพ"
-                    placeholder="-- เลือกตำแหน่ง / สาขาวิชาชีพ --"
-                  />
-                </div>
-
-                {/* Address */}
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="font-bold text-slate-700 flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                    <span>ที่อยู่จัดส่งเอกสาร / ใบเสร็จ</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="ที่อยู่สำหรับจัดส่งเอกสาร"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
-                  />
-                </div>
-              </div>
-            ) : (
-              /* กรณีการลงทะเบียนเข้าร่วมประชุม (Conference Registration): แสดงเฉพาะข้อมูลที่ใช้ลงทะเบียนจริง ไม่ต้องมีเบอร์โทรหรือที่อยู่ */
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                {/* Full Name TH */}
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700 flex items-center gap-1">
-                    <User className="w-3.5 h-3.5 text-slate-400" />
-                    <span>ชื่อ - นามสกุล ภาษาไทย <span className="text-rose-500">*</span></span>
-                  </label>
-                  <input
-                    type="text"
-                    value={nameTh}
-                    onChange={(e) => setNameTh(e.target.value)}
-                    placeholder="ระบุชื่อ-นามสกุล ภาษาไทย"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
-                  />
-                </div>
-
-                {/* Full Name EN */}
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700 flex items-center gap-1">
-                    <User className="w-3.5 h-3.5 text-slate-400" />
-                    <span>ชื่อ - นามสกุล ภาษาอังกฤษ</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={nameEn}
-                    onChange={(e) => setNameEn(e.target.value)}
-                    placeholder="Full Name English"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
-                  />
-                </div>
-
-                {/* Email */}
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700 flex items-center gap-1">
-                    <Mail className="w-3.5 h-3.5 text-slate-400" />
-                    <span>อีเมล <span className="text-rose-500">*</span></span>
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="example@mail.com"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
-                  />
-                </div>
-
-                {/* Workplace */}
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700 flex items-center gap-1">
-                    <Building className="w-3.5 h-3.5 text-slate-400" />
-                    <span>หน่วยงาน / โรงพยาบาล / สถานที่ทำงาน <span className="text-rose-500">*</span></span>
-                  </label>
-                  <input
-                    type="text"
-                    value={workplace}
-                    onChange={(e) => setWorkplace(e.target.value)}
-                    placeholder="ชื่อโรงพยาบาล หรือหน่วยงานต้นสังกัด"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
-                  />
-                </div>
-
-                {/* Position */}
-                <div className="space-y-1.5 sm:col-span-2">
-                  <PositionSelect
-                    value={position}
-                    onChange={(val) => setPosition(val)}
-                    otherValue={positionOther}
-                    onOtherChange={(val) => setPositionOther(val)}
-                    label="ตำแหน่ง / สาขาวิชาชีพ"
-                    placeholder="-- เลือกตำแหน่ง / สาขาวิชาชีพ --"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+          slipData.isCorporate ? (
+            <CorporateResubmitForm
+              formData={corporateData}
+              onChange={handleCorporateChange}
+            />
+          ) : slipData.isMembershipRegistration ? (
+            <MembershipResubmitForm
+              formData={membershipData}
+              onChange={handleMembershipChange}
+            />
+          ) : (
+            <ConferenceResubmitForm
+              formData={conferenceData}
+              onChange={handleConferenceChange}
+            />
+          )
         )}
 
-        {/* Upload New Slip Section หรือ กล่องยืนยันสลิปเดิม (กรณี Info Mode) */}
-        {isInfoMode ? (
-          <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>หลักฐานการโอนเงิน</span>
-              </h3>
-              {slipData.oldSlipUrl && slipData.oldSlipUrl !== 'PAY_LATER' && (
-                <button
-                  type="button"
-                  onClick={() => setPreviewOldSlip(!previewOldSlip)}
-                  className="text-xs font-bold text-[#0026b3] hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>{previewOldSlip ? 'ซ่อนหลักฐานเดิม' : 'ดูหลักฐานเดิม'}</span>
-                </button>
-              )}
-            </div>
-
-            <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2.5 text-emerald-900 font-bold">
-                <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-                <div>
-                  <p className="font-black text-xs text-emerald-950">หลักฐานการโอนเงินถูกต้องแล้ว</p>
-                  <p className="text-[11px] text-emerald-700/90 font-normal mt-0.5">
-                    ระบบจะใช้หลักฐานการโอนเงินเดิมของท่าน ท่านเพียงแก้ไขข้อมูลในแบบฟอร์มด้านบนให้ถูกต้อง แล้วกดยืนยันได้ทันที
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Preview of Old Slip */}
-            {previewOldSlip && slipData.oldSlipUrl && slipData.oldSlipUrl !== 'PAY_LATER' && (
-              <div className="p-3 bg-slate-100 rounded-2xl border border-slate-200 space-y-2 animate-fade-in">
-                <div className="flex justify-center bg-slate-900 rounded-xl overflow-hidden max-h-56">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={slipData.oldSlipUrl} alt="Old Slip" className="max-h-56 object-contain" />
-                </div>
-              </div>
-            )}
-
-            {/* Optional change slip */}
-            {newSlipUrl ? (
-              <div className="space-y-3 pt-2">
-                <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 max-h-64 flex items-center justify-center">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={newSlipUrl} alt="New Slip" className="max-h-64 object-contain" />
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-600 truncate font-semibold">{newSlipName}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewSlipUrl(null);
-                      setNewSlipName('');
-                      setNewSlipFile(null);
-                    }}
-                    className="text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>ยกเลิกรูปใหม่</span>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="pt-1">
-                <input
-                  ref={infoFileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,image/*"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => infoFileInputRef.current?.click()}
-                  className="text-[12px] text-slate-600 hover:text-[#0026b3] underline font-semibold cursor-pointer flex items-center gap-1.5 py-1"
-                >
-                  <Upload className="w-3.5 h-3.5 text-[#0026b3]" />
-                  <span>ต้องการแนบหลักฐานการโอนเงินใหม่เพิ่มเติม คลิกที่นี่เพื่อเลือกภาพ</span>
-                </button>
-              </div>
-            )}
-
-            {/* Confirm Button for Info Mode */}
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={handleConfirmResubmit}
-              className={`w-full py-4 rounded-2xl font-black text-xs sm:text-sm tracking-wide flex items-center justify-center gap-2 shadow-lg transition mt-4 ${
-                !submitting
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white cursor-pointer active:scale-98'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              {submitting ? (
-                <>
-                  <RotateCw className="w-4 h-4 animate-spin" />
-                  <span>กำลังบันทึกข้อมูลที่แก้ไข...</span>
-                </>
-              ) : (
-                <>
-                  <Check className="w-4 h-4" />
-                  <span>💾 ยืนยันบันทึกข้อมูลที่แก้ไขและส่งตรวจสอบใหม่</span>
-                </>
-              )}
-            </button>
-          </div>
-        ) : (
-          /* Slip Upload Mode หรือ Default */
-          <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                <Upload className="w-4 h-4 text-[#0026b3]" />
-                <span>แบบฟอร์มแนบหลักฐานสลิปการโอนเงินใหม่</span>
-              </h3>
-              {slipData.oldSlipUrl && slipData.oldSlipUrl !== 'PAY_LATER' && (
-                <button
-                  type="button"
-                  onClick={() => setPreviewOldSlip(!previewOldSlip)}
-                  className="text-xs font-bold text-[#0026b3] hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>{previewOldSlip ? 'ซ่อนสลิปเดิม' : 'ดูสลิปเดิม'}</span>
-                </button>
-              )}
-            </div>
-
-            {/* Preview of Old Slip */}
-            {previewOldSlip && slipData.oldSlipUrl && slipData.oldSlipUrl !== 'PAY_LATER' && (
-              <div className="p-3 bg-slate-100 rounded-2xl border border-slate-200 space-y-2 animate-fade-in">
-                <div className="flex justify-between items-center text-xs font-bold text-slate-700">
-                  <span>สลิปเดิมที่เคยแนบไว้:</span>
-                </div>
-                <div className="flex justify-center bg-slate-900 rounded-xl overflow-hidden max-h-56">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={slipData.oldSlipUrl} alt="Old Slip" className="max-h-56 object-contain" />
-                </div>
-              </div>
-            )}
-
-            {/* New Slip Uploaded or Selected */}
-            {newSlipUrl ? (
-              <div className="space-y-3">
-                <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 max-h-64 flex items-center justify-center">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={newSlipUrl} alt="New Slip" className="max-h-64 object-contain" />
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-600 truncate font-semibold">{newSlipName}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewSlipUrl(null);
-                      setNewSlipName('');
-                      setNewSlipFile(null);
-                    }}
-                    className="text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>เปลี่ยนรูปสลิป</span>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <input
-                  id="resubmit-slip-upload-input"
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,application/pdf"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-
-                <label
-                  htmlFor="resubmit-slip-upload-input"
-                  className="border-2 border-dashed border-rose-300 hover:border-[#0026b3] rounded-3xl p-7 flex flex-col items-center justify-center cursor-pointer bg-rose-50/30 hover:bg-blue-50/30 transition group select-none active:scale-[0.99] block text-center"
-                >
-                  <Upload className="w-8 h-8 text-rose-500 group-hover:text-[#0026b3] group-hover:scale-110 transition mb-2 mx-auto" />
-                  <p className="text-sm font-bold text-slate-800 group-hover:text-[#0026b3] text-center">
-                    แตะเพื่อเลือกภาพสลิปการโอนเงินใหม่
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1 text-center">รองรับไฟล์รูปภาพ JPG, PNG, HEIC (ขนาดไม่เกิน 10MB)</p>
-                </label>
-              </div>
-            )}
-
-            {/* Confirm Button for Slip Mode */}
-            <button
-              type="button"
-              disabled={submitting || (!newSlipUrl && !newSlipFile)}
-              onClick={handleConfirmResubmit}
-              className={`w-full py-4 rounded-2xl font-black text-xs sm:text-sm tracking-wide flex items-center justify-center gap-2 shadow-lg transition mt-4 ${
-                (newSlipUrl || newSlipFile) && !submitting
-                  ? 'bg-gradient-to-r from-[#0026b3] to-[#0055ff] hover:from-[#001f8f] hover:to-[#0040cc] text-white cursor-pointer active:scale-98'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              {submitting ? (
-                <>
-                  <RotateCw className="w-4 h-4 animate-spin" />
-                  <span>กำลังอัปโหลดสลิปใหม่และบันทึกข้อมูล...</span>
-                </>
-              ) : (
-                <>
-                  <Check className="w-4 h-4" />
-                  <span>📤 ยืนยันการแนบสลิปใหม่ & ส่งให้เจ้าหน้าที่ตรวจสอบ</span>
-                </>
-              )}
-            </button>
-          </div>
-        )}
+        {/* Shared Proof of Payment Section & Submit Button */}
+        <SharedSlipResubmitSection
+          isInfoMode={Boolean(isInfoMode)}
+          oldSlipUrl={slipData.oldSlipUrl}
+          newSlipFile={newSlipFile}
+          newSlipUrl={newSlipUrl}
+          newSlipName={newSlipName}
+          submitting={submitting}
+          onSlipFileChange={(file, url, name) => {
+            setNewSlipFile(file);
+            setNewSlipUrl(url);
+            setNewSlipName(name);
+          }}
+          onSubmit={handleConfirmResubmit}
+        />
       </div>
     </div>
   );

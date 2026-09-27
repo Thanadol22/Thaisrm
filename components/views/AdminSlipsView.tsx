@@ -352,8 +352,17 @@ export function AdminSlipsView() {
   const openRejectModal = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setRejectingSlipId(id);
+    const target = slips.find((s) => s.id === id) || (selectedSlip?.id === id ? selectedSlip : null);
+    const isMem = target?.isMembershipRegistration || target?.ticketCode?.startsWith('MEM-');
+    const isCorp = target?.isGroupMembership || target?.isGroupConference || target?.ticketCode?.startsWith('GRP-') || target?.ticketCode?.startsWith('MEMGRP');
     setRejectType('info');
-    setRejectReason('ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบและแก้ไขข้อมูลให้ถูกต้อง');
+    if (isMem) {
+      setRejectReason('ข้อมูลหรือเอกสารการสมัครสมาชิกไม่ถูกต้อง/ไม่ครบถ้วน กรุณาตรวจสอบและแก้ไขข้อมูล หรือแนบเอกสารรับรองใหม่');
+    } else if (isCorp) {
+      setRejectReason('ข้อมูลบริษัทหรือรายชื่อผู้ลงทะเบียนไม่ถูกต้อง กรุณาตรวจสอบและแก้ไขข้อมูลให้ถูกต้อง');
+    } else {
+      setRejectReason('ข้อมูลผู้ลงทะเบียนไม่ถูกต้อง กรุณาตรวจสอบและแก้ไขข้อมูลให้ถูกต้อง');
+    }
   };
 
   const handleConfirmReject = async () => {
@@ -2081,71 +2090,93 @@ export function AdminSlipsView() {
                 <h3 className="font-extrabold text-slate-900 text-base">ระบุเหตุผลการปฏิเสธ / ส่งกลับแก้ไข</h3>
               </div>
 
-              <p className="text-xs text-slate-500 leading-relaxed">
-                ระบบจะส่งอีเมลแจ้งเหตุผลนี้ไปยังผู้ลงทะเบียน พร้อมแบบฟอร์มรายการและลิงก์ให้ผู้ลงทะเบียนเข้ามากดตรวจสอบ แก้ไขข้อมูล หรือแนบสลิปใหม่ได้ทันที
-              </p>
+              {(() => {
+                const target = slips.find((s) => s.id === rejectingSlipId) || (selectedSlip?.id === rejectingSlipId ? selectedSlip : null);
+                const isMem = target?.isMembershipRegistration || target?.ticketCode?.startsWith('MEM-');
+                const isCorp = target?.isGroupMembership || target?.isGroupConference || target?.ticketCode?.startsWith('GRP-') || target?.ticketCode?.startsWith('MEMGRP');
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  เลือกเหตุผลด่วน (คลิกเพื่อเลือกรูปแบบการส่งกลับ):
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRejectType('info');
-                      setRejectReason('ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบและแก้ไขข้อมูลให้ถูกต้อง');
-                    }}
-                    className={`p-2.5 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${rejectType === 'info'
-                        ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-300 text-rose-950 shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
-                      }`}
-                  >
-                    <div className="flex items-center gap-1.5 font-extrabold text-xs">
-                      <span>⚠️</span>
-                      <span className="leading-snug">ข้อมูลไม่ถูกต้อง</span>
-                    </div>
-                    <span className="inline-block mt-1 text-[11px] font-bold text-rose-700 bg-rose-100/80 px-2 py-0.5 rounded-md w-fit">
-                      แนบการแก้ไขข้อมูลกลับไป
-                    </span>
-                    <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
-                      ส่งลิงก์แบบฟอร์มให้ผู้ลงทะเบียนเข้ามากรอกแก้ไขข้อมูลส่วนตัว
+                return (
+                  <>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      ระบบจะส่งอีเมลแจ้งเหตุผลนี้ไปยังผู้ลงทะเบียน พร้อมแบบฟอร์มรายการและลิงก์ให้ผู้ลงทะเบียนเข้ามากดตรวจสอบ แก้ไขข้อมูล หรือแนบสลิปใหม่ได้ทันที
                     </p>
-                  </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRejectType('slip');
-                      setRejectReason('หลักฐานการโอนเงิน (สลิป) ไม่ถูกต้อง หรือไม่ชัดเจน กรุณาแนบสลิปใหม่');
-                    }}
-                    className={`p-2.5 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${rejectType === 'slip'
-                        ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-300 text-rose-950 shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
-                      }`}
-                  >
-                    <div className="flex items-center gap-1.5 font-extrabold text-xs">
-                      <span>🧾</span>
-                      <span className="leading-snug">สลิปไม่ถูกต้อง</span>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        เลือกเหตุผลด่วน (คลิกเพื่อเลือกรูปแบบการส่งกลับ):
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRejectType('info');
+                            setRejectReason(
+                              isMem
+                                ? 'ข้อมูลหรือเอกสารการสมัครสมาชิกไม่ถูกต้อง/ไม่ครบถ้วน กรุณาตรวจสอบและแก้ไขข้อมูล หรือแนบเอกสารรับรองใหม่'
+                                : isCorp
+                                ? 'ข้อมูลบริษัทหรือรายชื่อผู้ลงทะเบียนไม่ถูกต้อง กรุณาตรวจสอบและแก้ไขข้อมูลให้ถูกต้อง'
+                                : 'ข้อมูลผู้ลงทะเบียนไม่ถูกต้อง กรุณาตรวจสอบและแก้ไขข้อมูลให้ถูกต้อง'
+                            );
+                          }}
+                          className={`p-2.5 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                            rejectType === 'info'
+                              ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-300 text-rose-950 shadow-xs'
+                              : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 font-extrabold text-xs">
+                            <span>⚠️</span>
+                            <span className="leading-snug">
+                              {isMem ? 'ข้อมูล/เอกสารไม่ถูกต้อง' : 'ข้อมูลไม่ถูกต้อง'}
+                            </span>
+                          </div>
+                          <span className="inline-block mt-1 text-[11px] font-bold text-rose-700 bg-rose-100/80 px-2 py-0.5 rounded-md w-fit">
+                            {isMem ? 'แนบฟอร์มสมัครสมาชิกกลับไป' : 'แนบการแก้ไขข้อมูลกลับไป'}
+                          </span>
+                          <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                            {isMem
+                              ? 'ส่งลิงก์แบบฟอร์มสมัครสมาชิกพร้อมข้อมูลเดิมให้แก้ไข'
+                              : 'ส่งลิงก์แบบฟอร์มให้ผู้ลงทะเบียนเข้ามากรอกแก้ไขข้อมูลส่วนตัว'}
+                          </p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRejectType('slip');
+                            setRejectReason('หลักฐานการโอนเงิน (สลิป) ไม่ถูกต้อง หรือไม่ชัดเจน กรุณาแนบสลิปใหม่');
+                          }}
+                          className={`p-2.5 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                            rejectType === 'slip'
+                              ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-300 text-rose-950 shadow-xs'
+                              : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 font-extrabold text-xs">
+                            <span>🧾</span>
+                            <span className="leading-snug">สลิปไม่ถูกต้อง</span>
+                          </div>
+                          <span className="inline-block mt-1 text-[11px] font-bold text-rose-700 bg-rose-100/80 px-2 py-0.5 rounded-md w-fit">
+                            แนบฟอร์มแนบสลิปกลับไป
+                          </span>
+                          <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                            ส่งลิงก์แบบฟอร์มให้ผู้ลงทะเบียนเข้ามากดอัปโหลดสลิปใหม่
+                          </p>
+                        </button>
+                      </div>
+
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">เหตุผล / คำแนะนำเพิ่มเติม:</label>
+                      <textarea
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                        rows={3}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-3 text-xs text-slate-800 outline-none focus:border-rose-500 focus:bg-white transition"
+                        placeholder="ระบุเหตุผลการปฏิเสธ หรือคำแนะนำเพิ่มเติม..."
+                      />
                     </div>
-                    <span className="inline-block mt-1 text-[11px] font-bold text-rose-700 bg-rose-100/80 px-2 py-0.5 rounded-md w-fit">
-                      แนบฟอร์มแนบสลิปกลับไป
-                    </span>
-                    <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
-                      ส่งลิงก์แบบฟอร์มให้ผู้ลงทะเบียนเข้ามากดอัปโหลดสลิปใหม่
-                    </p>
-                  </button>
-                </div>
-
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">เหตุผล / คำแนะนำเพิ่มเติม:</label>
-                <textarea
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  rows={3}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-3 text-xs text-slate-800 outline-none focus:border-rose-500 focus:bg-white transition"
-                  placeholder="ระบุเหตุผลการปฏิเสธ หรือคำแนะนำเพิ่มเติม..."
-                />
-              </div>
+                  </>
+                );
+              })()}
 
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button

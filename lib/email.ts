@@ -148,6 +148,27 @@ export interface EmailSendResult {
 }
 
 /**
+ * Utility to strip HTML tags and generate clean plain text representation
+ * Prevents MIME_HTML_ONLY anti-spam penalty
+ */
+export function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<\/tr>|<\/p>|<\/div>|<br\s*\/?>/gi, '\n')
+    .replace(/<\/td>/gi, '  ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n\s*\n\s*\n/g, '\n\n')
+    .trim();
+}
+
+/**
  * Core Generic Mail Dispatcher
  */
 async function dispatchEmail({
@@ -185,14 +206,20 @@ async function dispatchEmail({
 
   try {
     const replyTo = process.env.SMTP_REPLY_TO || process.env.SMTP_USER || 'tsrm.support2026@gmail.com';
+    const plainTextContent = text || htmlToPlainText(html) || subject;
+
     const info = await transporter.sendMail({
       from,
       to,
       replyTo,
       subject,
       html,
-      text: text || subject,
+      text: plainTextContent,
       attachments,
+      headers: {
+        'X-Mailer': 'TSRM Notification System',
+        'X-Auto-Response-Suppress': 'OOF, AutoReply',
+      },
     });
 
     console.log('📧 [EMAIL DELIVERED] Successfully sent to:', to, 'ID:', info.messageId);
@@ -421,12 +448,12 @@ export async function sendSlipRejectionEmail(params: SendSlipRejectionParams): P
     rejectType: params.rejectType,
   });
 
-  const subjectPrefix = isInfoMode ? '[โปรดแก้ไขข้อมูล]' : '[โปรดแนบสลิปใหม่]';
-  const refSuffix = params.ticketCode ? ` (${params.ticketCode})` : '';
+  const subjectPrefix = isInfoMode ? 'แจ้งผลการตรวจสอบข้อมูล' : 'แจ้งผลการตรวจสอบสลิปการโอนเงิน';
+  const refSuffix = params.ticketCode ? ` - ${params.ticketCode}` : '';
 
   return dispatchEmail({
     to: params.to,
-    subject: `${subjectPrefix} แจ้งผลการตรวจสอบรายการ ${params.meetingName}${refSuffix}`,
+    subject: `${subjectPrefix} รายการ ${params.meetingName}${refSuffix}`,
     html,
   });
 }
@@ -467,10 +494,10 @@ export async function sendAttendeeTicketEmail(params: SendAttendeeTicketParams):
     extraNote: params.extraNote,
   });
 
-  const subjectPrefix = params.dailyProgram ? `🎟️ [${params.dailyProgram}] ` : `🎟️ `;
+  const programText = params.dailyProgram ? ` ${params.dailyProgram}` : '';
   return dispatchEmail({
     to: params.to,
-    subject: `${subjectPrefix}บัตรเข้างาน ${params.meetingName} - คุณ ${params.recipientName}`,
+    subject: `บัตรเข้างาน${programText} ${params.meetingName} - คุณ ${params.recipientName}`,
     html,
     attachments: qrBuffer ? [{
       filename: `pass-qr-${params.ticketCode}.png`,
@@ -523,7 +550,7 @@ export async function sendAttendeeOnlineEmail(params: SendAttendeeOnlineParams):
 
   return dispatchEmail({
     to: params.to,
-    subject: `🌐 ยืนยันสิทธิ์เข้าร่วมประชุมออนไลน์ ${params.meetingName} - คุณ ${params.recipientName}`,
+    subject: `ยืนยันสิทธิ์เข้าร่วมประชุมออนไลน์ ${params.meetingName} - คุณ ${params.recipientName}`,
     html,
     customConfig: params.customConfig,
   });
@@ -601,8 +628,8 @@ export async function sendSponsorOtpEmail(
 ) {
   const isMembership = options.systemType === 'membership';
   const subject = isMembership
-    ? `[TSRM] รหัสชั่วคราว (OTP) สำหรับเข้าสู่ระบบสมัครสมาชิกบริษัท: ${options.otpCode}`
-    : `[TSRM] รหัสชั่วคราว (OTP) สำหรับเข้าสู่ระบบลงทะเบียนบริษัท: ${options.otpCode}`;
+    ? `รหัสผ่านชั่วคราวสำหรับเข้าสู่ระบบสมัครสมาชิกบริษัท: ${options.otpCode}`
+    : `รหัสผ่านชั่วคราวสำหรับเข้าสู่ระบบลงทะเบียนบริษัท: ${options.otpCode}`;
   const html = renderSponsorOtpEmail(options);
 
   return dispatchEmail({
@@ -621,7 +648,7 @@ export async function sendMemberOtpEmail(
   options: MemberOtpEmailOptions,
   customConfig?: SmtpConfig
 ) {
-  const subject = `[TSRM] รหัสชั่วคราว (OTP) สำหรับตรวจสอบและอัปเดตข้อมูลสมาชิก: ${options.otpCode}`;
+  const subject = `รหัสผ่านชั่วคราวสำหรับตรวจสอบและแก้ไขข้อมูลสมาชิก: ${options.otpCode}`;
   const html = renderMemberOtpEmail(options);
 
   return dispatchEmail({

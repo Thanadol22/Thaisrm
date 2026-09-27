@@ -22,12 +22,27 @@ export async function GET(request: NextRequest) {
             member_no: true,
             fullNameTh: true,
             fullNameEn: true,
+            idLast4: true,
             email: true,
             mobile: true,
             workplace: true,
+            work_start_date: true,
             position: true,
             address: true,
             job_category: true,
+            scientist_license_no: true,
+            referees: true,
+            photo_url: true,
+            degree_cert_doc: true,
+            work_cert_doc: true,
+            member_educations: {
+              select: {
+                edu_id: true,
+                degree: true,
+                institution: true,
+                graduation_year: true,
+              },
+            },
           },
         },
         meetings: {
@@ -130,12 +145,27 @@ export async function GET(request: NextRequest) {
             member_no: true,
             fullNameTh: true,
             fullNameEn: true,
+            idLast4: true,
             email: true,
             mobile: true,
             workplace: true,
+            work_start_date: true,
             position: true,
             address: true,
             job_category: true,
+            scientist_license_no: true,
+            referees: true,
+            photo_url: true,
+            degree_cert_doc: true,
+            work_cert_doc: true,
+            member_educations: {
+              select: {
+                edu_id: true,
+                degree: true,
+                institution: true,
+                graduation_year: true,
+              },
+            },
           },
         });
       } catch { }
@@ -271,6 +301,43 @@ export async function GET(request: NextRequest) {
       }
     } catch (e) {
       console.warn('Error resolving coupon for resubmit slip:', e);
+    }
+
+    if (isMembershipRegistration) {
+      const sourceMember = slip.members || matchedMember;
+      memberPayload = {
+        full_name_th: memberPayload?.full_name_th || sourceMember?.fullNameTh || nameTh,
+        full_name_en: memberPayload?.full_name_en || sourceMember?.fullNameEn || nameEn,
+        id_last4: memberPayload?.id_last4 || memberPayload?.idLast4 || memberPayload?.id4Digits || sourceMember?.idLast4 || '',
+        mobile: memberPayload?.mobile || sourceMember?.mobile || phone,
+        email: memberPayload?.email || sourceMember?.email || email,
+        workplace: memberPayload?.workplace || sourceMember?.workplace || workplace,
+        start_date: memberPayload?.start_date || (sourceMember?.work_start_date ? new Date(sourceMember.work_start_date).toISOString().split('T')[0] : '') || '',
+        position: memberPayload?.position || sourceMember?.position || position,
+        positionOther: memberPayload?.positionOther || memberPayload?.member_type_other || '',
+        job_category: memberPayload?.job_category || sourceMember?.job_category || jobCategory,
+        scientist_reg_no: memberPayload?.scientist_reg_no || memberPayload?.scientistNo || sourceMember?.scientist_license_no || '',
+        referees: memberPayload?.referees || sourceMember?.referees || '',
+        address: memberPayload?.address || sourceMember?.address || address,
+        photo_path: memberPayload?.photo_path || memberPayload?.photo_url || sourceMember?.photo_url || null,
+        degree_cert_doc: memberPayload?.degree_cert_doc || sourceMember?.degree_cert_doc || null,
+        work_cert_doc: memberPayload?.work_cert_doc || sourceMember?.work_cert_doc || null,
+        educations: Array.isArray(memberPayload?.educations) && memberPayload.educations.length > 0
+          ? memberPayload.educations.map((e: any, idx: number) => ({
+              id: String(e.id || e.edu_id || idx + 1),
+              degree: e.degree || '',
+              institution: e.institution || '',
+              year: e.graduation_year || e.year ? String(e.graduation_year || e.year) : '',
+            }))
+          : Array.isArray(sourceMember?.member_educations) && sourceMember.member_educations.length > 0
+          ? sourceMember.member_educations.map((e: any, idx: number) => ({
+              id: String(e.edu_id || idx + 1),
+              degree: e.degree || '',
+              institution: e.institution || '',
+              year: e.graduation_year ? String(e.graduation_year) : '',
+            }))
+          : [{ id: '1', degree: '', institution: '', year: '' }],
+      };
     }
 
     return NextResponse.json({
@@ -411,7 +478,8 @@ export async function POST(request: NextRequest) {
             rejectType: undefined,
           };
           updatedActivities = actObj;
-        } else if (actObj.memberPayload || actObj.type === 'membership_registration') {
+        } else if (actObj.memberPayload || actObj.type === 'membership_registration' || slip.ticket_code?.startsWith('MEM-') || slip.meeting_id === 'membership') {
+          actObj.type = 'membership_registration';
           actObj.memberPayload = {
             ...(actObj.memberPayload || {}),
             ...(customMemberPayload || {}),
