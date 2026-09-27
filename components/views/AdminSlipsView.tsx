@@ -1535,13 +1535,8 @@ export function AdminSlipsView() {
                                       <div className="pl-6 sm:pl-7 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-slate-500 pt-0.5">
                                         <div className="flex items-center gap-2 flex-wrap min-w-0">
                                           <span className="text-sky-700 font-mono font-medium break-all">
-                                            {att.email || '-'}
+                                            {att.email || att.mobile || '-'}
                                           </span>
-                                          {(att.mobile || att.phone) && (
-                                            <span className="text-slate-600 font-mono">
-                                              📞 {att.mobile || att.phone}
-                                            </span>
-                                          )}
                                           {att.workplace && att.workplace !== selectedSlip.companyName && (
                                             <span className="truncate max-w-[200px]">🏢 {att.workplace}</span>
                                           )}
