@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. ตรวจสอบคูปอง (ถ้ามีการระบุคูปองมา)
+    // 4. ตรวจสอบคูปอง (ถ้ามีการระบุคูปองมา หรือดึงคูปองปัจจุบันของบริษัท)
     let couponRecord: any = null;
     if (couponCode) {
       couponRecord = await (prisma as any).coupons.findFirst({
@@ -102,6 +102,18 @@ export async function POST(req: NextRequest) {
         },
       });
     }
+    if (!couponRecord) {
+      couponRecord = await (prisma as any).coupons.findFirst({
+        where: {
+          company_name: { equals: sponsor.name, mode: 'insensitive' },
+          meeting_id: meetingId,
+          is_active: true,
+        },
+        orderBy: { created_at: 'desc' },
+      });
+    }
+
+    const effectiveCouponCode = couponRecord?.code || (couponCode ? couponCode.trim().toUpperCase() : null);
 
     // 5. ดำเนินการตรวจสอบและบันทึกข้อมูลสมาชิกแต่ละคน
     const results: any[] = [];
@@ -172,7 +184,7 @@ export async function POST(req: NextRequest) {
           attendance_status: 'Registered',
           sponsor_id: sponsor.id,
           sponsor_company_name: sponsor.name,
-          coupon_code: couponCode || (isUsingQuota ? `SPONSOR-${sponsor.name}` : null),
+          coupon_code: effectiveCouponCode,
         },
       });
 
@@ -188,13 +200,37 @@ export async function POST(req: NextRequest) {
           workplace: dbMember.workplace || entry.workplace || null,
           ticket_code: ticketCode,
           attendance_id: attendance.attendance_id,
-          coupon_code: couponCode || null,
+          coupon_code: effectiveCouponCode,
           discount_amount: meeting.base_price || 0,
           net_price: 0,
           submitted_by_email: submittedByEmail || sponsor.contact_email,
           status: 'confirmed',
         },
       });
+
+      // บันทึกประวัติการใช้คูปองลง coupon_usages เพื่อติดตามรายชื่อผู้ใช้สิทธิ์แยกตามรหัสคูปอง
+      if (couponRecord) {
+        try {
+          await (prisma as any).coupon_usages.create({
+            data: {
+              coupon_id: couponRecord.id,
+              meeting_id: meetingId,
+              member_no: dbMember.member_no,
+              attendee_name: dbMember.fullNameTh || entry.fullName,
+              attendee_email: dbMember.email || entry.email,
+              attendee_phone: dbMember.mobile || entry.phone || null,
+              workplace: dbMember.workplace || entry.workplace || sponsor.name || null,
+              discount_applied: meeting.base_price || 0,
+              final_amount: 0,
+              ticket_code: ticketCode,
+              slip_id: `GRP-${sponsor.name}`,
+              used_at: new Date(),
+            },
+          });
+        } catch (usageErr) {
+          console.error('[SubmitGroupRegistration] Failed to create coupon_usages:', usageErr);
+        }
+      }
 
       // อัปเดต Member ให้ระบุว่าได้รับการสนับสนุนโดยบริษัท
       await (prisma as any).member.update({

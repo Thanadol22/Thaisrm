@@ -54,9 +54,9 @@ export async function GET(
 
     const usageMap = new Map<string, any>();
 
-    // 1. จาก coupon_usages table
+    // 1. จาก coupon_usages table (ผูกด้วย coupon_id)
     (coupon.usages || []).forEach((u: any) => {
-      const key = `${u.ticket_code || ''}_${u.member_no || ''}_${(u.attendee_email || '').toLowerCase()}`;
+      const key = `${u.id || ''}_${u.ticket_code || ''}_${u.member_no || ''}_${(u.attendee_email || '').toLowerCase()}`;
       usageMap.set(key, {
         id: u.id ? u.id.toString() : `cu-${Date.now()}`,
         attendee_name: u.attendee_name || u.member?.fullNameTh || u.member?.fullNameEn || 'ผู้เข้าร่วมประชุม',
@@ -71,14 +71,13 @@ export async function GET(
       });
     });
 
-    // 2. Fallback จาก sponsor_group_members table
+    // 2. ตรวจสอบ fallback จาก sponsor_group_members เฉพาะที่ระบุ coupon_code ตรงกับรหัสนี้เท่านั้น
     try {
       const sgmList = await (prisma as any).sponsor_group_members.findMany({
         where: {
           OR: [
             { coupon_code: coupon.code },
             { coupon_code: { equals: coupon.code, mode: 'insensitive' } },
-            ...(coupon.company_name ? [{ sponsor: { name: { equals: coupon.company_name, mode: 'insensitive' } } }] : []),
           ],
         },
         orderBy: { created_at: 'desc' },
@@ -86,7 +85,20 @@ export async function GET(
 
       sgmList.forEach((sgm: any) => {
         const key = `${sgm.ticket_code || ''}_${sgm.member_no || ''}_${(sgm.attendee_email || '').toLowerCase()}`;
-        if (!usageMap.has(key)) {
+        // ตรวจสอบว่ามีอยู่แล้วใน usageMap หรือไม่
+        let exists = false;
+        for (const existingVal of Array.from(usageMap.values())) {
+          if (
+            (sgm.ticket_code && existingVal.ticket_code === sgm.ticket_code) ||
+            (sgm.member_no && existingVal.member_no === sgm.member_no) ||
+            (sgm.attendee_email && existingVal.attendee_email?.toLowerCase() === sgm.attendee_email.toLowerCase())
+          ) {
+            exists = true;
+            break;
+          }
+        }
+
+        if (!exists) {
           usageMap.set(key, {
             id: sgm.id ? sgm.id.toString() : `sgm-${sgm.member_no}`,
             attendee_name: sgm.attendee_name || 'ผู้เข้าร่วมประชุม',
@@ -105,7 +117,7 @@ export async function GET(
       console.warn('[Coupon Usages] SGM query fallback warning:', sgmErr);
     }
 
-    // 3. Fallback จาก meeting_attendances table
+    // 3. ตรวจสอบ fallback จาก meeting_attendances เฉพาะที่ระบุ coupon_code ตรงกับรหัสนี้เท่านั้น
     try {
       const attList = await (prisma as any).meeting_attendances.findMany({
         where: {
@@ -113,7 +125,6 @@ export async function GET(
           OR: [
             { coupon_code: coupon.code },
             { coupon_code: { equals: coupon.code, mode: 'insensitive' } },
-            ...(coupon.company_name ? [{ sponsor_company_name: { equals: coupon.company_name, mode: 'insensitive' } }] : []),
           ],
         },
         include: {
@@ -136,7 +147,6 @@ export async function GET(
         const em = att.attendee_email || att.members?.email || '';
         const key = `att_${memNo}_${em.toLowerCase()}`;
         
-        // Check if already covered
         let alreadyCovered = false;
         for (const existingVal of Array.from(usageMap.values())) {
           if ((memNo && existingVal.member_no === memNo) || (em && existingVal.attendee_email?.toLowerCase() === em.toLowerCase())) {

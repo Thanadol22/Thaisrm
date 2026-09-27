@@ -27,30 +27,20 @@ async function syncFromNeon() {
     }
     console.log(`   ✅ Synced ${settings.length} system_settings`);
 
-    // 2. Members
-    console.log('\n📦 2. กำลัง Sync members...');
-    const members = await neon.member.findMany();
-    for (const m of members) {
-      await local.member.upsert({
-        where: { member_no: m.member_no },
-        update: m,
-        create: m,
+    // 2. Sponsors
+    console.log('\n📦 2. กำลัง Sync sponsors...');
+    const sponsors = await neon.sponsors.findMany();
+    for (const sp of sponsors) {
+      await local.sponsors.upsert({
+        where: { id: sp.id },
+        update: sp,
+        create: sp,
       });
     }
-    console.log(`   ✅ Synced ${members.length} members`);
+    console.log(`   ✅ Synced ${sponsors.length} sponsors`);
 
-    // 3. Member Educations
-    console.log('\n📦 3. กำลัง Sync member_educations...');
-    const educations = await neon.member_educations.findMany();
-    // Clear local educations to mirror Neon exactly
-    await local.member_educations.deleteMany();
-    for (const edu of educations) {
-      await local.member_educations.create({ data: edu });
-    }
-    console.log(`   ✅ Synced ${educations.length} member_educations`);
-
-    // 4. Meetings
-    console.log('\n📦 4. กำลัง Sync meetings...');
+    // 3. Meetings
+    console.log('\n📦 3. กำลัง Sync meetings...');
     const meetings = await neon.meetings.findMany();
     for (const meet of meetings) {
       await local.meetings.upsert({
@@ -61,8 +51,38 @@ async function syncFromNeon() {
     }
     console.log(`   ✅ Synced ${meetings.length} meetings`);
 
-    // 5. Meeting Attendances
-    console.log('\n📦 5. กำลัง Sync meeting_attendances...');
+    // 4. Sponsor Quotas
+    console.log('\n📦 4. กำลัง Sync sponsor_quotas...');
+    const quotas = await neon.sponsor_quotas.findMany();
+    await local.sponsor_quotas.deleteMany();
+    for (const q of quotas) {
+      await local.sponsor_quotas.create({ data: q });
+    }
+    console.log(`   ✅ Synced ${quotas.length} sponsor_quotas`);
+
+    // 5. Members
+    console.log('\n📦 5. กำลัง Sync members...');
+    const members = await neon.member.findMany();
+    for (const m of members) {
+      await local.member.upsert({
+        where: { member_no: m.member_no },
+        update: m,
+        create: m,
+      });
+    }
+    console.log(`   ✅ Synced ${members.length} members`);
+
+    // 6. Member Educations
+    console.log('\n📦 6. กำลัง Sync member_educations...');
+    const educations = await neon.member_educations.findMany();
+    await local.member_educations.deleteMany();
+    for (const edu of educations) {
+      await local.member_educations.create({ data: edu });
+    }
+    console.log(`   ✅ Synced ${educations.length} member_educations`);
+
+    // 7. Meeting Attendances
+    console.log('\n📦 7. กำลัง Sync meeting_attendances...');
     const attendances = await neon.meeting_attendances.findMany();
     await local.meeting_attendances.deleteMany();
     for (const att of attendances) {
@@ -70,8 +90,8 @@ async function syncFromNeon() {
     }
     console.log(`   ✅ Synced ${attendances.length} meeting_attendances`);
 
-    // 6. Meeting Daily Checkins
-    console.log('\n📦 6. กำลัง Sync meeting_daily_checkins...');
+    // 8. Meeting Daily Checkins
+    console.log('\n📦 8. กำลัง Sync meeting_daily_checkins...');
     const dailyCheckins = await neon.meeting_daily_checkins.findMany();
     await local.meeting_daily_checkins.deleteMany();
     for (const dc of dailyCheckins) {
@@ -79,8 +99,8 @@ async function syncFromNeon() {
     }
     console.log(`   ✅ Synced ${dailyCheckins.length} meeting_daily_checkins`);
 
-    // 7. Payment Slips
-    console.log('\n📦 7. กำลัง Sync payment_slips...');
+    // 9. Payment Slips
+    console.log('\n📦 9. กำลัง Sync payment_slips...');
     const slips = await neon.payment_slips.findMany();
     await local.payment_slips.deleteMany();
     for (const slip of slips) {
@@ -88,8 +108,8 @@ async function syncFromNeon() {
     }
     console.log(`   ✅ Synced ${slips.length} payment_slips`);
 
-    // 8. Receipts
-    console.log('\n📦 8. กำลัง Sync receipts...');
+    // 10. Receipts
+    console.log('\n📦 10. กำลัง Sync receipts...');
     const receipts = await neon.receipts.findMany();
     await local.receipts.deleteMany();
     for (const r of receipts) {
@@ -97,8 +117,8 @@ async function syncFromNeon() {
     }
     console.log(`   ✅ Synced ${receipts.length} receipts`);
 
-    // 9. Coupons
-    console.log('\n📦 9. กำลัง Sync coupons...');
+    // 11. Coupons
+    console.log('\n📦 11. กำลัง Sync coupons...');
     const coupons = await neon.coupons.findMany();
     await local.coupons.deleteMany();
     for (const c of coupons) {
@@ -106,14 +126,23 @@ async function syncFromNeon() {
     }
     console.log(`   ✅ Synced ${coupons.length} coupons`);
 
-    // 10. Coupon Usages
-    console.log('\n📦 10. กำลัง Sync coupon_usages...');
+    // 12. Coupon Usages
+    console.log('\n📦 12. กำลัง Sync coupon_usages...');
     const couponUsages = await neon.coupon_usages.findMany();
     await local.coupon_usages.deleteMany();
     for (const cu of couponUsages) {
       await local.coupon_usages.create({ data: cu });
     }
     console.log(`   ✅ Synced ${couponUsages.length} coupon_usages`);
+
+    // 13. Sponsor Group Members
+    console.log('\n📦 13. กำลัง Sync sponsor_group_members...');
+    const sgmList = await neon.sponsor_group_members.findMany();
+    await local.sponsor_group_members.deleteMany();
+    for (const sgm of sgmList) {
+      await local.sponsor_group_members.create({ data: sgm });
+    }
+    console.log(`   ✅ Synced ${sgmList.length} sponsor_group_members`);
 
     console.log('\n🎉 ดึงข้อมูลจาก Neon ลง Local DB สำเร็จสมบูรณ์ทุกตาราง!');
   } catch (error) {

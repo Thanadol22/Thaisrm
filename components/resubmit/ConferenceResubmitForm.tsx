@@ -18,9 +18,10 @@ export interface ConferenceFormData {
 interface ConferenceResubmitFormProps {
   formData: ConferenceFormData;
   onChange: <K extends keyof ConferenceFormData>(field: K, value: ConferenceFormData[K]) => void;
+  hidePhone?: boolean;
 }
 
-export function ConferenceResubmitForm({ formData, onChange }: ConferenceResubmitFormProps) {
+export function ConferenceResubmitForm({ formData, onChange, hidePhone = false }: ConferenceResubmitFormProps) {
   return (
     <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm space-y-4">
       <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -60,25 +61,27 @@ export function ConferenceResubmitForm({ formData, onChange }: ConferenceResubmi
           />
         </div>
 
-        {/* Phone */}
-        <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1">
-            เบอร์โทรศัพท์มือถือ <span className="text-rose-500">*</span>
-          </label>
-          <div className="relative flex items-center">
-            <Phone className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none shrink-0" />
-            <input
-              type="tel"
-              placeholder="08XXXXXXXX"
-              value={formData.phone}
-              onChange={(e) => onChange('phone', e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition font-medium"
-            />
+        {/* Phone (ซ่อนในกรณีลงทะเบียนแบบกลุ่ม) */}
+        {!hidePhone && (
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              เบอร์โทรศัพท์มือถือ <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative flex items-center">
+              <Phone className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none shrink-0" />
+              <input
+                type="tel"
+                placeholder="08XXXXXXXX"
+                value={formData.phone}
+                onChange={(e) => onChange('phone', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition font-medium"
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Email */}
-        <div>
+        <div className={hidePhone ? 'sm:col-span-2' : ''}>
           <SmartEmailInput
             value={formData.email}
             onChange={(val) => onChange('email', val)}

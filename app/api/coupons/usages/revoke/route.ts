@@ -20,15 +20,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const numericUsageId = BigInt(usageId);
+    let usage: any = null;
+    let isSgm = false;
+    let sgmId: any = null;
 
-    // 1. Find coupon usage record
-    const usage = await (prisma as any).coupon_usages.findUnique({
-      where: { id: numericUsageId },
-      include: {
-        coupon: true,
-      },
-    });
+    if (String(usageId).startsWith('sgm-')) {
+      isSgm = true;
+      const memNo = String(usageId).replace('sgm-', '');
+      const sgm = await (prisma as any).sponsor_group_members.findFirst({
+        where: { member_no: memNo },
+        include: { sponsor: true },
+      });
+      if (sgm) {
+        sgmId = sgm.id;
+        const linkedCoupon = sgm.coupon_code
+          ? await (prisma as any).coupons.findFirst({ where: { code: sgm.coupon_code } })
+          : null;
+        usage = {
+          id: sgm.id,
+          coupon_id: linkedCoupon?.id || null,
+          coupon: linkedCoupon,
+          meeting_id: sgm.meeting_id,
+          member_no: sgm.member_no,
+          attendee_email: sgm.attendee_email,
+          attendee_name: sgm.attendee_name,
+          ticket_code: sgm.ticket_code,
+        };
+      }
+    } else {
+      try {
+        usage = await (prisma as any).coupon_usages.findUnique({
+          where: { id: BigInt(usageId) },
+          include: {
+            coupon: true,
+          },
+        });
+      } catch (e) {
+        console.warn('BigInt conversion error for usageId:', usageId);
+      }
+    }
 
     if (!usage) {
       return NextResponse.json(
@@ -44,21 +74,37 @@ export async function POST(request: NextRequest) {
     const ticketCode = usage.ticket_code;
 
     // 2. Decrement coupon used_count (not below 0)
-    await (prisma as any).coupons.update({
-      where: { id: couponId },
-      data: {
-        used_count: {
-          decrement: usage.coupon.used_count > 0 ? 1 : 0,
+    if (couponId) {
+      await (prisma as any).coupons.update({
+        where: { id: couponId },
+        data: {
+          used_count: {
+            decrement: usage.coupon && usage.coupon.used_count > 0 ? 1 : 0,
+          },
         },
-      },
-    });
+      });
+    }
 
-    // 3. Delete usage record from coupon_usages
-    await (prisma as any).coupon_usages.delete({
-      where: { id: numericUsageId },
-    });
+    // 3. Delete usage record from coupon_usages if numeric id
+    if (!isSgm && usage.id) {
+      await (prisma as any).coupon_usages.delete({
+        where: { id: BigInt(usage.id) },
+      });
+    }
 
-    // 4. Optionally cancel attendance record if requested
+    // 4. Update sponsor_group_members if exists
+    if (memberNo && meetingId) {
+      try {
+        await prisma.$executeRaw`
+          DELETE FROM sponsor_group_members
+          WHERE meeting_id = ${meetingId} AND member_no = ${memberNo}
+        `;
+      } catch (e) {
+        console.warn('Error deleting SGM record:', e);
+      }
+    }
+
+    // 5. Optionally cancel attendance record if requested
     if (cancelAttendance) {
       if (memberNo) {
         await prisma.$executeRaw`
@@ -84,12 +130,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const couponCodeStr = usage.coupon?.code || usage.coupon_code || 'คูปอง';
+
     return NextResponse.json({
       success: true,
-      message: `คืนสิทธิ์โควตาคูปอง "${usage.coupon.code}" เรียบร้อยแล้ว (โควตากลับมาเพิ่มขึ้น 1 สิทธิ์)`,
+      message: `คืนสิทธิ์โควตาคูปอง "${couponCodeStr}" เรียบร้อยแล้ว (โควตากลับมาเพิ่มขึ้น 1 สิทธิ์)`,
       data: {
         couponId,
-        couponCode: usage.coupon.code,
+        couponCode: couponCodeStr,
         revokedAttendee: usage.attendee_name,
       },
     });

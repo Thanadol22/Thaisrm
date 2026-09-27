@@ -331,9 +331,13 @@ export function SponsorCouponHistoryModal({
                         {/* Left: Code & Metadata */}
                         <div className="space-y-1.5 min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            {isLatest && (
+                            {isLatest ? (
                               <span className="bg-blue-600 text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md shadow-2xs">
                                 🔥 ล่าสุด / รหัสปัจจุบัน
+                              </span>
+                            ) : (
+                              <span className="bg-slate-100 text-slate-700 border border-slate-300 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                                📜 รหัสก่อนหน้า
                               </span>
                             )}
 

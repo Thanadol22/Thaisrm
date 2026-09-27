@@ -107,20 +107,38 @@ export async function POST(req: NextRequest) {
     let remainingQuota = 0;
     let totalQuota = 0;
 
+    // ตรวจสอบโควต้าทั้งหมดของบริษัทจาก sponsor_quotas
+    let sponsorQuotaRecord: any = null;
+    if (prismaAny.sponsor_quotas) {
+      sponsorQuotaRecord = await prismaAny.sponsor_quotas.findFirst({
+        where: {
+          sponsor_id: sponsor.id,
+        },
+        orderBy: { created_at: 'desc' },
+      });
+    }
+
     if (couponRecord) {
-      totalQuota = couponRecord.max_uses || 0;
-      remainingQuota = Math.max(0, totalQuota - (couponRecord.used_count || 0));
+      totalQuota = sponsorQuotaRecord?.quota_seats || couponRecord.max_uses || 0;
+      // คำนวณสิทธิ์คงเหลือจากโควต้าจริง
+      const usedSeats = sponsorQuotaRecord ? sponsorQuotaRecord.used_seats : (couponRecord.used_count || 0);
+      remainingQuota = Math.max(0, totalQuota - usedSeats);
+
       if (couponRecord.meetings?.meeting_name) {
         meetingName = couponRecord.meetings.meeting_name;
       } else if (couponRecord.meeting_name) {
         meetingName = couponRecord.meeting_name;
       }
 
-      // หากยังมีสิทธิ์คงเหลือ ให้หมุนเวียนเปลี่ยนรหัสใหม่ทันที (ยกเว้นกรณีบัญชีทดสอบที่ใช้รหัสคงที่ T34-TEST-111111)
       if (remainingQuota > 0) {
         if (couponRecord.code === 'T34-TEST-111111' || email === 'test@sponsor.com') {
           activeRotatedCouponCode = 'T34-TEST-111111';
+        } else if (couponRecord.used_count === 0 && couponRecord.is_active) {
+          // หากรหัสปัจจุบันยังไม่เคยมีใครใช้สิทธิ์ ให้ใช้รหัสเดิมต่อเนื่องได้
+          activeRotatedCouponCode = couponRecord.code;
         } else {
+          // หากรหัสเดิมมีการใช้งานไปแล้ว (used_count > 0) ต้องสร้างรหัสคูปองใหม่แยกแถว
+          // เพื่อรักษาประวัติการใช้สิทธิ์ของรหัสเดิมไว้ ไม่ให้ถูกเขียนทับ
           const chars = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
           const words = (sponsor.name || '').toUpperCase().replace(/[^A-Z0-9\s]/g, '').split(/\s+/).filter(Boolean);
           let prefix = 'SPN';
@@ -136,20 +154,42 @@ export async function POST(req: NextRequest) {
           }
           activeRotatedCouponCode = `T34-${prefix}-${token}`;
 
-          // อัปเดตรหัสใหม่ลงตาราง coupons (ประวัติการใช้งานเดิมใน coupon_usages ยังคงอยู่ครบถ้วน)
+          // ปิดการใช้งานรหัสเดิม และตั้ง max_uses ให้ตรงกับจำนวนที่ใช้ไปแล้ว
           if (prismaAny.coupons) {
             await prismaAny.coupons.update({
               where: { id: couponRecord.id },
               data: {
-                code: activeRotatedCouponCode,
+                max_uses: couponRecord.used_count,
+                is_active: false,
                 updated_at: new Date(),
+              },
+            });
+
+            // สร้างแถวคูปองใหม่สำหรับสิทธิ์คงเหลือ
+            await prismaAny.coupons.create({
+              data: {
+                code: activeRotatedCouponCode,
+                company_name: sponsor.name,
+                meeting_id: couponRecord.meeting_id,
+                discount_type: couponRecord.discount_type || 'free',
+                discount_value: couponRecord.discount_value || 0,
+                applicable_type: couponRecord.applicable_type || 'all',
+                max_uses: remainingQuota,
+                used_count: 0,
+                expire_date: couponRecord.expire_date,
+                is_active: true,
+                remarks: couponRecord.remarks,
               },
             });
           } else {
             await prisma.$executeRaw`
               UPDATE coupons 
-              SET code = ${activeRotatedCouponCode}, updated_at = NOW() 
+              SET max_uses = used_count, is_active = false, updated_at = NOW() 
               WHERE id = ${couponRecord.id}
+            `;
+            await prisma.$executeRaw`
+              INSERT INTO coupons (id, code, company_name, meeting_id, discount_type, discount_value, applicable_type, max_uses, used_count, is_active, remarks, created_at, updated_at)
+              VALUES (gen_random_uuid()::text, ${activeRotatedCouponCode}, ${sponsor.name}, ${couponRecord.meeting_id}, 'free', 0, 'all', ${remainingQuota}, 0, true, ${couponRecord.remarks || null}, NOW(), NOW())
             `;
           }
         }

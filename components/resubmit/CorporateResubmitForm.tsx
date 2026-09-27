@@ -321,6 +321,7 @@ export function CorporateResubmitForm({ formData, onChange }: CorporateResubmitF
           <ConferenceResubmitForm
             formData={currentAttendee}
             onChange={handleAttendeeFieldChange}
+            hidePhone={true}
           />
         )}
       </div>

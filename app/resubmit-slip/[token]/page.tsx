@@ -759,10 +759,6 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
             </div>
           </div>
 
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-[11px] text-amber-800 text-left leading-relaxed">
-            💡 <strong>คำแนะนำ:</strong> หากท่านไม่ได้รับอีเมลแจ้งผลในกล่องจดหมายหลัก กรุณาตรวจสอบในโฟลเดอร์ &ldquo;จดหมายขยะ&rdquo; และกด &ldquo;ไม่ใช่จดหมายขยะ&rdquo; เพื่อความต่อเนื่องในการรับข่าวสาร
-          </div>
-
           <button
             onClick={() => router.push('/login')}
             className="w-full bg-[#0026b3] text-white py-3.5 rounded-2xl font-bold text-xs hover:bg-[#001f8f] transition shadow-md cursor-pointer"
@@ -884,7 +880,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
 
         {/* Dynamic Resubmit Form based on type (Only rendered when not purely slip re-upload mode) */}
         {!isSlipMode && (
-          slipData.isCorporate ? (
+          slipData.isCorporate || slipData.isGroup ? (
             <CorporateResubmitForm
               formData={corporateData}
               onChange={handleCorporateChange}
@@ -898,6 +894,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
             <ConferenceResubmitForm
               formData={conferenceData}
               onChange={handleConferenceChange}
+              hidePhone={Boolean(slipData.isCorporate || slipData.isGroup)}
             />
           )
         )}
