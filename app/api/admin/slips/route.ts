@@ -30,14 +30,14 @@ export async function GET(request: NextRequest) {
 
     const slipsModel = (prisma as any).payment_slips || (prisma as any).paymentSlip;
 
-    const parseActivitiesData = (act: any, slipAmount?: any) => {
-      if (!act) return { activities: [], isMembership: false, isFormatChange: false, formatChangePayload: null, memberPayload: null };
+    const parseActivitiesData = (act: any, slipAmount?: any): any => {
+      if (!act) return { activities: [], isMembership: false, isGroupMembership: false, isGroupConference: false, isFormatChange: false, formatChangePayload: null, memberPayload: null, guestPayload: null, groupPayload: null };
       let parsed = act;
       if (typeof act === 'string') {
         try {
           parsed = JSON.parse(act);
         } catch {
-          return { activities: [], isMembership: false, isFormatChange: false, formatChangePayload: null, memberPayload: null };
+          return { activities: [], isMembership: false, isGroupMembership: false, isGroupConference: false, isFormatChange: false, formatChangePayload: null, memberPayload: null, guestPayload: null, groupPayload: null };
         }
       }
 
@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
           isFormatChange: false,
           formatChangePayload: null,
           memberPayload: null,
+          guestPayload: null,
           groupPayload: parsed,
         };
       }
@@ -90,6 +91,7 @@ export async function GET(request: NextRequest) {
           isFormatChange: false,
           formatChangePayload: null,
           memberPayload: null,
+          guestPayload: null,
           groupPayload: parsed,
         };
       }
@@ -99,7 +101,7 @@ export async function GET(request: NextRequest) {
         return {
           activities: [{
             id: 'membership_registration',
-            name: 'ค่าสมัครสมาชิก (Membership Fee)',
+            name: 'ค่าสมัครสมาชิก',
             type: 'membership_registration',
             price: effectivePrice,
             rateBadgeTh: 'สมัครสมาชิกใหม่',
@@ -107,9 +109,11 @@ export async function GET(request: NextRequest) {
           }],
           isMembership: true,
           isGroupMembership: false,
+          isGroupConference: false,
           isFormatChange: false,
           formatChangePayload: null,
           memberPayload: parsed.memberPayload || null,
+          guestPayload: null,
           groupPayload: null,
         };
       }
@@ -129,9 +133,11 @@ export async function GET(request: NextRequest) {
           }],
           isMembership: false,
           isGroupMembership: false,
+          isGroupConference: false,
           isFormatChange: true,
           formatChangePayload: parsed,
           memberPayload: null,
+          guestPayload: null,
           groupPayload: null,
         };
       }
@@ -143,10 +149,57 @@ export async function GET(request: NextRequest) {
           }
           return actItem;
         });
-        return { activities, isMembership: false, isFormatChange: false, formatChangePayload: null, memberPayload: null };
+        return { activities, isMembership: false, isGroupMembership: false, isGroupConference: false, isFormatChange: false, formatChangePayload: null, memberPayload: null, guestPayload: null, groupPayload: null };
       }
 
-      return { activities: [], isMembership: false, isFormatChange: false, formatChangePayload: null, memberPayload: null };
+      if (parsed && typeof parsed === 'object') {
+        const actsList = Array.isArray(parsed.activities)
+          ? parsed.activities
+          : (Array.isArray(parsed.selectedActivities) ? parsed.selectedActivities : []);
+
+        const activities = actsList.map((actItem: any) => {
+          if (actsList.length === 1 && (!actItem.price || Number(actItem.price) === 0) && Number(slipAmount) > 0) {
+            return { ...actItem, price: Number(slipAmount) };
+          }
+          return actItem;
+        });
+
+        if (activities.length === 0 && (parsed.programNameTh || parsed.selectedPackage || (slipAmount && Number(slipAmount) > 0))) {
+          activities.push({
+            id: 'registration_package',
+            name: parsed.programNameTh || parsed.selectedPackage || 'การลงทะเบียนประชุมวิชาการ',
+            price: Number(slipAmount) || 0,
+          });
+        }
+
+        const guestPayload = {
+          nameTh: parsed.nameTh || (parsed.attendees?.[0]?.nameTh) || null,
+          nameEn: parsed.nameEn || (parsed.attendees?.[0]?.nameEn) || null,
+          email: parsed.email || (parsed.attendees?.[0]?.email) || null,
+          phone: parsed.phone || (parsed.attendees?.[0]?.phone) || parsed.mobile || (parsed.attendees?.[0]?.mobile) || null,
+          workplace: parsed.workplace || (parsed.attendees?.[0]?.workplace) || null,
+          position: parsed.position || (parsed.attendees?.[0]?.position) || null,
+          positionCode: parsed.positionCode || (parsed.attendees?.[0]?.positionCode) || null,
+          attendanceType: parsed.attendanceType || (parsed.attendees?.[0]?.attendanceType) || null,
+          dietaryPreference: parsed.dietaryPreference || (parsed.attendees?.[0]?.dietaryPreference) || null,
+          foodAllergies: parsed.foodAllergies || (parsed.attendees?.[0]?.foodAllergies) || null,
+          specialRequirements: parsed.specialRequirements || (parsed.attendees?.[0]?.specialRequirements) || null,
+        };
+
+        return {
+          activities,
+          isMembership: Boolean(parsed.type === 'membership_registration' || parsed.memberPayload),
+          isGroupMembership: false,
+          isGroupConference: false,
+          isFormatChange: false,
+          formatChangePayload: null,
+          memberPayload: parsed.memberPayload || null,
+          guestPayload,
+          groupPayload: null,
+        };
+      }
+
+      return { activities: [], isMembership: false, isGroupMembership: false, isGroupConference: false, isFormatChange: false, formatChangePayload: null, memberPayload: null, guestPayload: null, groupPayload: null };
     };
 
     const resolveSlipCouponAndDiscount = (
@@ -370,6 +423,7 @@ export async function GET(request: NextRequest) {
               email: true,
               mobile: true,
               workplace: true,
+              position: true,
             },
           },
           meetings: {
@@ -555,17 +609,29 @@ export async function GET(request: NextRequest) {
           });
         }
         
+        const guestPayload: any = parsedAct.guestPayload || {};
+
         // Isolate company data from personal attendee data (Rule: do not mix personal with corporate)
         const nameTh = isCorporate && companyName
           ? companyName
           : isMember
-            ? s.members?.fullNameTh || 'สมาชิก'
-            : s.guest_name || parsedAct.memberPayload?.full_name_th || 'ผู้สมัครทั่วไป';
+            ? (s.members?.fullNameTh || 'สมาชิก')
+            : (s.guest_name || parsedAct.memberPayload?.full_name_th || guestPayload.nameTh || 'ผู้สมัครทั่วไป');
         const nameEn = isCorporate && companyName
           ? companyName
           : isMember
-            ? s.members?.fullNameEn || ''
-            : parsedAct.memberPayload?.full_name_en || '';
+            ? (s.members?.fullNameEn || '')
+            : (parsedAct.memberPayload?.full_name_en || guestPayload.nameEn || '');
+
+        const position = isCorporate
+          ? ''
+          : isMember
+            ? (s.members?.position || '')
+            : (parsedAct.memberPayload?.position || guestPayload.position || '');
+
+        const attendanceType = isCorporate
+          ? ''
+          : (parsedAct.memberPayload?.attendanceType || guestPayload.attendanceType || '');
 
         // For corporate, use coordinator contact only, NEVER personal attendee email/phone
         let coordinatorEmail = parsedAct.groupPayload?.groupContact?.coordinatorEmail || null;
@@ -588,18 +654,18 @@ export async function GET(request: NextRequest) {
         const email = isCorporate
           ? (coordinatorEmail || '')
           : isMember
-            ? s.members?.email || ''
-            : s.guest_email || parsedAct.memberPayload?.email || '';
+            ? (s.members?.email || '')
+            : (s.guest_email || parsedAct.memberPayload?.email || guestPayload.email || '');
         const phone = isCorporate
           ? (coordinatorPhone || '')
           : isMember
-            ? s.members?.mobile || ''
-            : s.guest_phone || parsedAct.memberPayload?.mobile || '';
+            ? (s.members?.mobile || '')
+            : (s.guest_phone || parsedAct.memberPayload?.mobile || guestPayload.phone || '');
         const workplace = isCorporate
           ? companyName
           : isMember
-            ? s.members?.workplace || ''
-            : s.guest_workplace || parsedAct.memberPayload?.workplace || '';
+            ? (s.members?.workplace || '')
+            : (s.guest_workplace || parsedAct.memberPayload?.workplace || guestPayload.workplace || '');
 
         // Resolve coupon and discount
         const { couponCode, couponInfo, discountTotal, couponUsagesList } = resolveSlipCouponAndDiscount(
@@ -631,7 +697,7 @@ export async function GET(request: NextRequest) {
           dbId: s.id.toString(),
           meetingId: s.meeting_id,
           meetingName: parsedAct.isMembership
-            ? 'สมัครสมาชิกสมาคม (Membership Registration)'
+            ? 'สมัครสมาชิกสมาคม'
             : parsedAct.isFormatChange
               ? `แจ้งเปลี่ยนรูปแบบ - ${s.meetings?.meeting_name || ''}`
               : (s.meetings?.meeting_name || ''),
@@ -648,8 +714,11 @@ export async function GET(request: NextRequest) {
           isFormatChange: parsedAct.isFormatChange,
           formatChangePayload: parsedAct.formatChangePayload,
           memberPayload: parsedAct.memberPayload,
+          guestPayload,
           nameTh,
           nameEn,
+          position,
+          attendanceType,
           email,
           phone,
           workplace,
@@ -685,6 +754,7 @@ export async function GET(request: NextRequest) {
           m.email AS member_email,
           m.mobile AS member_mobile,
           m.workplace AS member_workplace,
+          m.position AS member_position,
           mtg.meeting_name,
           mtg.meeting_date
         FROM payment_slips s
@@ -871,16 +941,29 @@ export async function GET(request: NextRequest) {
             app.lineId = app.lineId || mem?.lineId || '';
           });
         }
+        
+        const guestPayload: any = parsedAct.guestPayload || {};
+
         const nameTh = isCorporate && companyName
           ? companyName
           : isMember
-            ? s.member_full_name_th
-            : s.guest_name || parsedAct.memberPayload?.full_name_th || 'ผู้สมัครทั่วไป';
+            ? (s.member_full_name_th || 'สมาชิก')
+            : (s.guest_name || parsedAct.memberPayload?.full_name_th || guestPayload.nameTh || 'ผู้สมัครทั่วไป');
         const nameEn = isCorporate && companyName
           ? companyName
           : isMember
-            ? s.member_full_name_en || ''
-            : parsedAct.memberPayload?.full_name_en || '';
+            ? (s.member_full_name_en || '')
+            : (parsedAct.memberPayload?.full_name_en || guestPayload.nameEn || '');
+
+        const position = isCorporate
+          ? ''
+          : isMember
+            ? (s.member_position || '')
+            : (parsedAct.memberPayload?.position || guestPayload.position || '');
+
+        const attendanceType = isCorporate
+          ? ''
+          : (parsedAct.memberPayload?.attendanceType || guestPayload.attendanceType || '');
 
         const coordinatorEmail = parsedAct.groupPayload?.groupContact?.coordinatorEmail || null;
         const coordinatorPhone = parsedAct.groupPayload?.groupContact?.coordinatorPhone || null;
@@ -889,18 +972,18 @@ export async function GET(request: NextRequest) {
         const email = isCorporate
           ? (coordinatorEmail || '')
           : isMember
-            ? s.member_email || ''
-            : s.guest_email || parsedAct.memberPayload?.email || '';
+            ? (s.member_email || '')
+            : (s.guest_email || parsedAct.memberPayload?.email || guestPayload.email || '');
         const phone = isCorporate
           ? (coordinatorPhone || '')
           : isMember
-            ? s.member_mobile || ''
-            : s.guest_phone || parsedAct.memberPayload?.mobile || '';
+            ? (s.member_mobile || '')
+            : (s.guest_phone || parsedAct.memberPayload?.mobile || guestPayload.phone || '');
         const workplace = isCorporate
           ? companyName
           : isMember
-            ? s.member_workplace || ''
-            : s.guest_workplace || parsedAct.memberPayload?.workplace || '';
+            ? (s.member_workplace || '')
+            : (s.guest_workplace || parsedAct.memberPayload?.workplace || guestPayload.workplace || '');
 
         // Resolve coupon and discount
         const { couponCode, couponInfo, discountTotal, couponUsagesList } = resolveSlipCouponAndDiscount(
@@ -929,7 +1012,7 @@ export async function GET(request: NextRequest) {
           id: s.slip_id,
           dbId: s.id?.toString(),
           meetingId: s.meeting_id,
-          meetingName: parsedAct.isMembership ? 'สมัครสมาชิกสมาคม (Membership Registration)' : (s.meeting_name || ''),
+          meetingName: parsedAct.isMembership ? 'สมัครสมาชิกสมาคม' : (s.meeting_name || ''),
           memberNo: s.member_no,
           isMember: Boolean(s.is_member || hasMemberAttendees),
           isMembershipRegistration: parsedAct.isMembership,
@@ -941,8 +1024,11 @@ export async function GET(request: NextRequest) {
           coordinatorEmail,
           coordinatorPhone,
           memberPayload: parsedAct.memberPayload,
+          guestPayload,
           nameTh,
           nameEn,
+          position,
+          attendanceType,
           email,
           phone,
           workplace,

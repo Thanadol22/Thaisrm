@@ -532,16 +532,45 @@ export async function POST(
     if (effectiveSelectedActivities && Array.isArray(effectiveSelectedActivities)) {
       effectiveSelectedActivities = {
         activities: effectiveSelectedActivities,
-        nameTh: guestName,
+        nameTh: guestName || body.nameTh || null,
         nameEn: body.guestNameEn || body.nameEn || null,
-        email: guestEmail,
-        phone: guestPhone,
-        workplace: guestWorkplace,
+        email: guestEmail || body.email || null,
+        phone: guestPhone || body.phone || body.mobile || null,
+        workplace: guestWorkplace || body.workplace || null,
         position: body.guestPosition || body.position || null,
+        dietaryPreference: body.dietaryPreference || null,
+        foodAllergies: body.foodAllergies || null,
+        specialRequirements: body.specialRequirements || null,
+        attendanceType: body.attendanceType || null,
       };
-    } else if (effectiveSelectedActivities && typeof effectiveSelectedActivities === 'object' && !effectiveSelectedActivities.nameEn) {
-      effectiveSelectedActivities.nameEn = body.guestNameEn || body.nameEn || effectiveSelectedActivities.nameEn || null;
-      effectiveSelectedActivities.position = body.guestPosition || body.position || effectiveSelectedActivities.position || null;
+    } else if (effectiveSelectedActivities && typeof effectiveSelectedActivities === 'object') {
+      effectiveSelectedActivities = {
+        ...effectiveSelectedActivities,
+        nameTh: effectiveSelectedActivities.nameTh || guestName || body.nameTh || null,
+        nameEn: effectiveSelectedActivities.nameEn || body.guestNameEn || body.nameEn || null,
+        email: effectiveSelectedActivities.email || guestEmail || body.email || null,
+        phone: effectiveSelectedActivities.phone || guestPhone || body.phone || body.mobile || null,
+        workplace: effectiveSelectedActivities.workplace || guestWorkplace || body.workplace || null,
+        position: effectiveSelectedActivities.position || body.guestPosition || body.position || null,
+        dietaryPreference: effectiveSelectedActivities.dietaryPreference || body.dietaryPreference || null,
+        foodAllergies: effectiveSelectedActivities.foodAllergies || body.foodAllergies || null,
+        specialRequirements: effectiveSelectedActivities.specialRequirements || body.specialRequirements || null,
+        attendanceType: effectiveSelectedActivities.attendanceType || body.attendanceType || null,
+      };
+    } else {
+      effectiveSelectedActivities = {
+        activities: [],
+        nameTh: guestName || body.nameTh || null,
+        nameEn: body.guestNameEn || body.nameEn || null,
+        email: guestEmail || body.email || null,
+        phone: guestPhone || body.phone || body.mobile || null,
+        workplace: guestWorkplace || body.workplace || null,
+        position: body.guestPosition || body.position || null,
+        dietaryPreference: body.dietaryPreference || null,
+        foodAllergies: body.foodAllergies || null,
+        specialRequirements: body.specialRequirements || null,
+        attendanceType: body.attendanceType || null,
+      };
     }
 
     // 2. Record payment slip in payment_slips table
