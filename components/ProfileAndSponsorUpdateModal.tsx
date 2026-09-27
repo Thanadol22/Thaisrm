@@ -134,6 +134,7 @@ export function ProfileAndSponsorUpdateModal({
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [userType, setUserType] = useState<'member' | 'sponsor' | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
 
   // Member State
   const [memberData, setMemberData] = useState<MemberData | null>(null);
@@ -166,6 +167,7 @@ export function ProfileAndSponsorUpdateModal({
       setErrorMsg('');
       setSuccessMsg('');
       setUserType(null);
+      setSessionToken(null);
       setMemberData(null);
       setSponsorData(null);
       setSaveSuccess(false);
@@ -236,6 +238,10 @@ export function ProfileAndSponsorUpdateModal({
         return;
       }
 
+      if (data.sessionToken) {
+        setSessionToken(data.sessionToken);
+      }
+
       if (data.userType === 'member') {
         setMemberData(data.data);
         setStep('member_view');
@@ -261,10 +267,18 @@ export function ProfileAndSponsorUpdateModal({
     setSaveSuccess(false);
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (sessionToken) {
+        headers['Authorization'] = `Bearer ${sessionToken}`;
+      }
+
       const res = await fetch('/api/members/profile-update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(memberData),
+        headers,
+        body: JSON.stringify({
+          ...memberData,
+          sessionToken,
+        }),
       });
 
       const data = await res.json();
@@ -329,9 +343,14 @@ export function ProfileAndSponsorUpdateModal({
 
       // 2. Submit slip metadata
       const activeMeetingId = sponsorData.quotas[0]?.meeting_id || 'TSRM34';
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (sessionToken) {
+        headers['Authorization'] = `Bearer ${sessionToken}`;
+      }
+
       const res = await fetch('/api/sponsors/portal/upload-slip', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           sponsorId: sponsorData.sponsorId,
           sponsorName: sponsorData.sponsorName,
@@ -343,6 +362,7 @@ export function ProfileAndSponsorUpdateModal({
           transfer_time: slipTime,
           slip_url: uploadRes.url,
           ref_no: slipRef,
+          sessionToken,
         }),
       });
 

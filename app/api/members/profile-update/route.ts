@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import crypto from 'crypto';
 import { getClientIp, checkRateLimitAsync } from '@/lib/security/rateLimiter';
+import { extractOtpSessionFromRequest } from '@/lib/security/otpSessionAuth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -28,8 +29,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       member_no,
-      otp,            // ← OTP ที่สมาชิกส่งมา (จำเป็น)
-      email,          // ← อีเมลที่สมาชิกส่งมา (จำเป็น)
+      email,
+      sessionToken,
       fullNameEn,
       idLast4,
       mobile,
@@ -55,7 +56,16 @@ export async function POST(req: NextRequest) {
 
     const cleanEmail = String(email).trim().toLowerCase();
 
-    // ─── Step 1: ตรวจสอบข้อมูลสมาชิกในระบบจากอีเมล ──────────────────────────
+    // ─── Step 1: ตรวจสอบความถูกต้องของสิทธิ์การเข้าใช้งาน (Cryptographic OTP Session Token) ────
+    const session = extractOtpSessionFromRequest(req, sessionToken);
+    if (!session || session.email !== cleanEmail || session.userType !== 'member') {
+      return NextResponse.json(
+        { success: false, message: 'สิทธิ์การเข้าใช้งานหมดอายุหรือไม่ถูกต้อง กรุณายืนยันตัวตนด้วยรหัส OTP ใหม่อีกครั้ง' },
+        { status: 401 }
+      );
+    }
+
+    // ─── Step 2: ตรวจสอบข้อมูลสมาชิกในระบบจากอีเมล ──────────────────────────
     const memberCheck = await prisma.member.findFirst({
       where: {
         email: { equals: cleanEmail, mode: 'insensitive' },

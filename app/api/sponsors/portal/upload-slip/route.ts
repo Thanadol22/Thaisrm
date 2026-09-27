@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { extractOtpSessionFromRequest } from '@/lib/security/otpSessionAuth';
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,12 +16,22 @@ export async function POST(req: NextRequest) {
       transfer_time,
       slip_url,
       ref_no,
+      sessionToken,
     } = body;
 
     if (!sponsorId || !contactEmail || !slip_url) {
       return NextResponse.json(
         { success: false, message: 'ข้อมูลไม่ครบถ้วน (กรุณาระบุหลักฐานสลิปโอนเงิน)' },
         { status: 400 }
+      );
+    }
+
+    // ตรวจสอบความถูกต้องของสิทธิ์การเข้าใช้งาน
+    const session = extractOtpSessionFromRequest(req, sessionToken);
+    if (!session || session.email !== contactEmail.trim().toLowerCase() || session.userType !== 'sponsor') {
+      return NextResponse.json(
+        { success: false, message: 'สิทธิ์การเข้าใช้งานหมดอายุหรือไม่ถูกต้อง กรุณายืนยันตัวตนด้วยรหัส OTP ใหม่อีกครั้ง' },
+        { status: 401 }
       );
     }
 

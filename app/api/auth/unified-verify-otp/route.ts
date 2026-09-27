@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import prisma from '@/lib/prisma';
+import { createOtpSessionToken } from '@/lib/security/otpSessionAuth';
 
 export async function POST(req: NextRequest) {
   try {
@@ -127,9 +128,16 @@ export async function POST(req: NextRequest) {
         }
       });
 
+      const sessionToken = createOtpSessionToken({
+        email: member.email || email,
+        userType: 'member',
+        member_no: member.member_no,
+      });
+
       return NextResponse.json({
         success: true,
         userType: 'member',
+        sessionToken,
         data: {
           member_no: member.member_no,
           fullNameTh: member.fullNameTh || '',
@@ -263,9 +271,16 @@ export async function POST(req: NextRequest) {
     // หากมียอด net_price > 0 และยังไม่มี slip ที่ approved หรือมี rejected slip
     const hasOutstanding = (totalAmount > 0 && !hasApprovedSlip) || hasRejectedSlip;
 
+    const sessionToken = createOtpSessionToken({
+      email: sponsor.contact_email || email,
+      userType: 'sponsor',
+      sponsorId: sponsor.id,
+    });
+
     return NextResponse.json({
       success: true,
       userType: 'sponsor',
+      sessionToken,
       data: {
         sponsorId: sponsor.id,
         sponsorName: sponsor.name,
