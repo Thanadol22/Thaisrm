@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
       member_no,
       email,
       sessionToken,
+      fullNameTh,
       fullNameEn,
       idLast4,
       mobile,
@@ -43,7 +44,10 @@ export async function POST(req: NextRequest) {
       job_category,
       job_category_other,
       scientist_license_no,
+      referees,
       photo_url,
+      degree_cert_doc,
+      work_cert_doc,
       educations,
     } = body;
 
@@ -81,11 +85,8 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── Step 2: ดำเนินการอัปเดตข้อมูล ─────────────────────────────────────
-    // ใช้ member_no ที่ผ่านการยืนยันแล้วจาก DB (ไม่ใช่จาก body)
-    const verifiedMemberNo = memberCheck.member_no;
-
-    // ─── Step 2: ดำเนินการอัปเดตข้อมูล ─────────────────────────────────────
     // ใช้ verifiedMemberNo ที่ผ่านการยืนยัน OTP แล้วเท่านั้น (ไม่ใช่ค่าจาก body โดยตรง)
+    const verifiedMemberNo = memberCheck.member_no;
 
     // แปลงวันเริ่มทำงาน
     let parsedWorkStartDate: Date | null = null;
@@ -103,6 +104,7 @@ export async function POST(req: NextRequest) {
       await db.member.update({
         where: { member_no: verifiedMemberNo },
         data: {
+          fullNameTh: fullNameTh !== undefined ? (fullNameTh ? String(fullNameTh).trim() : undefined) : undefined,
           fullNameEn: fullNameEn !== undefined ? (fullNameEn ? String(fullNameEn).trim() : null) : undefined,
           idLast4: idLast4 !== undefined ? (idLast4 ? String(idLast4).trim() : null) : undefined,
           mobile: mobile !== undefined ? (mobile ? String(mobile).trim() : null) : undefined,
@@ -115,12 +117,16 @@ export async function POST(req: NextRequest) {
           job_category: job_category !== undefined ? (job_category ? String(job_category).trim() : null) : undefined,
           job_category_other: job_category_other !== undefined ? (job_category_other ? String(job_category_other).trim() : null) : undefined,
           scientist_license_no: scientist_license_no !== undefined ? (scientist_license_no ? String(scientist_license_no).trim() : null) : undefined,
+          referees: referees !== undefined ? (referees ? String(referees).trim() : null) : undefined,
           photo_url: photo_url !== undefined ? (photo_url ? String(photo_url).trim() : null) : undefined,
+          degree_cert_doc: degree_cert_doc !== undefined ? (degree_cert_doc ? String(degree_cert_doc).trim() : null) : undefined,
+          work_cert_doc: work_cert_doc !== undefined ? (work_cert_doc ? String(work_cert_doc).trim() : null) : undefined,
         },
       });
     } else {
       await prisma.$executeRaw`
         UPDATE members SET
+          full_name_th = COALESCE(${fullNameTh ? String(fullNameTh).trim() : null}, full_name_th),
           full_name_en = ${fullNameEn ? String(fullNameEn).trim() : null},
           id_last4 = ${idLast4 ? String(idLast4).trim() : null},
           mobile = ${mobile ? String(mobile).trim() : null},
@@ -133,7 +139,10 @@ export async function POST(req: NextRequest) {
           job_category = ${job_category ? String(job_category).trim() : null},
           job_category_other = ${job_category_other ? String(job_category_other).trim() : null},
           scientist_license_no = ${scientist_license_no ? String(scientist_license_no).trim() : null},
-          photo_url = ${photo_url ? String(photo_url).trim() : null}
+          referees = ${referees ? String(referees).trim() : null},
+          photo_url = ${photo_url ? String(photo_url).trim() : null},
+          degree_cert_doc = ${degree_cert_doc ? String(degree_cert_doc).trim() : null},
+          work_cert_doc = ${work_cert_doc ? String(work_cert_doc).trim() : null}
         WHERE member_no = ${verifiedMemberNo}
       `;
     }

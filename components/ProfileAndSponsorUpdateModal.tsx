@@ -30,7 +30,11 @@ import {
   Info,
   Calendar,
   Lock,
+  Camera,
+  FileCheck,
+  Eye,
 } from 'lucide-react';
+import { PositionSelect } from '@/components/PositionSelect';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
 import { ThaiDatePicker } from '@/components/ThaiDatePicker';
 import { uploadImageToStorage } from '@/lib/blobUpload';
@@ -49,18 +53,21 @@ interface MemberData {
   idLast4: string;
   mobile: string;
   email: string;
-  lineId: string;
-  address: string;
+  lineId?: string;
+  address?: string;
   workplace: string;
-  work_phone: string;
+  work_phone?: string;
   work_start_date: string;
   position: string;
-  job_category: string;
+  job_category?: string;
   job_category_other: string;
   scientist_license_no: string;
+  referees?: string;
+  photo_url?: string;
+  degree_cert_doc?: string;
+  work_cert_doc?: string;
   membership_status: string;
   membership_type: string;
-  photo_url?: string;
   educations: EducationItem[];
   missingFields: string[];
   isProfileComplete: boolean;
@@ -140,6 +147,9 @@ export function ProfileAndSponsorUpdateModal({
   const [memberData, setMemberData] = useState<MemberData | null>(null);
   const [savingMember, setSavingMember] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingWorkCert, setUploadingWorkCert] = useState(false);
+  const [uploadingDegreeCert, setUploadingDegreeCert] = useState(false);
 
   // Sponsor State
   const [sponsorData, setSponsorData] = useState<SponsorData | null>(null);
@@ -178,6 +188,77 @@ export function ProfileAndSponsorUpdateModal({
   }, [isOpen]);
 
   if (!isOpen || !mounted) return null;
+
+  // Helper check PDF
+  const isPdf = (url: string | null | undefined): boolean => {
+    if (!url) return false;
+    const cleanUrl = url.split('?')[0].toLowerCase();
+    return cleanUrl.endsWith('.pdf') || cleanUrl.includes('.pdf');
+  };
+
+  // Upload handlers for member documents
+  const handleMemberPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !memberData) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert(lang === 'th' ? 'ขนาดรูปถ่ายเกิน 5MB' : 'Photo size exceeds 5MB');
+      return;
+    }
+    try {
+      setUploadingPhoto(true);
+      const res = await uploadImageToStorage(file, 'avatars');
+      if (res?.url) {
+        setMemberData({ ...memberData, photo_url: res.url });
+      }
+    } catch (err) {
+      alert(lang === 'th' ? 'อัปโหลดรูปภาพไม่สำเร็จ' : 'Photo upload failed');
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleMemberWorkCertUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !memberData) return;
+    if (file.size > 10 * 1024 * 1024) {
+      alert(lang === 'th' ? 'ขนาดไฟล์เกิน 10MB' : 'File size exceeds 10MB');
+      return;
+    }
+    try {
+      setUploadingWorkCert(true);
+      const res = await uploadImageToStorage(file, 'documents');
+      if (res?.url) {
+        setMemberData({ ...memberData, work_cert_doc: res.url });
+      }
+    } catch (err) {
+      alert(lang === 'th' ? 'อัปโหลดเอกสารไม่สำเร็จ' : 'Document upload failed');
+    } finally {
+      setUploadingWorkCert(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleMemberDegreeCertUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !memberData) return;
+    if (file.size > 10 * 1024 * 1024) {
+      alert(lang === 'th' ? 'ขนาดไฟล์เกิน 10MB' : 'File size exceeds 10MB');
+      return;
+    }
+    try {
+      setUploadingDegreeCert(true);
+      const res = await uploadImageToStorage(file, 'documents');
+      if (res?.url) {
+        setMemberData({ ...memberData, degree_cert_doc: res.url });
+      }
+    } catch (err) {
+      alert(lang === 'th' ? 'อัปโหลดเอกสารไม่สำเร็จ' : 'Document upload failed');
+    } finally {
+      setUploadingDegreeCert(false);
+      e.target.value = '';
+    }
+  };
 
   // 1. ขอรับรหัสชั่วคราว (Request OTP)
   const handleRequestOtp = async (e: React.FormEvent) => {
@@ -288,18 +369,14 @@ export function ProfileAndSponsorUpdateModal({
       }
 
       setSaveSuccess(true);
-      // Re-calculate missing fields
+      // Re-calculate missing fields matching signup inputs
       const fieldsToCheck = [
-        { key: 'fullNameEn', label: 'ชื่อ-นามสกุล (อังกฤษ)' },
+        { key: 'fullNameTh', label: 'ชื่อ-นามสกุล (ภาษาไทย)' },
+        { key: 'fullNameEn', label: 'ชื่อ-นามสกุล (ภาษาอังกฤษ)' },
         { key: 'idLast4', label: 'เลข 4 หลักท้ายบัตรประชาชน' },
         { key: 'mobile', label: 'เบอร์โทรศัพท์มือถือ' },
-        { key: 'lineId', label: 'LINE ID' },
-        { key: 'address', label: 'ที่อยู่ติดต่อ' },
         { key: 'workplace', label: 'สถานที่ทำงาน' },
-        { key: 'work_phone', label: 'เบอร์โทรศัพท์ที่ทำงาน' },
         { key: 'position', label: 'ตำแหน่งงาน' },
-        { key: 'job_category', label: 'สาขาวิชาชีพ' },
-        { key: 'scientist_license_no', label: 'เลขที่ใบอนุญาตนักวิทยาศาสตร์' },
       ];
       const newMissing: string[] = [];
       fieldsToCheck.forEach((f) => {
@@ -602,7 +679,7 @@ export function ProfileAndSponsorUpdateModal({
                     </span>
                   </div>
                   <h4 className="font-extrabold text-slate-900 text-base mt-1.5">
-                    {memberData.fullNameTh}
+                    {memberData.fullNameTh || 'ยังไม่ได้ระบุชื่อ-นามสกุล'}
                   </h4>
                   <p className="text-xs text-slate-500">{memberData.email}</p>
                 </div>
@@ -640,34 +717,117 @@ export function ProfileAndSponsorUpdateModal({
                 </div>
               )}
 
-              {/* 1. ข้อมูลส่วนบุคคล */}
-              <div className="space-y-3 border-t border-slate-200 pt-4">
+              {/* 1. ข้อมูลส่วนบุคคลและรูปถ่ายสมาชิก */}
+              <div className="space-y-4 border-t border-slate-200 pt-4">
                 <h5 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                   <User className="w-4 h-4 text-blue-600" />
-                  <span>1. ข้อมูลส่วนบุคคล</span>
+                  <span>1. ข้อมูลส่วนบุคคลและรูปถ่ายสมาชิก</span>
                 </h5>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* ชื่อ-นามสกุล ไทย (Locked) */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1 flex items-center justify-between">
-                      <span>ชื่อ-นามสกุล (ภาษาไทย)</span>
-                      <span className="text-[10px] text-slate-400 font-normal flex items-center gap-0.5">
-                        <Lock className="w-3 h-3" /> ทะเบียนสมาคมฯ
+                {/* Profile Photo Upload Row */}
+                <div className="bg-gradient-to-r from-blue-50/70 via-slate-50 to-white rounded-2xl p-3.5 sm:p-4 border border-blue-100 flex flex-col sm:flex-row items-center gap-3.5 sm:gap-5">
+                  <div className="relative group shrink-0">
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-dashed border-blue-300 bg-white flex flex-col items-center justify-center overflow-hidden shadow-2xs group-hover:border-blue-600 transition-all relative">
+                      {memberData.photo_url ? (
+                        <img
+                          src={memberData.photo_url}
+                          alt="Profile Preview"
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center p-2 text-center text-slate-400 group-hover:text-blue-600 transition-colors">
+                          <User className="w-7 h-7 sm:w-8 sm:h-8 stroke-[1.5] mb-0.5" />
+                          <span className="text-[9px] font-bold text-slate-500">รูปถ่าย</span>
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleMemberPhotoUpload}
+                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                        title="เลือกรูปโปรไฟล์"
+                      />
+                    </div>
+
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md border-2 border-white pointer-events-none group-hover:scale-110 transition-transform">
+                      {uploadingPhoto ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 text-center sm:text-left space-y-1 min-w-0">
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5">
+                      <h4 className="font-extrabold text-slate-800 text-xs sm:text-sm">
+                        รูปถ่ายหน้าตรงติดบัตรสมาชิก
+                      </h4>
+                      <span className="text-[10px] font-bold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-md">
+                        รูปหน้าตรงสุภาพ
                       </span>
+                    </div>
+                    <p className="text-[10.5px] sm:text-xs text-slate-500 leading-tight">
+                      อัปโหลดรูปถ่ายหน้าตรงสุภาพ (ไฟล์ JPG หรือ PNG ขนาดไม่เกิน 5MB)
+                    </p>
+
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                      <label className="relative cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold border border-slate-300 shadow-2xs hover:border-blue-600 transition active:scale-95">
+                        <Upload className="w-3.5 h-3.5 text-blue-600" />
+                        <span>{uploadingPhoto ? 'กำลังอัปโหลด...' : memberData.photo_url ? 'เปลี่ยนรูปถ่าย' : 'เลือกรูปถ่าย'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleMemberPhotoUpload}
+                          disabled={uploadingPhoto}
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                        />
+                      </label>
+
+                      {memberData.photo_url && (
+                        <button
+                          type="button"
+                          onClick={() => setMemberData({ ...memberData, photo_url: '' })}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 border border-red-200 transition cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>ลบรูป</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* ชื่อ-นามสกุล ไทย (Editable) */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>ชื่อ-นามสกุล (ภาษาไทย) <span className="text-red-500">*</span></span>
+                      {isFieldEmpty(memberData.fullNameTh) && (
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                          ⚠️ โปรดใส่ข้อมูล
+                        </span>
+                      )}
                     </label>
                     <input
                       type="text"
                       value={memberData.fullNameTh}
-                      disabled
-                      className="w-full text-xs sm:text-sm py-2 px-3 bg-slate-100 text-slate-700 rounded-xl border border-slate-200 cursor-not-allowed font-medium"
+                      onChange={(e) =>
+                        setMemberData({
+                          ...memberData,
+                          fullNameTh: e.target.value.replace(/[^\u0E00-\u0E7F\s\.\-]/g, ''),
+                        })
+                      }
+                      placeholder="เช่น นายสมชาย ใจดี"
+                      className={`w-full text-xs sm:text-sm py-2 px-3 rounded-xl border transition outline-none font-medium ${
+                        isFieldEmpty(memberData.fullNameTh)
+                          ? 'border-amber-400 bg-amber-50/40 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
+                          : 'border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+                      }`}
                     />
                   </div>
 
-                  {/* ชื่อ-นามสกุล อังกฤษ */}
+                  {/* ชื่อ-นามสกุล อังกฤษ (Editable) */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1 flex items-center justify-between">
-                      <span>Full Name (English)</span>
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>ชื่อ-นามสกุล (ภาษาอังกฤษ) <span className="text-red-500">*</span></span>
                       {isFieldEmpty(memberData.fullNameEn) && (
                         <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
                           ⚠️ โปรดใส่ข้อมูล
@@ -677,9 +837,14 @@ export function ProfileAndSponsorUpdateModal({
                     <input
                       type="text"
                       value={memberData.fullNameEn}
-                      onChange={(e) => setMemberData({ ...memberData, fullNameEn: e.target.value })}
-                      placeholder="e.g. Somchai Jaidee"
-                      className={`w-full text-xs sm:text-sm py-2 px-3 rounded-xl border transition outline-none ${
+                      onChange={(e) =>
+                        setMemberData({
+                          ...memberData,
+                          fullNameEn: e.target.value.replace(/[^a-zA-Z\s\.\-']/g, ''),
+                        })
+                      }
+                      placeholder="e.g. Mr. Somchai Jaidee"
+                      className={`w-full text-xs sm:text-sm py-2 px-3 rounded-xl border transition outline-none font-medium ${
                         isFieldEmpty(memberData.fullNameEn)
                           ? 'border-amber-400 bg-amber-50/40 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
                           : 'border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
@@ -688,9 +853,9 @@ export function ProfileAndSponsorUpdateModal({
                   </div>
 
                   {/* เลข 4 หลักท้ายบัตร ปชช */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1 flex items-center justify-between">
-                      <span>เลข 4 หลักท้ายบัตรประชาชน</span>
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>เลข 4 หลักท้ายบัตรประชาชน <span className="text-red-500">*</span></span>
                       {isFieldEmpty(memberData.idLast4) && (
                         <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
                           ⚠️ โปรดใส่ข้อมูล
@@ -701,9 +866,14 @@ export function ProfileAndSponsorUpdateModal({
                       type="text"
                       maxLength={4}
                       value={memberData.idLast4}
-                      onChange={(e) => setMemberData({ ...memberData, idLast4: e.target.value.replace(/\D/g, '') })}
+                      onChange={(e) =>
+                        setMemberData({
+                          ...memberData,
+                          idLast4: e.target.value.replace(/\D/g, '').slice(0, 4),
+                        })
+                      }
                       placeholder="เช่น 1234"
-                      className={`w-full text-xs sm:text-sm py-2 px-3 rounded-xl border transition outline-none ${
+                      className={`w-full text-xs sm:text-sm py-2 px-3 rounded-xl border transition outline-none font-mono ${
                         isFieldEmpty(memberData.idLast4)
                           ? 'border-amber-400 bg-amber-50/40 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
                           : 'border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
@@ -720,210 +890,246 @@ export function ProfileAndSponsorUpdateModal({
                   <span>2. ข้อมูลการติดต่อ</span>
                 </h5>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   {/* เบอร์โทรศัพท์มือถือ */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1 flex items-center justify-between">
-                      <span>เบอร์โทรศัพท์มือถือ</span>
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>เบอร์โทรศัพท์มือถือ <span className="text-red-500">*</span></span>
                       {isFieldEmpty(memberData.mobile) && (
                         <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
                           ⚠️ โปรดใส่ข้อมูล
                         </span>
                       )}
                     </label>
-                    <input
-                      type="tel"
-                      value={memberData.mobile}
-                      onChange={(e) => setMemberData({ ...memberData, mobile: e.target.value })}
-                      placeholder="เช่น 0812345678"
-                      className={`w-full text-xs sm:text-sm py-2 px-3 rounded-xl border transition outline-none ${
-                        isFieldEmpty(memberData.mobile)
-                          ? 'border-amber-400 bg-amber-50/40 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
-                          : 'border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
-                      }`}
-                    />
+                    <div className="relative flex items-center">
+                      <Phone className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none shrink-0" />
+                      <input
+                        type="tel"
+                        value={memberData.mobile}
+                        onChange={(e) =>
+                          setMemberData({
+                            ...memberData,
+                            mobile: e.target.value.replace(/\D/g, '').slice(0, 10),
+                          })
+                        }
+                        placeholder="เช่น 0812345678"
+                        className={`w-full text-xs sm:text-sm py-2 pl-9 pr-3 rounded-xl border transition outline-none font-medium ${
+                          isFieldEmpty(memberData.mobile)
+                            ? 'border-amber-400 bg-amber-50/40 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
+                            : 'border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+                        }`}
+                      />
+                    </div>
                   </div>
 
-                  {/* LINE ID */}
+                  {/* อีเมลสำหรับเข้าใช้งาน */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1 flex items-center justify-between">
-                      <span>LINE ID</span>
-                      {isFieldEmpty(memberData.lineId) && (
-                        <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
-                          ⚠️ โปรดใส่ข้อมูล
-                        </span>
-                      )}
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>อีเมล</span>
+                      <span className="text-[10px] text-slate-400 font-normal flex items-center gap-0.5">
+                        <Lock className="w-3 h-3" /> บัญชีเข้าสู่ระบบ
+                      </span>
                     </label>
-                    <input
-                      type="text"
-                      value={memberData.lineId}
-                      onChange={(e) => setMemberData({ ...memberData, lineId: e.target.value })}
-                      placeholder="เช่น line_user"
-                      className={`w-full text-xs sm:text-sm py-2 px-3 rounded-xl border transition outline-none ${
-                        isFieldEmpty(memberData.lineId)
-                          ? 'border-amber-400 bg-amber-50/40 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
-                          : 'border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
-                      }`}
-                    />
-                  </div>
-
-                  {/* ที่อยู่ติดต่อ */}
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-slate-600 mb-1 flex items-center justify-between">
-                      <span>ที่อยู่ติดต่อ / จัดส่งเอกสาร</span>
-                      {isFieldEmpty(memberData.address) && (
-                        <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
-                          ⚠️ โปรดใส่ข้อมูล
-                        </span>
-                      )}
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={memberData.address}
-                      onChange={(e) => setMemberData({ ...memberData, address: e.target.value })}
-                      placeholder="บ้านเลขที่ ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด รหัสไปรษณีย์"
-                      className={`w-full text-xs sm:text-sm py-2 px-3 rounded-xl border transition outline-none resize-none ${
-                        isFieldEmpty(memberData.address)
-                          ? 'border-amber-400 bg-amber-50/40 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
-                          : 'border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
-                      }`}
-                    />
+                    <div className="relative flex items-center">
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none shrink-0" />
+                      <input
+                        type="email"
+                        value={memberData.email}
+                        disabled
+                        className="w-full text-xs sm:text-sm py-2 pl-9 pr-3 bg-slate-100 text-slate-600 rounded-xl border border-slate-200 cursor-not-allowed font-medium"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* 3. สถานที่ทำงานและวิชาชีพ */}
-              <div className="space-y-3 border-t border-slate-200 pt-4">
+              {/* 3. ข้อมูลสถานที่ทำงาน ตำแหน่ง และหลักฐานการทำงาน */}
+              <div className="space-y-4 border-t border-slate-200 pt-4">
                 <h5 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                   <Briefcase className="w-4 h-4 text-blue-600" />
-                  <span>3. ข้อมูลสถานที่ทำงานและวิชาชีพ</span>
+                  <span>3. ข้อมูลสถานที่ทำงาน ตำแหน่ง และหลักฐานการทำงาน</span>
                 </h5>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   {/* สถานที่ทำงาน */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1 flex items-center justify-between">
-                      <span>สถานที่ทำงาน / โรงพยาบาล / สถาบัน</span>
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>สถานที่ทำงาน หรือ สถาบัน <span className="text-red-500">*</span></span>
                       {isFieldEmpty(memberData.workplace) && (
                         <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
                           ⚠️ โปรดใส่ข้อมูล
                         </span>
                       )}
                     </label>
-                    <input
-                      type="text"
-                      value={memberData.workplace}
-                      onChange={(e) => setMemberData({ ...memberData, workplace: e.target.value })}
-                      placeholder="เช่น โรงพยาบาลศิริราช หรือ คลินิก..."
-                      className={`w-full text-xs sm:text-sm py-2 px-3 rounded-xl border transition outline-none ${
-                        isFieldEmpty(memberData.workplace)
-                          ? 'border-amber-400 bg-amber-50/40 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
-                          : 'border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
-                      }`}
-                    />
+                    <div className="relative flex items-center">
+                      <Building2 className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none shrink-0" />
+                      <input
+                        type="text"
+                        value={memberData.workplace}
+                        onChange={(e) => setMemberData({ ...memberData, workplace: e.target.value })}
+                        placeholder="เช่น โรงพยาบาลศิริราช หรือ คลินิก..."
+                        className={`w-full text-xs sm:text-sm py-2 pl-9 pr-3 rounded-xl border transition outline-none font-medium ${
+                          isFieldEmpty(memberData.workplace)
+                            ? 'border-amber-400 bg-amber-50/40 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
+                            : 'border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+                        }`}
+                      />
+                    </div>
                   </div>
 
-                  {/* เบอร์โทรศัพท์ที่ทำงาน */}
+                  {/* วันที่เริ่มปฏิบัติงาน */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1 flex items-center justify-between">
-                      <span>เบอร์โทรศัพท์ที่ทำงาน</span>
-                      {isFieldEmpty(memberData.work_phone) && (
-                        <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
-                          ⚠️ โปรดใส่ข้อมูล
-                        </span>
-                      )}
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      วันที่เริ่มปฏิบัติงาน
                     </label>
-                    <input
-                      type="text"
-                      value={memberData.work_phone}
-                      onChange={(e) => setMemberData({ ...memberData, work_phone: e.target.value })}
-                      placeholder="เช่น 02-123-4567 ต่อ 123"
-                      className={`w-full text-xs sm:text-sm py-2 px-3 rounded-xl border transition outline-none ${
-                        isFieldEmpty(memberData.work_phone)
-                          ? 'border-amber-400 bg-amber-50/40 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
-                          : 'border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
-                      }`}
+                    <ThaiDatePicker
+                      value={memberData.work_start_date}
+                      onChange={(val) => setMemberData({ ...memberData, work_start_date: val })}
+                      outputFormat="iso"
+                      placeholder="เลือกวันที่เริ่มปฏิบัติงาน"
+                      className="w-full"
                     />
                   </div>
+                </div>
 
-                  {/* ตำแหน่งงาน */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1 flex items-center justify-between">
-                      <span>ตำแหน่งงาน</span>
-                      {isFieldEmpty(memberData.position) && (
-                        <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
-                          ⚠️ โปรดใส่ข้อมูล
-                        </span>
-                      )}
-                    </label>
-                    <input
-                      type="text"
-                      value={memberData.position}
-                      onChange={(e) => setMemberData({ ...memberData, position: e.target.value })}
-                      placeholder="เช่น สูตินรีแพทย์, นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อน"
-                      className={`w-full text-xs sm:text-sm py-2 px-3 rounded-xl border transition outline-none ${
-                        isFieldEmpty(memberData.position)
-                          ? 'border-amber-400 bg-amber-50/40 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
-                          : 'border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
-                      }`}
-                    />
+                {/* ตำแหน่งงาน */}
+                <PositionSelect
+                  value={memberData.position}
+                  onChange={(val) => setMemberData({ ...memberData, position: val })}
+                  otherValue={memberData.job_category_other}
+                  onOtherChange={(val) => setMemberData({ ...memberData, job_category_other: val })}
+                  showIcon={false}
+                  showLabel={true}
+                  label="ตำแหน่งงาน"
+                  otherLabel="ระบุตำแหน่งงานเพิ่มเติม"
+                  otherPlaceholder="ระบุตำแหน่งงานของคุณ..."
+                  selectClassName="px-3.5 py-2 text-xs sm:text-sm font-semibold"
+                />
+
+                {/* เลขทะเบียนนักวิทย์ */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>เลขทะเบียนนักวิทยาศาสตร์ (นว) หรือ เลขที่ใบประกอบวิชาชีพ</span>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      (จำเป็นสำหรับตำแหน่งแพทย์ RM และ Fellow RM หรือระบุถ้ามี)
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    value={memberData.scientist_license_no}
+                    onChange={(e) => setMemberData({ ...memberData, scientist_license_no: e.target.value })}
+                    placeholder="เช่น วท.1234/2565"
+                    className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-none font-medium"
+                  />
+                </div>
+
+                {/* หลักฐานใบรับรองการทำงาน */}
+                <div className="p-3.5 rounded-2xl border border-indigo-200 bg-indigo-50/50 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Briefcase className="w-4 h-4 text-blue-600 shrink-0" />
+                      <span className="text-xs sm:text-sm font-bold text-slate-800">
+                        หลักฐานใบรับรองการทำงาน
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md">
+                      ใบรับรองการทำงาน
+                    </span>
                   </div>
 
-                  {/* สาขาวิชาชีพ */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1 flex items-center justify-between">
-                      <span>สาขาวิชาชีพ</span>
-                      {isFieldEmpty(memberData.job_category) && (
-                        <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
-                          ⚠️ โปรดใส่ข้อมูล
-                        </span>
-                      )}
-                    </label>
-                    <select
-                      value={memberData.job_category}
-                      onChange={(e) => setMemberData({ ...memberData, job_category: e.target.value })}
-                      className={`w-full text-xs sm:text-sm py-2 px-3 rounded-xl border transition outline-none bg-white ${
-                        isFieldEmpty(memberData.job_category)
-                          ? 'border-amber-400 bg-amber-50/40 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
-                          : 'border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
-                      }`}
-                    >
-                      <option value="">-- กรุณาเลือก --</option>
-                      <option value="RM">แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)</option>
-                      <option value="Embryologist">นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อน (Embryologist)</option>
-                      <option value="Nurse">พยาบาลผู้เชี่ยวชาญ (Nurse)</option>
-                      <option value="Scientist">นักวิทยาศาสตร์การแพทย์ (Scientist)</option>
-                      <option value="Other">อื่นๆ (ระบุ)</option>
-                    </select>
-                  </div>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-3 rounded-xl border border-slate-200/80">
+                    {memberData.work_cert_doc ? (
+                      isPdf(memberData.work_cert_doc) ? (
+                        <div className="relative w-14 h-14 rounded-xl border border-rose-200 bg-rose-50 flex flex-col items-center justify-center text-rose-600 shrink-0 shadow-2xs">
+                          <FileText className="w-6 h-6 text-rose-500" />
+                          <span className="text-[9px] font-black uppercase tracking-wider text-rose-700 mt-0.5">PDF</span>
+                        </div>
+                      ) : (
+                        <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-slate-300 bg-slate-50 shrink-0 shadow-2xs">
+                          <img
+                            src={memberData.work_cert_doc}
+                            alt="Work Cert"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )
+                    ) : (
+                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-indigo-500 shrink-0">
+                        <FileCheck className="w-6 h-6" />
+                      </div>
+                    )}
 
-                  {/* เลขที่ใบอนุญาตนักวิทยาศาสตร์ */}
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-slate-600 mb-1 flex items-center justify-between">
-                      <span>เลขที่ใบประกอบวิชาชีพวิทยาศาสตร์ / เลขที่ใบอนุญาต (ถ้ามี)</span>
-                      {isFieldEmpty(memberData.scientist_license_no) && (
-                        <span className="text-[10px] text-slate-400 font-normal">
-                          (ไม่บังคับหากไม่มี)
-                        </span>
+                    <div className="flex-1 space-y-1 min-w-0">
+                      {memberData.work_cert_doc ? (
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span>
+                              {isPdf(memberData.work_cert_doc)
+                                ? 'แนบเอกสาร PDF ใบรับรองการทำงานแล้ว'
+                                : 'แนบรูปหลักฐานใบรับรองการทำงานเรียบร้อยแล้ว'}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+                          อัปโหลดใบรับรองการทำงาน (JPG, PNG หรือ PDF ขนาดไม่เกิน 10MB)
+                        </p>
                       )}
-                    </label>
-                    <input
-                      type="text"
-                      value={memberData.scientist_license_no}
-                      onChange={(e) => setMemberData({ ...memberData, scientist_license_no: e.target.value })}
-                      placeholder="เช่น วท.1234/2565"
-                      className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-none"
-                    />
+
+                      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                        {memberData.work_cert_doc && (
+                          <a
+                            href={memberData.work_cert_doc}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold border border-blue-200 shadow-2xs transition active:scale-95"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-blue-600" />
+                            <span>{isPdf(memberData.work_cert_doc) ? 'เปิดดู PDF' : 'ดูรูปภาพ'}</span>
+                          </a>
+                        )}
+
+                        <label className="relative cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-900 text-xs font-bold border border-indigo-200 shadow-2xs transition active:scale-95">
+                          <Upload className="w-3.5 h-3.5 text-blue-600" />
+                          <span>
+                            {uploadingWorkCert
+                              ? 'กำลังอัปโหลด...'
+                              : memberData.work_cert_doc
+                              ? 'เปลี่ยนไฟล์'
+                              : 'อัปโหลดใบรับรองการทำงาน'}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf,.pdf"
+                            onChange={handleMemberWorkCertUpload}
+                            disabled={uploadingWorkCert}
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                          />
+                        </label>
+
+                        {memberData.work_cert_doc && (
+                          <button
+                            type="button"
+                            onClick={() => setMemberData({ ...memberData, work_cert_doc: '' })}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-xl border border-red-200 transition cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>ลบเอกสาร</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* 4. ประวัติการศึกษา */}
-              <div className="space-y-3 border-t border-slate-200 pt-4">
+              {/* 4. ประวัติการศึกษาและหลักฐานปริญญาบัตร */}
+              <div className="space-y-4 border-t border-slate-200 pt-4">
                 <div className="flex items-center justify-between">
                   <h5 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                     <GraduationCap className="w-4 h-4 text-blue-600" />
-                    <span>4. ประวัติการศึกษา</span>
+                    <span>4. ประวัติการศึกษาและหลักฐานปริญญาบัตร</span>
                   </h5>
                   <button
                     type="button"
@@ -958,33 +1164,34 @@ export function ProfileAndSponsorUpdateModal({
                               newEdus[idx].degree = e.target.value;
                               setMemberData({ ...memberData, educations: newEdus });
                             }}
-                            className="w-full text-xs py-1.5 px-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:border-blue-500"
+                            className="w-full text-xs py-1.5 px-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:border-blue-500 font-medium"
                           />
                         </div>
                         <div className="sm:col-span-5">
                           <input
                             type="text"
-                            placeholder="สถาบัน / มหาวิทยาลัย"
+                            placeholder="สถาบัน หรือ มหาวิทยาลัย"
                             value={edu.institution}
                             onChange={(e) => {
                               const newEdus = [...memberData.educations];
                               newEdus[idx].institution = e.target.value;
                               setMemberData({ ...memberData, educations: newEdus });
                             }}
-                            className="w-full text-xs py-1.5 px-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:border-blue-500"
+                            className="w-full text-xs py-1.5 px-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:border-blue-500 font-medium"
                           />
                         </div>
                         <div className="sm:col-span-2">
                           <input
                             type="text"
+                            maxLength={4}
                             placeholder="ปีที่จบ (พ.ศ.)"
                             value={edu.graduation_year || ''}
                             onChange={(e) => {
                               const newEdus = [...memberData.educations];
-                              newEdus[idx].graduation_year = e.target.value;
+                              newEdus[idx].graduation_year = e.target.value.replace(/\D/g, '').slice(0, 4);
                               setMemberData({ ...memberData, educations: newEdus });
                             }}
-                            className="w-full text-xs py-1.5 px-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:border-blue-500"
+                            className="w-full text-xs py-1.5 px-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:border-blue-500 font-mono"
                           />
                         </div>
                         <div className="sm:col-span-1 text-right">
@@ -1004,6 +1211,127 @@ export function ProfileAndSponsorUpdateModal({
                     ))}
                   </div>
                 )}
+
+                {/* หลักฐานปริญญาบัตร */}
+                <div className="p-3.5 rounded-2xl border border-blue-100 bg-blue-50/40 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <GraduationCap className="w-4 h-4 text-blue-600 shrink-0" />
+                      <span className="text-xs sm:text-sm font-bold text-slate-800">
+                        หลักฐานปริญญาบัตร
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md">
+                      ปริญญาบัตร
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-3 rounded-xl border border-slate-200/80">
+                    {memberData.degree_cert_doc ? (
+                      isPdf(memberData.degree_cert_doc) ? (
+                        <div className="relative w-14 h-14 rounded-xl border border-rose-200 bg-rose-50 flex flex-col items-center justify-center text-rose-600 shrink-0 shadow-2xs">
+                          <FileText className="w-6 h-6 text-rose-500" />
+                          <span className="text-[9px] font-black uppercase tracking-wider text-rose-700 mt-0.5">PDF</span>
+                        </div>
+                      ) : (
+                        <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-slate-300 bg-slate-50 shrink-0 shadow-2xs">
+                          <img
+                            src={memberData.degree_cert_doc}
+                            alt="Degree Cert"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )
+                    ) : (
+                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/50 flex items-center justify-center text-blue-500 shrink-0">
+                        <FileCheck className="w-6 h-6" />
+                      </div>
+                    )}
+
+                    <div className="flex-1 space-y-1 min-w-0">
+                      {memberData.degree_cert_doc ? (
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span>
+                              {isPdf(memberData.degree_cert_doc)
+                                ? 'แนบเอกสาร PDF ปริญญาบัตรแล้ว'
+                                : 'แนบรูปหลักฐานปริญญาบัตรแล้ว'}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+                          อัปโหลดรูปหลักฐานปริญญาบัตร (JPG, PNG หรือ PDF ขนาดไม่เกิน 10MB)
+                        </p>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                        {memberData.degree_cert_doc && (
+                          <a
+                            href={memberData.degree_cert_doc}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold border border-blue-200 shadow-2xs transition active:scale-95"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-blue-600" />
+                            <span>{isPdf(memberData.degree_cert_doc) ? 'เปิดดู PDF' : 'ดูรูปภาพ'}</span>
+                          </a>
+                        )}
+
+                        <label className="relative cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 text-xs font-bold border border-blue-200 shadow-2xs transition active:scale-95">
+                          <Upload className="w-3.5 h-3.5 text-blue-600" />
+                          <span>
+                            {uploadingDegreeCert
+                              ? 'กำลังอัปโหลด...'
+                              : memberData.degree_cert_doc
+                              ? 'เปลี่ยนไฟล์'
+                              : 'อัปโหลดปริญญาบัตร'}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf,.pdf"
+                            onChange={handleMemberDegreeCertUpload}
+                            disabled={uploadingDegreeCert}
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                          />
+                        </label>
+
+                        {memberData.degree_cert_doc && (
+                          <button
+                            type="button"
+                            onClick={() => setMemberData({ ...memberData, degree_cert_doc: '' })}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-xl border border-red-200 transition cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>ลบเอกสาร</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 5. ข้อมูลผู้รับรอง */}
+              <div className="space-y-3 border-t border-slate-200 pt-4">
+                <h5 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-blue-600" />
+                  <span>5. ข้อมูลผู้รับรอง</span>
+                </h5>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    ชื่อแพทย์ผู้รับรอง 2 ท่าน
+                  </label>
+                  <input
+                    type="text"
+                    value={memberData.referees || ''}
+                    onChange={(e) => setMemberData({ ...memberData, referees: e.target.value })}
+                    placeholder="เช่น นพ.สมศักดิ์ รักษาดี, พญ.สมศรี มีสุข"
+                    className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-none font-medium"
+                  />
+                </div>
               </div>
 
               {/* Save Button */}

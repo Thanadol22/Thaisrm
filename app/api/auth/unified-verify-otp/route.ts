@@ -106,18 +106,14 @@ export async function POST(req: NextRequest) {
         graduation_year: e.graduation_year || '',
       }));
 
-      // เช็คฟิลด์ที่ว่าง
+      // เช็คฟิลด์ที่ว่างให้ตรงกับเงื่อนไขการสมัคร
       const fieldsToCheck = [
-        { key: 'fullNameEn', label: 'ชื่อ-นามสกุล (อังกฤษ)' },
+        { key: 'fullNameTh', label: 'ชื่อ-นามสกุล (ภาษาไทย)' },
+        { key: 'fullNameEn', label: 'ชื่อ-นามสกุล (ภาษาอังกฤษ)' },
         { key: 'idLast4', label: 'เลข 4 หลักท้ายบัตรประชาชน' },
         { key: 'mobile', label: 'เบอร์โทรศัพท์มือถือ' },
-        { key: 'lineId', label: 'LINE ID' },
-        { key: 'address', label: 'ที่อยู่ติดต่อ' },
         { key: 'workplace', label: 'สถานที่ทำงาน' },
-        { key: 'work_phone', label: 'เบอร์โทรศัพท์ที่ทำงาน' },
         { key: 'position', label: 'ตำแหน่งงาน' },
-        { key: 'job_category', label: 'สาขาวิชาชีพ' },
-        { key: 'scientist_license_no', label: 'เลขที่ใบอนุญาตนักวิทยาศาสตร์' },
       ];
 
       const missingFields: string[] = [];
@@ -154,11 +150,14 @@ export async function POST(req: NextRequest) {
           job_category: member.job_category || '',
           job_category_other: member.job_category_other || '',
           scientist_license_no: member.scientist_license_no || '',
-          membership_status: member.membership_status || 'Active',
-          membership_type: member.membership_type || 'Regular',
+          referees: member.referees || '',
+          photo_url: member.photo_url || '',
+          degree_cert_doc: member.degree_cert_doc || '',
+          work_cert_doc: member.work_cert_doc || '',
+          membership_status: member.membership_status || 'ปกติ',
+          membership_type: member.membership_type || 'สามัญ',
           applied_at: member.applied_at,
           expire_date: member.expire_date,
-          photo_url: member.photo_url || '',
           educations: rawEdus,
           missingFields,
           isProfileComplete: missingFields.length === 0,
