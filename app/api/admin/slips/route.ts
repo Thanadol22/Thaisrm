@@ -1430,13 +1430,17 @@ export async function POST(request: NextRequest) {
               const created = await createMember(applicant);
               applicantMemberNo = created.member_no || '';
               if (applicant.email) {
-                // Send approval email to individual member in background without blocking response
-                sendMembershipApprovedEmail({
-                  to: applicant.email,
-                  recipientName: applicant.full_name_th || applicant.full_name_en || 'สมาชิก',
-                  memberNo: applicantMemberNo,
-                  amountPaid: 1000,
-                }).catch((e) => console.error('Failed to send group member approval email:', e));
+                try {
+                  console.log(`📧 [SLIP APPROVAL] Sending group member approval email to: ${applicant.email} (Member: ${applicantMemberNo})`);
+                  await sendMembershipApprovedEmail({
+                    to: applicant.email,
+                    recipientName: applicant.full_name_th || applicant.full_name_en || 'สมาชิก',
+                    memberNo: applicantMemberNo,
+                    amountPaid: 1000,
+                  });
+                } catch (e) {
+                  console.error('Failed to send group member approval email:', e);
+                }
               }
             }
 
@@ -1468,17 +1472,20 @@ export async function POST(request: NextRequest) {
             (typeof slip.bank === 'string' && slip.bank.includes('ชำระเงินภายหลัง'));
 
           if (companyEmail && approvedApplicants.length > 0) {
-            sendCompanyGroupMembershipApprovedEmail({
-              to: companyEmail,
-              companyName,
-              coordinatorName,
-              ticketCode: slip.ticket_code || slip.slip_id,
-              amountPaid: slip.amount || approvedApplicants.length * 1000,
-              isPayLater,
-              applicants: approvedApplicants,
-            }).catch((companyMailErr) =>
-              console.error('Failed to send company group approval email:', companyMailErr)
-            );
+            try {
+              console.log(`📧 [SLIP APPROVAL] Sending company group membership approval email to: ${companyEmail}`);
+              await sendCompanyGroupMembershipApprovedEmail({
+                to: companyEmail,
+                companyName,
+                coordinatorName,
+                ticketCode: slip.ticket_code || slip.slip_id,
+                amountPaid: slip.amount || approvedApplicants.length * 1000,
+                isPayLater,
+                applicants: approvedApplicants,
+              });
+            } catch (companyMailErr) {
+              console.error('Failed to send company group approval email:', companyMailErr);
+            }
           }
         } catch (grpCreateErr: any) {
           console.error('Failed to create group members on slip approval:', grpCreateErr);
@@ -1639,65 +1646,128 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 5. Send approval confirmation email (asynchronously in background)
-      if (isMembershipRegistration) {
-        // Individual membership registration
-        if (!isGroupMembership) {
-          const recipientEmail = slip.members?.email || slip.guest_email || memberPayload?.email || '';
-          const recipientName = slip.members?.fullNameTh || slip.guest_name || memberPayload?.full_name_th || 'ผู้สมัครสมาชิก';
-          if (recipientEmail) {
-            sendMembershipApprovedEmail({
-              to: recipientEmail,
-              recipientName,
-              memberNo: assignedMemberNo || '',
-              amountPaid: slip.amount,
-            }).catch((mailErr) => console.error('Failed to send membership approval email:', mailErr));
-          }
-        }
-      } else {
-        // ONLY for conference/meeting registrations
-        let meetingDateStr: string | undefined = undefined;
-        if (slip.meetings) {
-          const m = slip.meetings;
-          if (m.start_date && m.end_date) {
-            const start = new Date(m.start_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
-            const end = new Date(m.end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
-            meetingDateStr = start === end ? start : `${start} - ${end}`;
-          } else if (m.meeting_date) {
-            meetingDateStr = new Date(m.meeting_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+      // 5. Send approval confirmation email (Reliable Awaited Dispatch with DB Fallbacks)
+      try {
+        // Look up member data if member_no or assignedMemberNo exists
+        let effectiveMemberRec: any = slip.members || null;
+        const targetMemberNo = assignedMemberNo || slip.member_no;
+        if (!effectiveMemberRec && targetMemberNo) {
+          try {
+            effectiveMemberRec = await prisma.member.findUnique({
+              where: { member_no: targetMemberNo },
+            });
+          } catch (memFindErr) {
+            console.warn('[Slip Approval] Failed to fetch member by member_no:', targetMemberNo, memFindErr);
           }
         }
 
-        if (isCorporate) {
-          // 1. For Corporate Group Conference: Send summary approval confirmation to the corporate coordinator
-          const resolved = await resolveCorporateEmail(slip, groupPayload);
-          if (resolved.email) {
-            sendRegistrationApprovedEmail({
-              to: resolved.email,
-              recipientName: resolved.name || 'ตัวแทนบริษัท',
-              meetingName: slip.meetings?.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
-              meetingDate: meetingDateStr,
-              ticketCode: slip.ticket_code || '',
-              amountPaid: slip.amount,
-              isMember: slip.is_member,
-              selectedActivities: slip.selected_activities,
-            }).catch((mailErr) => console.error('Failed to send conference group approval email to corporate coordinator:', mailErr));
-          } else {
-            console.warn(`[Conference Group Approval] Could not resolve corporate email for slip ${slip.slip_id}`);
+        if (isMembershipRegistration) {
+          // Individual membership registration
+          if (!isGroupMembership) {
+            const recipientEmail = (
+              effectiveMemberRec?.email ||
+              slip.members?.email ||
+              slip.guest_email ||
+              memberPayload?.email ||
+              ''
+            ).trim();
+
+            const recipientName = (
+              effectiveMemberRec?.fullNameTh ||
+              slip.members?.fullNameTh ||
+              slip.guest_name ||
+              memberPayload?.full_name_th ||
+              'ผู้สมัครสมาชิก'
+            ).trim();
+
+            if (recipientEmail) {
+              console.log(`📧 [SLIP APPROVAL] Sending membership approval email to: ${recipientEmail} (Member: ${targetMemberNo || 'N/A'})`);
+              await sendMembershipApprovedEmail({
+                to: recipientEmail,
+                recipientName,
+                memberNo: targetMemberNo || '',
+                amountPaid: slip.amount || 1000,
+              });
+            } else {
+              console.warn(`⚠️ [SLIP APPROVAL] No recipient email found for membership slip ${slip.slip_id}`);
+            }
+          }
+        } else {
+          // ONLY for conference/meeting registrations
+          let effectiveMeetingRec = slip.meetings;
+          if (!effectiveMeetingRec && slip.meeting_id) {
+            try {
+              effectiveMeetingRec = await (prisma as any).meetings.findUnique({
+                where: { meeting_id: slip.meeting_id },
+              });
+            } catch (mtgErr) {
+              console.warn('[Slip Approval] Could not fetch meeting record:', mtgErr);
+            }
           }
 
-          // 2. Send sponsored registration approval notification to EACH individual attendee
-          // Displays only the attendee's personal details and the sponsoring company's name
-          const companyName = groupPayload?.companyName?.trim() || slip.guest_workplace?.trim() || resolved.name || 'บริษัทผู้สนับสนุน';
+          let meetingDateStr: string | undefined = undefined;
+          if (effectiveMeetingRec) {
+            const m = effectiveMeetingRec;
+            if (m.start_date && m.end_date) {
+              const start = new Date(m.start_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+              const end = new Date(m.end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+              meetingDateStr = start === end ? start : `${start} - ${end}`;
+            } else if (m.meeting_date) {
+              meetingDateStr = new Date(m.meeting_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+            }
+          }
+
+          const meetingNameStr = effectiveMeetingRec?.meeting_name || 'งานประชุมวิชาการ TSRM 2026';
+
+          // Look up attendance record for extra fields if needed
+          let attendanceRec: any = null;
+          if (slip.meeting_id) {
+            try {
+              const attList = await prisma.$queryRaw<Array<any>>`
+                SELECT * FROM meeting_attendances
+                WHERE meeting_id = ${slip.meeting_id}
+                  AND (
+                    (member_no IS NOT NULL AND member_no = ${targetMemberNo || ''})
+                    OR (attendee_email IS NOT NULL AND LOWER(attendee_email) = LOWER(${slip.guest_email || ''}))
+                  )
+                LIMIT 1
+              `;
+              attendanceRec = attList?.[0] || null;
+            } catch (attQueryErr) {
+              console.warn('[Slip Approval] Could not query meeting_attendances:', attQueryErr);
+            }
+          }
+
           const attendeesList = groupPayload?.attendees || [];
+          const hasCorporateAttendees = isCorporate && Array.isArray(attendeesList) && attendeesList.length > 0;
 
-          if (Array.isArray(attendeesList) && attendeesList.length > 0) {
+          if (isCorporate && hasCorporateAttendees) {
+            // 1. For Corporate Group Conference: Send summary approval confirmation to the corporate coordinator
+            const resolved = await resolveCorporateEmail(slip, groupPayload);
+            if (resolved.email) {
+              console.log(`📧 [SLIP APPROVAL] Sending corporate group approval email to coordinator: ${resolved.email}`);
+              await sendRegistrationApprovedEmail({
+                to: resolved.email,
+                recipientName: resolved.name || 'ตัวแทนบริษัท',
+                meetingName: meetingNameStr,
+                meetingDate: meetingDateStr,
+                ticketCode: slip.ticket_code || '',
+                amountPaid: slip.amount,
+                isMember: slip.is_member,
+                selectedActivities: slip.selected_activities,
+              });
+            } else {
+              console.warn(`[Conference Group Approval] Could not resolve corporate coordinator email for slip ${slip.slip_id}`);
+            }
+
+            // 2. Send sponsored registration approval notification to EACH individual attendee
+            const companyName = groupPayload?.companyName?.trim() || slip.guest_workplace?.trim() || resolved.name || 'บริษัทผู้สนับสนุน';
+
             for (const att of attendeesList) {
               const attEmail = (att.email || att.attendee_email)?.trim();
               const attName = att.nameTh || att.nameEn || att.attendee_name || 'ผู้เข้าร่วมประชุม';
               
               if (attEmail) {
-                // Parse individual attendee activities
                 let attItems: any[] = [];
                 if (Array.isArray(att.selectedActivities) && att.selectedActivities.length > 0) {
                   attItems = att.selectedActivities.map((a: any) => {
@@ -1718,58 +1788,80 @@ export async function POST(request: NextRequest) {
                   }];
                 }
 
-                sendAttendeeSponsoredRegistrationEmail({
+                console.log(`📧 [SLIP APPROVAL] Sending sponsored registration approval email to attendee: ${attEmail}`);
+                await sendAttendeeSponsoredRegistrationEmail({
                   to: attEmail,
                   recipientName: attName,
                   recipientEmail: attEmail,
                   memberNo: att.memberNo || undefined,
                   workplace: att.workplace || undefined,
                   companyName,
-                  meetingName: slip.meetings?.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
+                  meetingName: meetingNameStr,
                   meetingDate: meetingDateStr,
                   ticketCode: slip.ticket_code || '',
                   items: attItems,
                   format: att.attendanceType || undefined,
-                }).catch((attMailErr) =>
-                  console.error(`Failed to send sponsored registration email to attendee ${attEmail}:`, attMailErr)
-                );
+                });
               }
             }
-          }
-        } else {
-          // Individual conference registration
-          let parsedActObj: any = null;
-          if (typeof slip.selected_activities === 'string') {
-            try {
-              parsedActObj = JSON.parse(slip.selected_activities);
-            } catch {}
-          } else if (typeof slip.selected_activities === 'object' && slip.selected_activities !== null) {
-            parsedActObj = slip.selected_activities;
-          }
+          } else {
+            // Individual conference registration (or single attendee fallback)
+            let parsedActObj: any = null;
+            if (typeof slip.selected_activities === 'string') {
+              try {
+                parsedActObj = JSON.parse(slip.selected_activities);
+              } catch {}
+            } else if (typeof slip.selected_activities === 'object' && slip.selected_activities !== null) {
+              parsedActObj = slip.selected_activities;
+            }
 
-          const recipientEmail = slip.members?.email || slip.guest_email || parsedActObj?.email || '';
-          const recipientName = slip.members?.fullNameTh || slip.guest_name || parsedActObj?.nameTh || 'ผู้ลงทะเบียน';
+            const recipientEmail = (
+              effectiveMemberRec?.email ||
+              slip.members?.email ||
+              slip.guest_email ||
+              parsedActObj?.email ||
+              parsedActObj?.guestEmail ||
+              attendanceRec?.attendee_email ||
+              ''
+            ).trim();
 
-          if (recipientEmail) {
-            sendRegistrationApprovedEmail({
-              to: recipientEmail,
-              recipientName,
-              nameEn: slip.members?.fullNameEn || parsedActObj?.nameEn || undefined,
-              memberNo: slip.member_no || undefined,
-              position: slip.members?.position || parsedActObj?.position || undefined,
-              workplace: slip.members?.workplace || slip.guest_workplace || parsedActObj?.workplace || undefined,
-              email: recipientEmail,
-              phone: slip.members?.mobile || slip.guest_phone || parsedActObj?.phone || undefined,
-              attendanceType: parsedActObj?.attendanceType || undefined,
-              meetingName: slip.meetings?.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
-              meetingDate: meetingDateStr,
-              ticketCode: slip.ticket_code || '',
-              amountPaid: slip.amount,
-              isMember: slip.is_member,
-              selectedActivities: slip.selected_activities,
-            }).catch((mailErr) => console.error('Failed to send conference registration approval email:', mailErr));
+            const recipientName = (
+              effectiveMemberRec?.fullNameTh ||
+              slip.members?.fullNameTh ||
+              slip.guest_name ||
+              parsedActObj?.nameTh ||
+              parsedActObj?.guestName ||
+              attendanceRec?.attendee_name ||
+              'ผู้ลงทะเบียน'
+            ).trim();
+
+            if (recipientEmail) {
+              console.log(`📧 [SLIP APPROVAL] Sending individual registration approval email to: ${recipientEmail} (Ticket: ${slip.ticket_code || 'N/A'})`);
+              await sendRegistrationApprovedEmail({
+                to: recipientEmail,
+                recipientName,
+                nameEn: effectiveMemberRec?.fullNameEn || slip.members?.fullNameEn || parsedActObj?.nameEn || parsedActObj?.guestNameEn || undefined,
+                memberNo: targetMemberNo || undefined,
+                position: effectiveMemberRec?.position || slip.members?.position || parsedActObj?.position || parsedActObj?.guestPosition || undefined,
+                workplace: effectiveMemberRec?.workplace || slip.members?.workplace || slip.guest_workplace || parsedActObj?.workplace || parsedActObj?.guestWorkplace || attendanceRec?.workplace || undefined,
+                email: recipientEmail,
+                phone: effectiveMemberRec?.mobile || slip.members?.mobile || slip.guest_phone || parsedActObj?.phone || parsedActObj?.guestPhone || attendanceRec?.attendee_phone || undefined,
+                attendanceType: parsedActObj?.attendanceType || undefined,
+                sponsorCompanyName: parsedActObj?.companyName || parsedActObj?.sponsorCompanyName || undefined,
+                meetingName: meetingNameStr,
+                meetingDate: meetingDateStr,
+                ticketCode: slip.ticket_code || '',
+                amountPaid: slip.amount,
+                isMember: slip.is_member,
+                selectedActivities: slip.selected_activities,
+              });
+            } else {
+              console.warn(`⚠️ [SLIP APPROVAL] No recipient email found for conference slip ${slip.slip_id}`);
+            }
           }
         }
+      } catch (mailDispatchErr) {
+        console.error('❌ [SLIP APPROVAL EMAIL DISPATCH ERROR]:', mailDispatchErr);
       }
 
       // 6. Auto-generate / link receipt in receipts table for this approved transaction

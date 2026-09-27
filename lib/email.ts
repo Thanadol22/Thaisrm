@@ -240,7 +240,7 @@ export async function sendMembershipApprovedEmail(params: SendMembershipApproved
 
   return dispatchEmail({
     to: params.to,
-    subject: `ยินดีต้อนรับสมาชิกใหม่ - รหัสสมาชิกของคุณคือ ${params.memberNo} (TSRM)`,
+    subject: `ยินดีต้อนรับสมาชิกใหม่ - รหัสสมาชิกของคุณคือ ${params.memberNo}`,
     html,
     attachments: qrBuffer ? [{
       filename: `member-qr-${params.memberNo}.png`,
@@ -285,7 +285,7 @@ export async function sendCompanyGroupMembershipApprovedEmail(params: SendCompan
 
   return dispatchEmail({
     to: params.to,
-    subject: `[TSRM] แจ้งผลการอนุมัติสมาชิกแบบกลุ่ม - ${params.companyName} (${params.applicants.length} ท่าน)`,
+    subject: `แจ้งผลการอนุมัติสมาชิกแบบกลุ่ม - ${params.companyName} (${params.applicants.length} ท่าน)`,
     html,
   });
 }
@@ -342,7 +342,7 @@ export async function sendRegistrationApprovedEmail(params: SendRegistrationAppr
 
   return dispatchEmail({
     to: params.to,
-    subject: `ยืนยันการลงทะเบียนเข้าร่วมประชุม ${params.meetingName} - TSRM`,
+    subject: `ยืนยันการลงทะเบียนเข้าร่วมประชุม ${params.meetingName}`,
     html,
   });
 }
@@ -380,7 +380,7 @@ export async function sendAttendeeSponsoredRegistrationEmail(params: SendAttende
 
   return dispatchEmail({
     to: params.to,
-    subject: `[TSRM] ยืนยันการลงทะเบียนเข้าร่วมประชุม ${params.meetingName} (สนับสนุนโดย ${params.companyName})`,
+    subject: `ยืนยันการลงทะเบียนเข้าร่วมประชุม ${params.meetingName} - ได้รับการสนับสนุนโดย ${params.companyName}`,
     html,
   });
 }

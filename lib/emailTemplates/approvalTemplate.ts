@@ -380,7 +380,7 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
         🎟️ การรับบัตรเข้างาน
       </div>
       <p style="font-size: 13px; color: #1e3a8a; margin: 0; line-height: 1.6;">
-        ระบบจะจัดส่ง <strong>บัตรเข้างาน (QR Code สำหรับ Onsite)</strong> หรือ <strong>ลิงก์ห้องประชุม (สำหรับ Online)</strong> ให้ท่านทางอีเมลนี้อีกครั้ง ก่อนถึงกำหนดวันเริ่มงานประชุม
+        ระบบจะจัดส่ง <strong>บัตรเข้างานสำหรับเข้างานสถานที่จริง</strong> หรือ <strong>ลิงก์ห้องประชุมออนไลน์</strong> ให้ท่านทางอีเมลนี้อีกครั้ง ก่อนถึงกำหนดวันเริ่มงานประชุม
       </p>
     </div>
 
@@ -390,7 +390,7 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
   `;
 
   return renderBaseEmailLayout({
-    title: `ยืนยันการลงทะเบียน ${options.meetingName} - TSRM`,
+    title: `ยืนยันการลงทะเบียน ${options.meetingName} - สมาคมเวชศาสตร์การเจริญพันธุ์ไทย`,
     preheader: `ยืนยันการลงทะเบียน ${options.recipientName} สำหรับ ${options.meetingName}`,
     contentHtml: content,
   });
