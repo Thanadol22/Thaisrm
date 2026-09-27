@@ -422,10 +422,11 @@ export async function sendSlipRejectionEmail(params: SendSlipRejectionParams): P
   });
 
   const subjectPrefix = isInfoMode ? '[โปรดแก้ไขข้อมูล]' : '[โปรดแนบสลิปใหม่]';
+  const refSuffix = params.ticketCode ? ` (${params.ticketCode})` : '';
 
   return dispatchEmail({
     to: params.to,
-    subject: `${subjectPrefix} แจ้งผลการตรวจสอบสำหรับรายการ - ${params.meetingName}`,
+    subject: `${subjectPrefix} แจ้งผลการตรวจสอบรายการ ${params.meetingName}${refSuffix}`,
     html,
   });
 }

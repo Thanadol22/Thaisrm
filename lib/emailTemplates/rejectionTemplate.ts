@@ -44,12 +44,14 @@ export function renderSlipRejectionEmail(options: SlipRejectionEmailOptions): st
   const content = `
     <div style="text-align: center; margin-bottom: 24px;">
       <div style="font-size: 44px; margin-bottom: 8px;">${isInfoMode ? '⚠️' : '🧾'}</div>
-      <span class="badge-alert">${badgeText}</span>
+      <span style="background-color: #fee2e2; color: #b91c1c; padding: 4px 14px; border-radius: 9999px; font-size: 12px; font-weight: bold; display: inline-block;">
+        ${badgeText}
+      </span>
       <h2 style="color: #0f172a; margin: 12px 0 6px 0; font-size: 22px; font-weight: 800;">
         ${headingText}
       </h2>
       <p style="color: #64748b; font-size: 14px; margin: 0;">
-        สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (TSRM) ขอแจ้งผลการตรวจสอบสำหรับรายการ ${options.meetingName}
+        สมาคมเวชศาสตร์การเจริญพันธุ์ไทย ขอแจ้งผลการตรวจสอบสำหรับรายการ ${options.meetingName}
       </p>
     </div>
 
@@ -75,7 +77,7 @@ export function renderSlipRejectionEmail(options: SlipRejectionEmailOptions): st
         ${options.ticketCode ? `
         <tr>
           <td style="padding: 6px 0; color: #64748b;">รหัสอ้างอิง:</td>
-          <td style="padding: 6px 0; font-weight: 700; color: #0026b3;">${options.ticketCode}</td>
+          <td style="padding: 6px 0; font-weight: 700; color: #0026b3; font-family: monospace;">${options.ticketCode}</td>
         </tr>` : ''}
         ${isCorporate ? `
         <tr>
@@ -116,7 +118,7 @@ export function renderSlipRejectionEmail(options: SlipRejectionEmailOptions): st
       </table>
     </div>
 
-    <div class="info-card">
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; margin: 20px 0;">
       <div style="font-size: 13px; font-weight: 800; color: #334155; text-transform: uppercase; margin-bottom: 8px;">
         ${cardTitle}
       </div>
@@ -126,12 +128,12 @@ export function renderSlipRejectionEmail(options: SlipRejectionEmailOptions): st
     </div>
 
     <div style="text-align: center; margin: 28px 0;">
-      <a href="${options.resubmitUrl}" class="btn btn-reject" target="_blank" style="display: inline-block; padding: 12px 24px; font-size: 14px; font-weight: bold; text-decoration: none; border-radius: 8px;">
+      <a href="${options.resubmitUrl}" target="_blank" style="display: inline-block; padding: 14px 28px; background-color: #dc2626; color: #ffffff !important; font-size: 15px; font-weight: bold; text-decoration: none; border-radius: 10px; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);">
         ${buttonText}
       </a>
-      <div style="font-size: 12px; color: #94a3b8; margin-top: 12px;">
-        หรือคัดลอกลิงก์นี้เปิดในเบราว์เซอร์: <br/>
-        <a href="${options.resubmitUrl}" style="color: #2563eb; word-break: break-all;">${options.resubmitUrl}</a>
+      <div style="font-size: 12px; color: #94a3b8; margin-top: 14px;">
+        หรือคลิกลิงก์นี้เปิดในเบราว์เซอร์: <br/>
+        <a href="${options.resubmitUrl}" style="color: #2563eb; word-break: break-all; font-weight: 600;">${options.resubmitUrl}</a>
       </div>
     </div>
 
