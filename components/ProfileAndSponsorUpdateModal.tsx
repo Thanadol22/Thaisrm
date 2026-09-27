@@ -194,6 +194,8 @@ export function ProfileAndSponsorUpdateModal({
   const [slipForms, setSlipForms] = useState<Record<string, SlipFormState>>({});
   const updateSlipForm = (key: string, patch: Partial<SlipFormState>) =>
     setSlipForms((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
+  const [submittingAll, setSubmittingAll] = useState(false);
+  const [allSlipsSuccess, setAllSlipsSuccess] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -454,101 +456,108 @@ export function ProfileAndSponsorUpdateModal({
     }
   };
 
-  // 4. อัปโหลดสลิปสำหรับแต่ละรายการ (per-slip)
-  const handleUploadSlipForItem = async (e: React.FormEvent, slip: SponsorSlip) => {
-    e.preventDefault();
-    if (!sponsorData) return;
+  // 4. อัปโหลดสลิปสำหรับ slip item เดียว (internal helper)
+  const uploadSlipItem = async (slip: SponsorSlip, currentSponsorData: SponsorData): Promise<{ success: boolean; slipUrl?: string; errorMsg?: string }> => {
     const key = slip.slip_id || slip.ticket_code || '';
     const form = slipForms[key];
-    if (!form) return;
-
-    if (!form.file) {
-      updateSlipForm(key, { errorMsg: lang === 'th' ? 'กรุณาเลือกไฟล์รูปภาพสลิปโอนเงิน' : 'Please select a slip image' });
-      return;
+    if (!form?.file) {
+      updateSlipForm(key, { errorMsg: 'กรุณาเลือกไฟล์รูปภาพสลิปโอนเงิน' });
+      return { success: false, errorMsg: 'กรุณาเลือกไฟล์รูปภาพสลิปโอนเงิน' };
     }
-
     updateSlipForm(key, { submitting: true, errorMsg: '' });
-
     try {
-      // 1. Upload image
       const uploadRes = await uploadImageToStorage(form.file, 'slips');
-      if (!uploadRes?.url) {
-        throw new Error(lang === 'th' ? 'ไม่สามารถอัปโหลดรูปภาพสลิปได้' : 'Failed to upload slip image');
-      }
+      if (!uploadRes?.url) throw new Error('อัปโหลดรูปสลิปไม่สำเร็จ');
 
-      // 2. Submit slip metadata
-      const activeMeetingId = slip.meeting_id || sponsorData.quotas[0]?.meeting_id || 'TSRM34';
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (sessionToken) {
-        headers['Authorization'] = `Bearer ${sessionToken}`;
-      }
+      if (sessionToken) headers['Authorization'] = `Bearer ${sessionToken}`;
 
       const res = await fetch('/api/sponsors/portal/upload-slip', {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          sponsorId: sponsorData.sponsorId,
-          sponsorName: sponsorData.sponsorName,
-          contactEmail: sponsorData.contactEmail,
-          meetingId: activeMeetingId,
-          amount: form.amount,
-          bank: form.bank,
-          transfer_date: form.date,
-          transfer_time: form.time,
+          sponsorId: currentSponsorData.sponsorId,
+          sponsorName: currentSponsorData.sponsorName,
+          contactEmail: currentSponsorData.contactEmail,
+          meetingId: slip.meeting_id || currentSponsorData.quotas[0]?.meeting_id || 'TSRM34',
           slip_url: uploadRes.url,
-          ref_no: form.ref,
           targetSlipId: slip.slip_id,
           targetTicketCode: slip.ticket_code,
           sessionToken,
         }),
       });
-
       const data = await res.json();
       if (!res.ok || !data.success) {
-        updateSlipForm(key, { submitting: false, errorMsg: data.message || (lang === 'th' ? 'ส่งสลิปไม่สำเร็จ' : 'Failed to submit slip') });
-        return;
+        const msg = data.message || 'ส่งสลิปไม่สำเร็จ';
+        updateSlipForm(key, { submitting: false, errorMsg: msg });
+        return { success: false, errorMsg: msg };
       }
-
       updateSlipForm(key, { submitting: false, success: true });
-
-      // อัปเดตสถานะของ Slip ใน state ทันที
-      const updatedSlips = sponsorData.slips.map((s) => {
-        if (
-          (slip.slip_id && s.slip_id === slip.slip_id) ||
-          (slip.ticket_code && s.ticket_code === slip.ticket_code)
-        ) {
-          return {
-            ...s,
-            slip_url: uploadRes.url,
-            bank: form.bank,
-            amount: form.amount,
-            transfer_date: form.date,
-            transfer_time: form.time,
-            status: 'pending',
-            itemStatus: 'pending_review' as const,
-            hasActualSlip: true,
-            requiresSlipUpload: false,
-          };
-        }
-        return s;
-      });
-
-      const existsInList = updatedSlips.some(
-        (s) => s.slip_id === (data.slip?.slip_id || slip.slip_id)
-      );
-      const finalSlips = existsInList ? updatedSlips : [data.slip, ...updatedSlips];
-      const remainingAwaiting = finalSlips.filter((s) => s.requiresSlipUpload || s.itemStatus === 'approved_awaiting_payment' || s.itemStatus === 'awaiting_payment');
-
-      setSponsorData({
-        ...sponsorData,
-        slips: finalSlips,
-        awaitingPaymentSlips: remainingAwaiting,
-        hasOutstanding: remainingAwaiting.length > 0,
-        paymentStatus: remainingAwaiting.length > 0 ? 'approved_awaiting_payment' : 'pending_review',
-      });
+      return { success: true, slipUrl: uploadRes.url };
     } catch (err: any) {
-      updateSlipForm(key, { submitting: false, errorMsg: err?.message || (lang === 'th' ? 'เกิดข้อผิดพลาดในการแนบสลิป' : 'Error submitting slip') });
+      const msg = err?.message || 'เกิดข้อผิดพลาดในการแนบสลิป';
+      updateSlipForm(key, { submitting: false, errorMsg: msg });
+      return { success: false, errorMsg: msg };
     }
+  };
+
+  // 5. ส่งสลิปทุกรายการพร้อมกัน (ปุ่มเดียว)
+  const handleSubmitAllSlips = async () => {
+    if (!sponsorData) return;
+    const awaitingSlips = sponsorData.slips.filter(
+      (s) => s.requiresSlipUpload || s.itemStatus === 'approved_awaiting_payment' || s.itemStatus === 'awaiting_payment' || s.itemStatus === 'rejected'
+    );
+
+    // ตรวจสอบว่าทุกรายการมีไฟล์แนบ
+    let hasError = false;
+    for (const slip of awaitingSlips) {
+      const key = slip.slip_id || slip.ticket_code || '';
+      const form = slipForms[key];
+      if (!form?.success && !form?.file) {
+        updateSlipForm(key, { errorMsg: 'กรุณาเลือกไฟล์รูปภาพสลิปโอนเงิน' });
+        hasError = true;
+      }
+    }
+    if (hasError) return;
+
+    setSubmittingAll(true);
+    setAllSlipsSuccess(false);
+
+    // Upload ทุกรายการที่ยังไม่ success
+    const pendingSlips = awaitingSlips.filter((s) => {
+      const key = s.slip_id || s.ticket_code || '';
+      return !slipForms[key]?.success;
+    });
+
+    let currentSponsorData = sponsorData;
+    const results = await Promise.allSettled(
+      pendingSlips.map((slip) => uploadSlipItem(slip, currentSponsorData))
+    );
+
+    const allOk = results.every((r) => r.status === 'fulfilled' && r.value.success);
+
+    // อัปเดต sponsorData หลัง upload ทั้งหมด
+    const updatedSlips = sponsorData.slips.map((s) => {
+      const key = s.slip_id || s.ticket_code || '';
+      const form = slipForms[key];
+      if (form?.success) {
+        return { ...s, status: 'pending', itemStatus: 'pending_review' as const, hasActualSlip: true, requiresSlipUpload: false };
+      }
+      return s;
+    });
+    const remainingAwaiting = updatedSlips.filter(
+      (s) => s.requiresSlipUpload || s.itemStatus === 'approved_awaiting_payment' || s.itemStatus === 'awaiting_payment'
+    );
+    setSponsorData({
+      ...sponsorData,
+      slips: updatedSlips,
+      awaitingPaymentSlips: remainingAwaiting,
+      hasOutstanding: remainingAwaiting.length > 0,
+      paymentStatus: remainingAwaiting.length > 0 ? 'approved_awaiting_payment' : 'pending_review',
+    });
+
+    setSubmittingAll(false);
+    if (allOk) setAllSlipsSuccess(true);
   };
 
   // Helper สำหรับเช็คฟิลด์ว่าง
@@ -1602,101 +1611,103 @@ export function ProfileAndSponsorUpdateModal({
                               </div>
                             </div>
 
-                            {/* Inline Slip Upload Form */}
-                            <form
-                              onSubmit={(e) => handleUploadSlipForItem(e, slip)}
-                              className="p-4 space-y-4 bg-white"
-                            >
+                            {/* Upload Zone */}
+                            <div className="p-4 bg-white space-y-3">
+                              {/* Per-item error */}
                               {form.errorMsg && (
                                 <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-start gap-2">
                                   <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                                   <span>{form.errorMsg}</span>
                                 </div>
                               )}
-                              {form.success && (
+                              {/* Per-item success */}
+                              {form.success ? (
                                 <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
                                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                                  <span className="font-bold">แนบสลิปเรียบร้อยแล้ว กำลังรอเจ้าหน้าที่ตรวจสอบ</span>
+                                  <span className="font-bold">แนบสลิปเรียบร้อยแล้ว — รอเจ้าหน้าที่ตรวจสอบ</span>
+                                </div>
+                              ) : (
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                                    แนบรูปภาพสลิปโอนเงิน (JPG, PNG)
+                                    <span className="ml-1 text-red-500 font-extrabold">* บังคับแนบ</span>
+                                  </label>
+                                  <div
+                                    className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition relative ${
+                                      form.file ? 'border-emerald-400 bg-emerald-50/30' : 'border-blue-300 hover:border-blue-500 bg-white'
+                                    }`}
+                                  >
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={(e) => {
+                                        const f = e.target.files?.[0];
+                                        if (f) {
+                                          updateSlipForm(key, { file: f, preview: URL.createObjectURL(f), errorMsg: '' });
+                                        }
+                                      }}
+                                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                    />
+                                    {form.preview ? (
+                                      <div className="flex flex-col items-center gap-2">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={form.preview} alt="Slip preview" className="max-h-48 rounded-lg object-contain border shadow-sm" />
+                                        <span className="text-xs text-blue-600 font-bold flex items-center gap-1">
+                                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                          ไฟล์สลิปพร้อมส่ง — คลิกเพื่อเปลี่ยนรูปภาพ
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <div className="flex flex-col items-center gap-1.5 text-slate-500">
+                                        <Upload className="w-8 h-8 text-blue-500" />
+                                        <span className="text-xs font-bold text-slate-700">คลิกหรือลากไฟล์ภาพสลิปโอนเงินมาวางที่นี่</span>
+                                        <span className="text-[11px] text-slate-400">รองรับไฟล์ JPG, PNG ขนาดไม่เกิน 10MB</span>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               )}
-
-                              <div>
-                                <label className="block text-xs font-bold text-slate-700 mb-1">
-                                  แนบรูปภาพสลิปโอนเงิน (JPG, PNG)
-                                  <span className="ml-1 text-red-500 font-extrabold">* บังคับแนบ</span>
-                                </label>
-                                <div
-                                  className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition relative ${
-                                    form.file ? 'border-emerald-400 bg-emerald-50/30' : 'border-blue-300 hover:border-blue-500 bg-white'
-                                  }`}
-                                >
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => {
-                                      const f = e.target.files?.[0];
-                                      if (f) {
-                                        updateSlipForm(key, {
-                                          file: f,
-                                          preview: URL.createObjectURL(f),
-                                        });
-                                      }
-                                    }}
-                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                                    required
-                                  />
-                                  {form.preview ? (
-                                    <div className="flex flex-col items-center gap-2">
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img src={form.preview} alt="Slip preview" className="max-h-48 rounded-lg object-contain border shadow-sm" />
-                                      <span className="text-xs text-blue-600 font-bold flex items-center gap-1">
-                                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                        ไฟล์สลิปพร้อมส่ง — คลิกเพื่อเปลี่ยนรูปภาพ
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex flex-col items-center gap-1.5 text-slate-500">
-                                      <Upload className="w-8 h-8 text-blue-500" />
-                                      <span className="text-xs font-bold text-slate-700">คลิกหรือลากไฟล์ภาพสลิปโอนเงินมาวางที่นี่</span>
-                                      <span className="text-[11px] text-slate-400">รองรับไฟล์ JPG, PNG ขนาดไม่เกิน 10MB</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Submit Button */}
-                              <div className="pt-1 flex justify-end">
-                                <button
-                                  type="submit"
-                                  disabled={form.submitting || !form.file || form.success}
-                                  className="px-5 py-2.5 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white text-sm font-extrabold rounded-xl shadow-md transition flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-                                >
-                                  {form.submitting ? (
-                                    <>
-                                      <RotateCw className="w-4 h-4 animate-spin" />
-                                      <span>กำลังอัปโหลดสลิป...</span>
-                                    </>
-                                  ) : form.success ? (
-                                    <>
-                                      <CheckCircle2 className="w-4 h-4" />
-                                      <span>ส่งสลิปเรียบร้อยแล้ว</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Check className="w-4 h-4" />
-                                      <span>ยืนยันการแนบสลิปการชำระเงิน</span>
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                            </form>
+                            </div>
                           </div>
                         );
                       })}
                     </div>
+
+                    {/* ─── ปุ่มส่งสลิปทั้งหมด (ปุ่มเดียว ด้านล่าง section) ─── */}
+                    {allSlipsSuccess ? (
+                      <div className="mt-4 p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl flex items-center gap-3">
+                        <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+                        <div>
+                          <p className="font-extrabold text-emerald-800 text-sm">ส่งสลิปทุกรายการเรียบร้อยแล้ว</p>
+                          <p className="text-xs text-emerald-700 mt-0.5">เจ้าหน้าที่จะตรวจสอบและยืนยันภายใน 1-2 วันทำการ</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-4 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleSubmitAllSlips}
+                          disabled={submittingAll}
+                          className="px-6 py-3 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white text-sm font-extrabold rounded-xl shadow-md transition flex items-center gap-2 disabled:opacity-60 cursor-pointer"
+                        >
+                          {submittingAll ? (
+                            <>
+                              <RotateCw className="w-4 h-4 animate-spin" />
+                              <span>กำลังอัปโหลดสลิป...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Check className="w-4 h-4" />
+                              <span>ยืนยันการแนบสลิปการชำระเงิน</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })()}
+
 
               {/* รายชื่อสมาชิกที่บริษัทส่งเข้าร่วม (Group Members List) */}
               <div className="space-y-3 border-t border-slate-200 pt-4">
