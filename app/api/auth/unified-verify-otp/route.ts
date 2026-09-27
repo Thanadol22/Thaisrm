@@ -262,26 +262,32 @@ export async function POST(req: NextRequest) {
       );
 
       // Determine item-level payment status
-      let itemStatus: 'approved' | 'approved_awaiting_payment' | 'pending_review' | 'rejected' | 'awaiting_payment' = 'approved';
+      let itemStatus: 'approved' | 'approved_awaiting_payment' | 'pending_review' | 'pending_payment_review' | 'rejected' | 'awaiting_payment' = 'approved';
       if (s.status === 'rejected') {
         itemStatus = 'rejected';
       } else if (hasActualSlip && s.status === 'pending') {
-        itemStatus = 'pending_review';
+        // มีสลิปจริง + pending = ส่งสลิปแล้ว รอตรวจสอบการชำระเงิน (ไม่ใช่ รออนุมัติสิทธิ์)
+        itemStatus = 'pending_payment_review';
       } else if (hasActualSlip && s.status === 'approved') {
+        // มีสลิปจริง + approved = ยืนยันการชำระเงินแล้ว
         itemStatus = 'approved';
       } else if (isPayLater) {
         if (s.status === 'approved') {
+          // PAY_LATER + approved = อนุมัติสิทธิ์แล้ว รอชำระเงิน
           itemStatus = 'approved_awaiting_payment';
         } else {
+          // PAY_LATER + pending = รออนุมัติสิทธิ์
           itemStatus = 'awaiting_payment';
         }
       } else if (s.amount > 0 && s.status === 'pending') {
+        // ไม่มีสลิป + pending = รออนุมัติสิทธิ์
         itemStatus = 'pending_review';
       } else if (s.amount === 0) {
         itemStatus = 'approved';
       }
 
-      // Check if this item requires slip upload
+      // requiresSlipUpload: เฉพาะสถานะที่ยังรอให้บริษัทอัพสลิป
+      // pending_payment_review = ส่งสลิปแล้ว ไม่ต้องแสดงฟอร์มอีก
       const requiresSlipUpload =
         (itemStatus === 'approved_awaiting_payment' || itemStatus === 'awaiting_payment' || itemStatus === 'rejected') &&
         s.amount > 0;

@@ -109,7 +109,7 @@ interface SponsorSlip {
   slip_url: string;
   raw_slip_url?: string;
   status: string;
-  itemStatus?: 'approved' | 'approved_awaiting_payment' | 'pending_review' | 'rejected' | 'awaiting_payment';
+  itemStatus?: 'approved' | 'approved_awaiting_payment' | 'pending_review' | 'pending_payment_review' | 'rejected' | 'awaiting_payment';
   isPayLater?: boolean;
   hasActualSlip?: boolean;
   requiresSlipUpload?: boolean;
@@ -131,7 +131,7 @@ interface SponsorData {
   totalAmount: number;
   outstandingAmount?: number;
   hasOutstanding: boolean;
-  paymentStatus: 'approved' | 'approved_awaiting_payment' | 'pending_review' | 'rejected' | 'unpaid' | 'free_quota';
+  paymentStatus: 'approved' | 'approved_awaiting_payment' | 'pending_review' | 'pending_payment_review' | 'rejected' | 'unpaid' | 'free_quota';
 }
 
 interface ProfileAndSponsorUpdateModalProps {
@@ -541,7 +541,8 @@ export function ProfileAndSponsorUpdateModal({
       const key = s.slip_id || s.ticket_code || '';
       const form = slipForms[key];
       if (form?.success) {
-        return { ...s, status: 'pending', itemStatus: 'pending_review' as const, hasActualSlip: true, requiresSlipUpload: false };
+        // อัปเดต state: หลังอัพสลิป สถานะคือ pending_payment_review (ส่งสลิปแล้ว รอตรวจสอบการชำระ)
+        return { ...s, status: 'pending', itemStatus: 'pending_payment_review' as const, hasActualSlip: true, requiresSlipUpload: false };
       }
       return s;
     });
@@ -553,7 +554,7 @@ export function ProfileAndSponsorUpdateModal({
       slips: updatedSlips,
       awaitingPaymentSlips: remainingAwaiting,
       hasOutstanding: remainingAwaiting.length > 0,
-      paymentStatus: remainingAwaiting.length > 0 ? 'approved_awaiting_payment' : 'pending_review',
+      paymentStatus: remainingAwaiting.length > 0 ? 'approved_awaiting_payment' : 'pending_payment_review',
     });
 
     setSubmittingAll(false);
@@ -1495,12 +1496,20 @@ export function ProfileAndSponsorUpdateModal({
                         </span>
                       </div>
                     </div>
+                  ) : sponsorData.paymentStatus === 'pending_payment_review' ? (
+                    <div className="bg-blue-50 border-2 border-blue-300 px-3.5 py-2.5 rounded-2xl text-blue-900 text-xs flex items-center gap-2.5">
+                      <Clock className="w-5 h-5 text-blue-600 shrink-0" />
+                      <div>
+                        <span className="font-black text-blue-900 block text-xs sm:text-sm">ส่งสลิปเรียบร้อยแล้ว</span>
+                        <span className="text-[11px] text-blue-700 font-bold">เจ้าหน้าที่กำลังตรวจสอบการชำระเงิน</span>
+                      </div>
+                    </div>
                   ) : sponsorData.paymentStatus === 'pending_review' ? (
                     <div className="bg-amber-500/10 border border-amber-300 px-3 py-2 rounded-xl text-amber-800 text-xs flex items-center gap-2">
                       <Clock className="w-4 h-4 text-amber-600 shrink-0" />
                       <div>
-                        <span className="font-bold block">อยู่ระหว่างตรวจสอบสลิป</span>
-                        <span className="text-[11px] text-amber-700">เจ้าหน้าที่กำลังตรวจสอบรายการ</span>
+                        <span className="font-bold block">รออนุมัติสิทธิ์</span>
+                        <span className="text-[11px] text-amber-700">เจ้าหน้าที่กำลังตรวจสอบคำขอ</span>
                       </div>
                     </div>
                   ) : sponsorData.paymentStatus === 'rejected' ? (
@@ -1516,7 +1525,7 @@ export function ProfileAndSponsorUpdateModal({
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                       <div>
                         <span className="font-bold block">ชำระเงินเรียบร้อยแล้ว</span>
-                        <span className="text-[11px] text-emerald-700">ไม่มียอดรอชำระ</span>
+                        <span className="text-[11px] text-emerald-700">ยืนยันการชำระเงินแล้ว</span>
                       </div>
                     </div>
                   )}
