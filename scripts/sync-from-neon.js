@@ -1,10 +1,16 @@
 const { PrismaClient } = require('@prisma/client');
 
-const neonUrl = process.env.DATABASE_URL?.includes('neon.tech') 
-  ? process.env.DATABASE_URL 
-  : 'postgresql://neondb_owner:npg_a5EFP3hriVcR@ep-restless-brook-b34k0hea-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?channel_binding=require&sslmode=require';
+const neonUrl = process.argv[2] || process.env.NEON_DATABASE_URL || (process.env.DATABASE_URL?.includes('neon.tech') ? process.env.DATABASE_URL : null);
+const localUrl = process.env.LOCAL_DATABASE_URL || (process.env.DATABASE_URL?.includes('neon.tech') ? null : process.env.DATABASE_URL) || 'postgresql://postgres:postgres@localhost:5432/thaisrm?schema=public';
 
-const localUrl = 'postgresql://postgres:1234@localhost:5432/thaisrm?schema=public';
+if (!neonUrl) {
+  console.error(`
+❌ กรุณาระบุ Connection URL ของ Neon:
+   node scripts/sync-from-neon.js "postgresql://<USER>:<PASSWORD>@<NEON_HOST>/neondb?sslmode=require"
+   หรือตั้งค่าใน .env (NEON_DATABASE_URL="...")
+`);
+  process.exit(1);
+}
 
 const neon = new PrismaClient({ datasources: { db: { url: neonUrl } } });
 const local = new PrismaClient({ datasources: { db: { url: localUrl } } });
