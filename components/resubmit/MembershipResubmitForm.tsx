@@ -5,7 +5,6 @@ import {
   User,
   Building,
   GraduationCap,
-  MapPin,
   Camera,
   Upload,
   Trash2,
@@ -653,25 +652,6 @@ export function MembershipResubmitForm({ formData, onChange }: MembershipResubmi
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* 4. ที่อยู่จัดส่งเอกสาร / ใบเสร็จ */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm space-y-3">
-        <h3 className="font-extrabold text-[#0026b3] text-sm flex items-center gap-2 border-b border-slate-100 pb-2.5">
-          <MapPin className="w-4 h-4 text-[#0026b3] shrink-0" />
-          <span>ที่อยู่จัดส่งเอกสาร / ใบเสร็จ</span>
-        </h3>
-
-        <div className="space-y-1.5 text-xs">
-          <label className="font-bold text-slate-700">ที่อยู่สำหรับจัดส่งเอกสาร</label>
-          <textarea
-            rows={2}
-            value={formData.address}
-            onChange={(e) => onChange('address', e.target.value)}
-            placeholder="ระบุที่อยู่สำหรับจัดส่งเอกสาร หรือออกใบเสร็จรับเงิน..."
-            className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
-          />
         </div>
       </div>
     </div>
