@@ -220,55 +220,228 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ดึงข้อมูลการชำระเงิน / สลิปของบริษัท
-    const rawGroupMembers = (sponsor.group_members || []).map((m: any) => ({
-      id: m.id ? m.id.toString() : '',
-      member_no: m.member_no,
-      attendee_name: m.attendee_name,
-      attendee_email: m.attendee_email,
-      ticket_code: m.ticket_code,
-      discount_amount: m.discount_amount || 0,
-      net_price: m.net_price || 0,
-      status: m.status || 'confirmed',
-      meeting_id: m.meeting_id,
-      meeting_name: m.meeting?.meeting_name || m.meeting_name || '',
-      created_at: m.created_at,
-    }));
-
-    // ค้นหาสลิปที่เกี่ยวข้องใน payment_slips
-    let sponsorSlips: any[] = [];
+    // ค้นหาสลิปทั้งหมดที่เกี่ยวข้องกับ Sponsor นี้
+    let sponsorSlipsRaw: any[] = [];
     try {
-      const slips = await prisma.payment_slips.findMany({
+      sponsorSlipsRaw = await prisma.payment_slips.findMany({
         where: {
-          guest_email: { equals: email, mode: 'insensitive' },
+          OR: [
+            { guest_email: { equals: email, mode: 'insensitive' } },
+            { guest_email: { equals: sponsor.contact_email, mode: 'insensitive' } },
+            { guest_workplace: { equals: sponsor.name, mode: 'insensitive' } },
+          ],
+        },
+        include: {
+          meetings: {
+            select: { meeting_id: true, meeting_name: true },
+          },
         },
         orderBy: { created_at: 'desc' },
       });
-      sponsorSlips = slips.map((s) => ({
+    } catch (e) {
+      console.error('[UnifiedVerifyOTP] Error fetching sponsor slips:', e);
+    }
+
+    // Process slips to determine actual payment & pay-later status
+    const sponsorSlips = sponsorSlipsRaw.map((s: any) => {
+      const isPayLater =
+        s.slip_url === 'PAY_LATER' ||
+        s.slip_url === 'pay_later_pending' ||
+        (typeof s.bank === 'string' && (s.bank.includes('ชำระเงินภายหลัง') || s.bank.toLowerCase().includes('pay later'))) ||
+        !s.slip_url ||
+        s.slip_url === '/placeholder-slip.png';
+
+      const hasActualSlip = Boolean(
+        s.slip_url &&
+        s.slip_url !== 'PAY_LATER' &&
+        s.slip_url !== 'pay_later_pending' &&
+        s.slip_url !== '/placeholder-slip.png' &&
+        s.slip_url !== 'GROUP_REGISTRATION' &&
+        s.slip_url !== 'GROUP_MEMBERSHIP' &&
+        !s.slip_url.startsWith('TEMP_')
+      );
+
+      // Determine item-level payment status
+      let itemStatus: 'approved' | 'approved_awaiting_payment' | 'pending_review' | 'rejected' | 'awaiting_payment' = 'approved';
+      if (s.status === 'rejected') {
+        itemStatus = 'rejected';
+      } else if (hasActualSlip && s.status === 'pending') {
+        itemStatus = 'pending_review';
+      } else if (hasActualSlip && s.status === 'approved') {
+        itemStatus = 'approved';
+      } else if (isPayLater) {
+        if (s.status === 'approved') {
+          itemStatus = 'approved_awaiting_payment';
+        } else {
+          itemStatus = 'awaiting_payment';
+        }
+      } else if (s.amount > 0 && s.status === 'pending') {
+        itemStatus = 'pending_review';
+      } else if (s.amount === 0) {
+        itemStatus = 'approved';
+      }
+
+      // Check if this item requires slip upload
+      const requiresSlipUpload =
+        (itemStatus === 'approved_awaiting_payment' || itemStatus === 'awaiting_payment' || itemStatus === 'rejected') &&
+        s.amount > 0;
+
+      // Extract details from selected_activities (if any)
+      const groupPayload = (s.selected_activities as any) || {};
+      const attendees = Array.isArray(groupPayload.attendees)
+        ? groupPayload.attendees
+        : Array.isArray(groupPayload.applicants)
+        ? groupPayload.applicants
+        : [];
+      const attendeesCount = attendees.length || 1;
+      const isGroupMembership = Boolean(
+        s.ticket_code?.startsWith('MEMGRP') ||
+        groupPayload.isGroupMembership ||
+        groupPayload.membershipType
+      );
+
+      const title = isGroupMembership
+        ? `ค่าสมัครสมาชิกแบบกลุ่ม (${sponsor.name} - รวม ${attendeesCount} ท่าน)`
+        : `ลงทะเบียนประชุมแบบกลุ่ม (${sponsor.name} - รวม ${attendeesCount} ท่าน)`;
+
+      return {
+        id: s.id ? s.id.toString() : '',
         slip_id: s.slip_id,
+        ticket_code: s.ticket_code || s.slip_id,
         meeting_id: s.meeting_id,
-        amount: s.amount,
+        meeting_name: s.meetings?.meeting_name || (s.meeting_id === 'TSRM34' ? '34th TSRM2026 V.2' : s.meeting_id),
+        title,
+        amount: Number(s.amount) || 0,
         bank: s.bank,
         transfer_date: s.transfer_date,
         transfer_time: s.transfer_time,
-        slip_url: s.slip_url,
+        slip_url: hasActualSlip ? s.slip_url : '',
+        raw_slip_url: s.slip_url,
         status: s.status,
+        itemStatus,
+        isPayLater,
+        hasActualSlip,
+        requiresSlipUpload,
         rejection_reason: s.rejection_reason,
+        attendeesCount,
         created_at: s.created_at,
-      }));
-    } catch (e) {
-      // ignore
+      };
+    });
+
+    // Aggregating all registered group members (from sponsor_group_members + meeting_attendances + slips payload)
+    const aggregatedMembersMap = new Map<string, any>();
+
+    // 1. From sponsor.group_members
+    (sponsor.group_members || []).forEach((m: any) => {
+      const key = `${m.member_no || ''}_${m.attendee_email || ''}_${m.meeting_id || ''}`;
+      aggregatedMembersMap.set(key, {
+        id: m.id ? m.id.toString() : '',
+        member_no: m.member_no || '-',
+        attendee_name: m.attendee_name || '-',
+        attendee_email: m.attendee_email || '-',
+        ticket_code: m.ticket_code || '-',
+        discount_amount: m.discount_amount || 0,
+        net_price: m.net_price || 0,
+        status: m.status || 'ยืนยันสิทธิ์แล้ว',
+        meeting_id: m.meeting_id,
+        meeting_name: m.meeting?.meeting_name || m.meeting_name || 'งานประชุม',
+        created_at: m.created_at,
+      });
+    });
+
+    // 2. From meeting_attendances linked to this sponsor
+    try {
+      const attendances = await prisma.meeting_attendances.findMany({
+        where: {
+          OR: [
+            { sponsor_id: sponsor.id },
+            { sponsor_company_name: { equals: sponsor.name, mode: 'insensitive' } },
+          ],
+        },
+        include: {
+          members: {
+            select: { member_no: true, fullNameTh: true, fullNameEn: true, email: true, workplace: true },
+          },
+          meetings: {
+            select: { meeting_id: true, meeting_name: true },
+          },
+        },
+      });
+
+      attendances.forEach((att: any) => {
+        const mem = att.members;
+        const key = `${att.member_no || ''}_${mem?.email || ''}_${att.meeting_id}`;
+        if (!aggregatedMembersMap.has(key)) {
+          aggregatedMembersMap.set(key, {
+            id: att.attendance_id ? att.attendance_id.toString() : '',
+            member_no: att.member_no || '-',
+            attendee_name: mem?.fullNameTh || mem?.fullNameEn || `สมาชิก #${att.member_no}`,
+            attendee_email: mem?.email || '-',
+            ticket_code: att.ticket_code || '-',
+            discount_amount: 0,
+            net_price: 0,
+            status: att.attendance_status === 'Registered' ? 'ยืนยันสิทธิ์แล้ว' : att.attendance_status,
+            meeting_id: att.meeting_id,
+            meeting_name: att.meetings?.meeting_name || att.meeting_id,
+            created_at: att.created_at,
+          });
+        }
+      });
+    } catch (attErr) {
+      console.error('[UnifiedVerifyOTP] Error fetching attendances for sponsor:', attErr);
     }
 
-    // คำนวณยอดเงินที่ต้องชำระ
-    const totalAmount = rawGroupMembers.reduce((sum: number, m: any) => sum + (m.net_price || 0), 0);
-    const hasRejectedSlip = sponsorSlips.some((s) => s.status === 'rejected');
-    const hasApprovedSlip = sponsorSlips.some((s) => s.status === 'approved');
-    const hasPendingSlip = sponsorSlips.some((s) => s.status === 'pending');
+    // 3. From payment_slips payload attendees
+    sponsorSlipsRaw.forEach((s: any) => {
+      const payload = (s.selected_activities as any) || {};
+      const attendees = Array.isArray(payload.attendees) ? payload.attendees : [];
+      attendees.forEach((att: any) => {
+        const emailKey = att.email?.trim()?.toLowerCase() || '';
+        const memberNoKey = att.memberNo || att.member_no || '';
+        const key = `${memberNoKey}_${emailKey}_${s.meeting_id}`;
+        if (!aggregatedMembersMap.has(key)) {
+          aggregatedMembersMap.set(key, {
+            id: `payload_${s.id}_${emailKey}`,
+            member_no: memberNoKey || '-',
+            attendee_name: att.nameTh || att.nameEn || att.fullNameTh || att.fullNameEn || att.fullName || '-',
+            attendee_email: emailKey || '-',
+            ticket_code: s.ticket_code || '-',
+            discount_amount: Number(att.discountTotal || att.discountAmount || 0),
+            net_price: Number(att.price || att.netPrice || 0),
+            status: s.status === 'approved' ? 'อนุมัติสิทธิ์แล้ว' : 'รอตรวจสอบ',
+            meeting_id: s.meeting_id,
+            meeting_name: s.meetings?.meeting_name || s.meeting_id,
+            created_at: s.created_at,
+          });
+        }
+      });
+    });
 
-    // ตรวจสอบสถานะค้างชำระ:
-    // หากมียอด net_price > 0 และยังไม่มี slip ที่ approved หรือมี rejected slip
-    const hasOutstanding = (totalAmount > 0 && !hasApprovedSlip) || hasRejectedSlip;
+    const rawGroupMembers = Array.from(aggregatedMembersMap.values());
+
+    // Calculate totals and overall financial status
+    const pendingReviewSlips = sponsorSlips.filter((s) => s.itemStatus === 'pending_review');
+    const awaitingPaymentSlips = sponsorSlips.filter((s) => s.requiresSlipUpload);
+    const rejectedSlips = sponsorSlips.filter((s) => s.itemStatus === 'rejected');
+
+    const totalOutstandingAmount = awaitingPaymentSlips.reduce((sum, s) => sum + s.amount, 0);
+    const totalSlipsAmount = sponsorSlips.reduce((sum, s) => sum + s.amount, 0);
+
+    const hasOutstanding = awaitingPaymentSlips.length > 0;
+
+    let overallPaymentStatus: 'approved' | 'approved_awaiting_payment' | 'pending_review' | 'rejected' | 'unpaid' | 'free_quota' = 'approved';
+    if (awaitingPaymentSlips.length > 0) {
+      const hasApprovedAwaiting = awaitingPaymentSlips.some((s) => s.itemStatus === 'approved_awaiting_payment');
+      overallPaymentStatus = hasApprovedAwaiting ? 'approved_awaiting_payment' : 'unpaid';
+    } else if (pendingReviewSlips.length > 0) {
+      overallPaymentStatus = 'pending_review';
+    } else if (rejectedSlips.length > 0) {
+      overallPaymentStatus = 'rejected';
+    } else if (sponsorSlips.length === 0 && rawGroupMembers.length === 0) {
+      overallPaymentStatus = 'free_quota';
+    } else {
+      overallPaymentStatus = 'approved';
+    }
 
     const sessionToken = createOtpSessionToken({
       email: sponsor.contact_email || email,
@@ -295,17 +468,11 @@ export async function POST(req: NextRequest) {
         })),
         groupMembers: rawGroupMembers,
         slips: sponsorSlips,
-        totalAmount,
+        awaitingPaymentSlips,
+        totalAmount: totalSlipsAmount,
+        outstandingAmount: totalOutstandingAmount,
         hasOutstanding,
-        paymentStatus: hasApprovedSlip
-          ? 'approved'
-          : hasPendingSlip
-          ? 'pending_review'
-          : hasRejectedSlip
-          ? 'rejected'
-          : totalAmount > 0
-          ? 'unpaid'
-          : 'free_quota',
+        paymentStatus: overallPaymentStatus,
       },
     });
   } catch (error: any) {

@@ -96,15 +96,25 @@ interface SponsorGroupMember {
 }
 
 interface SponsorSlip {
+  id?: string;
   slip_id: string;
+  ticket_code?: string;
   meeting_id: string;
+  meeting_name?: string;
+  title?: string;
   amount: number;
   bank: string | null;
   transfer_date: string | null;
   transfer_time: string | null;
   slip_url: string;
+  raw_slip_url?: string;
   status: string;
+  itemStatus?: 'approved' | 'approved_awaiting_payment' | 'pending_review' | 'rejected' | 'awaiting_payment';
+  isPayLater?: boolean;
+  hasActualSlip?: boolean;
+  requiresSlipUpload?: boolean;
   rejection_reason?: string | null;
+  attendeesCount?: number;
   created_at: string;
 }
 
@@ -117,9 +127,11 @@ interface SponsorData {
   quotas: SponsorQuota[];
   groupMembers: SponsorGroupMember[];
   slips: SponsorSlip[];
+  awaitingPaymentSlips?: SponsorSlip[];
   totalAmount: number;
+  outstandingAmount?: number;
   hasOutstanding: boolean;
-  paymentStatus: 'approved' | 'pending_review' | 'rejected' | 'unpaid' | 'free_quota';
+  paymentStatus: 'approved' | 'approved_awaiting_payment' | 'pending_review' | 'rejected' | 'unpaid' | 'free_quota';
 }
 
 interface ProfileAndSponsorUpdateModalProps {
@@ -153,6 +165,7 @@ export function ProfileAndSponsorUpdateModal({
 
   // Sponsor State
   const [sponsorData, setSponsorData] = useState<SponsorData | null>(null);
+  const [selectedSlipToUpload, setSelectedSlipToUpload] = useState<SponsorSlip | null>(null);
   const [slipFile, setSlipFile] = useState<File | null>(null);
   const [slipPreview, setSlipPreview] = useState<string | null>(null);
   const [slipBank, setSlipBank] = useState('Kasikorn (KBANK)');
@@ -180,10 +193,10 @@ export function ProfileAndSponsorUpdateModal({
       setSessionToken(null);
       setMemberData(null);
       setSponsorData(null);
+      setSelectedSlipToUpload(null);
       setSaveSuccess(false);
       setSlipSubmitSuccess(false);
       setSlipFile(null);
-      setSlipPreview(null);
     }
   }, [isOpen]);
 
@@ -407,12 +420,28 @@ export function ProfileAndSponsorUpdateModal({
     }
   };
 
-  // 4. อัปโหลดสลิปสำหรับสปอนเซอร์
+  // เมื่อเลือกรายการที่จะแนบสลิป
+  const handleSelectSlipToUpload = (slip: SponsorSlip) => {
+    setSelectedSlipToUpload(slip);
+    setSlipAmount(slip.amount || 0);
+    setSlipBank('Kasikorn (KBANK)');
+    setSlipDate(new Date().toISOString().split('T')[0]);
+    setSlipTime(
+      new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false })
+    );
+    setSlipRef(slip.ticket_code || slip.slip_id || '');
+    setSlipFile(null);
+    setSlipPreview(null);
+    setErrorMsg('');
+    setSlipSubmitSuccess(false);
+  };
+
+  // 4. อัปโหลดสลิปสำหรับสปอนเซอร์ (รองรับทั้งแยกรายรายการและทั่วไป)
   const handleUploadSlip = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sponsorData) return;
     if (!slipFile) {
-      setErrorMsg('กรุณาเลือกไฟล์รูปภาพสลิปโอนเงิน');
+      setErrorMsg(lang === 'th' ? 'กรุณาเลือกไฟล์รูปภาพสลิปโอนเงิน' : 'Please select a slip image');
       return;
     }
 
@@ -422,12 +451,12 @@ export function ProfileAndSponsorUpdateModal({
     try {
       // 1. Upload image
       const uploadRes = await uploadImageToStorage(slipFile, 'slips');
-      if (!uploadRes.url) {
-        throw new Error('ไม่สามารถอัปโหลดรูปภาพสลิปได้');
+      if (!uploadRes?.url) {
+        throw new Error(lang === 'th' ? 'ไม่สามารถอัปโหลดรูปภาพสลิปได้' : 'Failed to upload slip image');
       }
 
       // 2. Submit slip metadata
-      const activeMeetingId = sponsorData.quotas[0]?.meeting_id || 'TSRM34';
+      const activeMeetingId = selectedSlipToUpload?.meeting_id || sponsorData.quotas[0]?.meeting_id || 'TSRM34';
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (sessionToken) {
         headers['Authorization'] = `Bearer ${sessionToken}`;
@@ -447,25 +476,63 @@ export function ProfileAndSponsorUpdateModal({
           transfer_time: slipTime,
           slip_url: uploadRes.url,
           ref_no: slipRef,
+          targetSlipId: selectedSlipToUpload?.slip_id,
+          targetTicketCode: selectedSlipToUpload?.ticket_code,
           sessionToken,
         }),
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        setErrorMsg(data.message || 'ส่งสลิปไม่สำเร็จ');
+        setErrorMsg(data.message || (lang === 'th' ? 'ส่งสลิปไม่สำเร็จ' : 'Failed to submit slip'));
         return;
       }
 
       setSlipSubmitSuccess(true);
+
+      // อัปเดตสถานะของ Slip ใน state ทันที
+      const updatedSlips = sponsorData.slips.map((s) => {
+        if (
+          (selectedSlipToUpload?.slip_id && s.slip_id === selectedSlipToUpload.slip_id) ||
+          (selectedSlipToUpload?.ticket_code && s.ticket_code === selectedSlipToUpload.ticket_code)
+        ) {
+          return {
+            ...s,
+            slip_url: uploadRes.url,
+            bank: slipBank,
+            amount: slipAmount,
+            transfer_date: slipDate,
+            transfer_time: slipTime,
+            status: 'pending',
+            itemStatus: 'pending_review' as const,
+            hasActualSlip: true,
+            requiresSlipUpload: false,
+          };
+        }
+        return s;
+      });
+
+      const existsInList = updatedSlips.some(
+        (s) => s.slip_id === (data.slip?.slip_id || selectedSlipToUpload?.slip_id)
+      );
+      const finalSlips = existsInList ? updatedSlips : [data.slip, ...updatedSlips];
+      const remainingAwaiting = finalSlips.filter((s) => s.requiresSlipUpload);
+
       setSponsorData({
         ...sponsorData,
-        paymentStatus: 'pending_review',
-        hasOutstanding: false,
-        slips: [data.slip, ...sponsorData.slips],
+        slips: finalSlips,
+        awaitingPaymentSlips: remainingAwaiting,
+        hasOutstanding: remainingAwaiting.length > 0,
+        paymentStatus: remainingAwaiting.length > 0 ? 'approved_awaiting_payment' : 'pending_review',
       });
+
+      setTimeout(() => {
+        setSelectedSlipToUpload(null);
+        setSlipFile(null);
+        setSlipPreview(null);
+      }, 3000);
     } catch (err: any) {
-      setErrorMsg(err?.message || 'เกิดข้อผิดพลาดในการแนบสลิป');
+      setErrorMsg(err?.message || (lang === 'th' ? 'เกิดข้อผิดพลาดในการแนบสลิป' : 'Error submitting slip'));
     } finally {
       setSubmittingSlip(false);
     }
@@ -1392,12 +1459,18 @@ export function ProfileAndSponsorUpdateModal({
 
                 {/* Overall Financial Status Badge */}
                 <div className="shrink-0">
-                  {sponsorData.paymentStatus === 'approved' ? (
-                    <div className="bg-emerald-500/10 border border-emerald-300 px-3 py-2 rounded-xl text-emerald-800 text-xs flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  {sponsorData.paymentStatus === 'approved_awaiting_payment' || sponsorData.paymentStatus === 'unpaid' ? (
+                    <div className="bg-sky-50 border-2 border-sky-300 px-3.5 py-2.5 rounded-2xl text-sky-900 text-xs flex items-center gap-2.5 shadow-xs">
+                      <CreditCard className="w-5 h-5 text-sky-700 shrink-0" />
                       <div>
-                        <span className="font-bold block">ชำระเงินเรียบร้อยแล้ว</span>
-                        <span className="text-[11px] text-emerald-700">ไม่มียอดรอชำระ</span>
+                        <span className="font-black text-sky-900 block text-xs sm:text-sm">
+                          {lang === 'th' ? '✓ อนุมัติสิทธิ์แล้ว (รอชำระเงิน)' : '✓ Access Approved (Awaiting Payment)'}
+                        </span>
+                        <span className="text-[11px] text-sky-700 font-bold">
+                          {lang === 'th'
+                            ? `มียอดรอชำระเงิน รวม ฿${(sponsorData.outstandingAmount || sponsorData.totalAmount).toLocaleString()} บาท`
+                            : `Total Awaiting Payment: ฿${(sponsorData.outstandingAmount || sponsorData.totalAmount).toLocaleString()}`}
+                        </span>
                       </div>
                     </div>
                   ) : sponsorData.paymentStatus === 'pending_review' ? (
@@ -1417,13 +1490,11 @@ export function ProfileAndSponsorUpdateModal({
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-orange-500/10 border border-orange-300 px-3 py-2 rounded-xl text-orange-800 text-xs flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-orange-600 shrink-0" />
+                    <div className="bg-emerald-500/10 border border-emerald-300 px-3 py-2 rounded-xl text-emerald-800 text-xs flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                       <div>
-                        <span className="font-bold block">สถานะ: รอชำระเงิน (แนบสลิป)</span>
-                        <span className="text-[11px] text-orange-700">
-                          {sponsorData.totalAmount > 0 ? `ยอดรอชำระ ฿${sponsorData.totalAmount.toLocaleString()}` : 'กรุณาแนบสลิปยืนยัน'}
-                        </span>
+                        <span className="font-bold block">ชำระเงินเรียบร้อยแล้ว</span>
+                        <span className="text-[11px] text-emerald-700">ไม่มียอดรอชำระ</span>
                       </div>
                     </div>
                   )}
@@ -1448,165 +1519,283 @@ export function ProfileAndSponsorUpdateModal({
               </div>
 
               {/* ═══════════════════════════════════════════════════════════
-                  FORM แนบสลิป (แสดงเมื่อมีการค้างชำระ หรือต้องการส่งสลิป)
+                  SECTION: รายการที่เป็นสถานะ "อนุมัติสิทธิ์รอชำระ" พร้อมบังคับแนบสลิปในแต่ละรายการ
                  ═══════════════════════════════════════════════════════════ */}
-              {(sponsorData.hasOutstanding || sponsorData.paymentStatus === 'rejected' || sponsorData.paymentStatus === 'unpaid') && (
-                <form onSubmit={handleUploadSlip} className="p-4 sm:p-5 bg-orange-50/50 border-2 border-orange-200 rounded-2xl space-y-4">
-                  <div className="flex items-center gap-2 font-bold text-orange-900 text-sm">
-                    <Upload className="w-4 h-4 text-orange-600" />
-                    <span>แบบฟอร์มแนบสลิปการโอนเงิน (Payment Slip Submission)</span>
-                  </div>
-
-                  {errorMsg && (
-                    <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                      <span>{errorMsg}</span>
-                    </div>
-                  )}
-
-                  {slipSubmitSuccess && (
-                    <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span className="font-bold">แนบสลิปเรียบร้อยแล้ว อยู่ระหว่างเจ้าหน้าที่ตรวจสอบ</span>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* ยอดเงิน */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        ยอดเงินที่โอน (บาท) <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={slipAmount}
-                        onChange={(e) => setSlipAmount(Number(e.target.value))}
-                        className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 bg-white font-bold text-slate-800"
-                        required
-                      />
-                    </div>
-
-                    {/* ธนาคารที่โอน */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        ธนาคารที่โอน <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={slipBank}
-                        onChange={(e) => setSlipBank(e.target.value)}
-                        className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 bg-white font-medium"
-                      >
-                        <option value="Kasikorn (KBANK)">ธนาคารกสิกรไทย (KBANK)</option>
-                        <option value="Siam Commercial (SCB)">ธนาคารไทยพาณิชย์ (SCB)</option>
-                        <option value="Bangkok Bank (BBL)">ธนาคารกรุงเทพ (BBL)</option>
-                        <option value="Krungthai (KTB)">ธนาคารกรุงไทย (KTB)</option>
-                        <option value="TTB">ธนาคารทหารไทยธนชาต (TTB)</option>
-                        <option value="PromptPay">พร้อมเพย์ (PromptPay)</option>
-                        <option value="Other">อื่นๆ</option>
-                      </select>
-                    </div>
-
-                    {/* วันที่โอน */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        วันที่โอนเงิน <span className="text-red-500">*</span>
-                      </label>
-                      <ThaiDatePicker
-                        value={slipDate}
-                        onChange={setSlipDate}
-                        outputFormat="iso"
-                        placeholder="เลือกวันที่โอนเงิน"
-                        required
-                        className="w-full"
-                      />
-                    </div>
-
-                    {/* เวลาที่โอน */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        เวลาที่โอน (เช่น 14:30) <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={slipTime}
-                        onChange={(e) => setSlipTime(e.target.value)}
-                        placeholder="14:30"
-                        className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 bg-white"
-                        required
-                      />
-                    </div>
-
-                    {/* เลขที่อ้างอิง */}
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        เลขอ้างอิง / หมายเหตุ (ถ้ามี)
-                      </label>
-                      <input
-                        type="text"
-                        value={slipRef}
-                        onChange={(e) => setSlipRef(e.target.value)}
-                        placeholder="เช่น รหัสธุรกรรม หรือ เลขที่ใบเสนอราคา"
-                        className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 bg-white"
-                      />
-                    </div>
-
-                    {/* แนบไฟล์รูปภาพสลิป */}
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        แนบรูปภาพสลิปโอนเงิน (JPG, PNG) <span className="text-red-500">*</span>
-                      </label>
-                      <div className="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-4 text-center bg-white cursor-pointer transition relative">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              setSlipFile(file);
-                              setSlipPreview(URL.createObjectURL(file));
-                            }
-                          }}
-                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                          required
-                        />
-                        {slipPreview ? (
-                          <div className="flex flex-col items-center gap-2">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={slipPreview} alt="Slip preview" className="max-h-36 rounded-lg object-contain border" />
-                            <span className="text-xs text-blue-600 font-bold">คลิกเพื่อเปลี่ยนรูปภาพ</span>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center gap-1.5 text-slate-500">
-                            <Upload className="w-6 h-6 text-slate-400" />
-                            <span className="text-xs font-bold text-slate-700">คลิกหรือลากไฟล์ภาพสลิปมาวางที่นี่</span>
-                            <span className="text-[11px] text-slate-400">รองรับไฟล์ JPG, PNG ขนาดไม่เกิน 10MB</span>
-                          </div>
-                        )}
+              {sponsorData.slips.some((s) => s.requiresSlipUpload || s.itemStatus === 'approved_awaiting_payment' || s.itemStatus === 'awaiting_payment' || s.itemStatus === 'rejected') && (
+                <div className="space-y-4 border-2 border-sky-300 bg-gradient-to-br from-sky-50/70 via-blue-50/40 to-white rounded-3xl p-4 sm:p-5 shadow-sm">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-sky-600 text-white flex items-center justify-center shadow-xs">
+                        <CreditCard className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">
+                          {lang === 'th' ? 'รายการอนุมัติสิทธิ์รอชำระเงิน' : 'Items Approved & Awaiting Payment'}
+                        </h4>
+                        <p className="text-xs text-sky-800 font-semibold">
+                          {lang === 'th'
+                            ? 'กรุณาแนบสลิปการโอนเงินแยกสำหรับแต่ละรายการด้านล่างนี้'
+                            : 'Please upload the payment slip for each item below.'}
+                        </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-2 flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={submittingSlip || !slipFile}
-                      className="px-6 py-2.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md transition flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-                    >
-                      {submittingSlip ? (
-                        <>
-                          <RotateCw className="w-4 h-4 animate-spin" />
-                          <span>กำลังอัปโหลดสลิป...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Check className="w-4 h-4" />
-                          <span>ยืนยันการแนบสลิปการชำระเงิน</span>
-                        </>
-                      )}
-                    </button>
+                  {/* Cards for each awaiting item */}
+                  <div className="space-y-3">
+                    {sponsorData.slips
+                      .filter((s) => s.requiresSlipUpload || s.itemStatus === 'approved_awaiting_payment' || s.itemStatus === 'awaiting_payment' || s.itemStatus === 'rejected')
+                      .map((slip, idx) => {
+                        const isSelected = selectedSlipToUpload?.slip_id === slip.slip_id || selectedSlipToUpload?.ticket_code === slip.ticket_code;
+                        return (
+                          <div
+                            key={idx}
+                            className={`p-4 rounded-2xl border transition-all ${
+                              isSelected
+                                ? 'bg-white border-blue-500 shadow-md ring-2 ring-blue-200'
+                                : 'bg-white/90 border-slate-200 hover:border-blue-300 shadow-2xs'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="space-y-1.5 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-mono text-xs font-extrabold bg-slate-100 text-slate-800 px-2 py-0.5 rounded-lg border border-slate-200">
+                                    {slip.ticket_code || slip.slip_id}
+                                  </span>
+
+                                  {/* Status Badge */}
+                                  <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-900 border border-sky-300 inline-flex items-center gap-1 shadow-2xs">
+                                    ✓ {lang === 'th' ? 'อนุมัติสิทธิ์แล้ว (รอชำระเงิน)' : 'Access Approved (Awaiting Payment)'}
+                                  </span>
+
+                                  {slip.ticket_code?.startsWith('MEMGRP') ? (
+                                    <span className="text-[10px] font-bold bg-purple-50 text-purple-800 px-2 py-0.5 rounded-md border border-purple-200 flex items-center gap-1">
+                                      <Sparkles className="w-3 h-3 text-purple-600" />
+                                      <span>คำขอสมัครสมาชิกใหม่</span>
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-bold bg-blue-50 text-blue-800 px-2 py-0.5 rounded-md border border-blue-200 flex items-center gap-1">
+                                      <Building2 className="w-3 h-3 text-blue-600" />
+                                      <span>กลุ่มสมาชิก ({slip.attendeesCount || 2} ท่าน)</span>
+                                    </span>
+                                  )}
+                                </div>
+
+                                <h5 className="font-bold text-xs sm:text-sm text-slate-800 leading-snug">
+                                  {slip.title || slip.meeting_name}
+                                </h5>
+
+                                <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                                  <span>{slip.meeting_name}</span>
+                                  <span>•</span>
+                                  <span>Ref: {slip.slip_id}</span>
+                                </div>
+                              </div>
+
+                              {/* Amount & Action Button */}
+                              <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                                <div className="text-left sm:text-right">
+                                  <span className="text-[10px] text-slate-500 block font-medium">ยอดเงินที่ต้องชำระ</span>
+                                  <span className="text-base sm:text-lg font-black text-slate-900">
+                                    ฿{slip.amount.toLocaleString()} <span className="text-xs font-bold text-slate-500">THB</span>
+                                  </span>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleSelectSlipToUpload(slip)}
+                                  className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition shadow-2xs cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-blue-600 text-white shadow-blue-200'
+                                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white'
+                                  }`}
+                                >
+                                  <Upload className="w-3.5 h-3.5" />
+                                  <span>{isSelected ? 'กำลังแนบสลิปรายการนี้' : 'แนบสลิปชำระเงิน'}</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Expandable Upload Form directly for this selected item */}
+                            {isSelected && (
+                              <form onSubmit={handleUploadSlip} className="mt-4 pt-4 border-t border-blue-100 space-y-4 bg-blue-50/50 -mx-4 -mb-4 p-4 rounded-b-2xl animate-fade-in">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2 font-bold text-blue-900 text-xs sm:text-sm">
+                                    <Upload className="w-4 h-4 text-blue-600" />
+                                    <span>แนบสลิปโอนเงินสำหรับ: {slip.ticket_code || slip.slip_id} (฿{slip.amount.toLocaleString()} บาท)</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedSlipToUpload(null)}
+                                    className="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                                  >
+                                    ปิดฟอร์ม
+                                  </button>
+                                </div>
+
+                                {errorMsg && (
+                                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-start gap-2">
+                                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                                    <span>{errorMsg}</span>
+                                  </div>
+                                )}
+
+                                {slipSubmitSuccess && (
+                                  <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                    <span className="font-bold">แนบสลิปเรียบร้อยแล้ว อยู่ระหว่างเจ้าหน้าที่ตรวจสอบ</span>
+                                  </div>
+                                )}
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  {/* ยอดเงิน */}
+                                  <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                                      ยอดเงินที่โอน (บาท) <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={slipAmount}
+                                      onChange={(e) => setSlipAmount(Number(e.target.value))}
+                                      className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 bg-white font-bold text-slate-800"
+                                      required
+                                    />
+                                  </div>
+
+                                  {/* ธนาคารที่โอน */}
+                                  <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                                      ธนาคารที่โอน <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                      value={slipBank}
+                                      onChange={(e) => setSlipBank(e.target.value)}
+                                      className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 bg-white font-medium"
+                                    >
+                                      <option value="Kasikorn (KBANK)">ธนาคารกสิกรไทย (KBANK)</option>
+                                      <option value="Siam Commercial (SCB)">ธนาคารไทยพาณิชย์ (SCB)</option>
+                                      <option value="Bangkok Bank (BBL)">ธนาคารกรุงเทพ (BBL)</option>
+                                      <option value="Krungthai (KTB)">ธนาคารกรุงไทย (KTB)</option>
+                                      <option value="TTB">ธนาคารทหารไทยธนชาต (TTB)</option>
+                                      <option value="PromptPay">พร้อมเพย์ (PromptPay)</option>
+                                      <option value="Other">อื่นๆ</option>
+                                    </select>
+                                  </div>
+
+                                  {/* วันที่โอน */}
+                                  <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                                      วันที่โอนเงิน <span className="text-red-500">*</span>
+                                    </label>
+                                    <ThaiDatePicker
+                                      value={slipDate}
+                                      onChange={setSlipDate}
+                                      outputFormat="iso"
+                                      placeholder="เลือกวันที่โอนเงิน"
+                                      required
+                                      className="w-full"
+                                    />
+                                  </div>
+
+                                  {/* เวลาที่โอน */}
+                                  <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                                      เวลาที่โอน (เช่น 14:30) <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={slipTime}
+                                      onChange={(e) => setSlipTime(e.target.value)}
+                                      placeholder="14:30"
+                                      className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 bg-white"
+                                      required
+                                    />
+                                  </div>
+
+                                  {/* เลขที่อ้างอิง */}
+                                  <div className="sm:col-span-2">
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                                      เลขอ้างอิง / หมายเหตุ
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={slipRef}
+                                      onChange={(e) => setSlipRef(e.target.value)}
+                                      placeholder="เช่น รหัสธุรกรรม หรือ เลขที่ใบเสนอราคา"
+                                      className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 bg-white"
+                                    />
+                                  </div>
+
+                                  {/* แนบไฟล์รูปภาพสลิป */}
+                                  <div className="sm:col-span-2">
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                                      แนบรูปภาพสลิปโอนเงิน (JPG, PNG) <span className="text-red-500">* (บังคับแนบสลิป)</span>
+                                    </label>
+                                    <div className="border-2 border-dashed border-blue-300 hover:border-blue-500 rounded-xl p-4 text-center bg-white cursor-pointer transition relative">
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) {
+                                            setSlipFile(file);
+                                            setSlipPreview(URL.createObjectURL(file));
+                                          }
+                                        }}
+                                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                        required
+                                      />
+                                      {slipPreview ? (
+                                        <div className="flex flex-col items-center gap-2">
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img src={slipPreview} alt="Slip preview" className="max-h-36 rounded-lg object-contain border" />
+                                          <span className="text-xs text-blue-600 font-bold">คลิกเพื่อเปลี่ยนรูปภาพสลิป</span>
+                                        </div>
+                                      ) : (
+                                        <div className="flex flex-col items-center gap-1.5 text-slate-500">
+                                          <Upload className="w-6 h-6 text-blue-500" />
+                                          <span className="text-xs font-bold text-slate-700">คลิกหรือลากไฟล์ภาพสลิปโอนเงินมาวางที่นี่</span>
+                                          <span className="text-[11px] text-slate-400">รองรับไฟล์ JPG, PNG ขนาดไม่เกิน 10MB</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="pt-2 flex justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedSlipToUpload(null)}
+                                    className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200/60 rounded-xl cursor-pointer"
+                                  >
+                                    ยกเลิก
+                                  </button>
+                                  <button
+                                    type="submit"
+                                    disabled={submittingSlip || !slipFile}
+                                    className="px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                                  >
+                                    {submittingSlip ? (
+                                      <>
+                                        <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                                        <span>กำลังอัปโหลดสลิป...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Check className="w-3.5 h-3.5" />
+                                        <span>ยืนยันการแนบสลิปชำระเงิน</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              </form>
+                            )}
+                          </div>
+                        );
+                      })}
                   </div>
-                </form>
+                </div>
               )}
 
               {/* รายชื่อสมาชิกที่บริษัทส่งเข้าร่วม (Group Members List) */}
@@ -1661,44 +1850,70 @@ export function ProfileAndSponsorUpdateModal({
                 <div className="space-y-3 border-t border-slate-200 pt-4">
                   <h5 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                     <FileText className="w-4 h-4 text-blue-600" />
-                    <span>ประวัติการแนบสลิป ({sponsorData.slips.length} รายการ)</span>
+                    <span>ประวัติรายการสลิปและการชำระเงิน ({sponsorData.slips.length} รายการ)</span>
                   </h5>
 
                   <div className="space-y-2">
-                    {sponsorData.slips.map((s, idx) => (
-                      <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-slate-700">{s.slip_id}</span>
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              s.status === 'approved'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : s.status === 'rejected'
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-amber-100 text-amber-800'
-                            }`}>
-                              {s.status === 'approved' ? 'อนุมัติแล้ว' : s.status === 'rejected' ? 'ไม่อนุมัติ' : 'รอตรวจสอบ'}
-                            </span>
+                    {sponsorData.slips.map((s, idx) => {
+                      const isPayLaterAwaiting = s.itemStatus === 'approved_awaiting_payment' || (s.isPayLater && s.amount > 0 && !s.hasActualSlip);
+                      return (
+                        <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono font-bold text-slate-700">{s.ticket_code || s.slip_id}</span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                isPayLaterAwaiting
+                                  ? 'bg-sky-100 text-sky-900 border border-sky-300'
+                                  : s.status === 'approved'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : s.status === 'rejected'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {isPayLaterAwaiting
+                                  ? 'อนุมัติสิทธิ์แล้ว (รอชำระเงิน)'
+                                  : s.status === 'approved'
+                                  ? 'อนุมัติแล้ว'
+                                  : s.status === 'rejected'
+                                  ? 'ไม่อนุมัติ'
+                                  : 'รอตรวจสอบสลิป'}
+                              </span>
+                            </div>
+                            <p className="text-slate-500 text-[11px] mt-0.5 truncate">
+                              {s.bank || 'ชำระเงินภายหลัง'} • ฿{s.amount.toLocaleString()} {s.transfer_date ? `• ${s.transfer_date} ${s.transfer_time || ''}` : ''}
+                            </p>
+                            {s.rejection_reason && (
+                              <p className="text-red-600 text-[11px] mt-0.5">เหตุผล: {s.rejection_reason}</p>
+                            )}
                           </div>
-                          <p className="text-slate-500 text-[11px] mt-0.5">
-                            {s.bank} • ฿{s.amount.toLocaleString()} • {s.transfer_date} {s.transfer_time}
-                          </p>
-                          {s.rejection_reason && (
-                            <p className="text-red-600 text-[11px] mt-0.5">เหตุผล: {s.rejection_reason}</p>
-                          )}
-                        </div>
 
-                        <a
-                          href={s.slip_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-2.5 py-1 bg-white border border-slate-300 hover:border-blue-500 text-blue-600 rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs"
-                        >
-                          <span>ดูสลิป</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </div>
-                    ))}
+                          <div className="shrink-0 flex items-center gap-2">
+                            {isPayLaterAwaiting && (
+                              <button
+                                type="button"
+                                onClick={() => handleSelectSlipToUpload(s)}
+                                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
+                              >
+                                <Upload className="w-3 h-3" />
+                                <span>แนบสลิป</span>
+                              </button>
+                            )}
+
+                            {s.slip_url && s.slip_url !== 'PAY_LATER' && s.slip_url !== 'pay_later_pending' && s.slip_url !== '/placeholder-slip.png' && s.slip_url !== 'GROUP_REGISTRATION' && s.slip_url !== 'GROUP_MEMBERSHIP' && (
+                              <a
+                                href={s.slip_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-2.5 py-1 bg-white border border-slate-300 hover:border-blue-500 text-blue-600 rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs"
+                              >
+                                <span>ดูสลิป</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
