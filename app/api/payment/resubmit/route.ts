@@ -68,9 +68,14 @@ export async function GET(request: NextRequest) {
           memberPayload = actObj.memberPayload;
         } else if (
           actObj.type === 'membership_group_registration' ||
-          actObj.isGroup ||
-          (actObj.attendees && Array.isArray(actObj.attendees)) ||
-          (actObj.applicants && Array.isArray(actObj.applicants))
+          (actObj.isGroup === true && actObj.applicants && Array.isArray(actObj.applicants) && actObj.applicants.length > 1)
+        ) {
+          isGroup = true;
+          groupPayload = actObj;
+        } else if (
+          actObj.type === 'conference_group_registration' ||
+          (actObj.isGroup === true && Array.isArray(actObj.attendees) && actObj.attendees.length > 1) ||
+          (Array.isArray(actObj.attendees) && actObj.attendees.length > 1 && (actObj.isGroup || actObj.companyName))
         ) {
           isGroup = true;
           groupPayload = actObj;
@@ -93,11 +98,16 @@ export async function GET(request: NextRequest) {
     }
 
     const isCorporate = Boolean(
-      isGroup ||
+      (isGroup && groupPayload) ||
       slip.ticket_code?.startsWith('MEMGRP') ||
       slip.ticket_code?.startsWith('GRP-') ||
-      slip.guest_name?.includes('ท่าน') ||
-      groupPayload
+      slip.ticket_code?.startsWith('GRP_') ||
+      slip.slip_id?.includes('GRP') ||
+      (groupPayload?.isGroup === true && (
+        (Array.isArray(groupPayload?.attendees) && groupPayload.attendees.length > 1) ||
+        (Array.isArray(groupPayload?.applicants) && groupPayload.applicants.length > 1)
+      )) ||
+      Boolean(slip.guest_name?.includes('ท่าน') && (slip.ticket_code?.startsWith('GRP') || slip.slip_id?.includes('GRP')))
     );
 
     let companyName = '';
@@ -171,37 +181,37 @@ export async function GET(request: NextRequest) {
     const nameTh = isCorporate
       ? companyName || slip.guest_name || ''
       : (slip.is_member
-        ? slip.members?.fullNameTh || matchedMember?.fullNameTh || ''
-        : slip.guest_name || actObj?.nameTh || actObj?.attendees?.[0]?.nameTh || memberPayload?.full_name_th || matchedMember?.fullNameTh || '');
+        ? slip.members?.fullNameTh || matchedMember?.fullNameTh || actObj?.nameTh || actObj?.fullNameTh || actObj?.attendees?.[0]?.nameTh || actObj?.attendees?.[0]?.fullNameTh || ''
+        : (slip.guest_name && !slip.guest_name.includes('ท่าน') ? slip.guest_name : '') || actObj?.nameTh || actObj?.fullNameTh || actObj?.attendees?.[0]?.nameTh || actObj?.attendees?.[0]?.fullNameTh || memberPayload?.full_name_th || matchedMember?.fullNameTh || slip.guest_name || '');
 
     const nameEn = isCorporate
       ? ''
       : (slip.is_member
-        ? slip.members?.fullNameEn || matchedMember?.fullNameEn || ''
-        : actObj?.nameEn || actObj?.attendees?.[0]?.nameEn || groupPayload?.attendees?.[0]?.nameEn || memberPayload?.full_name_en || matchedMember?.fullNameEn || '');
+        ? slip.members?.fullNameEn || matchedMember?.fullNameEn || actObj?.nameEn || actObj?.fullNameEn || actObj?.attendees?.[0]?.nameEn || actObj?.attendees?.[0]?.fullNameEn || ''
+        : actObj?.nameEn || actObj?.fullNameEn || actObj?.attendees?.[0]?.nameEn || actObj?.attendees?.[0]?.fullNameEn || groupPayload?.attendees?.[0]?.nameEn || memberPayload?.full_name_en || matchedMember?.fullNameEn || '');
 
     const email = isCorporate
       ? (coordinatorEmail || slip.guest_email || '')
       : (slip.is_member
-        ? slip.members?.email || matchedMember?.email || ''
+        ? slip.members?.email || matchedMember?.email || actObj?.email || actObj?.attendees?.[0]?.email || ''
         : slip.guest_email || actObj?.email || actObj?.attendees?.[0]?.email || memberPayload?.email || matchedMember?.email || '');
 
     // ถ้าเป็นข้อมูลบริษัท อย่าดึงเบอร์โทรของคนสมัครมาปน
     const phone = isCorporate
       ? (coordinatorPhone || '')
       : (slip.is_member
-        ? slip.members?.mobile || matchedMember?.mobile || ''
-        : slip.guest_phone || actObj?.phone || actObj?.attendees?.[0]?.phone || memberPayload?.mobile || matchedMember?.mobile || '');
+        ? slip.members?.mobile || matchedMember?.mobile || actObj?.mobile || actObj?.phone || actObj?.attendees?.[0]?.mobile || actObj?.attendees?.[0]?.phone || ''
+        : slip.guest_phone || actObj?.phone || actObj?.mobile || actObj?.attendees?.[0]?.phone || actObj?.attendees?.[0]?.mobile || memberPayload?.mobile || matchedMember?.mobile || '');
 
     const workplace = isCorporate
       ? companyName
       : (slip.is_member
-        ? slip.members?.workplace || matchedMember?.workplace || ''
+        ? slip.members?.workplace || matchedMember?.workplace || actObj?.workplace || actObj?.attendees?.[0]?.workplace || ''
         : slip.guest_workplace || actObj?.workplace || actObj?.attendees?.[0]?.workplace || memberPayload?.workplace || matchedMember?.workplace || '');
 
     const position = isCorporate
       ? ''
-      : (slip.members?.position || actObj?.position || actObj?.attendees?.[0]?.position || groupPayload?.attendees?.[0]?.position || memberPayload?.position || matchedMember?.position || '');
+      : (slip.members?.position || actObj?.position || actObj?.guestPosition || actObj?.attendees?.[0]?.position || groupPayload?.attendees?.[0]?.position || memberPayload?.position || matchedMember?.position || '');
 
     const address = slip.members?.address || actObj?.address || memberPayload?.address || matchedMember?.address || '';
     const jobCategory = slip.members?.job_category || actObj?.jobCategory || memberPayload?.job_category || matchedMember?.job_category || '';
@@ -420,12 +430,30 @@ export async function POST(request: NextRequest) {
           actObj = {
             ...(typeof actObj === 'object' && !Array.isArray(actObj) ? actObj : { activities: actObj }),
             nameTh: cleanNameTh,
+            fullNameTh: cleanNameTh,
             nameEn: nameEn?.trim() || '',
+            fullNameEn: nameEn?.trim() || '',
             email: cleanEmail,
+            phone: cleanPhone,
+            mobile: cleanPhone,
             workplace: cleanWorkplace,
             position: position?.trim() || '',
             rejectType: undefined,
           };
+          if (Array.isArray(actObj.attendees) && actObj.attendees.length === 1) {
+            actObj.attendees[0] = {
+              ...actObj.attendees[0],
+              nameTh: cleanNameTh,
+              fullNameTh: cleanNameTh,
+              nameEn: nameEn?.trim() || '',
+              fullNameEn: nameEn?.trim() || '',
+              email: cleanEmail,
+              phone: cleanPhone,
+              mobile: cleanPhone,
+              workplace: cleanWorkplace,
+              position: position?.trim() || '',
+            };
+          }
           updatedActivities = actObj;
         }
       }
@@ -434,8 +462,12 @@ export async function POST(request: NextRequest) {
     } else if (nameEn || position) {
       updatedActivities = {
         nameTh: cleanNameTh,
+        fullNameTh: cleanNameTh,
         nameEn: nameEn?.trim() || '',
+        fullNameEn: nameEn?.trim() || '',
         email: cleanEmail,
+        phone: cleanPhone,
+        mobile: cleanPhone,
         workplace: cleanWorkplace,
         position: position?.trim() || '',
       };
@@ -443,7 +475,14 @@ export async function POST(request: NextRequest) {
 
     const isGroupResubmit = Boolean(
       customGroupPayload ||
-      (updatedActivities && typeof updatedActivities === 'object' && (updatedActivities.isGroup || updatedActivities.attendees || updatedActivities.applicants))
+      (updatedActivities && typeof updatedActivities === 'object' && (
+        updatedActivities.type === 'conference_group_registration' ||
+        updatedActivities.type === 'membership_group_registration' ||
+        (updatedActivities.isGroup === true && (
+          (Array.isArray(updatedActivities.attendees) && updatedActivities.attendees.length > 1) ||
+          (Array.isArray(updatedActivities.applicants) && updatedActivities.applicants.length > 1)
+        ))
+      ))
     );
 
     const groupCompany = customGroupPayload?.companyName || cleanWorkplace || 'Corporate Group';
