@@ -32,6 +32,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
+import { ThaiDatePicker } from '@/components/ThaiDatePicker';
 import { uploadImageToStorage } from '@/lib/blobUpload';
 
 interface EducationItem {
@@ -1158,12 +1159,13 @@ export function ProfileAndSponsorUpdateModal({
                       <label className="block text-xs font-bold text-slate-700 mb-1">
                         วันที่โอนเงิน <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="date"
+                      <ThaiDatePicker
                         value={slipDate}
-                        onChange={(e) => setSlipDate(e.target.value)}
-                        className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 bg-white"
+                        onChange={setSlipDate}
+                        outputFormat="iso"
+                        placeholder="เลือกวันที่โอนเงิน"
                         required
+                        className="w-full"
                       />
                     </div>
 

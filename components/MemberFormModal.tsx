@@ -14,6 +14,7 @@ import {
 import { MemberAvatar } from '@/components/MemberAvatar';
 import { PositionSelect } from '@/components/PositionSelect';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
+import { ThaiDatePicker } from '@/components/ThaiDatePicker';
 import {
   X,
   User,
@@ -618,14 +619,13 @@ export function MemberFormModal({
                 {/* วันที่เริ่มปฏิบัติงาน */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
                     <span>วันที่เริ่มปฏิบัติงาน</span>
                   </label>
-                  <input
-                    type="date"
+                  <ThaiDatePicker
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent"
+                    onChange={setStartDate}
+                    outputFormat="iso"
+                    placeholder="เลือกวันที่เริ่มปฏิบัติงาน"
                   />
                 </div>
 

@@ -33,6 +33,8 @@ import {
   Copy,
   Layers,
   UserCheck,
+  Lock,
+  X,
 } from 'lucide-react';
 import { TsrmLogo } from '@/components/TsrmLogo';
 import { GoogleIcon } from '@/components/GoogleIcon';
@@ -470,6 +472,21 @@ export function LoginView({
         sanitized = value.replace(/[^a-zA-Z\s\.\-']/g, '');
       } else if (field === 'memberNo') {
         sanitized = value.replace(/\D/g, '').slice(0, 4);
+        if (!sanitized) {
+          return {
+            ...att,
+            memberNo: '',
+            nameTh: '',
+            nameEn: '',
+            email: '',
+            position: '',
+            positionOther: '',
+            workplace: sponsorSession?.sponsorName || '',
+            memberCheckStatus: 'idle',
+            memberCheckMessage: '',
+            verifiedMember: null,
+          };
+        }
       }
       return { ...att, [field]: sanitized };
     }));
@@ -525,9 +542,27 @@ export function LoginView({
     const nameEn = currentAttendee?.nameEn?.trim() || '';
 
     if (!memNo) {
-      updateCurrentAttendee('memberCheckStatus', 'idle');
-      updateCurrentAttendee('memberCheckMessage', '');
-      updateCurrentAttendee('verifiedMember', null);
+      if (currentAttendee?.verifiedMember || currentAttendee?.memberCheckStatus === 'valid') {
+        setAttendees(prev => prev.map((att, idx) => {
+          if (idx !== activeAttendeeIdx) return att;
+          return {
+            ...att,
+            nameTh: '',
+            nameEn: '',
+            email: '',
+            position: '',
+            positionOther: '',
+            workplace: sponsorSession?.sponsorName || '',
+            memberCheckStatus: 'idle',
+            memberCheckMessage: '',
+            verifiedMember: null,
+          };
+        }));
+      } else {
+        updateCurrentAttendee('memberCheckStatus', 'idle');
+        updateCurrentAttendee('memberCheckMessage', '');
+        updateCurrentAttendee('verifiedMember', null);
+      }
       return;
     }
 
@@ -544,9 +579,6 @@ export function LoginView({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             memberNo: memNo,
-            nameTh: nameTh,
-            nameEn: nameEn,
-            name: nameTh || nameEn,
             meetingId: activeMeeting?.meeting_id,
           }),
         });
@@ -554,12 +586,12 @@ export function LoginView({
         if (data.valid && data.member) {
           setAttendees(prev => prev.map((att, idx) => {
             if (idx !== activeAttendeeIdx) return att;
-            // Autofill fields from member if empty or if looking up by memberNo
-            const nextNameTh = data.member.fullNameTh || att.nameTh;
-            const nextNameEn = data.member.fullNameEn || att.nameEn;
-            const nextEmail = att.email || data.member.email || '';
-            const nextPosition = data.member.position || att.position || '';
-            const nextWorkplace = sponsorSession?.sponsorName || att.workplace || data.member.workplace || '';
+            // Autofill fields strictly from verified member profile
+            const nextNameTh = data.member.fullNameTh || '';
+            const nextNameEn = data.member.fullNameEn || '';
+            const nextEmail = data.member.email || att.email || '';
+            const nextPosition = data.member.position || '';
+            const nextWorkplace = sponsorSession?.sponsorName || data.member.workplace || att.workplace || '';
 
             return {
               ...att,
@@ -575,48 +607,78 @@ export function LoginView({
               verifiedMember: data.member,
             };
           }));
-        } else if (data.nameMismatch) {
-          updateCurrentAttendee('memberCheckStatus', 'mismatch');
-          updateCurrentAttendee(
-            'memberCheckMessage',
-            lang === 'th' ? '❌ ชื่อไม่ตรงกับเลขสมาชิก' : '❌ Name does not match Member ID'
-          );
-          updateCurrentAttendee('verifiedMember', null);
         } else if (data.alreadyRegistered) {
-          updateCurrentAttendee('memberCheckStatus', 'invalid');
-          updateCurrentAttendee(
-            'memberCheckMessage',
-            lang === 'th'
-              ? '⚠️ สมาชิกหมายเลขนี้ได้ลงทะเบียนงานประชุมนี้แล้ว'
-              : '⚠️ This member has already registered for this conference'
-          );
-          updateCurrentAttendee('verifiedMember', null);
+          setAttendees(prev => prev.map((att, idx) => {
+            if (idx !== activeAttendeeIdx) return att;
+            return {
+              ...att,
+              nameTh: '',
+              nameEn: '',
+              email: '',
+              position: '',
+              positionOther: '',
+              workplace: sponsorSession?.sponsorName || '',
+              memberCheckStatus: 'invalid',
+              memberCheckMessage: lang === 'th'
+                ? '⚠️ สมาชิกหมายเลขนี้ได้ลงทะเบียนงานประชุมนี้แล้ว'
+                : '⚠️ This member has already registered for this conference',
+              verifiedMember: null,
+            };
+          }));
         } else if (data.member?.membership_status && data.member.membership_status.toLowerCase() !== 'active') {
-          updateCurrentAttendee('memberCheckStatus', 'expired');
-          updateCurrentAttendee(
-            'memberCheckMessage',
-            lang === 'th' ? '⚠️ สถานะสมาชิกภาพหมดอายุ' : '⚠️ Membership expired'
-          );
-          updateCurrentAttendee('verifiedMember', null);
+          setAttendees(prev => prev.map((att, idx) => {
+            if (idx !== activeAttendeeIdx) return att;
+            return {
+              ...att,
+              nameTh: '',
+              nameEn: '',
+              email: '',
+              position: '',
+              positionOther: '',
+              workplace: sponsorSession?.sponsorName || '',
+              memberCheckStatus: 'expired',
+              memberCheckMessage: lang === 'th' ? '⚠️ สถานะสมาชิกภาพหมดอายุ' : '⚠️ Membership expired',
+              verifiedMember: null,
+            };
+          }));
         } else {
-          updateCurrentAttendee('memberCheckStatus', 'invalid');
-          updateCurrentAttendee(
-            'memberCheckMessage',
-            lang === 'th' ? '❌ ไม่พบเลขสมาชิกนี้ในระบบ' : '❌ Member ID not found'
-          );
-          updateCurrentAttendee('verifiedMember', null);
+          setAttendees(prev => prev.map((att, idx) => {
+            if (idx !== activeAttendeeIdx) return att;
+            return {
+              ...att,
+              nameTh: '',
+              nameEn: '',
+              email: '',
+              position: '',
+              positionOther: '',
+              workplace: sponsorSession?.sponsorName || '',
+              memberCheckStatus: 'invalid',
+              memberCheckMessage: lang === 'th' ? '❌ ไม่พบเลขสมาชิกนี้ในระบบ' : '❌ Member ID not found',
+              verifiedMember: null,
+            };
+          }));
         }
       } catch (err) {
-        updateCurrentAttendee('memberCheckStatus', 'invalid');
-        updateCurrentAttendee(
-          'memberCheckMessage',
-          lang === 'th' ? 'เกิดข้อผิดพลาดในการตรวจสอบ' : 'Verification error'
-        );
+        setAttendees(prev => prev.map((att, idx) => {
+          if (idx !== activeAttendeeIdx) return att;
+          return {
+            ...att,
+            nameTh: '',
+            nameEn: '',
+            email: '',
+            position: '',
+            positionOther: '',
+            workplace: sponsorSession?.sponsorName || '',
+            memberCheckStatus: 'invalid',
+            memberCheckMessage: lang === 'th' ? 'เกิดข้อผิดพลาดในการตรวจสอบ' : 'Verification error',
+            verifiedMember: null,
+          };
+        }));
       }
     }, 450);
 
     return () => clearTimeout(timer);
-  }, [currentAttendee?.memberNo, currentAttendee?.nameTh, currentAttendee?.nameEn, activeAttendeeIdx, activeMeeting?.meeting_id]);
+  }, [currentAttendee?.memberNo, activeAttendeeIdx, activeMeeting?.meeting_id]);
 
   // Sponsor session auto-fills workplace
   useEffect(() => {
@@ -974,18 +1036,24 @@ export function LoginView({
         const attendeeSubtotal = selectedActivityObjects.reduce((sum, item) => sum + item.price, 0);
         groupTotalAmount += attendeeSubtotal;
 
-        const finalPosition = (att.position === 'อื่นๆ' || att.position === '0 อื่นๆ')
-          ? (att.positionOther || (lang === 'th' ? 'อื่นๆ' : 'Other'))
-          : (att.position || '');
+        const finalNameTh = (isMemberCalculated && memberDataFound?.fullNameTh) ? memberDataFound.fullNameTh : att.nameTh.trim();
+        const finalNameEn = (isMemberCalculated && memberDataFound?.fullNameEn) ? memberDataFound.fullNameEn : att.nameEn.trim();
+        const finalEmail = (isMemberCalculated && memberDataFound?.email) ? memberDataFound.email : att.email.trim();
+        const finalWorkplace = (isMemberCalculated && memberDataFound?.workplace) ? memberDataFound.workplace : att.workplace.trim();
+        const finalPosition = (isMemberCalculated && memberDataFound?.position)
+          ? memberDataFound.position
+          : ((att.position === 'อื่นๆ' || att.position === '0 อื่นๆ')
+            ? (att.positionOther || (lang === 'th' ? 'อื่นๆ' : 'Other'))
+            : (att.position || ''));
 
         const programLabel = selectedActivityObjects.map(a => a.name).join(' + ');
 
         processedAttendees.push({
           id: att.id,
-          nameTh: att.nameTh.trim(),
-          nameEn: att.nameEn.trim(),
-          email: att.email.trim(),
-          workplace: att.workplace.trim(),
+          nameTh: finalNameTh,
+          nameEn: finalNameEn,
+          email: finalEmail,
+          workplace: finalWorkplace,
           position: finalPosition,
           positionCode: att.position,
           memberNo: rawMemberNo,
@@ -1573,7 +1641,7 @@ export function LoginView({
                       )}
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5">
-                        {/* 1. รหัสสมาชิก (Member ID) - ช่องแรกสุด พร้อมฟังก์ชันออโต้ฟิล */}
+                        {/* 1. รหัสสมาชิก - ช่องแรกสุด พร้อมฟังก์ชันออโต้ฟิล */}
                         <div className="sm:col-span-2 bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-blue-50/80 border border-blue-200/90 rounded-2xl p-3 sm:p-3.5 shadow-2xs space-y-1.5">
                           <div className="flex items-center justify-between flex-wrap gap-1">
                             <label className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
@@ -1597,7 +1665,7 @@ export function LoginView({
                               value={currentAttendee.memberNo}
                               onChange={(e) => updateCurrentAttendee('memberNo', e.target.value)}
                               placeholder={lang === 'th' ? 'กรอกเลขสมาชิก (เว้นว่างหากไม่ใช่สมาชิก)' : 'Enter Member No. (Leave blank if not a member)'}
-                              className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-white text-slate-900 rounded-xl border text-xs sm:text-sm font-mono font-bold tracking-wider placeholder:font-sans placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:outline-none transition ${currentAttendee.memberCheckStatus === 'valid'
+                              className={`w-full pl-9 sm:pl-10 ${currentAttendee.memberNo ? 'pr-9' : 'pr-3 sm:pr-3.5'} py-2 sm:py-2.5 bg-white text-slate-900 rounded-xl border text-xs sm:text-sm font-mono font-bold tracking-wider placeholder:font-sans placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:outline-none transition ${currentAttendee.memberCheckStatus === 'valid'
                                 ? 'border-emerald-500 focus:ring-emerald-500 ring-1 ring-emerald-400/50'
                                 : currentAttendee.memberCheckStatus === 'mismatch' || currentAttendee.memberCheckStatus === 'invalid'
                                   ? 'border-rose-400 focus:ring-rose-500 ring-1 ring-rose-300'
@@ -1606,6 +1674,16 @@ export function LoginView({
                                     : 'border-slate-300 focus:ring-[#0026b3]'
                                 }`}
                             />
+                            {currentAttendee.memberNo && (
+                              <button
+                                type="button"
+                                onClick={() => updateCurrentAttendee('memberNo', '')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                                title={lang === 'th' ? 'ล้างเลขสมาชิกและข้อมูล' : 'Clear Member ID and Data'}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
 
                           {/* Debounced Member Check Message below input */}
@@ -1625,36 +1703,72 @@ export function LoginView({
                           )}
                         </div>
 
-                        {/* 2. ชื่อ-นามสกุล(ไทย) */}
+                        {/* Member Data Lock Notice */}
+                        {currentAttendee.memberCheckStatus === 'valid' && (
+                          <div className="sm:col-span-2 bg-emerald-50/90 border border-emerald-200/90 rounded-xl px-3 py-2 flex items-center justify-between text-xs text-emerald-900 font-semibold animate-fade-in shadow-2xs">
+                            <div className="flex items-center gap-2">
+                              <Lock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>{lang === 'th' ? 'ระบบล็อกข้อมูลตามฐานข้อมูลสมาชิกเพื่อความถูกต้อง (ลบเลขสมาชิกออกหากต้องการแก้ไขด้วยตนเอง)' : 'Fields locked based on member profile (Clear Member ID to edit manually)'}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 2. ชื่อ-นามสกุล (ไทย) */}
                         <div>
-                          <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
-                            {lang === 'th' ? 'ชื่อ-นามสกุล (ภาษาไทย)' : 'Full Name (Thai)'} <span className="text-rose-500 font-bold">*</span>
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[11px] sm:text-xs font-bold text-slate-700">
+                              {lang === 'th' ? 'ชื่อ-นามสกุล' : 'Full Name (Thai)'} <span className="text-rose-500 font-bold">*</span>
+                            </label>
+                            {currentAttendee.memberCheckStatus === 'valid' && (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                <Lock className="w-2.5 h-2.5" />
+                                {lang === 'th' ? 'ข้อมูลสมาชิก' : 'Member DB'}
+                              </span>
+                            )}
+                          </div>
                           <div className="relative">
                             <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                             <input
                               type="text"
                               value={currentAttendee.nameTh}
+                              readOnly={currentAttendee.memberCheckStatus === 'valid'}
                               onChange={(e) => updateCurrentAttendee('nameTh', e.target.value)}
-                              placeholder={lang === 'th' ? 'ชื่อ-นามสกุล (ไม่ต้องมีคำนำหน้า)' : 'Full Name (Without prefix)'}
-                              className="w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition"
+                              placeholder={lang === 'th' ? 'ชื่อ-นามสกุล' : 'Full Name (Thai)'}
+                              className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 rounded-xl border text-xs sm:text-sm font-medium transition ${
+                                currentAttendee.memberCheckStatus === 'valid'
+                                  ? 'bg-slate-100/90 text-slate-700 border-slate-200 cursor-not-allowed select-none font-semibold'
+                                  : 'bg-slate-50 text-slate-900 border-slate-200 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none'
+                              }`}
                             />
                           </div>
                         </div>
 
-                        {/* 3. ชื่อ-นามสกุล(อังกฤษ) */}
+                        {/* 3. ชื่อ-นามสกุล (อังกฤษ) */}
                         <div>
-                          <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
-                            {lang === 'th' ? 'ชื่อ-นามสกุล (ภาษาอังกฤษ)' : 'Full Name (English)'} <span className="text-rose-500 font-bold">*</span>
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[11px] sm:text-xs font-bold text-slate-700">
+                              {lang === 'th' ? 'ชื่อ-นามสกุล ภาษาอังกฤษ' : 'Full Name (English)'} <span className="text-rose-500 font-bold">*</span>
+                            </label>
+                            {currentAttendee.memberCheckStatus === 'valid' && (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                <Lock className="w-2.5 h-2.5" />
+                                {lang === 'th' ? 'ข้อมูลสมาชิก' : 'Member DB'}
+                              </span>
+                            )}
+                          </div>
                           <div className="relative">
                             <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                             <input
                               type="text"
                               value={currentAttendee.nameEn}
+                              readOnly={currentAttendee.memberCheckStatus === 'valid'}
                               onChange={(e) => updateCurrentAttendee('nameEn', e.target.value)}
-                              placeholder="Full Name (Without prefix)"
-                              className="w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition"
+                              placeholder="Full Name (English)"
+                              className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 rounded-xl border text-xs sm:text-sm font-medium transition ${
+                                currentAttendee.memberCheckStatus === 'valid'
+                                  ? 'bg-slate-100/90 text-slate-700 border-slate-200 cursor-not-allowed select-none font-semibold'
+                                  : 'bg-slate-50 text-slate-900 border-slate-200 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none'
+                              }`}
                             />
                           </div>
                         </div>
@@ -1664,26 +1778,54 @@ export function LoginView({
                           <SmartEmailInput
                             value={currentAttendee.email}
                             onChange={(val) => updateCurrentAttendee('email', val)}
-                            label={lang === 'th' ? 'อีเมล' : 'Email Address'}
+                            label={
+                              <span className="flex items-center justify-between w-full">
+                                <span>{lang === 'th' ? 'อีเมล' : 'Email Address'}</span>
+                                {currentAttendee.memberCheckStatus === 'valid' && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                    <Lock className="w-2.5 h-2.5" />
+                                    {lang === 'th' ? 'ข้อมูลสมาชิก' : 'Member DB'}
+                                  </span>
+                                )}
+                              </span>
+                            }
                             placeholder="youremail@example.com"
-                            helperText={lang === 'th' ? 'กรุณากรอกอีเมลที่มีอยู่จริง เพื่อรับ QR Code เข้าร่วมงาน' : 'Please provide a valid email to receive your Event QR Code.'}
+                            helperText={
+                              currentAttendee.memberCheckStatus === 'valid'
+                                ? (lang === 'th' ? 'ระบบจะส่ง QR Code เข้าร่วมงานไปยังอีเมลสมาชิกนี้' : 'Event QR Code will be sent to this member email.')
+                                : (lang === 'th' ? 'กรุณากรอกอีเมลที่มีอยู่จริง เพื่อรับ QR Code เข้าร่วมงาน' : 'Please provide a valid email to receive your Event QR Code.')
+                            }
+                            disabled={currentAttendee.memberCheckStatus === 'valid'}
                             required
                           />
                         </div>
 
                         {/* 5. หน่วยงาน */}
                         <div>
-                          <label className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1">
-                            {lang === 'th' ? 'หน่วยงาน / บริษัท' : 'Organization / Workplace'} <span className="text-rose-500 font-bold">*</span>
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[11px] sm:text-xs font-bold text-slate-700">
+                              {lang === 'th' ? 'หน่วยงาน / บริษัท' : 'Organization / Workplace'} <span className="text-rose-500 font-bold">*</span>
+                            </label>
+                            {(currentAttendee.memberCheckStatus === 'valid' || (regMode === 'group' && !!sponsorSession?.sponsorName)) && (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                <Lock className="w-2.5 h-2.5" />
+                                {sponsorSession?.sponsorName ? (lang === 'th' ? 'บริษัทสปอนเซอร์' : 'Sponsor Company') : (lang === 'th' ? 'ข้อมูลสมาชิก' : 'Member DB')}
+                              </span>
+                            )}
+                          </div>
                           <div className="relative">
                             <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                             <input
                               type="text"
                               value={currentAttendee.workplace}
+                              readOnly={currentAttendee.memberCheckStatus === 'valid' || (regMode === 'group' && !!sponsorSession?.sponsorName)}
                               onChange={(e) => updateCurrentAttendee('workplace', e.target.value)}
                               placeholder={lang === 'th' ? 'โรงพยาบาล / คลินิก / บริษัท' : 'Hospital / Clinic / Company'}
-                              className="w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition"
+                              className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 rounded-xl border text-xs sm:text-sm font-medium transition ${
+                                currentAttendee.memberCheckStatus === 'valid' || (regMode === 'group' && !!sponsorSession?.sponsorName)
+                                  ? 'bg-slate-100/90 text-slate-700 border-slate-200 cursor-not-allowed select-none font-semibold'
+                                  : 'bg-slate-50 text-slate-900 border-slate-200 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none'
+                              }`}
                             />
                           </div>
                         </div>
@@ -1696,7 +1838,18 @@ export function LoginView({
                             otherValue={currentAttendee.positionOther}
                             onOtherChange={(val) => updateCurrentAttendee('positionOther', val)}
                             required
-                            label={lang === 'th' ? 'ตำแหน่ง' : 'Position'}
+                            disabled={currentAttendee.memberCheckStatus === 'valid'}
+                            label={
+                              <span className="flex items-center justify-between w-full">
+                                <span>{lang === 'th' ? 'ตำแหน่ง' : 'Position'}</span>
+                                {currentAttendee.memberCheckStatus === 'valid' && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                    <Lock className="w-2.5 h-2.5" />
+                                    {lang === 'th' ? 'ข้อมูลสมาชิก' : 'Member DB'}
+                                  </span>
+                                )}
+                              </span>
+                            }
                           />
                         </div>
                       </div>

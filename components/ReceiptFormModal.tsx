@@ -23,6 +23,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { ReceiptModal } from '@/components/ReceiptModal';
+import { ThaiDatePicker } from '@/components/ThaiDatePicker';
 
 interface ReceiptFormModalProps {
   isOpen: boolean;
@@ -603,36 +604,14 @@ export function ReceiptFormModal({
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   วันที่ออกใบเสร็จ <span className="text-rose-600 font-bold">*</span>
                 </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={formData.receiptDate}
-                    onChange={(e) => setFormData({ ...formData, receiptDate: e.target.value })}
-                    placeholder="เช่น 18 กันยายน 2569"
-                    className="flex-1 px-4 py-2.5 text-sm font-medium bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition"
-                    required
-                  />
-                  <div className="relative shrink-0">
-                    <input
-                      type="date"
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          const d = new Date(e.target.value);
-                          if (!isNaN(d.getTime())) {
-                            const thaiDateStr = d.toLocaleDateString('th-TH', {
-                              day: 'numeric',
-                              month: 'long',
-                              year: 'numeric',
-                            });
-                            setFormData({ ...formData, receiptDate: thaiDateStr });
-                          }
-                        }
-                      }}
-                      className="w-10 h-10.5 px-2 bg-white border border-slate-200 rounded-2xl text-slate-600 cursor-pointer hover:border-indigo-500 transition opacity-80 hover:opacity-100"
-                      title="เลือกจากปฏิทิน"
-                    />
-                  </div>
-                </div>
+                <ThaiDatePicker
+                  value={formData.receiptDate}
+                  onChange={(val) => setFormData({ ...formData, receiptDate: val })}
+                  outputFormat="thai"
+                  placeholder="เช่น 18 กันยายน 2569"
+                  required
+                  className="w-full"
+                />
               </div>
             </div>
           </div>

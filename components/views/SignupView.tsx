@@ -40,6 +40,7 @@ import {
 import { PositionSelect, isScientistPosition } from '@/components/PositionSelect';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
 import { SponsorAuthModal, SponsorSessionData } from '@/components/SponsorAuthModal';
+import { ThaiDatePicker } from '@/components/ThaiDatePicker';
 import { useLanguage } from '@/context/LanguageContext';
 import { uploadImageToStorage } from '@/lib/blobUpload';
 import { CreateMemberInput } from '@/types/member';
@@ -1089,17 +1090,13 @@ export function SignupView({
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     {t.signup.startDateLabel}
                   </label>
-                  <div className="relative flex items-center">
-                    <Calendar className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none shrink-0" />
-                    <input
-                      type="date"
-                      name="startDate"
-                      autoComplete="bday"
-                      value={currentApplicant.startDate}
-                      onChange={(e) => updateCurrentApplicant('startDate', e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 transition outline-none font-medium"
-                    />
-                  </div>
+                  <ThaiDatePicker
+                    value={currentApplicant.startDate}
+                    onChange={(val) => updateCurrentApplicant('startDate', val)}
+                    outputFormat="iso"
+                    placeholder={t.signup.startDateLabel || 'เลือกวันที่เริ่มปฏิบัติงาน'}
+                    className="w-full"
+                  />
                 </div>
               </div>
 

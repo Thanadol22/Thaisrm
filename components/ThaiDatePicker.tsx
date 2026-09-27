@@ -1,21 +1,34 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Clock } from 'lucide-react';
 
 export interface ThaiDatePickerProps {
   value: string;
   onChange: (val: string) => void;
   placeholder?: string;
   className?: string;
+  inputClassName?: string;
   required?: boolean;
+  disabled?: boolean;
   prefix?: string; // e.g. 'After ' or 'หลังจากวันที่ ' or ''
   format?: 'thai' | 'english' | 'iso'; // '10 ตุลาคม 2569' | '10 October 2026' | '2026-10-10'
+  outputFormat?: 'thai' | 'english' | 'iso';
+  displayFormat?: 'thai' | 'english' | 'iso';
+  dropdownAlign?: 'left' | 'right';
+  showTime?: boolean; // When true, includes hour & minute picker
+  theme?: 'light' | 'dark'; // Dark theme for dark cards
 }
 
 const THAI_MONTH_FULL = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+];
+
+const THAI_MONTH_SHORT = [
+  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
 ];
 
 const ENG_MONTH_FULL = [
@@ -30,14 +43,29 @@ const ENG_MONTH_SHORT = [
 
 const WEEKDAYS = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
-export function parseThaiSingleDate(dateStr: string): Date | null {
-  if (!dateStr || typeof dateStr !== 'string') return null;
+export function parseThaiSingleDate(dateStr: string): { date: Date | null; timeStr: string } {
+  if (!dateStr || typeof dateStr !== 'string') return { date: null, timeStr: '07:00' };
   const trimmed = dateStr.replace(/^(After|after|หลังจากวันที่|หลังวันที่|วันที่)\s*/i, '').trim();
 
-  // Try ISO format (e.g. 2026-10-10)
+  let extractedTime = '07:00';
+  const timeMatch = trimmed.match(/(?:T|\s+|เวลา\s*)(\d{1,2}):(\d{2})/i);
+  if (timeMatch) {
+    const hh = String(parseInt(timeMatch[1], 10)).padStart(2, '0');
+    const mm = String(parseInt(timeMatch[2], 10)).padStart(2, '0');
+    extractedTime = `${hh}:${mm}`;
+  }
+
+  // Try ISO format (e.g. 2026-10-10 or 2026-10-10T07:00)
   if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
-    const d = new Date(trimmed);
-    if (!isNaN(d.getTime())) return d;
+    const datePart = trimmed.split('T')[0].split(' ')[0];
+    const parts = datePart.split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      const parsed = new Date(y, m, d);
+      if (!isNaN(parsed.getTime())) return { date: parsed, timeStr: extractedTime };
+    }
   }
 
   // Check English format e.g. "10 Oct 2026" or "10 October 2026"
@@ -53,7 +81,7 @@ export function parseThaiSingleDate(dateStr: string): Date | null {
       mIdx = ENG_MONTH_SHORT.findIndex(m => m.toLowerCase() === mStr);
     }
     if (mIdx >= 0) {
-      return new Date(year, mIdx, day);
+      return { date: new Date(year, mIdx, day), timeStr: extractedTime };
     }
   }
 
@@ -67,20 +95,44 @@ export function parseThaiSingleDate(dateStr: string): Date | null {
 
     let mIdx = THAI_MONTH_FULL.indexOf(mName);
     if (mIdx < 0) {
-      const shortIdx = [
-        'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
-        'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
-      ].indexOf(mName);
-      if (shortIdx >= 0) mIdx = shortIdx;
+      mIdx = THAI_MONTH_SHORT.indexOf(mName);
+    }
+    if (mIdx < 0) {
+      const clean = mName.replace(/\./g, '');
+      mIdx = THAI_MONTH_SHORT.map(s => s.replace(/\./g, '')).indexOf(clean);
     }
     if (mIdx >= 0) {
-      return new Date(year, mIdx, day);
+      return { date: new Date(year, mIdx, day), timeStr: extractedTime };
     }
   }
 
   // Fallback native date parsing
   const d = new Date(trimmed);
-  return !isNaN(d.getTime()) ? d : null;
+  return { date: !isNaN(d.getTime()) ? d : null, timeStr: extractedTime };
+}
+
+export function formatThaiDate(
+  d: Date | null,
+  formatType: 'thai' | 'english' | 'iso' = 'thai',
+  timeStr?: string
+): string {
+  if (!d || isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const thaiY = y + 543;
+  const day = d.getDate();
+  const m = d.getMonth();
+
+  if (formatType === 'english') {
+    const base = `${day} ${ENG_MONTH_FULL[m]} ${y}`;
+    return timeStr ? `${base} ${timeStr}` : base;
+  } else if (formatType === 'iso') {
+    const mm = String(m + 1).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+    return timeStr ? `${y}-${mm}-${dd}T${timeStr}` : `${y}-${mm}-${dd}`;
+  } else {
+    const base = `${day} ${THAI_MONTH_FULL[m]} ${thaiY}`;
+    return timeStr ? `${base} เวลา ${timeStr} น.` : base;
+  }
 }
 
 export function ThaiDatePicker({
@@ -88,64 +140,129 @@ export function ThaiDatePicker({
   onChange,
   placeholder = 'เลือกวันที่',
   className = '',
+  inputClassName = '',
   required = false,
+  disabled = false,
   prefix = '',
   format = 'thai',
+  outputFormat,
+  displayFormat = 'thai',
+  dropdownAlign = 'left',
+  showTime = false,
+  theme = 'light',
 }: ThaiDatePickerProps) {
+  const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [popupPos, setPopupPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  const effectiveOutputFormat = outputFormat || (showTime ? 'iso' : (format || 'thai'));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedTime, setSelectedTime] = useState<string>('07:00');
   const [viewDate, setViewDate] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Sync internal state when value prop changes
   useEffect(() => {
     if (!value) {
       setSelectedDate(null);
+      setSelectedTime('07:00');
       return;
     }
-    const parsed = parseThaiSingleDate(value);
-    if (parsed) {
-      setSelectedDate(parsed);
-      setViewDate(new Date(parsed.getFullYear(), parsed.getMonth(), 1));
+    const { date, timeStr } = parseThaiSingleDate(value);
+    if (date) {
+      setSelectedDate(date);
+      setSelectedTime(timeStr || '07:00');
+      setViewDate(new Date(date.getFullYear(), date.getMonth(), 1));
+    } else {
+      setSelectedDate(null);
     }
   }, [value]);
 
-  // Close when clicking outside
+  // Calculate and update position on open, scroll, or resize
+  useEffect(() => {
+    if (!isOpen || !containerRef.current) return;
+
+    const updatePosition = () => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const popoverWidth = 340;
+      const popoverHeight = showTime ? 440 : 380;
+
+      let top = rect.bottom + 8;
+      // If bottom edge exceeds window height and there is room above, flip to top
+      if (top + popoverHeight > window.innerHeight && rect.top - popoverHeight > 10) {
+        top = Math.max(10, rect.top - popoverHeight - 8);
+      }
+
+      let left = dropdownAlign === 'right' ? rect.right - popoverWidth : rect.left;
+      if (left + popoverWidth > window.innerWidth - 12) {
+        left = window.innerWidth - popoverWidth - 12;
+      }
+      if (left < 12) left = 12;
+
+      setPopupPos({ top, left });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen, showTime, dropdownAlign]);
+
+  // Close when clicking outside both container trigger and portal popover
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        popoverRef.current &&
+        !popoverRef.current.contains(target)
+      ) {
         setIsOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const formatDateOutput = (d: Date): string => {
-    const y = d.getFullYear();
-    const thaiY = y + 543;
-    const day = d.getDate();
-    const m = d.getMonth();
-
-    let dateText = '';
-    if (format === 'english') {
-      dateText = `${day} ${ENG_MONTH_FULL[m]} ${y}`;
-    } else if (format === 'iso') {
-      const mm = String(m + 1).padStart(2, '0');
-      const dd = String(day).padStart(2, '0');
-      dateText = `${y}-${mm}-${dd}`;
-    } else {
-      dateText = `${day} ${THAI_MONTH_FULL[m]} ${thaiY}`;
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
     }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
 
+  const formatDateOutput = (d: Date, targetFormat: 'thai' | 'english' | 'iso', tStr?: string): string => {
+    const dateText = formatThaiDate(d, targetFormat, showTime ? tStr || selectedTime : undefined);
     return prefix ? `${prefix}${dateText}` : dateText;
   };
 
   const handleDateClick = (d: Date) => {
     setSelectedDate(d);
-    const output = formatDateOutput(d);
+    const output = formatDateOutput(d, effectiveOutputFormat, selectedTime);
     onChange(output);
+  };
+
+  const handleTimeChange = (newTime: string) => {
+    setSelectedTime(newTime);
+    if (selectedDate) {
+      const output = formatDateOutput(selectedDate, effectiveOutputFormat, newTime);
+      onChange(output);
+    }
+  };
+
+  const handleConfirm = () => {
+    if (!selectedDate) {
+      const today = new Date();
+      setSelectedDate(today);
+      const output = formatDateOutput(today, effectiveOutputFormat, selectedTime);
+      onChange(output);
+    }
     setIsOpen(false);
   };
 
@@ -194,7 +311,7 @@ export function ThaiDatePicker({
     });
   }
 
-  // Leading days for next month
+  // Leading days for next month to complete the grid
   const remaining = (7 - (calendarCells.length % 7)) % 7;
   for (let d = 1; d <= remaining; d++) {
     calendarCells.push({
@@ -218,32 +335,69 @@ export function ThaiDatePicker({
     return isSameDay(today, d);
   };
 
+  // Calculate formatted display label for trigger
+  const displayLabel = selectedDate
+    ? formatDateOutput(selectedDate, displayFormat, showTime ? selectedTime : undefined)
+    : value
+    ? value
+    : '';
+
+  // Trigger Style Variations (Light vs Dark theme)
+  const isDark = theme === 'dark';
+  const triggerContainerStyle = isDark
+    ? `bg-white/10 hover:bg-white/15 border border-white/20 text-white ${
+        isOpen ? 'ring-2 ring-amber-400/50 border-amber-400' : ''
+      }`
+    : `bg-white border text-slate-900 ${
+        disabled
+          ? 'opacity-60 cursor-not-allowed bg-slate-100 border-slate-200'
+          : isOpen
+          ? 'border-slate-900 ring-2 ring-slate-900/10'
+          : value
+          ? 'border-slate-300 hover:border-slate-400'
+          : 'border-slate-200 hover:border-slate-300'
+      }`;
+
+  const triggerLabelStyle = isDark
+    ? displayLabel
+      ? 'text-white font-bold'
+      : 'text-blue-200/60 font-medium'
+    : displayLabel
+    ? 'text-slate-900 font-semibold'
+    : 'text-slate-400 font-normal';
+
+  const [hours, minutes] = selectedTime.split(':');
+
   return (
-    <div ref={containerRef} className={`relative ${className}`}>
+    <div ref={containerRef} className={`relative w-full ${className}`}>
       {/* Input Trigger Field */}
       <div
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full bg-white border rounded-xl px-3.5 py-2 text-xs sm:text-sm cursor-pointer transition flex items-center justify-between gap-2 shadow-2xs select-none ${
-          isOpen
-            ? 'border-amber-500 ring-2 ring-amber-200'
-            : value
-            ? 'border-amber-300 hover:border-amber-400'
-            : 'border-slate-300 hover:border-slate-400'
-        }`}
+        onClick={() => {
+          if (!disabled) setIsOpen(!isOpen);
+        }}
+        className={`flex items-center justify-between w-full rounded-xl px-3.5 py-2.5 text-xs sm:text-sm cursor-pointer shadow-2xs transition select-none ${triggerContainerStyle} ${inputClassName}`}
       >
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <CalendarIcon className="w-4 h-4 text-amber-600 shrink-0" />
-          <span className={`truncate font-bold ${value ? 'text-slate-900' : 'text-slate-400'}`}>
-            {value || placeholder}
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          {showTime ? (
+            <Clock className={`w-4 h-4 shrink-0 ${isDark ? 'text-amber-400' : 'text-slate-500'}`} />
+          ) : (
+            <CalendarIcon className={`w-4 h-4 shrink-0 ${isDark ? 'text-blue-200' : 'text-slate-500'}`} />
+          )}
+          <span className={`truncate ${triggerLabelStyle}`}>
+            {displayLabel || placeholder}
           </span>
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {value && (
+          {value && !disabled && (
             <button
               type="button"
               onClick={handleClear}
-              className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+              className={`p-1 rounded-md transition cursor-pointer ${
+                isDark
+                  ? 'text-blue-200/80 hover:text-white hover:bg-white/10'
+                  : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+              }`}
               title="ล้างวันที่"
             >
               <X className="w-3.5 h-3.5" />
@@ -258,102 +412,175 @@ export function ThaiDatePicker({
           type="text"
           value={value}
           onChange={() => {}}
-          required
+          required={required}
           className="sr-only"
           tabIndex={-1}
         />
       )}
 
-      {/* Popup Calendar Dropdown */}
-      {isOpen && (
-        <div className="absolute left-0 top-full mt-1.5 z-50 bg-white rounded-2xl shadow-xl border border-slate-200 p-3.5 w-72 sm:w-80 animate-scale-up">
-          {/* Header Month & Navigation */}
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
-              aria-label="Previous Month"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            <div className="text-center">
-              <span className="text-xs sm:text-sm font-extrabold text-slate-900">
+      {/* Portal Dropdown Popover (Mounted to document.body to prevent overflow-hidden clipping) */}
+      {isOpen &&
+        mounted &&
+        createPortal(
+          <div
+            ref={popoverRef}
+            style={{
+              top: `${popupPos.top}px`,
+              left: `${popupPos.left}px`,
+            }}
+            className="fixed z-[99999] bg-white text-slate-900 border border-slate-200/90 rounded-3xl shadow-2xl p-4 w-[calc(100vw-2rem)] max-w-[340px] sm:w-[340px] animate-scale-up select-none"
+          >
+            {/* Header Month / Year Navigation */}
+            <div className="flex items-center justify-between mb-3 px-1">
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+                aria-label="Previous Month"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div className="text-sm font-black text-slate-900 tracking-tight">
                 {monthName} {thaiYear}
-              </span>
-              <span className="text-[10px] text-slate-400 block font-normal">
-                ({ENG_MONTH_FULL[month]} {year})
-              </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+                aria-label="Next Month"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
-              aria-label="Next Month"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+            {/* Weekday Row */}
+            <div className="grid grid-cols-7 mb-2 text-center text-xs font-bold text-slate-400">
+              {WEEKDAYS.map((wd) => (
+                <div key={wd} className="py-1">
+                  {wd}
+                </div>
+              ))}
+            </div>
 
-          {/* Weekday Headers */}
-          <div className="grid grid-cols-7 gap-1 text-center py-2 text-[11px] font-bold text-slate-400">
-            {WEEKDAYS.map((w, idx) => (
-              <div key={w} className={idx === 0 ? 'text-rose-500' : ''}>
-                {w}
+            {/* Day Cells Grid */}
+            <div className="grid grid-cols-7 gap-y-1">
+              {calendarCells.map((cell, idx) => {
+                const isSelected = isSameDay(selectedDate, cell.date);
+                const today = isToday(cell.date);
+
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => handleDateClick(cell.date)}
+                    className="relative flex items-center justify-center h-9 text-xs sm:text-sm cursor-pointer select-none"
+                  >
+                    <div
+                      className={`w-8 h-8 flex items-center justify-center rounded-xl transition font-bold ${
+                        !cell.isCurrentMonth
+                          ? 'text-slate-300 hover:bg-slate-50'
+                          : isSelected
+                          ? 'bg-slate-900 text-white shadow-sm'
+                          : today
+                          ? 'border border-slate-400 text-slate-900 bg-slate-50 hover:bg-slate-100 font-bold'
+                          : 'text-slate-800 hover:bg-slate-100'
+                      }`}
+                    >
+                      {cell.dayNum}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Optional Time Picker Section */}
+            {showTime && (
+              <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-blue-600" />
+                    <span>เวลาที่กำหนด (น.)</span>
+                  </span>
+                  <div className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-xl border border-slate-200">
+                    <select
+                      value={hours || '07'}
+                      onChange={(e) => handleTimeChange(`${e.target.value}:${minutes || '00'}`)}
+                      className="bg-transparent font-black text-xs text-slate-900 outline-none cursor-pointer"
+                    >
+                      {Array.from({ length: 24 }).map((_, i) => {
+                        const val = String(i).padStart(2, '0');
+                        return (
+                          <option key={val} value={val}>
+                            {val}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <span className="text-xs font-bold text-slate-400">:</span>
+                    <select
+                      value={minutes || '00'}
+                      onChange={(e) => handleTimeChange(`${hours || '07'}:${e.target.value}`)}
+                      className="bg-transparent font-black text-xs text-slate-900 outline-none cursor-pointer"
+                    >
+                      {['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'].map((mVal) => (
+                        <option key={mVal} value={mVal}>
+                          {mVal}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Quick Time Presets */}
+                <div className="flex items-center gap-1.5 pt-0.5">
+                  {['07:00', '08:00', '09:00', '12:00', '18:00'].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => handleTimeChange(preset)}
+                      className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                        selectedTime === preset
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
-
-          {/* Calendar Day Grid */}
-          <div className="grid grid-cols-7 gap-1">
-            {calendarCells.map((cell, idx) => {
-              const selected = isSameDay(selectedDate, cell.date);
-              const today = isToday(cell.date);
-
-              return (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => handleDateClick(cell.date)}
-                  className={`h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer relative ${
-                    !cell.isCurrentMonth
-                      ? 'text-slate-300 hover:bg-slate-50'
-                      : selected
-                      ? 'bg-amber-600 text-white font-extrabold shadow-sm'
-                      : today
-                      ? 'border border-amber-400 text-amber-900 bg-amber-50/50 hover:bg-amber-100'
-                      : 'text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <span>{cell.dayNum}</span>
-                  {selected && (
-                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-white" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Quick Format Selection & Presets */}
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            <button
-              type="button"
-              onClick={() => handleDateClick(new Date())}
-              className="font-bold text-amber-700 hover:text-amber-900 transition hover:underline cursor-pointer"
-            >
-              วันนี้
-            </button>
-
-            {selectedDate && (
-              <span className="font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                {selectedDate.getDate()} {THAI_MONTH_FULL[selectedDate.getMonth()]} {selectedDate.getFullYear() + 543}
-              </span>
             )}
-          </div>
-        </div>
-      )}
+
+            {/* Footer with Status & Confirm Button */}
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium text-[11px] truncate max-w-[170px]">
+                {selectedDate
+                  ? formatThaiDate(selectedDate, 'thai', showTime ? selectedTime : undefined)
+                  : 'คลิกเลือกวันที่'}
+              </span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {selectedDate && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleClear(e)}
+                    className="px-2 py-1 rounded-md text-[11px] font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    ล้างค่า
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleConfirm}
+                  className="px-3.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-900 text-white hover:bg-slate-800 cursor-pointer shadow-2xs transition"
+                >
+                  ตกลง
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
+
+export default ThaiDatePicker;

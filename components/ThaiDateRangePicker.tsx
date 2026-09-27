@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from 'lucide-react';
 
 export interface ThaiDateRangePickerProps {
@@ -106,13 +107,21 @@ export function ThaiDateRangePicker({
   className = '',
   required = false,
 }: ThaiDateRangePickerProps) {
+  const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [popupPos, setPopupPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
-  const [viewDate, setViewDate] = useState<Date>(() => new Date(2026, 8, 1));
+  const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  const [viewDate, setViewDate] = useState<Date>(() => new Date());
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [hoverDate, setHoverDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Sync internal start/end date when incoming value changes
   useEffect(() => {
@@ -129,16 +138,57 @@ export function ThaiDateRangePicker({
     setEndDate(end);
   }, [value]);
 
-  // Close when clicking outside
+  // Update fixed portal position
+  useEffect(() => {
+    if (!isOpen || !containerRef.current) return;
+
+    const updatePosition = () => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const popoverWidth = 340;
+      const popoverHeight = 380;
+
+      let top = rect.bottom + 8;
+      if (top + popoverHeight > window.innerHeight && rect.top - popoverHeight > 10) {
+        top = Math.max(10, rect.top - popoverHeight - 8);
+      }
+
+      let left = rect.left;
+      if (left + popoverWidth > window.innerWidth - 12) {
+        left = window.innerWidth - popoverWidth - 12;
+      }
+      if (left < 12) left = 12;
+
+      setPopupPos({ top, left });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen]);
+
+  // Close when clicking outside both trigger and popover
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        popoverRef.current &&
+        !popoverRef.current.contains(target)
+      ) {
         setIsOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isOpen]);
 
   const formatDateRangeString = (start: Date, end: Date | null) => {
     if (!start) return '';
@@ -257,7 +307,13 @@ export function ThaiDateRangePicker({
       {/* Input Trigger Field */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between w-full bg-white border border-slate-300 hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 rounded-xl px-4 py-3 text-sm text-slate-900 cursor-pointer shadow-2xs transition"
+        className={`flex items-center justify-between w-full bg-white border rounded-xl px-3.5 py-2.5 sm:py-3 text-xs sm:text-sm text-slate-900 cursor-pointer shadow-2xs transition select-none ${
+          isOpen
+            ? 'border-slate-900 ring-2 ring-slate-900/10'
+            : value
+            ? 'border-slate-300 hover:border-slate-400'
+            : 'border-slate-200 hover:border-slate-300'
+        }`}
       >
         <div className="flex items-center gap-2.5 min-w-0">
           <CalendarIcon className="w-4 h-4 text-slate-500 shrink-0" />
@@ -274,7 +330,7 @@ export function ThaiDateRangePicker({
               setEndDate(null);
               onChange('');
             }}
-            className="text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100"
+            className="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-100 transition cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -293,119 +349,128 @@ export function ThaiDateRangePicker({
         />
       )}
 
-      {/* Calendar Range Dropdown Popover */}
-      {isOpen && (
-        <div className="absolute left-0 sm:left-auto right-auto top-full mt-2 z-50 bg-white border border-slate-200/90 rounded-2xl shadow-2xl p-3.5 sm:p-4 w-[calc(100vw-2.5rem)] max-w-[340px] sm:w-[340px] animate-slide-down">
-          {/* Header Month / Year Navigation */}
-          <div className="flex items-center justify-between mb-4 px-1">
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <div className="text-sm font-black text-slate-900 tracking-tight">
-              {monthName} {thaiYear}
-            </div>
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Weekday Row */}
-          <div className="grid grid-cols-7 mb-2 text-center text-xs font-semibold text-slate-400">
-            {WEEKDAYS.map((wd) => (
-              <div key={wd} className="py-1">
-                {wd}
-              </div>
-            ))}
-          </div>
-
-          {/* Day Cells Grid */}
-          <div className="grid grid-cols-7 gap-y-1">
-            {calendarCells.map((cell, idx) => {
-              const isStart = isSameDay(startDate, cell.date);
-              const isEnd = isSameDay(endDate, cell.date) || (!endDate && isSameDay(hoverDate, cell.date) && hoverDate && startDate && hoverDate > startDate);
-              const inRange = isInRange(cell.date);
-              const isSingleSelected = isStart && (isEnd || (!endDate && !hoverDate));
-
-              return (
-                <div
-                  key={idx}
-                  onClick={() => handleDateClick(cell.date)}
-                  onMouseEnter={() => {
-                    if (startDate && !endDate) {
-                      setHoverDate(cell.date);
-                    }
-                  }}
-                  className={`relative flex items-center justify-center h-9 text-xs sm:text-sm font-medium cursor-pointer select-none transition-colors ${
-                    !cell.isCurrentMonth
-                      ? 'text-slate-300'
-                      : 'text-slate-800'
-                  } ${
-                    inRange ? 'bg-slate-100' : ''
-                  } ${
-                    isStart && !isSingleSelected ? 'bg-slate-100 rounded-l-xl' : ''
-                  } ${
-                    isEnd && !isSingleSelected ? 'bg-slate-100 rounded-r-xl' : ''
-                  }`}
-                >
-                  <div
-                    className={`w-8 h-8 flex items-center justify-center rounded-xl transition font-bold ${
-                      isStart || isEnd
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : isSameDay(new Date(2026, 8, 10), cell.date)
-                        ? 'border border-slate-400 font-bold'
-                        : 'hover:bg-slate-100 text-slate-800'
-                    }`}
-                  >
-                    {cell.dayNum}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Quick Presets Footer */}
-          {/* Footer */}
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500 font-medium text-[11px]">
-              {startDate && endDate
-                ? `${formatDateRangeString(startDate, endDate)}`
-                : startDate
-                ? 'เลือกวันสิ้นสุด'
-                : 'คลิกเลือกวันเริ่มต้น'}
-            </span>
-            <div className="flex items-center gap-1.5">
-              {(startDate || endDate) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStartDate(null);
-                    setEndDate(null);
-                    onChange('');
-                  }}
-                  className="px-2 py-1 rounded-md text-[11px] font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  ล้างค่า
-                </button>
-              )}
+      {/* Calendar Range Dropdown Popover (Mounted to document.body via Portal) */}
+      {isOpen &&
+        mounted &&
+        createPortal(
+          <div
+            ref={popoverRef}
+            style={{
+              top: `${popupPos.top}px`,
+              left: `${popupPos.left}px`,
+            }}
+            className="fixed z-[99999] bg-white border border-slate-200/90 rounded-3xl shadow-2xl p-4 w-[calc(100vw-2rem)] max-w-[340px] sm:w-[340px] animate-scale-up select-none"
+          >
+            {/* Header Month / Year Navigation */}
+            <div className="flex items-center justify-between mb-3 px-1">
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
-                className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-slate-900 text-white hover:bg-slate-800 cursor-pointer shadow-2xs"
+                onClick={handlePrevMonth}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-600 transition cursor-pointer"
               >
-                ตกลง
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div className="text-sm font-black text-slate-900 tracking-tight">
+                {monthName} {thaiYear}
+              </div>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
               </button>
             </div>
-          </div>
-        </div>
-      )}
+
+            {/* Weekday Row */}
+            <div className="grid grid-cols-7 mb-2 text-center text-xs font-bold text-slate-400">
+              {WEEKDAYS.map((wd) => (
+                <div key={wd} className="py-1">
+                  {wd}
+                </div>
+              ))}
+            </div>
+
+            {/* Day Cells Grid */}
+            <div className="grid grid-cols-7 gap-y-1">
+              {calendarCells.map((cell, idx) => {
+                const isStart = isSameDay(startDate, cell.date);
+                const isEnd = isSameDay(endDate, cell.date) || (!endDate && isSameDay(hoverDate, cell.date) && hoverDate && startDate && hoverDate > startDate);
+                const inRange = isInRange(cell.date);
+                const isSingleSelected = isStart && (isEnd || (!endDate && !hoverDate));
+
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => handleDateClick(cell.date)}
+                    onMouseEnter={() => {
+                      if (startDate && !endDate) {
+                        setHoverDate(cell.date);
+                      }
+                    }}
+                    className={`relative flex items-center justify-center h-9 text-xs sm:text-sm font-medium cursor-pointer select-none transition-colors ${
+                      !cell.isCurrentMonth
+                        ? 'text-slate-300'
+                        : 'text-slate-800'
+                    } ${
+                      inRange ? 'bg-slate-100' : ''
+                    } ${
+                      isStart && !isSingleSelected ? 'bg-slate-100 rounded-l-xl' : ''
+                    } ${
+                      isEnd && !isSingleSelected ? 'bg-slate-100 rounded-r-xl' : ''
+                    }`}
+                  >
+                    <div
+                      className={`w-8 h-8 flex items-center justify-center rounded-xl transition font-bold ${
+                        isStart || isEnd
+                          ? 'bg-slate-900 text-white shadow-xs'
+                          : isSameDay(new Date(), cell.date)
+                          ? 'border border-slate-400 font-bold'
+                          : 'hover:bg-slate-100 text-slate-800'
+                      }`}
+                    >
+                      {cell.dayNum}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium text-[11px] truncate max-w-[170px]">
+                {startDate && endDate
+                  ? `${formatDateRangeString(startDate, endDate)}`
+                  : startDate
+                  ? 'เลือกวันสิ้นสุด'
+                  : 'คลิกเลือกวันเริ่มต้น'}
+              </span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {(startDate || endDate) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStartDate(null);
+                      setEndDate(null);
+                      onChange('');
+                    }}
+                    className="px-2 py-1 rounded-md text-[11px] font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    ล้างค่า
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="px-3.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-900 text-white hover:bg-slate-800 cursor-pointer shadow-2xs transition"
+                >
+                  ตกลง
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

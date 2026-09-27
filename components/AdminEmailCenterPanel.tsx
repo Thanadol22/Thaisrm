@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { EmailPreviewModal } from '@/components/EmailPreviewModal';
 import { PaginationControls } from '@/components/PaginationControls';
+import { ThaiDatePicker } from '@/components/ThaiDatePicker';
 import { renderAttendeeTicketEmail } from '@/lib/emailTemplates/attendeeQrTemplate';
 import { renderAttendeeOnlineEmail } from '@/lib/emailTemplates/attendeeOnlineTemplate';
 import { renderCustomBroadcastEmail } from '@/lib/emailTemplates/customTemplate';
@@ -924,12 +925,14 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
                   ) : (
                     <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2 text-center">
                       <p className="text-xs text-slate-500 font-bold">ไม่พบรายการหลักสูตรย่อยของงานประชุมนี้</p>
-                      <input
-                        type="date"
-                        value={selectedDailyDate}
-                        onChange={(e) => setSelectedDailyDate(e.target.value)}
-                        className="w-full max-w-xs mx-auto bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-[#0026b3]/20"
-                      />
+                      <div className="max-w-xs mx-auto text-left">
+                        <ThaiDatePicker
+                          value={selectedDailyDate}
+                          onChange={setSelectedDailyDate}
+                          outputFormat="iso"
+                          placeholder="เลือกวันที่จัดกิจกรรม"
+                        />
+                      </div>
                     </div>
                   )}
 
@@ -1185,11 +1188,14 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
                   </div>
                 </div>
 
-                <input
-                  type="datetime-local"
+                <ThaiDatePicker
+                  showTime
+                  theme="dark"
                   value={scheduleDateTime}
-                  onChange={(e) => setScheduleDateTime(e.target.value)}
-                  className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-hidden focus:ring-2 focus:ring-amber-400/50 [color-scheme:dark]"
+                  onChange={setScheduleDateTime}
+                  outputFormat="iso"
+                  placeholder="เลือกวันและเวลาที่ต้องการส่ง"
+                  className="w-full"
                 />
                 <button
                   type="button"
@@ -1407,11 +1413,14 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
               <p className="text-xs text-slate-300 leading-relaxed">
                 บันทึกเนื้อหาที่ร่างไว้นี้เพื่อตั้งเวลาส่งล่วงหน้าในระบบ
               </p>
-              <input
-                type="datetime-local"
+              <ThaiDatePicker
+                showTime
+                theme="dark"
                 value={scheduleDateTime}
-                onChange={(e) => setScheduleDateTime(e.target.value)}
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-hidden [color-scheme:dark]"
+                onChange={setScheduleDateTime}
+                outputFormat="iso"
+                placeholder="เลือกวันและเวลาที่ต้องการส่ง"
+                className="w-full"
               />
               <button
                 type="button"
