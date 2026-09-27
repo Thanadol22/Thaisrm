@@ -627,25 +627,42 @@ export async function POST(request: NextRequest) {
         const attName = att.nameTh || att.nameEn || 'Attendee';
         const attEmail = att.email?.trim()?.toLowerCase() || '';
         const attWorkplace = att.workplace || groupCompany;
-        const attMemberNo = att.memberNo?.trim() || null;
+        let attMemberNo = att.memberNo?.trim() || null;
         const attPhone = att.phone?.trim() || null;
+
+        if (!attMemberNo && attEmail) {
+          const foundMem = await prisma.member.findFirst({
+            where: { email: { equals: attEmail, mode: 'insensitive' } },
+            select: { member_no: true },
+          });
+          if (foundMem?.member_no) {
+            attMemberNo = foundMem.member_no.trim();
+          }
+        }
 
         if (attMemberNo) {
           await prisma.$executeRaw`
-            INSERT INTO meeting_attendances (
-              meeting_id, member_no, attendance_status, workplace, attendee_phone
-            ) VALUES (
-              ${slip.meeting_id}, ${attMemberNo}, 'Pending_Payment', ${attWorkplace}, ${attPhone}
-            ) ON CONFLICT (meeting_id, member_no)
-            DO UPDATE SET
-              attendance_status = 'Pending_Payment',
-              workplace = COALESCE(${attWorkplace}, meeting_attendances.workplace),
-              attendee_phone = COALESCE(${attPhone}, meeting_attendances.attendee_phone)
+            UPDATE meeting_attendances
+            SET attendance_status = 'Pending_Payment',
+                workplace = COALESCE(${attWorkplace}, workplace),
+                attendee_phone = COALESCE(${attPhone}, attendee_phone)
+            WHERE meeting_id = ${slip.meeting_id} AND member_no = ${attMemberNo}
           `;
+
+          // Clean up any orphaned non-member record
+          if (attEmail) {
+            await prisma.$executeRaw`
+              DELETE FROM meeting_attendances
+              WHERE meeting_id = ${slip.meeting_id}
+                AND member_no IS NULL
+                AND LOWER(attendee_email) = ${attEmail}
+            `.catch(() => {});
+          }
         } else if (attEmail) {
           const existingAtt = await prisma.meeting_attendances.findFirst({
             where: {
               meeting_id: slip.meeting_id,
+              member_no: null,
               attendee_email: { equals: attEmail, mode: 'insensitive' },
             },
           });
@@ -657,17 +674,6 @@ export async function POST(request: NextRequest) {
                 attendee_name: attName,
                 attendee_phone: attPhone,
                 workplace: attWorkplace,
-              },
-            });
-          } else {
-            await prisma.meeting_attendances.create({
-              data: {
-                meeting_id: slip.meeting_id,
-                attendee_name: attName,
-                attendee_email: attEmail,
-                attendee_phone: attPhone,
-                workplace: attWorkplace,
-                attendance_status: 'Non-Member-Pending',
               },
             });
           }

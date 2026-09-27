@@ -157,78 +157,127 @@ export async function POST(
           },
         });
 
-        // Create attendance records for each attendee & link sponsor data
-        for (const att of attendees) {
-          const attName = att.nameTh || att.nameEn || 'Attendee';
-          const attEmail = att.email?.trim()?.toLowerCase() || '';
-          const attWorkplace = att.workplace || companyName || null;
-          const attMemberNo = att.memberNo ? att.memberNo.trim() : null;
-          const attDiscount = Number(att.discountTotal || att.discountAmount || 0);
-          const attNet = Number(att.price || att.netPrice || 0);
+        // Create attendance records ONLY IF registration is already approved (Free 100% / Auto-Approved)
+        if (isFreeRegistration) {
+          for (const att of attendees) {
+            const attName = att.nameTh || att.nameEn || att.fullNameTh || att.fullNameEn || 'Attendee';
+            const attEmail = att.email?.trim()?.toLowerCase() || '';
+            const attPhone = att.phone?.trim() || att.mobile?.trim() || null;
+            const attWorkplace = att.workplace || companyName || null;
+            let attMemberNo = att.memberNo ? att.memberNo.trim() : null;
+            const attDiscount = Number(att.discountTotal || att.discountAmount || 0);
+            const attNet = Number(att.price || att.netPrice || 0);
 
-          let attendanceId: any = null;
-
-          if (attMemberNo) {
-            const attResult = await tx.$queryRaw<Array<{ attendance_id: any }>>`
-              INSERT INTO meeting_attendances (
-                meeting_id, member_no, attendance_status, sponsor_id, sponsor_company_name, coupon_code
-              ) VALUES (
-                ${meetingId}, ${attMemberNo}, ${isFreeRegistration ? 'Registered' : 'Pending_Payment'},
-                ${effectiveSponsorId}, ${effectiveSponsorName}, ${couponCode || null}
-              ) ON CONFLICT (meeting_id, member_no)
-              DO UPDATE SET 
-                attendance_status = ${isFreeRegistration ? 'Registered' : 'Pending_Payment'},
-                sponsor_id = COALESCE(${effectiveSponsorId}, meeting_attendances.sponsor_id),
-                sponsor_company_name = COALESCE(${effectiveSponsorName}, meeting_attendances.sponsor_company_name),
-                coupon_code = COALESCE(${couponCode || null}, meeting_attendances.coupon_code)
-              RETURNING attendance_id
-            `;
-            attendanceId = attResult?.[0]?.attendance_id;
-
-            // Update member record with sponsor company linkage (Rule #10)
-            if (effectiveSponsorId || effectiveSponsorName) {
-              await tx.$executeRaw`
-                UPDATE members 
-                SET 
-                  sponsor_id = COALESCE(${effectiveSponsorId}, sponsor_id),
-                  sponsored_by_company = COALESCE(${effectiveSponsorName}, sponsored_by_company)
-                WHERE member_no = ${attMemberNo}
-              `;
+            // If memberNo was not explicitly provided, search in members table by email
+            if (!attMemberNo && attEmail) {
+              const foundMem = await tx.member.findFirst({
+                where: { email: { equals: attEmail, mode: 'insensitive' } },
+                select: { member_no: true },
+              });
+              if (foundMem?.member_no) {
+                attMemberNo = foundMem.member_no.trim();
+              }
             }
 
-            // Insert into sponsor_group_members table for Company Portal roster tab
-            if (effectiveSponsorId) {
-              await tx.$executeRaw`
-                INSERT INTO sponsor_group_members (
-                  sponsor_id, meeting_id, member_no, attendee_name, attendee_email, attendee_phone,
-                  workplace, ticket_code, attendance_id, coupon_code, discount_amount, net_price,
-                  submitted_by_email, status, created_at, updated_at
+            let attendanceId: any = null;
+
+            if (attMemberNo) {
+              const attResult = await tx.$queryRaw<Array<{ attendance_id: any }>>`
+                INSERT INTO meeting_attendances (
+                  meeting_id, member_no, attendance_status, sponsor_id, sponsor_company_name, coupon_code
                 ) VALUES (
-                  ${effectiveSponsorId}, ${meetingId}, ${attMemberNo}, ${attName}, ${attEmail},
-                  ${att.phone || null}, ${attWorkplace}, ${ticketCode}, ${attendanceId || null},
-                  ${couponCode || null}, ${attDiscount}, ${attNet},
-                  ${effectiveCompanyEmail || groupContact?.coordinatorEmail || null},
-                  ${isFreeRegistration ? 'confirmed' : 'pending'}, NOW(), NOW()
+                  ${meetingId}, ${attMemberNo}, 'Registered',
+                  ${effectiveSponsorId}, ${effectiveSponsorName}, ${couponCode || null}
                 ) ON CONFLICT (meeting_id, member_no)
-                DO UPDATE SET
-                  status = ${isFreeRegistration ? 'confirmed' : 'pending'},
-                  attendance_id = COALESCE(${attendanceId || null}, sponsor_group_members.attendance_id),
-                  updated_at = NOW()
+                DO UPDATE SET 
+                  attendance_status = 'Registered',
+                  sponsor_id = COALESCE(${effectiveSponsorId}, meeting_attendances.sponsor_id),
+                  sponsor_company_name = COALESCE(${effectiveSponsorName}, meeting_attendances.sponsor_company_name),
+                  coupon_code = COALESCE(${couponCode || null}, meeting_attendances.coupon_code)
+                RETURNING attendance_id
               `;
+              attendanceId = attResult?.[0]?.attendance_id;
+
+              // Delete any orphaned non-member ghost record for this member in this meeting
+              if (attEmail) {
+                await tx.$executeRaw`
+                  DELETE FROM meeting_attendances
+                  WHERE meeting_id = ${meetingId}
+                    AND member_no IS NULL
+                    AND LOWER(attendee_email) = ${attEmail}
+                `.catch(() => {});
+              }
+
+              // Update member record with sponsor company linkage (Rule #10)
+              if (effectiveSponsorId || effectiveSponsorName) {
+                await tx.$executeRaw`
+                  UPDATE members 
+                  SET 
+                    sponsor_id = COALESCE(${effectiveSponsorId}, sponsor_id),
+                    sponsored_by_company = COALESCE(${effectiveSponsorName}, sponsored_by_company)
+                  WHERE member_no = ${attMemberNo}
+                `;
+              }
+
+              // Insert into sponsor_group_members table for Company Portal roster tab
+              if (effectiveSponsorId) {
+                await tx.$executeRaw`
+                  INSERT INTO sponsor_group_members (
+                    sponsor_id, meeting_id, member_no, attendee_name, attendee_email, attendee_phone,
+                    workplace, ticket_code, attendance_id, coupon_code, discount_amount, net_price,
+                    submitted_by_email, status, created_at, updated_at
+                  ) VALUES (
+                    ${effectiveSponsorId}, ${meetingId}, ${attMemberNo}, ${attName}, ${attEmail},
+                    ${attPhone}, ${attWorkplace}, ${ticketCode}, ${attendanceId || null},
+                    ${couponCode || null}, ${attDiscount}, ${attNet},
+                    ${effectiveCompanyEmail || groupContact?.coordinatorEmail || null},
+                    'confirmed', NOW(), NOW()
+                  ) ON CONFLICT (meeting_id, member_no)
+                  DO UPDATE SET
+                    status = 'confirmed',
+                    attendance_id = COALESCE(${attendanceId || null}, sponsor_group_members.attendance_id),
+                    updated_at = NOW()
+                `;
+              }
+            } else if (attEmail) {
+              // Check if existing non-member record already exists for this email
+              const existingNonMember = await tx.meeting_attendances.findFirst({
+                where: {
+                  meeting_id: meetingId,
+                  member_no: null,
+                  attendee_email: { equals: attEmail, mode: 'insensitive' },
+                },
+              });
+
+              if (existingNonMember) {
+                await tx.meeting_attendances.update({
+                  where: { attendance_id: existingNonMember.attendance_id },
+                  data: {
+                    attendee_name: attName,
+                    attendee_phone: attPhone || existingNonMember.attendee_phone,
+                    workplace: attWorkplace || existingNonMember.workplace,
+                    attendance_status: 'Registered',
+                    sponsor_id: effectiveSponsorId || existingNonMember.sponsor_id,
+                    sponsor_company_name: effectiveSponsorName || existingNonMember.sponsor_company_name,
+                    coupon_code: couponCode || existingNonMember.coupon_code,
+                  },
+                });
+                attendanceId = existingNonMember.attendance_id;
+              } else {
+                const attResult = await tx.$queryRaw<Array<{ attendance_id: any }>>`
+                  INSERT INTO meeting_attendances (
+                    meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status,
+                    sponsor_id, sponsor_company_name, coupon_code
+                  ) VALUES (
+                    ${meetingId}, NULL, ${attName}, ${attEmail}, ${attPhone}, ${attWorkplace},
+                    'Registered',
+                    ${effectiveSponsorId}, ${effectiveSponsorName}, ${couponCode || null}
+                  )
+                  RETURNING attendance_id
+                `;
+                attendanceId = attResult?.[0]?.attendance_id;
+              }
             }
-          } else if (attEmail) {
-            const attResult = await tx.$queryRaw<Array<{ attendance_id: any }>>`
-              INSERT INTO meeting_attendances (
-                meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status,
-                sponsor_id, sponsor_company_name, coupon_code
-              ) VALUES (
-                ${meetingId}, NULL, ${attName}, ${attEmail}, ${att.phone || null}, ${attWorkplace},
-                ${isFreeRegistration ? 'Registered' : 'Non-Member-Pending'},
-                ${effectiveSponsorId}, ${effectiveSponsorName}, ${couponCode || null}
-              )
-              RETURNING attendance_id
-            `;
-            attendanceId = attResult?.[0]?.attendance_id;
           }
         }
 
@@ -643,25 +692,56 @@ export async function POST(
       slip = { slip_id: slipId };
     }
 
-    // 3. Record attendance in meeting_attendances table
-    if (isMember && validMemberNo) {
-      await prisma.$executeRaw`
-        INSERT INTO meeting_attendances (
-          meeting_id, member_no, attendance_status
-        ) VALUES (
-          ${meetingId}, ${validMemberNo}, ${attendanceStatus}
-        ) ON CONFLICT (meeting_id, member_no)
-        DO UPDATE SET attendance_status = ${attendanceStatus}
-      `;
-    } else {
-      // Create non-member attendance record
-      await prisma.$executeRaw`
-        INSERT INTO meeting_attendances (
-          meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status
-        ) VALUES (
-          ${meetingId}, NULL, ${guestName}, ${guestEmail}, ${guestPhone || null}, ${guestWorkplace || null}, ${attendanceStatus}
-        )
-      `;
+    // 3. Record attendance in meeting_attendances table ONLY IF isFreeRegistration (Auto-Approved)
+    if (isFreeRegistration) {
+      if (isMember && validMemberNo) {
+        await prisma.$executeRaw`
+          INSERT INTO meeting_attendances (
+            meeting_id, member_no, attendance_status
+          ) VALUES (
+            ${meetingId}, ${validMemberNo}, 'Registered'
+          ) ON CONFLICT (meeting_id, member_no)
+          DO UPDATE SET attendance_status = 'Registered'
+        `;
+      } else {
+        // Create or update non-member attendance record
+        if (guestEmail) {
+          const existingNonMember = await (prisma as any).meeting_attendances.findFirst({
+            where: {
+              meeting_id: meetingId,
+              member_no: null,
+              attendee_email: { equals: guestEmail.trim(), mode: 'insensitive' },
+            },
+          });
+          if (existingNonMember) {
+            await (prisma as any).meeting_attendances.update({
+              where: { attendance_id: existingNonMember.attendance_id },
+              data: {
+                attendee_name: guestName,
+                attendee_phone: guestPhone || existingNonMember.attendee_phone,
+                workplace: guestWorkplace || existingNonMember.workplace,
+                attendance_status: 'Registered',
+              },
+            });
+          } else {
+            await prisma.$executeRaw`
+              INSERT INTO meeting_attendances (
+                meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status
+              ) VALUES (
+                ${meetingId}, NULL, ${guestName}, ${guestEmail}, ${guestPhone || null}, ${guestWorkplace || null}, 'Registered'
+              )
+            `;
+          }
+        } else {
+          await prisma.$executeRaw`
+            INSERT INTO meeting_attendances (
+              meeting_id, member_no, attendee_name, attendee_email, attendee_phone, workplace, attendance_status
+            ) VALUES (
+              ${meetingId}, NULL, ${guestName}, ${guestEmail}, ${guestPhone || null}, ${guestWorkplace || null}, 'Registered'
+            )
+          `;
+        }
+      }
     }
 
     // 4. Record Coupon Usage & increment used_count if coupon was used

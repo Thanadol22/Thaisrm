@@ -379,7 +379,9 @@ export function SponsorCouponHistoryModal({
                                   : 'bg-slate-100 text-slate-500 border-slate-200'
                               }`}
                             >
-                              {isFull ? 'สิทธิ์เต็ม' : isExpired ? 'หมดอายุ' : coupon.is_active ? 'ใช้งานได้' : 'ระงับการใช้'}
+                              {coupon.is_active
+                                ? (isFull ? 'สิทธิ์เต็ม' : isExpired ? 'หมดอายุ' : 'ใช้งานได้')
+                                : (isFull ? 'สิทธิ์เต็ม' : isLatest ? 'ระงับการใช้' : 'หมุนเวียนรหัสแล้ว')}
                             </span>
                           </div>
 

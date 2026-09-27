@@ -1656,11 +1656,21 @@ export async function POST(request: NextRequest) {
 
         if (isGroupConference && groupPayload?.attendees && Array.isArray(groupPayload.attendees)) {
           for (const att of groupPayload.attendees) {
-            const attMemberNo = att.memberNo ? att.memberNo.trim() : null;
+            let attMemberNo = att.memberNo ? att.memberNo.trim() : null;
             const attEmail = att.email ? att.email.trim().toLowerCase() : null;
             const attName = att.nameTh || att.nameEn || att.fullNameTh || att.fullNameEn || 'ผู้เข้าร่วมประชุม';
             const attPhone = att.phone || att.mobile || null;
             const attWorkplace = att.workplace || groupPayload.companyName || null;
+
+            if (!attMemberNo && attEmail) {
+              const foundMem = await prisma.member.findFirst({
+                where: { email: { equals: attEmail, mode: 'insensitive' } },
+                select: { member_no: true },
+              });
+              if (foundMem?.member_no) {
+                attMemberNo = foundMem.member_no.trim();
+              }
+            }
 
             if (attMemberNo) {
               await prisma.$executeRaw`
@@ -1680,10 +1690,21 @@ export async function POST(request: NextRequest) {
                   sponsor_company_name = COALESCE(meeting_attendances.sponsor_company_name, ${effectiveSponsorName}),
                   coupon_code = COALESCE(meeting_attendances.coupon_code, ${effectiveCouponCode})
               `;
+
+              // Clean up any orphaned non-member ghost record
+              if (attEmail) {
+                await prisma.$executeRaw`
+                  DELETE FROM meeting_attendances
+                  WHERE meeting_id = ${slip.meeting_id}
+                    AND member_no IS NULL
+                    AND LOWER(attendee_email) = ${attEmail}
+                `.catch(() => {});
+              }
             } else if (attEmail) {
               const existingAtt = await (prisma as any).meeting_attendances.findFirst({
                 where: {
                   meeting_id: slip.meeting_id,
+                  member_no: null,
                   attendee_email: { equals: attEmail, mode: 'insensitive' },
                 },
               });
@@ -1743,6 +1764,15 @@ export async function POST(request: NextRequest) {
               attendee_phone = COALESCE(meeting_attendances.attendee_phone, ${memPhone}),
               workplace = COALESCE(meeting_attendances.workplace, ${memWorkplace})
           `;
+
+          if (memEmail) {
+            await prisma.$executeRaw`
+              DELETE FROM meeting_attendances
+              WHERE meeting_id = ${slip.meeting_id}
+                AND member_no IS NULL
+                AND LOWER(attendee_email) = ${memEmail.trim().toLowerCase()}
+            `.catch(() => {});
+          }
         } else {
           // Individual non-member conference registration (e.g. SLIP-MUJOERWK)
           const guestName = slip.guest_name || actsObj?.nameTh || actsObj?.fullNameTh || actsObj?.attendees?.[0]?.nameTh || actsObj?.attendees?.[0]?.fullNameTh || 'ผู้สมัครทั่วไป';
@@ -2190,18 +2220,27 @@ export async function POST(request: NextRequest) {
       if (!isMembershipRegistration) {
         if (isGroupConference && groupPayload?.attendees && Array.isArray(groupPayload.attendees)) {
           for (const att of groupPayload.attendees) {
-            if (att.isMember && att.memberNo) {
+            const memNo = att.memberNo?.trim();
+            const attEmail = att.email?.trim()?.toLowerCase();
+            if (memNo) {
               await prisma.$executeRaw`
                 UPDATE meeting_attendances
                 SET attendance_status = 'Rejected'
-                WHERE meeting_id = ${slip.meeting_id} AND member_no = ${att.memberNo.trim()}
+                WHERE meeting_id = ${slip.meeting_id} AND member_no = ${memNo}
               `;
-            } else if (att.email) {
+            }
+            if (attEmail) {
               await prisma.$executeRaw`
                 UPDATE meeting_attendances
                 SET attendance_status = 'Rejected'
-                WHERE meeting_id = ${slip.meeting_id} AND attendee_email = ${att.email.trim().toLowerCase()}
+                WHERE meeting_id = ${slip.meeting_id} AND member_no IS NULL AND LOWER(attendee_email) = ${attEmail}
               `;
+              await prisma.$executeRaw`
+                UPDATE meeting_attendances
+                SET attendance_status = 'Rejected'
+                WHERE meeting_id = ${slip.meeting_id}
+                  AND member_no IN (SELECT member_no FROM members WHERE LOWER(email) = ${attEmail})
+              `.catch(() => {});
             }
           }
           if (slip.ticket_code) {

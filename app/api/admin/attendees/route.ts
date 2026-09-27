@@ -186,8 +186,58 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // 3. Format attendee items
-    const formattedAttendees = attendances.map((att: any) => {
+    // 3. Deduplicate attendances (Filter out ghost non-member records if a member record already exists, or if duplicate non-member rows exist)
+    const memberAttendanceKeys = new Set<string>();
+    const seenNonMemberKeys = new Set<string>();
+    const ghostAttendanceIdsToDelete: any[] = [];
+
+    // Index all member attendances in this meeting
+    attendances.forEach((att: any) => {
+      if (att.member_no && att.members) {
+        if (att.members.email) memberAttendanceKeys.add(`${att.meeting_id}_${att.members.email.trim().toLowerCase()}`);
+        if (att.members.mobile) memberAttendanceKeys.add(`${att.meeting_id}_${att.members.mobile.trim()}`);
+        if (att.members.fullNameTh) memberAttendanceKeys.add(`${att.meeting_id}_${att.members.fullNameTh.trim()}`);
+      }
+    });
+
+    const cleanAttendances = attendances.filter((att: any) => {
+      if (att.member_no && att.members) return true;
+
+      // Non-member attendance check
+      const attEmail = att.attendee_email?.trim()?.toLowerCase() || '';
+      const attPhone = att.attendee_phone?.trim() || '';
+      const attName = att.attendee_name?.trim() || '';
+
+      // If matches an existing member attendance in the same meeting, this is a ghost duplicate
+      if (
+        (attEmail && memberAttendanceKeys.has(`${att.meeting_id}_${attEmail}`)) ||
+        (attPhone && attName && memberAttendanceKeys.has(`${att.meeting_id}_${attPhone}`))
+      ) {
+        ghostAttendanceIdsToDelete.push(att.attendance_id);
+        return false;
+      }
+
+      // Check duplicate non-member in same meeting
+      const nonMemKey = `${att.meeting_id}_${attEmail || (attName + '_' + attPhone)}`;
+      if (seenNonMemberKeys.has(nonMemKey)) {
+        ghostAttendanceIdsToDelete.push(att.attendance_id);
+        return false;
+      }
+      seenNonMemberKeys.add(nonMemKey);
+      return true;
+    });
+
+    // Prune ghost attendance IDs if any found in background
+    if (ghostAttendanceIdsToDelete.length > 0) {
+      (prisma as any).meeting_attendances.deleteMany({
+        where: {
+          attendance_id: { in: ghostAttendanceIdsToDelete },
+        },
+      }).catch((e: any) => console.warn('Pruning ghost attendances:', e));
+    }
+
+    // 4. Format attendee items
+    const formattedAttendees = cleanAttendances.map((att: any) => {
       const isMember = !!att.members;
       const mem = att.members;
 

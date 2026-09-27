@@ -172,21 +172,57 @@ export async function POST(req: NextRequest) {
       const randomSuffix = crypto.randomBytes(3).toString('hex').toUpperCase();
       const ticketCode = `TSRM-${meetingId.substring(0, 4).toUpperCase()}-SP${randomSuffix}`;
 
-      // บันทึกลง meeting_attendances
-      const attendance = await (prisma as any).meeting_attendances.create({
-        data: {
+      // บันทึกลง meeting_attendances (อัปเดตรายการเดิมถ้ามี หรือสร้างรายการใหม่)
+      let attendance: any = null;
+      const existingAttendanceRecord = await (prisma as any).meeting_attendances.findFirst({
+        where: {
           meeting_id: meetingId,
           member_no: dbMember.member_no,
-          attendee_name: dbMember.fullNameTh || entry.fullName,
-          attendee_email: dbMember.email || entry.email,
-          attendee_phone: dbMember.mobile || entry.phone || null,
-          workplace: dbMember.workplace || entry.workplace || null,
-          attendance_status: 'Registered',
-          sponsor_id: sponsor.id,
-          sponsor_company_name: sponsor.name,
-          coupon_code: effectiveCouponCode,
         },
       });
+
+      if (existingAttendanceRecord) {
+        attendance = await (prisma as any).meeting_attendances.update({
+          where: { attendance_id: existingAttendanceRecord.attendance_id },
+          data: {
+            attendee_name: dbMember.fullNameTh || entry.fullName,
+            attendee_email: dbMember.email || entry.email,
+            attendee_phone: dbMember.mobile || entry.phone || null,
+            workplace: dbMember.workplace || entry.workplace || null,
+            attendance_status: 'Registered',
+            sponsor_id: sponsor.id,
+            sponsor_company_name: sponsor.name,
+            coupon_code: effectiveCouponCode,
+          },
+        });
+      } else {
+        attendance = await (prisma as any).meeting_attendances.create({
+          data: {
+            meeting_id: meetingId,
+            member_no: dbMember.member_no,
+            attendee_name: dbMember.fullNameTh || entry.fullName,
+            attendee_email: dbMember.email || entry.email,
+            attendee_phone: dbMember.mobile || entry.phone || null,
+            workplace: dbMember.workplace || entry.workplace || null,
+            attendance_status: 'Registered',
+            sponsor_id: sponsor.id,
+            sponsor_company_name: sponsor.name,
+            coupon_code: effectiveCouponCode,
+          },
+        });
+      }
+
+      // ลบรายการบุคคลทั่วไปที่ตกค้างออกหากเป็นสมาชิก
+      const effectiveAttendeeEmail = (dbMember.email || entry.email || '').trim().toLowerCase();
+      if (effectiveAttendeeEmail) {
+        await (prisma as any).meeting_attendances.deleteMany({
+          where: {
+            meeting_id: meetingId,
+            member_no: null,
+            attendee_email: { equals: effectiveAttendeeEmail, mode: 'insensitive' },
+          },
+        }).catch(() => {});
+      }
 
       // บันทึกลง sponsor_group_members
       await (prisma as any).sponsor_group_members.create({

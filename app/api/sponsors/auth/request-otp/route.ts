@@ -154,12 +154,11 @@ export async function POST(req: NextRequest) {
           }
           activeRotatedCouponCode = `T34-${prefix}-${token}`;
 
-          // ปิดการใช้งานรหัสเดิม และตั้ง max_uses ให้ตรงกับจำนวนที่ใช้ไปแล้ว
+          // ปิดการใช้งานรหัสเดิม โดยคง max_uses เดิมไว้เพื่อรักษาประวัติจำนวนสิทธิ์ที่มี ณ ตอนนั้น
           if (prismaAny.coupons) {
             await prismaAny.coupons.update({
               where: { id: couponRecord.id },
               data: {
-                max_uses: couponRecord.used_count,
                 is_active: false,
                 updated_at: new Date(),
               },
@@ -184,7 +183,7 @@ export async function POST(req: NextRequest) {
           } else {
             await prisma.$executeRaw`
               UPDATE coupons 
-              SET max_uses = used_count, is_active = false, updated_at = NOW() 
+              SET is_active = false, updated_at = NOW() 
               WHERE id = ${couponRecord.id}
             `;
             await prisma.$executeRaw`
