@@ -52,6 +52,8 @@ export interface CouponItem {
   applicable_type: string;
   max_uses: number;
   used_count: number;
+  quota_seats?: number;
+  used_seats?: number;
   expire_date: string | null;
   is_active: boolean;
   remarks: string | null;

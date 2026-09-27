@@ -193,8 +193,14 @@ export function SponsorCouponHistoryModal({
     return timeB - timeA;
   });
 
-  const totalQuota = sortedCoupons.reduce((sum, c) => sum + (c.max_uses || 0), 0);
-  const totalUsed = sortedCoupons.reduce((sum, c) => sum + (c.used_count || 0), 0);
+  const activeCoupon = sortedCoupons.find((c) => c.is_active) || sortedCoupons[0];
+  const totalUsed = activeCoupon?.used_seats !== undefined
+    ? activeCoupon.used_seats
+    : sortedCoupons.reduce((sum, c) => sum + (c.used_count || 0), 0);
+  const totalQuota = activeCoupon?.quota_seats !== undefined && activeCoupon.quota_seats > 0
+    ? activeCoupon.quota_seats
+    : Math.max(totalUsed, ...sortedCoupons.map((c) => c.max_uses || 0), 0);
+  const activeRemaining = Math.max(0, totalQuota - totalUsed);
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in overflow-y-auto">
@@ -236,7 +242,9 @@ export function SponsorCouponHistoryModal({
                 <span>•</span>
                 <span>สร้างแล้วทั้งหมด {sortedCoupons.length} รหัส</span>
                 <span>•</span>
-                <span className="text-amber-300 font-bold">ใช้สิทธิ์ไปแล้ว {totalUsed} / {totalQuota}</span>
+                <span className="text-amber-300 font-bold">
+                  ใช้สิทธิ์ไปแล้ว {totalUsed} / {totalQuota} {activeRemaining > 0 ? `(คงเหลือ ${activeRemaining} สิทธิ์)` : '(ใช้สิทธิ์ครบแล้ว)'}
+                </span>
               </p>
             </div>
           </div>
@@ -413,26 +421,33 @@ export function SponsorCouponHistoryModal({
                         {/* Right: Usages Stats & Actions */}
                         <div className="flex items-center gap-2 shrink-0 self-end sm:self-center pt-2 sm:pt-0 flex-wrap justify-end">
                           {/* Toggle Expand Attendee Usages Button */}
-                          <button
-                            type="button"
-                            onClick={() => toggleExpandCoupon(coupon)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition cursor-pointer shadow-2xs ${
-                              isExpanded
-                                ? 'bg-blue-600 text-white border-blue-600'
-                                : (coupon.used_count || 0) > 0
-                                ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
-                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-                            }`}
-                            title="ดูรายชื่อสมาชิกและประวัติการใช้สิทธิ์รหัสนี้"
-                          >
-                            <Users className="w-3.5 h-3.5 shrink-0" />
-                            <span>ใช้ไป {coupon.used_count || 0} / {coupon.max_uses}</span>
-                            {isExpanded ? (
-                              <ChevronUp className="w-3.5 h-3.5 shrink-0" />
-                            ) : (
-                              <ChevronDown className="w-3.5 h-3.5 shrink-0" />
-                            )}
-                          </button>
+                          {(() => {
+                            const rowUsed = isLatest && coupon.used_seats !== undefined ? coupon.used_seats : (coupon.used_count || 0);
+                            const rowMax = isLatest && coupon.quota_seats !== undefined && coupon.quota_seats > 0 ? coupon.quota_seats : coupon.max_uses;
+
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => toggleExpandCoupon(coupon)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition cursor-pointer shadow-2xs ${
+                                  isExpanded
+                                    ? 'bg-blue-600 text-white border-blue-600'
+                                    : rowUsed > 0
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                                }`}
+                                title="ดูรายชื่อสมาชิกและประวัติการใช้สิทธิ์รหัสนี้"
+                              >
+                                <Users className="w-3.5 h-3.5 shrink-0" />
+                                <span>ใช้ไป {rowUsed} / {rowMax}</span>
+                                {isExpanded ? (
+                                  <ChevronUp className="w-3.5 h-3.5 shrink-0" />
+                                ) : (
+                                  <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+                                )}
+                              </button>
+                            );
+                          })()}
 
                           {/* Edit Button */}
                           {onEditCoupon && (

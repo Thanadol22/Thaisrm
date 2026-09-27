@@ -166,10 +166,15 @@ export function AdminCouponsPanel({
   // Stats
   const stats = useMemo(() => {
     const totalCoupons = coupons.length;
-    const totalQuota = coupons.reduce((sum, c) => sum + (c.max_uses || 0), 0);
+    const activeCouponsList = coupons.filter((c) => c.is_active);
+    const activeCoupons = activeCouponsList.length;
     const totalUsed = coupons.reduce((sum, c) => sum + (c.used_count || 0), 0);
-    const remainingQuota = Math.max(0, totalQuota - totalUsed);
-    const activeCoupons = coupons.filter((c) => c.is_active).length;
+    const activeRemaining = activeCouponsList.reduce(
+      (sum, c) => sum + Math.max(0, (c.max_uses || 0) - (c.used_count || 0)),
+      0
+    );
+    const totalQuota = totalUsed + activeRemaining;
+    const remainingQuota = activeRemaining;
 
     return {
       totalCoupons,
@@ -371,8 +376,10 @@ export function AdminCouponsPanel({
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
                 {paginatedCoupons.map((coupon) => {
-                  const percentUsed = coupon.max_uses > 0 ? Math.round((coupon.used_count / coupon.max_uses) * 100) : 0;
-                  const isQuotaFull = coupon.used_count >= coupon.max_uses;
+                  const effectiveUsed = coupon.used_seats !== undefined ? coupon.used_seats : coupon.used_count;
+                  const effectiveMax = coupon.quota_seats !== undefined && coupon.quota_seats > 0 ? coupon.quota_seats : coupon.max_uses;
+                  const percentUsed = effectiveMax > 0 ? Math.round((effectiveUsed / effectiveMax) * 100) : 0;
+                  const isQuotaFull = effectiveUsed >= effectiveMax;
                   const isExpired = coupon.expire_date ? new Date() > new Date(coupon.expire_date) : false;
 
                   return (
@@ -446,7 +453,7 @@ export function AdminCouponsPanel({
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between text-xs">
                             <span className="font-bold text-slate-700">
-                              {coupon.used_count} / {coupon.max_uses} สิทธิ์
+                              {effectiveUsed} / {effectiveMax} สิทธิ์
                             </span>
                             <span className="font-extrabold text-slate-500 text-[11px]">
                               {percentUsed}%
@@ -466,7 +473,7 @@ export function AdminCouponsPanel({
                             />
                           </div>
                           <span className="text-[10.5px] text-slate-400 block">
-                            เหลืออีก {Math.max(0, coupon.max_uses - coupon.used_count)} สิทธิ์
+                            เหลืออีก {Math.max(0, effectiveMax - effectiveUsed)} สิทธิ์
                           </span>
                         </div>
                       </td>

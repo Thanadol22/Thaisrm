@@ -958,18 +958,36 @@ export default function AdminSponsorsPanel({
 
                             {/* Usages */}
                             <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedCouponForUsages(coupon);
-                                  setCouponUsagesModalOpen(true);
-                                }}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-800 text-xs font-bold transition cursor-pointer whitespace-nowrap"
-                                title="ดูรายชื่อสมาชิกที่ใช้คูปองนี้"
-                              >
-                                <Users className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                                <span>{coupon.used_count} / {coupon.max_uses}</span>
-                              </button>
+                              {(() => {
+                                const matchingQuota = matchingSponsor?.quotas?.find(
+                                  (q) => q.meeting_id === coupon.meeting_id
+                                ) || matchingSponsor?.quotas?.[0];
+                                const effectiveUsed = matchingQuota?.used_seats !== undefined
+                                  ? matchingQuota.used_seats
+                                  : (matchingSponsor?.total_used_seats !== undefined
+                                    ? matchingSponsor.total_used_seats
+                                    : (coupon.used_seats !== undefined ? coupon.used_seats : coupon.used_count));
+                                const effectiveQuota = matchingQuota?.quota_seats !== undefined
+                                  ? matchingQuota.quota_seats
+                                  : (matchingSponsor?.total_allocated_quota !== undefined && matchingSponsor.total_allocated_quota > 0
+                                    ? matchingSponsor.total_allocated_quota
+                                    : (coupon.quota_seats !== undefined ? coupon.quota_seats : coupon.max_uses));
+
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedCouponForUsages(coupon);
+                                      setCouponUsagesModalOpen(true);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-800 text-xs font-bold transition cursor-pointer whitespace-nowrap"
+                                    title="ดูรายชื่อสมาชิกที่ใช้คูปองนี้"
+                                  >
+                                    <Users className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                    <span>{effectiveUsed} / {effectiveQuota}</span>
+                                  </button>
+                                );
+                              })()}
                             </td>
 
                             {/* Status */}

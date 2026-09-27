@@ -1496,15 +1496,15 @@ export function AdminSlipsView() {
                                   a.name.toLowerCase().includes('main') ||
                                   a.name.includes('การประชุมหลัก') ||
                                   a.name.includes('Main Program')
-                                );
+                                ) || true;
 
                                 const attDiscount = (attUsage?.discountApplied && Number(attUsage.discountApplied) > 0)
                                   ? Number(attUsage.discountApplied)
                                   : (Number(att.discountTotal) || Number(att.discountAmount) || ((isFreeCoupon || isCouponActive) && hasMainProgram ? 4000 : 0));
 
                                 const hasDiscount = attDiscount > 0 || ((isFreeCoupon || isCouponActive) && hasMainProgram) || Boolean(att.discountAppliedNotice);
-                                const originalPrice = Number(att.originalTotal || att.subtotal || att.price || 0);
-                                const netPrice = hasDiscount && originalPrice > 0 ? Math.max(0, originalPrice - attDiscount) : (att.subtotal || att.price || 0);
+                                const originalPrice = Number(att.originalTotal || att.subtotal || (hasDiscount ? ((Number(att.price) || 0) + attDiscount) : (Number(att.price) || (hasMainProgram ? 4000 : 0))));
+                                const netPrice = hasDiscount && originalPrice > 0 ? Math.max(0, originalPrice - attDiscount) : (att.price !== undefined ? Number(att.price) : (Number(att.subtotal) || 0));
 
                                 return (
                                   <div
@@ -1957,20 +1957,28 @@ export function AdminSlipsView() {
                               </p>
                             </div>
                             <div className="text-right shrink-0">
-                              {selectedSlip.discountTotal && selectedSlip.discountTotal > 0 ? (
-                                <div className="flex items-center gap-1.5 justify-end">
-                                  <span className="line-through text-slate-400 font-mono text-xs">
-                                    ฿{(selectedSlip.amount + selectedSlip.discountTotal).toLocaleString()}
-                                  </span>
-                                  <span className="font-black text-emerald-700 font-mono text-sm sm:text-base">
+                              {(() => {
+                                const effGroupDiscount = (selectedSlip.discountTotal && selectedSlip.discountTotal > 0)
+                                  ? selectedSlip.discountTotal
+                                  : (selectedSlip.couponInfo?.discountType === 'free' || Boolean(selectedSlip.couponCode) ? attendeesCount * 4000 : 0);
+                                if (effGroupDiscount > 0) {
+                                  return (
+                                    <div className="flex items-center gap-1.5 justify-end">
+                                      <span className="line-through text-slate-400 font-mono text-xs">
+                                        ฿{(selectedSlip.amount + effGroupDiscount).toLocaleString()}
+                                      </span>
+                                      <span className="font-black text-emerald-700 font-mono text-sm sm:text-base">
+                                        ฿{selectedSlip.amount.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">THB</span>
+                                      </span>
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <span className="font-black text-indigo-700 font-mono text-sm sm:text-base">
                                     ฿{selectedSlip.amount.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">THB</span>
                                   </span>
-                                </div>
-                              ) : (
-                                <span className="font-black text-indigo-700 font-mono text-sm sm:text-base">
-                                  ฿{selectedSlip.amount.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">THB</span>
-                                </span>
-                              )}
+                                );
+                              })()}
                             </div>
                           </div>
                           <p className="text-[11px] text-slate-500 font-medium leading-relaxed">

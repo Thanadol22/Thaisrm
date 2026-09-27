@@ -57,14 +57,38 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Fetch sponsor quotas for matching company names
+    let allSponsorsWithQuotas: any[] = [];
+    try {
+      allSponsorsWithQuotas = await (prisma as any).sponsors.findMany({
+        include: {
+          quotas: true,
+        },
+      });
+    } catch (spErr) {
+      console.warn('Could not fetch sponsors for coupons quota enrichment:', spErr);
+    }
+
     // Format BigInt and response
-    const formatted = couponsList.map((c: any) => ({
-      ...c,
-      usages: (c.usages || []).map((u: any) => ({
-        ...u,
-        id: u.id ? u.id.toString() : '',
-      })),
-    }));
+    const formatted = couponsList.map((c: any) => {
+      const sp = allSponsorsWithQuotas.find(
+        (s: any) => s.name && c.company_name && s.name.trim().toLowerCase() === c.company_name.trim().toLowerCase()
+      );
+      const quota = sp?.quotas?.find((q: any) => q.meeting_id === c.meeting_id) || sp?.quotas?.[0];
+      const quota_seats = quota?.quota_seats !== undefined ? quota.quota_seats : sp?.total_allocated_quota;
+      const used_seats = quota?.used_seats !== undefined ? quota.used_seats : sp?.total_used_seats;
+
+      return {
+        ...c,
+        sponsor_id: sp?.id || null,
+        quota_seats: quota_seats !== undefined ? quota_seats : c.max_uses,
+        used_seats: used_seats !== undefined ? used_seats : c.used_count,
+        usages: (c.usages || []).map((u: any) => ({
+          ...u,
+          id: u.id ? u.id.toString() : '',
+        })),
+      };
+    });
 
     return NextResponse.json({
       success: true,

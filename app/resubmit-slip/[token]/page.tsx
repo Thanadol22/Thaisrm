@@ -458,7 +458,8 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
         let processedApplicants: any[] = [];
         if (corporateData.isMembershipGroup) {
           processedApplicants = await Promise.all(
-            corporateData.applicants.map(async (app) => {
+            corporateData.applicants.map(async (app, idx) => {
+              const origApp = slipData.groupPayload?.applicants?.[idx] || {};
               let photoUrl = app.photoPreview;
               if (app.selectedPhotoFile) {
                 try {
@@ -495,6 +496,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
                   : app.position.trim() || app.positionOther.trim();
 
               return {
+                ...origApp,
                 full_name_th: app.nameTh.trim(),
                 full_name_en: app.nameEn.trim() || null,
                 id_last4: app.id4Digits.trim() || null,
@@ -515,28 +517,31 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
                 membership_status: 'Active',
                 educations: app.educations
                   .filter((edu) => edu.degree.trim() !== '' || edu.institution.trim() !== '')
-                  .map((edu, idx) => ({
+                  .map((edu, eIdx) => ({
                     degree: edu.degree.trim(),
                     institution: edu.institution.trim(),
                     graduation_year: edu.year.trim() ? parseInt(edu.year.trim(), 10) : null,
-                    display_order: idx + 1,
+                    display_order: eIdx + 1,
                   })),
               };
             })
           );
         }
 
-        const processedAttendees = corporateData.attendees.map((att) => {
+        const processedAttendees = corporateData.attendees.map((att, idx) => {
+          const origAtt = slipData.groupPayload?.attendees?.[idx] || {};
           const finalPos =
             att.position === '0 อื่นๆ' || att.position === 'อื่นๆ'
               ? att.positionOther.trim()
               : att.position.trim() || att.positionOther.trim();
 
           return {
+            ...origAtt,
             nameTh: att.nameTh.trim(),
             nameEn: att.nameEn?.trim() || null,
             email: att.email.trim(),
             phone: att.phone.trim(),
+            mobile: att.phone.trim(),
             workplace: att.workplace.trim() || corporateData.companyName.trim(),
             position: finalPos,
             positionOther: att.positionOther?.trim() || null,
@@ -544,16 +549,22 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
         });
 
         const customGroupPayload: any = {
+          ...(slipData.groupPayload || {}),
           isGroup: true,
           type: corporateData.isMembershipGroup
             ? 'membership_group_registration'
             : 'conference_group_registration',
           companyName: corporateData.companyName.trim(),
           groupContact: {
+            ...(slipData.groupPayload?.groupContact || {}),
             coordinatorName: corporateData.companyName.trim(),
             coordinatorEmail: corporateData.coordinatorEmail.trim(),
             coordinatorPhone: corporateData.coordinatorPhone.trim(),
           },
+          couponCode: slipData.groupPayload?.couponCode || slipData.couponCode || null,
+          couponData: slipData.groupPayload?.couponData || slipData.couponInfo || null,
+          discountAmount: slipData.groupPayload?.discountAmount || slipData.discountTotal || 0,
+          originalAmount: slipData.groupPayload?.originalAmount || (slipData.amount + (slipData.discountTotal || 0)),
           totalAmount: slipData.groupPayload?.totalAmount || slipData.amount,
           submittedAt: new Date().toISOString(),
         };
@@ -857,29 +868,41 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
                 </span>
               </div>
             )}
-            {((slipData.discountTotal && slipData.discountTotal > 0) ||
-              slipData.couponInfo?.discountType === 'free' ||
-              slipData.couponCode) && (
-              <div className="flex justify-between py-1.5 items-center">
-                <span className="text-slate-500">ส่วนลดที่ได้รับ:</span>
-                <span className="font-extrabold text-emerald-700 text-xs sm:text-sm font-mono">
-                  -฿{(slipData.discountTotal || 8000).toLocaleString()} THB
-                </span>
-              </div>
-            )}
-            <div className="flex justify-between py-1.5 items-center">
-              <span className="text-slate-500">ยอดเงินที่ต้องชำระ:</span>
-              <div className="text-right">
-                {slipData.discountTotal && slipData.discountTotal > 0 ? (
-                  <span className="line-through text-slate-400 text-xs font-mono mr-2">
-                    ฿ {(slipData.amount + slipData.discountTotal).toLocaleString()}
-                  </span>
-                ) : null}
-                <span className="font-extrabold text-[#0026b3] text-sm sm:text-base font-mono">
-                  ฿ {slipData.amount.toLocaleString()}
-                </span>
-              </div>
-            </div>
+            {(() => {
+              const attendeeCount = slipData.groupPayload?.attendees?.length || slipData.groupPayload?.applicants?.length || 1;
+              const effectiveDiscount = Number(slipData.discountTotal) > 0
+                ? Number(slipData.discountTotal)
+                : (slipData.couponInfo?.discountType === 'free' || Boolean(slipData.couponCode) ? attendeeCount * 4000 : 0);
+              const originalPrice = effectiveDiscount > 0
+                ? Number(slipData.amount) + effectiveDiscount
+                : Number(slipData.groupPayload?.originalAmount || slipData.amount);
+
+              return (
+                <>
+                  {effectiveDiscount > 0 && (
+                    <div className="flex justify-between py-1.5 items-center">
+                      <span className="text-slate-500">ส่วนลดที่ได้รับ:</span>
+                      <span className="font-extrabold text-emerald-700 text-xs sm:text-sm font-mono">
+                        -฿{effectiveDiscount.toLocaleString()} THB
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-1.5 items-center">
+                    <span className="text-slate-500">ยอดเงินที่ต้องชำระ:</span>
+                    <div className="text-right">
+                      {effectiveDiscount > 0 && originalPrice > Number(slipData.amount) ? (
+                        <span className="line-through text-slate-400 text-xs font-mono mr-2">
+                          ฿ {originalPrice.toLocaleString()}
+                        </span>
+                      ) : null}
+                      <span className="font-extrabold text-[#0026b3] text-sm sm:text-base font-mono">
+                        ฿ {slipData.amount.toLocaleString()} THB
+                      </span>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
 

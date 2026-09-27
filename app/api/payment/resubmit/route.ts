@@ -495,14 +495,26 @@ export async function POST(request: NextRequest) {
           coordinatorEmail: cleanEmail,
           coordinatorPhone: cleanPhone,
         },
+        couponCode: customGroupPayload.couponCode || baseAct.couponCode || null,
+        couponData: customGroupPayload.couponData || baseAct.couponData || null,
+        discountAmount: customGroupPayload.discountAmount || baseAct.discountAmount || 0,
+        originalAmount: customGroupPayload.originalAmount || baseAct.originalAmount || 0,
         rejectType: undefined,
       };
 
       if (isMemGroup) {
-        updatedActivities.applicants = customGroupPayload.applicants || baseAct.applicants || [];
+        const rawApplicants = customGroupPayload.applicants || baseAct.applicants || [];
+        updatedActivities.applicants = rawApplicants.map((app: any, idx: number) => {
+          const origApp = baseAct.applicants?.[idx] || {};
+          return { ...origApp, ...app };
+        });
         delete updatedActivities.attendees;
       } else {
-        updatedActivities.attendees = customGroupPayload.attendees || baseAct.attendees || [];
+        const rawAttendees = customGroupPayload.attendees || baseAct.attendees || [];
+        updatedActivities.attendees = rawAttendees.map((att: any, idx: number) => {
+          const origAtt = baseAct.attendees?.[idx] || {};
+          return { ...origAtt, ...att };
+        });
         delete updatedActivities.applicants;
       }
     } else if (customMemberPayload) {

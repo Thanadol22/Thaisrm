@@ -83,6 +83,11 @@ export async function POST(
         companyName: companyName || 'Corporate Group',
         groupContact: groupContact || null,
         attendees: attendees,
+        couponCode: couponCode || body.couponData?.code || null,
+        couponData: body.couponData || null,
+        discountAmount: Number(body.discountAmount) || (body.originalAmount ? Math.max(0, Number(body.originalAmount) - numericAmount) : 0),
+        originalAmount: Number(body.originalAmount) || (numericAmount + (Number(body.discountAmount) || 0)),
+        totalAmount: numericAmount,
         submittedAt: new Date().toISOString(),
       };
 

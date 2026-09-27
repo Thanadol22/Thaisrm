@@ -600,6 +600,18 @@ function PaymentContent() {
       try {
         if ((regData as any)?.isGroup) {
           // Group Conference Registration Submission
+          const enrichedAttendees = ((regData as any).attendees || []).map((att: any, idx: number) => {
+            const summaryItem = calculationResult.groupSummary?.[idx];
+            return {
+              ...att,
+              originalTotal: summaryItem?.originalTotal || att.originalTotal || att.subtotal || att.price || 0,
+              subtotal: summaryItem?.originalTotal || att.subtotal || att.price || 0,
+              price: summaryItem?.price !== undefined ? summaryItem.price : att.price,
+              discountTotal: summaryItem?.discountTotal || att.discountTotal || 0,
+              discountAppliedNotice: summaryItem?.discountAppliedNotice || att.discountAppliedNotice || undefined,
+            };
+          });
+
           const res = await fetch(`/api/meetings/${meetingId}/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -612,10 +624,12 @@ function PaymentContent() {
                 coordinatorName: (regData as any)?.sponsorSession?.contactName || (regData as any)?.sponsorSession?.sponsorName,
                 coordinatorPhone: '',
               } : undefined),
-              attendees: (regData as any).attendees,
+              attendees: enrichedAttendees,
               amount: calculationResult.totalAmount,
               originalAmount: calculationResult.originalAmount,
+              discountAmount: calculationResult.discountAmount,
               couponCode: regData?.couponData?.code || undefined,
+              couponData: regData?.couponData || undefined,
               sponsorId: (regData as any)?.sponsorSession?.sponsorId || (regData?.couponData as any)?.sponsorId || undefined,
               bank: isFreeOrSponsored
                 ? `สิทธิ์สปอนเซอร์: ${regData?.couponData?.companyName || (regData as any).companyName || 'Corporate Pass'}`
