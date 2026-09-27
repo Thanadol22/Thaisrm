@@ -406,7 +406,7 @@ export async function GET(request: NextRequest) {
 // POST: Resubmit edited details and/or new slip
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body: any = await request.json();
     const {
       token,
       slipUrl,
@@ -422,9 +422,10 @@ export async function POST(request: NextRequest) {
       position,
       address,
       jobCategory,
-      memberPayload: customMemberPayload,
-      groupPayload: customGroupPayload,
     } = body;
+
+    const customMemberPayload = body.customMemberPayload || body.memberPayload || null;
+    const customGroupPayload = body.customGroupPayload || body.groupPayload || null;
 
     if (!token) {
       return NextResponse.json(
@@ -461,47 +462,80 @@ export async function POST(request: NextRequest) {
     const cleanWorkplace = workplace?.trim() || slip.guest_workplace || slip.members?.workplace || '';
 
     // Handle updating selected_activities if this was a group registration or individual membership registration
-    let updatedActivities = slip.selected_activities;
+    let updatedActivities: any = slip.selected_activities;
     if (updatedActivities) {
-      let actObj = updatedActivities;
-      if (typeof actObj === 'string') {
-        try { actObj = JSON.parse(actObj); } catch { }
+      if (typeof updatedActivities === 'string') {
+        try { updatedActivities = JSON.parse(updatedActivities); } catch { }
       }
-      if (actObj && typeof actObj === 'object') {
-        if (customGroupPayload) {
-          actObj = {
-            ...actObj,
-            ...customGroupPayload,
-            companyName: customGroupPayload.companyName || actObj.companyName || cleanWorkplace,
-            groupContact: customGroupPayload.groupContact || {
-              coordinatorName: cleanNameTh,
-              coordinatorEmail: cleanEmail,
-              coordinatorPhone: cleanPhone,
-            },
-            attendees: customGroupPayload.attendees || actObj.attendees || [],
-            applicants: customGroupPayload.applicants || actObj.applicants || [],
-            rejectType: undefined,
-          };
-          updatedActivities = actObj;
-        } else if (actObj.memberPayload || actObj.type === 'membership_registration' || slip.ticket_code?.startsWith('MEM-') || slip.meeting_id === 'membership') {
-          actObj.type = 'membership_registration';
-          actObj.memberPayload = {
-            ...(actObj.memberPayload || {}),
-            ...(customMemberPayload || {}),
-            full_name_th: cleanNameTh,
-            ...(nameEn ? { full_name_en: nameEn.trim() } : {}),
-            email: cleanEmail,
-            mobile: cleanPhone,
-            workplace: cleanWorkplace,
-            ...(position ? { position: position.trim() } : {}),
-            ...(address ? { address: address.trim() } : {}),
-            ...(jobCategory ? { job_category: jobCategory.trim() } : {}),
-          };
-          actObj.rejectType = undefined;
-          updatedActivities = actObj;
-        } else {
-          actObj = {
-            ...(typeof actObj === 'object' && !Array.isArray(actObj) ? actObj : { activities: actObj }),
+    }
+
+    if (customGroupPayload) {
+      const baseAct = typeof updatedActivities === 'object' && !Array.isArray(updatedActivities) ? updatedActivities : {};
+      updatedActivities = {
+        ...baseAct,
+        ...customGroupPayload,
+        isGroup: true,
+        companyName: customGroupPayload.companyName || baseAct.companyName || cleanWorkplace,
+        groupContact: customGroupPayload.groupContact || baseAct.groupContact || {
+          coordinatorName: cleanNameTh,
+          coordinatorEmail: cleanEmail,
+          coordinatorPhone: cleanPhone,
+        },
+        applicants: customGroupPayload.applicants || baseAct.applicants || [],
+        attendees: customGroupPayload.attendees || baseAct.attendees || [],
+        rejectType: undefined,
+      };
+    } else if (customMemberPayload) {
+      const baseAct = typeof updatedActivities === 'object' && !Array.isArray(updatedActivities) ? updatedActivities : {};
+      updatedActivities = {
+        ...baseAct,
+        type: 'membership_registration',
+        memberPayload: {
+          ...(baseAct.memberPayload || {}),
+          ...customMemberPayload,
+          full_name_th: customMemberPayload.full_name_th || cleanNameTh,
+          full_name_en: customMemberPayload.full_name_en || (nameEn ? nameEn.trim() : null),
+          email: customMemberPayload.email || cleanEmail,
+          mobile: customMemberPayload.mobile || cleanPhone,
+          workplace: customMemberPayload.workplace || cleanWorkplace,
+          position: customMemberPayload.position || (position ? position.trim() : null),
+          address: customMemberPayload.address || (address ? address.trim() : null),
+          job_category: customMemberPayload.job_category || (jobCategory ? jobCategory.trim() : null),
+        },
+        rejectType: undefined,
+      };
+    } else if (updatedActivities && typeof updatedActivities === 'object') {
+      if (updatedActivities.memberPayload || updatedActivities.type === 'membership_registration' || slip.ticket_code?.startsWith('MEM-') || slip.meeting_id === 'membership') {
+        updatedActivities.type = 'membership_registration';
+        updatedActivities.memberPayload = {
+          ...(updatedActivities.memberPayload || {}),
+          full_name_th: cleanNameTh,
+          ...(nameEn ? { full_name_en: nameEn.trim() } : {}),
+          email: cleanEmail,
+          mobile: cleanPhone,
+          workplace: cleanWorkplace,
+          ...(position ? { position: position.trim() } : {}),
+          ...(address ? { address: address.trim() } : {}),
+          ...(jobCategory ? { job_category: jobCategory.trim() } : {}),
+        };
+        updatedActivities.rejectType = undefined;
+      } else {
+        updatedActivities = {
+          ...updatedActivities,
+          nameTh: cleanNameTh,
+          fullNameTh: cleanNameTh,
+          nameEn: nameEn?.trim() || '',
+          fullNameEn: nameEn?.trim() || '',
+          email: cleanEmail,
+          phone: cleanPhone,
+          mobile: cleanPhone,
+          workplace: cleanWorkplace,
+          position: position?.trim() || '',
+          rejectType: undefined,
+        };
+        if (Array.isArray(updatedActivities.attendees) && updatedActivities.attendees.length === 1) {
+          updatedActivities.attendees[0] = {
+            ...updatedActivities.attendees[0],
             nameTh: cleanNameTh,
             fullNameTh: cleanNameTh,
             nameEn: nameEn?.trim() || '',
@@ -511,28 +545,10 @@ export async function POST(request: NextRequest) {
             mobile: cleanPhone,
             workplace: cleanWorkplace,
             position: position?.trim() || '',
-            rejectType: undefined,
           };
-          if (Array.isArray(actObj.attendees) && actObj.attendees.length === 1) {
-            actObj.attendees[0] = {
-              ...actObj.attendees[0],
-              nameTh: cleanNameTh,
-              fullNameTh: cleanNameTh,
-              nameEn: nameEn?.trim() || '',
-              fullNameEn: nameEn?.trim() || '',
-              email: cleanEmail,
-              phone: cleanPhone,
-              mobile: cleanPhone,
-              workplace: cleanWorkplace,
-              position: position?.trim() || '',
-            };
-          }
-          updatedActivities = actObj;
         }
       }
-    } else if (customGroupPayload) {
-      updatedActivities = customGroupPayload;
-    } else if (nameEn || position) {
+    } else {
       updatedActivities = {
         nameTh: cleanNameTh,
         fullNameTh: cleanNameTh,

@@ -356,15 +356,6 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
     // Validation
     if (isInfoMode) {
       if (slipData.isCorporate || slipData.isGroup) {
-        if (!corporateData.companyName.trim()) {
-          alert('กรุณากรอกชื่อบริษัท / องค์กร / นิติบุคคล');
-          return;
-        }
-        if (!corporateData.coordinatorEmail.trim()) {
-          alert('กรุณากรอกอีเมลประสานงานบริษัท');
-          return;
-        }
-
         if (corporateData.isMembershipGroup) {
           for (let i = 0; i < corporateData.applicants.length; i++) {
             const app = corporateData.applicants[i];
@@ -570,10 +561,11 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
 
         payloadToSend = {
           ...payloadToSend,
-          nameTh: corporateData.companyName.trim(),
-          email: corporateData.coordinatorEmail.trim(),
-          phone: corporateData.coordinatorPhone.trim(),
-          workplace: corporateData.companyName.trim(),
+          nameTh: corporateData.companyName.trim() || slipData.companyName || 'Corporate Group',
+          email: corporateData.coordinatorEmail.trim() || slipData.email || '',
+          phone: corporateData.coordinatorPhone.trim() || slipData.phone || '',
+          workplace: corporateData.companyName.trim() || slipData.companyName || 'Corporate Group',
+          groupPayload: customGroupPayload,
           customGroupPayload,
         };
       } else if (slipData.isMembershipRegistration) {
@@ -652,6 +644,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
           position: finalPosition,
           address: membershipData.address.trim(),
           memberPayload,
+          customMemberPayload: memberPayload,
         };
       } else {
         const finalPosition =
