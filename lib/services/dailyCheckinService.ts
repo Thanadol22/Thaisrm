@@ -32,9 +32,10 @@ const THAI_MONTHS: Record<string, number> = {
  * Safely format a Date object or ISO string to YYYY-MM-DD in Asia/Bangkok timezone
  */
 export function formatBangkokDate(date?: Date | string | null): string {
-  if (!date) return '';
+  const targetDate = date === undefined ? new Date() : date;
+  if (!targetDate) return '';
   try {
-    const d = typeof date === 'string' ? new Date(date) : date;
+    const d = typeof targetDate === 'string' ? new Date(targetDate) : targetDate;
     if (isNaN(d.getTime())) return '';
     return new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Bangkok',
@@ -391,7 +392,7 @@ export async function processDailyQrScan(
     },
   });
 
-  // 2. If not found by daily_qr_token, check if code contains ticket_code, member_no or attendance_id for today
+  // 2. If not found by daily_qr_token, check if code contains ticket_code, member_no or attendance_id
   if (!dailyRecord) {
     // Extract possible clean ticket / member code
     let cleanCode = trimmed.replace(/^TSRM-PASS:/i, '').replace(/^TSRM-TICKET:/i, '').trim();
@@ -404,7 +405,6 @@ export async function processDailyQrScan(
 
     dailyRecord = await prisma.meeting_daily_checkins.findFirst({
       where: {
-        checkin_date: todayDateObj,
         OR: [
           { ticket_code: { equals: cleanCode, mode: 'insensitive' } },
           { member_no: cleanCode },
@@ -413,6 +413,7 @@ export async function processDailyQrScan(
         ],
         ...(staffMeetingId ? { meeting_id: staffMeetingId } : {}),
       },
+      orderBy: { checkin_date: 'asc' },
       include: {
         meetings: true,
         meeting_attendances: true,
@@ -424,31 +425,12 @@ export async function processDailyQrScan(
   // 3. If found daily record
   if (dailyRecord) {
     const recordDateStr = formatBangkokDate(dailyRecord.checkin_date);
-    const isToday = recordDateStr === todayBangkok;
-
     const attendeeName = dailyRecord.members?.fullNameTh || dailyRecord.meeting_attendances?.attendee_name || 'ผู้เข้าร่วมประชุม';
     const attendeeEmail = dailyRecord.members?.email || dailyRecord.meeting_attendances?.attendee_email || '-';
     const programName = dailyRecord.program_name || 'Main Program';
     const ticketDisplay = `${dailyRecord.ticket_code} (${programName})`;
 
-    // Check Date Validity
-    if (!isToday) {
-      return {
-        success: true,
-        status: 'invalid',
-        message: `QR Code นี้สำหรับเข้างานวันที่ ${formatThaiDate(recordDateStr)} ไม่ตรงกับวันที่สแกน (${formatThaiDate(todayBangkok)})`,
-        record: {
-          id: dailyRecord.ticket_code,
-          name: attendeeName,
-          ticketType: ticketDisplay,
-          email: attendeeEmail,
-          checkInTime: `วันเข้างาน: ${formatThaiDate(recordDateStr)}`,
-          status: 'invalid',
-        },
-      };
-    }
-
-    // Check if ALREADY CHECKED IN TODAY (Duplicate)
+    // Check if ALREADY CHECKED IN (Duplicate)
     if (dailyRecord.checkin_status === 'attended' || dailyRecord.checkin_time !== null) {
       const existingTime = dailyRecord.checkin_time
         ? new Date(dailyRecord.checkin_time).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) + ' น.'
@@ -457,7 +439,7 @@ export async function processDailyQrScan(
       return {
         success: true,
         status: 'duplicate',
-        message: `ผู้เข้าร่วมได้สแกนเช็คอินเข้าร่วม ${programName} ของวันนี้แล้วเมื่อ ${existingTime}`,
+        message: `ผู้เข้าร่วมได้สแกนเช็คอินเข้าร่วม ${programName} (${formatThaiDate(recordDateStr, true)}) ไปแล้วเมื่อ ${existingTime}`,
         record: {
           id: dailyRecord.ticket_code,
           name: attendeeName,
@@ -502,7 +484,7 @@ export async function processDailyQrScan(
     return {
       success: true,
       status: 'success',
-      message: `เช็คอินเข้าร่วม ${programName} (ประจำวันที่ ${formatThaiDate(todayBangkok)}) สำเร็จ`,
+      message: `เช็คอินเข้าร่วม ${programName} (${formatThaiDate(recordDateStr, true)}) สำเร็จ`,
       record: {
         id: dailyRecord.ticket_code,
         name: attendeeName,

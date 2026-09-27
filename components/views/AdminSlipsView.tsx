@@ -1489,11 +1489,16 @@ export function AdminSlipsView() {
                                             </span>
                                           )}
 
-                                          {(att.selectedFormat || att.format || att.selectedPackage) && (
-                                            <span className="text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs whitespace-nowrap">
-                                              {att.selectedFormat || att.format || att.selectedPackage}
-                                            </span>
-                                          )}
+                                          {(() => {
+                                            let fmt = att.selectedFormat || att.attendanceType || att.format || att.selectedPackage;
+                                            if (fmt === 'both') fmt = att.attendanceType || 'onsite';
+                                            if (!fmt) return null;
+                                            return (
+                                              <span className="text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs whitespace-nowrap">
+                                                {fmt}
+                                              </span>
+                                            );
+                                          })()}
                                         </div>
 
                                         {/* View All Button on Top Right (Always accessible) */}

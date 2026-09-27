@@ -268,11 +268,16 @@ function PaymentContent() {
             actPrice = isMem ? mPrice : nonMPrice;
           }
 
+          const isMainAct = act.type === 'main' || act.id === 'main';
+          const resolvedFormat = isMainAct
+            ? (attType || 'onsite')
+            : (act.format === 'both' ? attType : (act.format || (act.type === 'workshop' ? 'onsite' : attType)));
+
           return {
             id: act.id,
             name: act.name,
             type: act.type || 'main',
-            format: act.format,
+            format: resolvedFormat,
             originalPrice: actPrice,
             discount: 0,
             netPrice: actPrice,
@@ -449,11 +454,16 @@ function PaymentContent() {
         rateBadgeEn = isMemberUser ? 'Workshop (Member Rate)' : 'Workshop (Non-Member Rate)';
       }
 
+      const isMainAct = act.type === 'main' || act.id === 'main';
+      const resolvedFormat = isMainAct
+        ? (attendType || 'onsite')
+        : (act.format === 'both' ? attendType : (act.format || (act.type === 'workshop' ? 'onsite' : attendType)));
+
       return {
         id: act.id,
         name: act.name,
         type: act.type || 'main',
-        format: act.format,
+        format: resolvedFormat,
         date: act.date,
         originalPrice: price,
         discount: 0,

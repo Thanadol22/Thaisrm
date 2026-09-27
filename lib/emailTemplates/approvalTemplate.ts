@@ -103,13 +103,19 @@ export function parseMeetingActivities(raw: any, fallbackAmount?: number): Meeti
       if (typeof item === 'string') {
         return { name: item, price: data.length === 1 ? fallbackAmount : undefined };
       }
+      const rawFmt = item.format || item.attendanceType;
+      const isMain = item.type === 'main' || item.id === 'main';
+      const resolvedFormat = (rawFmt === 'both' || isMain)
+        ? (item.attendanceType || (rawFmt !== 'both' ? rawFmt : undefined))
+        : rawFmt;
+
       return {
         id: item.id,
         name: item.name || item.title || item.programNameTh || item.programNameEn || item.id || 'กิจกรรมการประชุม',
         price: item.price !== undefined && Number(item.price) >= 0 ? Number(item.price) : (data.length === 1 ? fallbackAmount : undefined),
         date: item.date || undefined,
         type: item.type || undefined,
-        format: item.format || item.attendanceType || undefined,
+        format: resolvedFormat,
       };
     });
   }
@@ -484,7 +490,13 @@ export function renderAttendeeSponsoredRegistrationEmail(options: AttendeeSponso
             </div>
             <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px;">
               <table width="100%" cellpadding="0" cellspacing="0">
-                ${items.map((item, idx) => `
+                ${items.map((item, idx) => {
+                  const isMain = item.type === 'main' || item.id === 'main';
+                  let itemFormat = item.format || options.format || 'onsite';
+                  if (itemFormat === 'both' || isMain) {
+                    itemFormat = options.format || (item.format && item.format !== 'both' ? item.format : 'onsite');
+                  }
+                  return `
                   <tr style="${idx < items.length - 1 ? 'border-bottom: 1px dashed #e2e8f0;' : ''}">
                     <td style="padding: 7px 0; vertical-align: top;">
                       <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; line-height: 1.4;">
@@ -498,11 +510,12 @@ export function renderAttendeeSponsoredRegistrationEmail(options: AttendeeSponso
                     </td>
                     <td style="padding: 7px 0 7px 12px; text-align: right; vertical-align: top; white-space: nowrap;">
                       <span style="font-size: 12px; font-weight: 700; color: #15803d; background-color: #dcfce7; padding: 2px 8px; border-radius: 4px;">
-                        ${item.format ? item.format : 'สิทธิ์สปอนเซอร์'}
+                        ${itemFormat}
                       </span>
                     </td>
                   </tr>
-                `).join('')}
+                `;
+                }).join('')}
               </table>
             </div>
           </td>

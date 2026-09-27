@@ -627,38 +627,27 @@ export default function AdminPage() {
   };
 
   const handlePrintAttendeeReceipt = (attendee: AttendeeItem) => {
-    const isTestAccount = (name?: string, email?: string, memberNo?: string | null, workplace?: string) => {
-      const n = (name || '').toLowerCase();
-      const e = (email || '').toLowerCase();
-      const m = (memberNo || '').trim();
-      const w = (workplace || '').toLowerCase();
-      return (
-        m === '0000' ||
-        n.includes('ทดสอบ') ||
-        n.includes('test account') ||
-        e.includes('test0000') ||
-        e.includes('test@') ||
-        w.includes('ทดสอบ') ||
-        w.includes('test hospital')
-      );
-    };
+    // 1. Check if an existing receipt is linked to this attendee or slip
+    const existing = receipts.find(
+      (r) =>
+        (r.attendeeId && r.attendeeId === attendee.id) ||
+        (attendee.slipId && r.slipId === attendee.slipId) ||
+        (attendee.ticketCode && r.items?.some((it) => it.subDetails?.some((sd) => sd.includes(attendee.ticketCode)))) ||
+        (r.meetingId === attendee.meetingId && r.payerName === attendee.nameTh)
+    );
 
-    if (isTestAccount(attendee.nameTh, attendee.email, attendee.code, attendee.workplace)) {
-      return;
-    }
-
-    const existing = receipts.find((r) => r.attendeeId === attendee.id);
     if (existing) {
       setGlobalReceipt(existing);
       setIsGlobalReceiptOpen(true);
       return;
     }
 
+    // 2. Generate a new receipt if not found
     const m = meetings.find((mtg) => mtg.id === attendee.meetingId || mtg.titleTh === attendee.meetingTitle);
 
     let amount = 3500;
-    if (attendee.ticketType.includes('Non-Member')) amount = 4500;
-    if (attendee.ticketType.includes('Workshop')) amount = 5000;
+    if (attendee.ticketType.includes('Non-Member') || attendee.memberType?.includes('บุคคลทั่วไป')) amount = 4500;
+    if (attendee.ticketType.includes('Workshop') || attendee.memberType?.includes('Workshop')) amount = 5000;
     if (attendee.ticketType.includes('Day')) amount = 2000;
 
     let maxSeq = DEFAULT_RECEIPT_START_SEQ - 1;
@@ -673,16 +662,19 @@ export default function AdminPage() {
       if (!isNaN(numId) && numId > maxId) maxId = numId;
     });
 
+    const isCompanyAttendee = Boolean(attendee.ticketCode?.startsWith('GRP-')) || Boolean(attendee.workplace && (attendee.workplace.includes('บริษัท') || attendee.workplace.includes('Co.,') || attendee.workplace.includes('Ltd.')));
+    const payerName = attendee.nameTh || 'ผู้ลงทะเบียน';
+
     const newReceipt: ReceiptData = {
       id: String(maxId + 1),
       receiptNo: generateReceiptNo(new Date(), maxSeq + 1),
       receiptDate: new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }),
       purposeText: systemSettings.receipt_tpl1_purpose || 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569',
-      payerType: 'individual',
-      payerName: attendee.nameTh,
-      payerAddressLine1: '',
+      payerType: isCompanyAttendee ? 'company' : 'individual',
+      payerName: isCompanyAttendee ? (attendee.workplace || payerName) : payerName,
+      payerAddressLine1: attendee.workplace || '',
       payerAddressLine2: '',
-      payerPhone: '',
+      payerPhone: attendee.phone || '',
       payerTaxId: '',
       items: [
         {
@@ -690,11 +682,13 @@ export default function AdminPage() {
           itemNumber: 1,
           title: systemSettings.receipt_tpl1_title || 'ค่าลงทะเบียน',
           subDetails: [
-            'การประชุมวิชาการ และการประชุมใหญ่สามัญประจำปี 2569',
-            'ด้านเทคโนโลยีช่วยการเจริญพันธุ์ทางการแพทย์',
+            m ? m.titleTh : 'การประชุมวิชาการประจำปี 2569',
             m ? `จัดขึ้นวันที่ ${m.date}` : 'จัดขึ้นวันที่ 20-22 ตุลาคม 2569',
             m ? `${m.location}` : 'โรงแรมแกรนด์ เซนเตอร์ พอยต์ ลุมพินี กรุงเทพฯ',
-            attendee.nameTh || '',
+            isCompanyAttendee
+              ? (attendee.workplace || payerName)
+              : `ผู้เข้าร่วม: ${attendee.nameTh}${attendee.code ? ` (รหัสสมาชิก ${attendee.code})` : ''}`,
+            !isCompanyAttendee && attendee.ticketCode ? `รหัสตั๋ว: ${attendee.ticketCode}` : '',
           ].filter(Boolean),
           amount: amount,
         },
@@ -712,6 +706,7 @@ export default function AdminPage() {
       associationTaxId: systemSettings.association_tax_id,
       meetingId: attendee.meetingId,
       attendeeId: attendee.id,
+      slipId: attendee.slipId || undefined,
       createdAt: new Date().toISOString().split('T')[0],
       status: 'issued',
     };

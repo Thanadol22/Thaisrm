@@ -64,7 +64,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
   const [extraNote, setExtraNote] = useState<string>('');
   const [isDailyPassMode, setIsDailyPassMode] = useState<boolean>(true);
   const [selectedDailyDate, setSelectedDailyDate] = useState<string>('');
-  const [selectedDailyProgramKey, setSelectedDailyProgramKey] = useState<string>('');
+  const [selectedDailyProgramKeys, setSelectedDailyProgramKeys] = useState<string[]>([]);
   const [dailyPrograms, setDailyPrograms] = useState<DailyProgramInfo[]>([]);
   const [loadingDailyPrograms, setLoadingDailyPrograms] = useState(false);
   const [autoScheduling, setAutoScheduling] = useState(false);
@@ -148,7 +148,10 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
           if (progs.length > 0) {
             const first = progs[0];
             setSelectedDailyDate(first.date);
-            setSelectedDailyProgramKey(first.id || `${first.date}_${first.programName}`);
+            const firstKey = first.id || `${first.date}_${first.programName}`;
+            setSelectedDailyProgramKeys([firstKey]);
+          } else {
+            setSelectedDailyProgramKeys([]);
           }
         }
       } catch (err) {
@@ -168,18 +171,52 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
     });
   }, [dailyPrograms]);
 
-  // Selected Program object helper
-  const selectedProgram = React.useMemo(() => {
-    if (sortedDailyPrograms.length === 0) return null;
-    return (
-      sortedDailyPrograms.find(
-        (p) =>
-          (p.id && p.id === selectedDailyProgramKey) ||
-          `${p.date}_${p.programName}` === selectedDailyProgramKey ||
-          p.date === selectedDailyDate
-      ) || sortedDailyPrograms[0]
-    );
-  }, [sortedDailyPrograms, selectedDailyProgramKey, selectedDailyDate]);
+  // Selected Program objects helper (supports multi-selection)
+  const selectedPrograms = React.useMemo(() => {
+    if (sortedDailyPrograms.length === 0) return [];
+    const filtered = sortedDailyPrograms.filter((p) => {
+      const itemKey = p.id || `${p.date}_${p.programName}`;
+      return selectedDailyProgramKeys.includes(itemKey);
+    });
+    return filtered.length > 0 ? filtered : [sortedDailyPrograms[0]];
+  }, [sortedDailyPrograms, selectedDailyProgramKeys]);
+
+  const handleToggleDailyProgram = (itemKey: string) => {
+    setSelectedDailyProgramKeys((prev) => {
+      if (prev.includes(itemKey)) {
+        if (prev.length === 1) return prev; // Keep at least 1 selected
+        return prev.filter((k) => k !== itemKey);
+      } else {
+        return [...prev, itemKey];
+      }
+    });
+  };
+
+  const handleSelectAllDailyPrograms = () => {
+    if (selectedDailyProgramKeys.length === sortedDailyPrograms.length) {
+      const firstKey = sortedDailyPrograms[0]?.id || `${sortedDailyPrograms[0]?.date}_${sortedDailyPrograms[0]?.programName}`;
+      setSelectedDailyProgramKeys(firstKey ? [firstKey] : []);
+    } else {
+      setSelectedDailyProgramKeys(
+        sortedDailyPrograms.map((p) => p.id || `${p.date}_${p.programName}`)
+      );
+    }
+  };
+
+  // Auto-sync format filter based on selected programs format
+  useEffect(() => {
+    if (isDailyPassMode && selectedPrograms.length > 0) {
+      const allOnsite = selectedPrograms.every((p) => p.format === 'onsite');
+      const allOnline = selectedPrograms.every((p) => p.format === 'online');
+      if (allOnsite) {
+        setFormatFilter('onsite');
+      } else if (allOnline) {
+        setFormatFilter('online');
+      } else {
+        setFormatFilter('all');
+      }
+    }
+  }, [selectedDailyProgramKeys, isDailyPassMode, sortedDailyPrograms]);
 
   // 2. Fetch scheduled queue when opening schedule tab
   const fetchScheduledQueue = async () => {
@@ -218,11 +255,14 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
     }
 
     const meeting = meetings.find((m) => m.meeting_id === selectedMeetingId);
-    const activeProg = selectedProgram;
-    const targetDateToUse = activeProg?.date || selectedDailyDate;
-    const modeDesc = isDailyPassMode
-      ? `แบบ QR รายวัน (วันที่ ${formatThaiDate(targetDateToUse, true)} - ${activeProg?.programName || 'Main Program'})`
-      : 'แบบบัตรทั่วไป';
+    let modeDesc = 'แบบบัตรทั่วไป';
+    if (isDailyPassMode) {
+      if (selectedPrograms.length === 1) {
+        modeDesc = `แบบ QR รายวัน (วันที่ ${formatThaiDate(selectedPrograms[0].date, true)} - ${selectedPrograms[0].programName})`;
+      } else {
+        modeDesc = `แบบ QR รายวัน (${selectedPrograms.length} รายการ: ${selectedPrograms.map((p) => `${p.programName} [${formatThaiDate(p.date, true)}]`).join(', ')})`;
+      }
+    }
 
     const formatDesc = formatFilter === 'online'
       ? ' (เฉพาะผู้ลงทะเบียนออนไลน์)'
@@ -244,8 +284,12 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
           formatFilter,
           extraNote,
           isDailyMode: isDailyPassMode,
-          targetDate: targetDateToUse,
-          programName: activeProg?.programName,
+          targetPrograms: isDailyPassMode ? selectedPrograms.map((p) => ({
+            targetDate: p.date,
+            programName: p.programName,
+          })) : undefined,
+          targetDate: selectedPrograms[0]?.date || selectedDailyDate,
+          programName: selectedPrograms[0]?.programName,
           zoomUrl: zoomUrl.trim() || undefined,
           meetingIdCredentials: meetingIdCredentials.trim() || undefined,
           passcode: passcode.trim() || undefined,
@@ -310,7 +354,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
   // 2. Preview Ticket Email (Supports both Onsite QR and Online Access Pass)
   const handlePreviewTicket = (previewType?: 'onsite' | 'online') => {
     const meeting = meetings.find((m) => m.meeting_id === selectedMeetingId);
-    const activeProg = selectedProgram;
+    const activeProg = selectedPrograms[0];
     const targetDateToUse = activeProg?.date || selectedDailyDate;
     const dateDisplay = isDailyPassMode
       ? `ประจำวันที่ ${formatThaiDate(targetDateToUse, true) || targetDateToUse} (${activeProg?.programName || 'Main Program'})`
@@ -348,7 +392,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
         extraNote: extraNote || (isDailyPassMode ? `บัตรสำหรับเข้าร่วม: ${activeProg?.programName || 'Main Program'} • QR Code นี้ใช้ได้เฉพาะวันนี้ 1 ครั้งเท่านั้น` : 'กรุณาแสดง QR Code นี้แก่เจ้าหน้าที่ ณ จุดลงทะเบียนหน้างาน'),
       });
 
-      setPreviewSubject(`[ตัวอย่าง - สำหรับผู้เข้าชม Onsite] บัตรเข้างาน ${meeting?.meeting_name || 'TSRM 2026'}${isDailyPassMode ? ` (${activeProg?.programName || 'Daily Pass'})` : ''}`);
+      setPreviewSubject(`[ตัวอย่าง - สำหรับผู้เข้าชม Onsite] บัตรเข้างาน ${meeting?.meeting_name || 'TSRM 2026'}${isDailyPassMode ? ` (${activeProg?.programName || 'Daily Pass'}${selectedPrograms.length > 1 ? ` - 1 จาก ${selectedPrograms.length} รายการที่เลือก` : ''})` : ''}`);
       setPreviewHtml(sampleHtml);
     }
 
@@ -768,14 +812,28 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
 
               {isDailyPassMode && (
                 <div className="pt-2 border-t border-slate-200/60 space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                      <span>เลือกรายการหลักสูตร / วันที่ที่ต้องการส่ง QR Code:</span>
-                    </label>
-                    <span className="text-[11px] text-slate-500 font-medium">
-                      (เรียงตามลำดับวันที่เริ่มก่อน ➡️ หลัง)
-                    </span>
+                      <label className="text-xs font-bold text-slate-700">
+                        เลือกรายการหลักสูตร / วันที่ที่ต้องการส่ง QR Code:
+                      </label>
+                      <span className="text-[11px] font-black text-[#0026b3] bg-blue-100/90 px-2.5 py-0.5 rounded-full border border-blue-200 shadow-2xs">
+                        เลือกแล้ว {selectedPrograms.length} จาก {sortedDailyPrograms.length} รายการ
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleSelectAllDailyPrograms}
+                        className="text-xs font-black text-[#0026b3] hover:text-blue-900 hover:underline cursor-pointer flex items-center gap-1 transition"
+                      >
+                        {selectedDailyProgramKeys.length === sortedDailyPrograms.length ? 'ยกเลิกเลือกทั้งหมด' : 'เลือกทั้งหมด'}
+                      </button>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        (เรียงตามลำดับวันที่)
+                      </span>
+                    </div>
                   </div>
 
                   {loadingDailyPrograms ? (
@@ -789,20 +847,15 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
                     </div>
                   ) : sortedDailyPrograms.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      {sortedDailyPrograms.map((prog, idx) => {
+                      {sortedDailyPrograms.map((prog) => {
                         const itemKey = prog.id || `${prog.date}_${prog.programName}`;
-                        const isSelected =
-                          selectedDailyProgramKey === itemKey ||
-                          (!selectedDailyProgramKey && selectedDailyDate === prog.date && idx === 0);
+                        const isSelected = selectedDailyProgramKeys.includes(itemKey);
 
                         return (
                           <button
                             key={itemKey}
                             type="button"
-                            onClick={() => {
-                              setSelectedDailyProgramKey(itemKey);
-                              setSelectedDailyDate(prog.date);
-                            }}
+                            onClick={() => handleToggleDailyProgram(itemKey)}
                             className={`p-3.5 rounded-2xl text-left border transition-all cursor-pointer relative flex flex-col justify-between gap-2.5 group ${
                               isSelected
                                 ? 'bg-gradient-to-br from-blue-50/90 to-indigo-50/70 border-2 border-[#0026b3] shadow-md shadow-blue-900/10 ring-2 ring-[#0026b3]/20'
@@ -840,7 +893,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
                               </div>
                             </div>
 
-                            {/* Bottom: Format / Price & Radio Check indicator */}
+                            {/* Bottom: Format / Price & Checkbox indicator */}
                             <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/50 mt-auto">
                               <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-bold">
                                 <span>
@@ -853,12 +906,14 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
 
                               <div className="flex items-center gap-1.5">
                                 {isSelected ? (
-                                  <div className="flex items-center gap-1 text-[11px] font-black text-[#0026b3]">
-                                    <CheckCircle2 className="w-4 h-4 text-[#0026b3]" />
+                                  <div className="flex items-center gap-1.5 text-[11px] font-black text-[#0026b3]">
+                                    <div className="w-4 h-4 rounded-md bg-[#0026b3] text-white flex items-center justify-center shadow-2xs">
+                                      <Check className="w-3 h-3 stroke-[3]" />
+                                    </div>
                                     <span>เลือกแล้ว</span>
                                   </div>
                                 ) : (
-                                  <div className="w-4 h-4 rounded-full border-2 border-slate-300 group-hover:border-blue-400"></div>
+                                  <div className="w-4 h-4 rounded-md border-2 border-slate-300 group-hover:border-blue-400 transition-colors"></div>
                                 )}
                               </div>
                             </div>
@@ -893,7 +948,11 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
                   <span>รูปแบบการเข้าร่วม:</span>
                 </span>
                 <span className="text-[11px] text-slate-500 font-medium">
-                  {formatFilter === 'online' ? '🔵 ส่งเฉพาะผู้ลงทะเบียนออนไลน์' : (formatFilter === 'onsite' ? '🟢 ส่งเฉพาะผู้ลงทะเบียน Onsite' : '✨ ส่งตามรูปแบบที่ลงทะเบียนจริงอัตโนมัติ')}
+                  {formatFilter === 'online'
+                    ? '🔵 ส่งเฉพาะผู้ลงทะเบียนออนไลน์ (ซิงค์อัตโนมัติ)'
+                    : (formatFilter === 'onsite'
+                    ? '🟢 ส่งเฉพาะผู้ลงทะเบียน Onsite (ซิงค์อัตโนมัติ)'
+                    : '✨ ส่งตามรูปแบบที่ลงทะเบียนจริงอัตโนมัติ')}
                 </span>
               </label>
 

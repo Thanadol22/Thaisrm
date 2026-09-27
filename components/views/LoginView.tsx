@@ -955,12 +955,16 @@ export function LoginView({
               price = isMemberUser ? mPrice : nonMPrice;
             }
 
+            const chosenFormat = isMain
+              ? (att.attendanceType || 'onsite')
+              : (a.format === 'both' ? (att.attendanceType || 'onsite') : (a.format || (a.type === 'workshop' ? 'onsite' : (att.attendanceType || 'onsite'))));
+
             return {
               id: a.id,
               name: a.name,
               type: a.type,
               date: a.date,
-              format: a.format || (a.type === 'workshop' ? 'onsite' : 'both'),
+              format: chosenFormat,
               price,
               memberPrice: a.memberPrice,
               nonMemberPrice: a.nonMemberPrice,

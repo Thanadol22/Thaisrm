@@ -59,18 +59,14 @@ export async function POST(req: NextRequest) {
 
     // 1.5 Try Daily Dynamic QR Scan first if code is daily token or matches daily checkin
     const dailyResult = await processDailyQrScan(rawCode, targetMeetingId);
-    if (dailyResult.success || dailyResult.status === 'duplicate' || (dailyResult.status === 'invalid' && dailyResult.message.includes('ไม่ตรงกับวันที่'))) {
-      const todayBangkok = formatBangkokDate();
-      const todayDateObj = new Date(`${todayBangkok}T00:00:00.000Z`);
-
+    if (dailyResult.success || dailyResult.status === 'duplicate') {
       const [totalCount, checkedInCount] = await Promise.all([
         prisma.meeting_daily_checkins.count({
-          where: { meeting_id: targetMeetingId, checkin_date: todayDateObj },
+          where: { meeting_id: targetMeetingId },
         }).then(async (c) => c > 0 ? c : prisma.meeting_attendances.count({ where: { meeting_id: targetMeetingId } })),
         prisma.meeting_daily_checkins.count({
           where: {
             meeting_id: targetMeetingId,
-            checkin_date: todayDateObj,
             OR: [{ checkin_status: 'attended' }, { checkin_time: { not: null } }],
           },
         }).then(async (c) => c > 0 ? c : prisma.meeting_attendances.count({
@@ -438,7 +434,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Staff Check-in Error:', error);
     return NextResponse.json(
-      { success: false, error: 'เกิดข้อผิดพลาดในการประมวลผลการสแกน' },
+      { success: false, error: error?.message || 'เกิดข้อผิดพลาดในการประมวลผลการสแกน', stack: error?.stack },
       { status: 500 }
     );
   }

@@ -11,6 +11,7 @@ import {
 import { createMember } from '@/lib/services/memberService';
 import { getSystemSettings } from '@/lib/services/settingsService';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
+import { createReceiptForApprovedSlip } from '@/lib/services/receiptService';
 
 // GET: Fetch all payment slips for Admin Review
 export async function GET(request: NextRequest) {
@@ -1586,15 +1587,21 @@ export async function POST(request: NextRequest) {
                 // Parse individual attendee activities
                 let attItems: any[] = [];
                 if (Array.isArray(att.selectedActivities) && att.selectedActivities.length > 0) {
-                  attItems = att.selectedActivities.map((a: any) => ({
-                    name: a.name || a.title || a.programNameTh || a.programNameEn || 'กิจกรรมการประชุม',
-                    date: a.date || undefined,
-                    format: a.format || a.attendanceType || undefined,
-                  }));
+                  attItems = att.selectedActivities.map((a: any) => {
+                    const isMain = a.type === 'main' || a.id === 'main';
+                    const resolvedFormat = (isMain || a.format === 'both')
+                      ? (att.attendanceType || (a.format && a.format !== 'both' ? a.format : 'onsite'))
+                      : (a.format || a.attendanceType || (a.type === 'workshop' ? 'onsite' : 'onsite'));
+                    return {
+                      name: a.name || a.title || a.programNameTh || a.programNameEn || 'กิจกรรมการประชุม',
+                      date: a.date || undefined,
+                      format: resolvedFormat,
+                    };
+                  });
                 } else if (att.programNameTh || att.programNameEn) {
                   attItems = [{
                     name: att.programNameTh || att.programNameEn,
-                    format: att.attendanceType || undefined,
+                    format: att.attendanceType || 'onsite',
                   }];
                 }
 
@@ -1635,6 +1642,11 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+
+      // 6. Auto-generate / link receipt in receipts table for this approved transaction
+      await createReceiptForApprovedSlip(slipId).catch((err) =>
+        console.error('Failed to auto-generate receipt on approval:', err)
+      );
 
       return NextResponse.json({
         success: true,

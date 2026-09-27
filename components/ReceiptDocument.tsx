@@ -154,17 +154,26 @@ export function ReceiptDocument({ data, className = '', isPrintOnly = false }: R
                 </div>
                 {item.subDetails && item.subDetails.length > 0 && (
                   <div className="pl-6 space-y-0.5 text-[14.5px]">
-                    {item.subDetails.map((line, subIdx) => {
-                      const isPayerName = Boolean(data.payerName && line.trim() === data.payerName.trim());
-                      return (
-                        <p
-                          key={subIdx}
-                          className={isPayerName ? 'font-bold text-slate-950 pt-0.5' : 'text-black'}
-                        >
-                          {line}
-                        </p>
-                      );
-                    })}
+                    {item.subDetails
+                      .filter((line) => {
+                        const trimmed = (line || '').trim();
+                        if (!trimmed) return false;
+                        if (data.payerType === 'company' && (/^\d+(\.|\))\s*$/.test(trimmed) || /^\d+\.?$/.test(trimmed))) {
+                          return false;
+                        }
+                        return true;
+                      })
+                      .map((line, subIdx) => {
+                        const isPayerName = Boolean(data.payerName && line.trim() === data.payerName.trim());
+                        return (
+                          <p
+                            key={subIdx}
+                            className={isPayerName ? 'font-bold text-slate-950 pt-0.5' : 'text-black'}
+                          >
+                            {line}
+                          </p>
+                        );
+                      })}
                   </div>
                 )}
               </div>

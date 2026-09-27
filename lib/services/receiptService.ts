@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import { ReceiptData, ReceiptItemLine } from '@/types/receipt';
+import { generateReceiptNo, DEFAULT_RECEIPT_START_SEQ } from '@/lib/receiptNumber';
 
 interface DbReceiptRow {
   id: string;
@@ -88,10 +89,270 @@ function mapRowToReceiptData(row: DbReceiptRow): ReceiptData {
 }
 
 /**
+ * Auto-sync approved payment slips into the receipts table so that all approved payments
+ * have an associated receipt record with complete relationship.
+ */
+export async function syncApprovedSlipsToReceipts(): Promise<void> {
+  try {
+    const [existingReceipts, approvedSlips, meetings, dbSettings] = await Promise.all([
+      prisma.$queryRawUnsafe<DbReceiptRow[]>(`SELECT * FROM receipts`),
+      prisma.$queryRawUnsafe<any[]>(`
+        SELECT s.*, 
+               m.full_name_th as member_full_name_th, 
+               m.address as member_address, 
+               m.workplace as member_workplace,
+               mtg.meeting_name, 
+               mtg.meeting_date, 
+               mtg.location as meeting_location,
+               mtg.start_date as meeting_start_date,
+               mtg.end_date as meeting_end_date
+        FROM payment_slips s
+        LEFT JOIN members m ON s.member_no = m.member_no
+        LEFT JOIN meetings mtg ON s.meeting_id = mtg.meeting_id
+        WHERE s.status = 'approved'
+        ORDER BY s.created_at ASC
+      `),
+      prisma.$queryRawUnsafe<any[]>(`SELECT * FROM meetings`),
+      prisma.$queryRawUnsafe<any[]>(`SELECT key, value FROM system_settings`),
+    ]);
+
+    if (!Array.isArray(approvedSlips) || approvedSlips.length === 0) {
+      return;
+    }
+
+    const settingsMap: Record<string, string> = {};
+    if (Array.isArray(dbSettings)) {
+      dbSettings.forEach((s) => {
+        settingsMap[s.key] = s.value;
+      });
+    }
+
+    const existingSlipIds = new Set<string>();
+    let maxSeq = DEFAULT_RECEIPT_START_SEQ - 1;
+    let maxId = 0;
+
+    if (Array.isArray(existingReceipts)) {
+      for (const r of existingReceipts) {
+        if (r.slip_id) existingSlipIds.add(r.slip_id);
+        const match = r.receipt_no?.match(/-(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxSeq) maxSeq = num;
+        }
+        const numId = parseInt(r.id, 10);
+        if (!isNaN(numId) && numId > maxId) maxId = numId;
+      }
+    }
+
+    for (const slip of approvedSlips) {
+      let parsedAct: any = slip.selected_activities;
+      if (typeof parsedAct === 'string') {
+        try {
+          parsedAct = JSON.parse(parsedAct);
+        } catch {
+          parsedAct = null;
+        }
+      }
+
+      const isGroup =
+        Boolean(parsedAct?.isGroup) ||
+        parsedAct?.type === 'membership_group_registration' ||
+        parsedAct?.type === 'conference_group_registration' ||
+        slip.ticket_code?.startsWith('GRP-') ||
+        slip.ticket_code?.startsWith('MEMGRP');
+
+      const isMembership =
+        parsedAct?.type === 'membership_registration' ||
+        parsedAct?.type === 'membership_group_registration' ||
+        parsedAct?.isMembership;
+
+      const groupPayload = parsedAct?.groupPayload || (isGroup && parsedAct?.applicants ? parsedAct : null) || (isGroup && parsedAct?.attendees ? parsedAct : null);
+
+      const companyName = groupPayload?.companyName || slip.guest_workplace || slip.member_workplace || '';
+      const payerType: 'company' | 'individual' = (isGroup && companyName) ? 'company' : 'individual';
+      const payerName = payerType === 'company'
+        ? companyName
+        : (slip.member_full_name_th || slip.guest_name || 'ผู้ลงทะเบียน');
+
+      const payerAddressLine1 = payerType === 'company'
+        ? (groupPayload?.taxInvoiceAddress || groupPayload?.companyAddress || slip.guest_workplace || '')
+        : (slip.member_address || slip.member_workplace || slip.guest_workplace || '');
+
+      const payerTaxId = groupPayload?.taxId || '';
+
+      let meetingDateStr = '';
+      if (slip.meeting_start_date && slip.meeting_end_date) {
+        const start = new Date(slip.meeting_start_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+        const end = new Date(slip.meeting_end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+        meetingDateStr = start === end ? `จัดขึ้นวันที่ ${start}` : `จัดขึ้นวันที่ ${start} - ${end}`;
+      } else if (slip.meeting_date) {
+        meetingDateStr = `จัดขึ้นวันที่ ${new Date(slip.meeting_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+      }
+
+      const meetingLocationStr = slip.meeting_location ? `${slip.meeting_location}` : '';
+
+      const subDetails: string[] = [];
+      if (isMembership) {
+        subDetails.push(settingsMap['association_name_th'] || 'สมาคมเวชศาสตร์การเจริญพันธุ์ไทย');
+        if (payerType === 'company') {
+          subDetails.push(companyName || payerName);
+        } else {
+          subDetails.push(payerName);
+          if (slip.member_no) subDetails.push(`รหัสสมาชิก: ${slip.member_no}`);
+        }
+      } else {
+        if (slip.meeting_name) subDetails.push(slip.meeting_name);
+        if (meetingDateStr) subDetails.push(meetingDateStr);
+        if (meetingLocationStr) subDetails.push(meetingLocationStr);
+        if (payerType === 'company') {
+          subDetails.push(companyName || payerName);
+        } else {
+          subDetails.push(payerName);
+        }
+      }
+
+      const itemTitle = isMembership
+        ? (payerType === 'company' ? 'ค่าสมัครสมาชิกแบบกลุ่ม' : (settingsMap['receipt_tpl2_title'] || 'ค่าสมัครสมาชิกสมาคมฯ'))
+        : (payerType === 'company' ? 'ค่าลงทะเบียนประชุมแบบกลุ่ม' : (settingsMap['receipt_tpl1_title'] || 'ค่าลงทะเบียนเข้าร่วมประชุมวิชาการ'));
+
+      const purposeText = isMembership
+        ? (settingsMap['receipt_tpl2_purpose'] || 'ได้รับเงินค่าสมัครสมาชิกสมาคมฯ ประจำปี 2569')
+        : (settingsMap['receipt_tpl1_purpose'] || 'ได้รับเงินค่าลงทะเบียน ประจำปี 2569');
+
+      if (existingSlipIds.has(slip.slip_id)) {
+        const existingRow = existingReceipts.find((r) => r.slip_id === slip.slip_id);
+        if (existingRow) {
+          let curItems: ReceiptItemLine[] = [];
+          if (Array.isArray(existingRow.items)) curItems = existingRow.items;
+          else if (typeof existingRow.items === 'string') {
+            try { curItems = JSON.parse(existingRow.items); } catch { curItems = []; }
+          }
+          
+          if (curItems.length === 0) {
+            // Re-generate item if empty
+            const generatedItems = [
+              {
+                id: `item-${existingRow.id}-1`,
+                itemNumber: 1,
+                title: itemTitle,
+                subDetails: subDetails.filter(Boolean),
+                amount: Number(slip.amount) || Number(existingRow.total_amount) || 0,
+              },
+            ];
+            await prisma.$executeRawUnsafe(
+              `UPDATE receipts SET items = $1::jsonb, payer_name = $2, purpose_text = $3, updated_at = NOW() WHERE id = $4`,
+              JSON.stringify(generatedItems),
+              payerName,
+              purposeText,
+              existingRow.id
+            );
+          } else if (payerType === 'company' || isGroup) {
+            const updatedItems = curItems.map((item) => {
+              const cleanedSubDetails = (item.subDetails || []).filter((line) => {
+                const trimmed = (line || '').trim();
+                if (!trimmed) return false;
+                if (/^\d+(\.|\))\s*/.test(trimmed) || /^\d+\.?$/.test(trimmed)) return false;
+                return true;
+              });
+              if (!cleanedSubDetails.includes(companyName) && !cleanedSubDetails.includes(payerName)) {
+                cleanedSubDetails.push(companyName || payerName);
+              }
+              return { 
+                ...item, 
+                title: itemTitle || item.title,
+                subDetails: cleanedSubDetails.filter(Boolean) 
+              };
+            });
+            await prisma.$executeRawUnsafe(
+              `UPDATE receipts SET items = $1::jsonb, payer_name = $2, purpose_text = $3, updated_at = NOW() WHERE id = $4`,
+              JSON.stringify(updatedItems),
+              payerName,
+              purposeText,
+              existingRow.id
+            );
+          }
+        }
+        continue;
+      }
+
+      maxSeq += 1;
+      maxId += 1;
+
+      const receiptDate = slip.transfer_date || new Date(slip.created_at || Date.now()).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+
+      const newReceiptData: ReceiptData = {
+        id: String(maxId),
+        receiptNo: generateReceiptNo(receiptDate, maxSeq),
+        receiptDate,
+        purposeText,
+        payerType,
+        payerName,
+        payerAddressLine1,
+        payerAddressLine2: '',
+        payerPhone: slip.guest_phone || undefined,
+        payerTaxId: payerTaxId || undefined,
+        items: [
+          {
+            id: `item-${maxId}-1`,
+            itemNumber: 1,
+            title: itemTitle,
+            subDetails: subDetails.filter(Boolean),
+            amount: Number(slip.amount) || 0,
+          },
+        ],
+        totalAmount: Number(slip.amount) || 0,
+        payerSignerRole: 'ผู้จ่ายเงิน',
+        authorizedSignerName: settingsMap['receipt_authorized_signer'] || 'แพทย์หญิงพิมพกา ชวนะเวสน์',
+        authorizedSignerRole: settingsMap['receipt_authorized_role'] || 'เหรัญญิก / ผู้รับเงิน',
+        preparedByName: settingsMap['receipt_prepared_by'] || 'ปณตพร ภวภูตานนท์ ณ มหาสารคาม',
+        preparedByRole: settingsMap['receipt_prepared_role'] || 'ผู้จัดทำ',
+        associationNameTh: settingsMap['association_name_th'],
+        associationNameEn: settingsMap['association_name_en'],
+        associationAddress: settingsMap['association_address'],
+        associationContact: settingsMap['association_contact'],
+        associationTaxId: settingsMap['association_tax_id'],
+        meetingId: slip.meeting_id || undefined,
+        slipId: slip.slip_id,
+        createdAt: slip.created_at ? new Date(slip.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        status: 'issued',
+      };
+
+      await saveReceipt(newReceiptData);
+      existingSlipIds.add(slip.slip_id);
+    }
+  } catch (syncErr) {
+    console.error('Error syncing approved slips to receipts:', syncErr);
+  }
+}
+
+/**
+ * Create or sync receipt for a specific approved slip immediately.
+ */
+export async function createReceiptForApprovedSlip(slipId: string): Promise<ReceiptData | null> {
+  try {
+    await syncApprovedSlipsToReceipts();
+    const rows = await prisma.$queryRawUnsafe<DbReceiptRow[]>(
+      `SELECT * FROM receipts WHERE slip_id = $1 LIMIT 1`,
+      slipId
+    );
+    if (Array.isArray(rows) && rows.length > 0) {
+      return mapRowToReceiptData(rows[0]);
+    }
+    return null;
+  } catch (error) {
+    console.error(`Error in createReceiptForApprovedSlip (${slipId}):`, error);
+    return null;
+  }
+}
+
+/**
  * Get all receipts from the database, ordered by created_at DESC
  */
 export async function getAllReceipts(): Promise<ReceiptData[]> {
   try {
+    // Ensure all approved slips have a corresponding receipt
+    await syncApprovedSlipsToReceipts();
+
     const rows = await prisma.$queryRawUnsafe<DbReceiptRow[]>(
       `SELECT * FROM receipts ORDER BY created_at DESC`
     );

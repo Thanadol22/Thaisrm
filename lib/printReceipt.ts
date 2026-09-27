@@ -37,6 +37,14 @@ export function generateReceiptHtml(data: ReceiptData): string {
   const itemsHtml = (data.items || [])
     .map((item, index) => {
       const subDetailsHtml = (item.subDetails || [])
+        .filter((line) => {
+          const trimmed = (line || '').trim();
+          if (!trimmed) return false;
+          if (data.payerType === 'company' && (/^\d+(\.|\))\s*$/.test(trimmed) || /^\d+\.?$/.test(trimmed))) {
+            return false;
+          }
+          return true;
+        })
         .map((line) => {
           const isPayerName = Boolean(data.payerName && line.trim() === data.payerName.trim());
           return `<div style="font-size: 14px; color: ${isPayerName ? '#000' : '#222'}; font-weight: ${isPayerName ? 'bold' : 'normal'}; padding-left: 24px; line-height: 1.45;">${escapeHtml(line)}</div>`;

@@ -303,15 +303,21 @@ export async function POST(
             if (attEmail) {
               let attItems: any[] = [];
               if (Array.isArray(att.selectedActivities) && att.selectedActivities.length > 0) {
-                attItems = att.selectedActivities.map((a: any) => ({
-                  name: a.name || a.title || a.programNameTh || a.programNameEn || 'กิจกรรมการประชุม',
-                  date: a.date || undefined,
-                  format: a.format || a.attendanceType || undefined,
-                }));
+                attItems = att.selectedActivities.map((a: any) => {
+                  const isMain = a.type === 'main' || a.id === 'main';
+                  const resolvedFormat = (isMain || a.format === 'both')
+                    ? (att.attendanceType || (a.format && a.format !== 'both' ? a.format : 'onsite'))
+                    : (a.format || a.attendanceType || (a.type === 'workshop' ? 'onsite' : 'onsite'));
+                  return {
+                    name: a.name || a.title || a.programNameTh || a.programNameEn || 'กิจกรรมการประชุม',
+                    date: a.date || undefined,
+                    format: resolvedFormat,
+                  };
+                });
               } else if (att.programNameTh || att.programNameEn) {
                 attItems = [{
                   name: att.programNameTh || att.programNameEn,
-                  format: att.attendanceType || undefined,
+                  format: att.attendanceType || 'onsite',
                 }];
               }
 
