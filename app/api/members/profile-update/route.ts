@@ -46,38 +46,27 @@ export async function POST(req: NextRequest) {
       educations,
     } = body;
 
-    if (!member_no || !email) {
+    if (!email) {
       return NextResponse.json(
-        { success: false, message: 'กรุณาระบุรหัสสมาชิกและอีเมลให้ครบถ้วน' },
+        { success: false, message: 'กรุณาระบุอีเมล' },
         { status: 400 }
       );
     }
 
     const cleanEmail = String(email).trim().toLowerCase();
 
-    // ─── Step 1: ตรวจสอบข้อมูลสมาชิกในระบบ ──────────────────────────────────
-    // จัดรูปแบบเลขสมาชิก
-    let formattedMemberNo = String(member_no).trim();
-    if (/^\d+$/.test(formattedMemberNo) && formattedMemberNo.length < 4) {
-      formattedMemberNo = formattedMemberNo.padStart(4, '0');
-    }
-
-    // ตรวจสอบสมาชิกและ email ตรงกัน
+    // ─── Step 1: ตรวจสอบข้อมูลสมาชิกในระบบจากอีเมล ──────────────────────────
     const memberCheck = await prisma.member.findFirst({
       where: {
-        OR: [
-          { member_no: formattedMemberNo },
-          { member_no: String(member_no).trim() },
-        ],
+        email: { equals: cleanEmail, mode: 'insensitive' },
       },
       select: { member_no: true, email: true },
     });
 
-    if (!memberCheck || !memberCheck.email ||
-        memberCheck.email.trim().toLowerCase() !== cleanEmail) {
+    if (!memberCheck || !memberCheck.email) {
       return NextResponse.json(
-        { success: false, message: 'อีเมลไม่ตรงกับข้อมูลสมาชิกในระบบ' },
-        { status: 401 }
+        { success: false, message: 'ไม่พบข้อมูลสมาชิกที่ผูกกับอีเมลนี้ในระบบ' },
+        { status: 404 }
       );
     }
 
