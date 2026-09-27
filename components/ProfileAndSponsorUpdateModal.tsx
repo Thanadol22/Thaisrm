@@ -1620,129 +1620,47 @@ export function ProfileAndSponsorUpdateModal({
                                 </div>
                               )}
 
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {/* ยอดเงิน */}
-                                <div>
-                                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                                    ยอดเงินที่โอน (บาท) <span className="text-red-500">*</span>
-                                  </label>
+                              <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1">
+                                  แนบรูปภาพสลิปโอนเงิน (JPG, PNG)
+                                  <span className="ml-1 text-red-500 font-extrabold">* บังคับแนบ</span>
+                                </label>
+                                <div
+                                  className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition relative ${
+                                    form.file ? 'border-emerald-400 bg-emerald-50/30' : 'border-blue-300 hover:border-blue-500 bg-white'
+                                  }`}
+                                >
                                   <input
-                                    type="number"
-                                    min={0}
-                                    value={form.amount}
-                                    onChange={(e) => updateSlipForm(key, { amount: Number(e.target.value) })}
-                                    className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 bg-white font-bold text-slate-800"
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      const f = e.target.files?.[0];
+                                      if (f) {
+                                        updateSlipForm(key, {
+                                          file: f,
+                                          preview: URL.createObjectURL(f),
+                                        });
+                                      }
+                                    }}
+                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                                     required
                                   />
-                                </div>
-
-                                {/* ธนาคารที่โอน */}
-                                <div>
-                                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                                    ธนาคารที่โอน <span className="text-red-500">*</span>
-                                  </label>
-                                  <select
-                                    value={form.bank}
-                                    onChange={(e) => updateSlipForm(key, { bank: e.target.value })}
-                                    className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 bg-white font-medium"
-                                  >
-                                    <option value="Kasikorn (KBANK)">ธนาคารกสิกรไทย (KBANK)</option>
-                                    <option value="Siam Commercial (SCB)">ธนาคารไทยพาณิชย์ (SCB)</option>
-                                    <option value="Bangkok Bank (BBL)">ธนาคารกรุงเทพ (BBL)</option>
-                                    <option value="Krungthai (KTB)">ธนาคารกรุงไทย (KTB)</option>
-                                    <option value="TTB">ธนาคารทหารไทยธนชาต (TTB)</option>
-                                    <option value="PromptPay">พร้อมเพย์ (PromptPay)</option>
-                                    <option value="Other">อื่นๆ</option>
-                                  </select>
-                                </div>
-
-                                {/* วันที่โอน */}
-                                <div>
-                                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                                    วันที่โอนเงิน <span className="text-red-500">*</span>
-                                  </label>
-                                  <ThaiDatePicker
-                                    value={form.date}
-                                    onChange={(v) => updateSlipForm(key, { date: v })}
-                                    outputFormat="iso"
-                                    placeholder="เลือกวันที่โอนเงิน"
-                                    required
-                                    className="w-full"
-                                  />
-                                </div>
-
-                                {/* เวลาที่โอน */}
-                                <div>
-                                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                                    เวลาที่โอน (เช่น 14:30) <span className="text-red-500">*</span>
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={form.time}
-                                    onChange={(e) => updateSlipForm(key, { time: e.target.value })}
-                                    placeholder="14:30"
-                                    className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 bg-white"
-                                    required
-                                  />
-                                </div>
-
-                                {/* เลขที่อ้างอิง */}
-                                <div className="sm:col-span-2">
-                                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                                    เลขอ้างอิง / หมายเหตุ (ถ้ามี)
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={form.ref}
-                                    onChange={(e) => updateSlipForm(key, { ref: e.target.value })}
-                                    placeholder="เช่น รหัสธุรกรรม หรือ เลขที่ใบเสนอราคา"
-                                    className="w-full text-xs sm:text-sm py-2 px-3 rounded-xl border border-slate-300 focus:border-blue-500 bg-white"
-                                  />
-                                </div>
-
-                                {/* แนบไฟล์รูปภาพสลิป — บังคับ */}
-                                <div className="sm:col-span-2">
-                                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                                    แนบรูปภาพสลิปโอนเงิน (JPG, PNG)
-                                    <span className="ml-1 text-red-500 font-extrabold">* บังคับแนบ</span>
-                                  </label>
-                                  <div
-                                    className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition relative ${
-                                      form.file ? 'border-emerald-400 bg-emerald-50/30' : 'border-blue-300 hover:border-blue-500 bg-white'
-                                    }`}
-                                  >
-                                    <input
-                                      type="file"
-                                      accept="image/*"
-                                      onChange={(e) => {
-                                        const f = e.target.files?.[0];
-                                        if (f) {
-                                          updateSlipForm(key, {
-                                            file: f,
-                                            preview: URL.createObjectURL(f),
-                                          });
-                                        }
-                                      }}
-                                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                                      required
-                                    />
-                                    {form.preview ? (
-                                      <div className="flex flex-col items-center gap-2">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={form.preview} alt="Slip preview" className="max-h-40 rounded-lg object-contain border shadow-sm" />
-                                        <span className="text-xs text-blue-600 font-bold flex items-center gap-1">
-                                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                          ไฟล์สลิปพร้อมส่ง — คลิกเพื่อเปลี่ยนรูปภาพ
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <div className="flex flex-col items-center gap-1.5 text-slate-500">
-                                        <Upload className="w-7 h-7 text-blue-500" />
-                                        <span className="text-xs font-bold text-slate-700">คลิกหรือลากไฟล์ภาพสลิปโอนเงินมาวางที่นี่</span>
-                                        <span className="text-[11px] text-slate-400">รองรับไฟล์ JPG, PNG ขนาดไม่เกิน 10MB</span>
-                                      </div>
-                                    )}
-                                  </div>
+                                  {form.preview ? (
+                                    <div className="flex flex-col items-center gap-2">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={form.preview} alt="Slip preview" className="max-h-48 rounded-lg object-contain border shadow-sm" />
+                                      <span className="text-xs text-blue-600 font-bold flex items-center gap-1">
+                                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                        ไฟล์สลิปพร้อมส่ง — คลิกเพื่อเปลี่ยนรูปภาพ
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex flex-col items-center gap-1.5 text-slate-500">
+                                      <Upload className="w-8 h-8 text-blue-500" />
+                                      <span className="text-xs font-bold text-slate-700">คลิกหรือลากไฟล์ภาพสลิปโอนเงินมาวางที่นี่</span>
+                                      <span className="text-[11px] text-slate-400">รองรับไฟล์ JPG, PNG ขนาดไม่เกิน 10MB</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
 

@@ -7,18 +7,19 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       sponsorId,
-      sponsorName,
       contactEmail,
       meetingId,
+      slip_url,
+      targetSlipId,
+      targetTicketCode,
+      sessionToken,
+      // legacy fields (ไม่บังคับใช้แล้ว แต่รับไว้เผื่อ fallback สร้างรายการใหม่)
+      sponsorName,
       amount,
       bank,
       transfer_date,
       transfer_time,
-      slip_url,
       ref_no,
-      targetSlipId,
-      targetTicketCode,
-      sessionToken,
     } = body;
 
     if (!sponsorId || !contactEmail || !slip_url) {
@@ -55,23 +56,19 @@ export async function POST(req: NextRequest) {
     let updatedOrCreatedSlip: any = null;
 
     if (targetRecord) {
-      // อัปเดตรายการเดิมด้วยสลิปจริง
+      // อัปเดตรายการเดิม — เก็บแค่ slip_url ใหม่ + รีเซ็ตสถานะเป็น pending
+      // preserve ค่าเดิมทั้งหมด (amount, bank, date, time) จาก DB โดยไม่ต้องรับจาก frontend
       updatedOrCreatedSlip = await prisma.payment_slips.update({
         where: { id: targetRecord.id },
         data: {
           slip_url: slip_url,
-          bank: bank || targetRecord.bank || 'Kasikorn (KBANK)',
-          amount: Number(amount) > 0 ? Number(amount) : targetRecord.amount,
-          transfer_date: transfer_date || targetRecord.transfer_date,
-          transfer_time: transfer_time || targetRecord.transfer_time,
-          ref_no: ref_no || targetRecord.ref_no,
           status: 'pending',
           rejection_reason: null,
           updated_at: new Date(),
         },
       });
     } else {
-      // สร้างรายการสลิปใหม่
+      // fallback: สร้างรายการสลิปใหม่ (กรณีไม่พบรายการเดิมใน DB)
       const newSlipId = `SLIP-SPON-${Date.now().toString(36).toUpperCase()}`;
       if (prismaAny.payment_slips) {
         updatedOrCreatedSlip = await prismaAny.payment_slips.create({
