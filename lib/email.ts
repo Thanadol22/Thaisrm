@@ -247,6 +247,7 @@ export interface SendMembershipApprovedParams {
   memberNo: string;
   amountPaid: number;
   qrCodeData?: string;
+  qrCodeImageUrl?: string;
 }
 
 /**
@@ -256,7 +257,10 @@ export async function sendMembershipApprovedEmail(params: SendMembershipApproved
   const qrPayload = params.qrCodeData || `TSRM-MEMBER:${params.memberNo}`;
   const qrBuffer = await generateQrCodeBuffer(qrPayload);
   const cid = `member-qr-${params.memberNo}`;
-  const qrCodeUrl = qrBuffer ? `cid:${cid}` : '';
+  
+  // Public HTTPS QR Code URL ensures universal display across all mobile email clients (Gmail iOS/Android, Apple Mail, Outlook)
+  const httpsQrUrl = params.qrCodeImageUrl || `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrPayload)}&color=0026b3`;
+  const qrCodeUrl = httpsQrUrl;
 
   const html = renderMembershipApprovedEmail({
     recipientName: params.recipientName,
@@ -480,7 +484,10 @@ export async function sendAttendeeTicketEmail(params: SendAttendeeTicketParams):
   const qrPayload = params.qrCodeData || `TSRM-PASS:${params.ticketCode}`;
   const qrBuffer = await generateQrCodeBuffer(qrPayload);
   const cid = `pass-qr-${params.ticketCode}`;
-  const qrCodeUrl = qrBuffer ? `cid:${cid}` : '';
+  
+  // Public HTTPS QR Code URL ensures universal display across all mobile email clients (Gmail iOS/Android, Apple Mail, Outlook)
+  const httpsQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrPayload)}&color=0026b3`;
+  const qrCodeUrl = httpsQrUrl;
 
   const html = renderAttendeeTicketEmail({
     recipientName: params.recipientName,

@@ -758,6 +758,11 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
               </span>
             </div>
           </div>
+
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-[11px] text-amber-800 text-left leading-relaxed">
+            💡 <strong>คำแนะนำ:</strong> หากท่านไม่ได้รับอีเมลแจ้งผลในกล่องจดหมายหลัก กรุณาตรวจสอบในโฟลเดอร์ &ldquo;จดหมายขยะ&rdquo; และกด &ldquo;ไม่ใช่จดหมายขยะ&rdquo; เพื่อความต่อเนื่องในการรับข่าวสาร
+          </div>
+
           <button
             onClick={() => router.push('/login')}
             className="w-full bg-[#0026b3] text-white py-3.5 rounded-2xl font-bold text-xs hover:bg-[#001f8f] transition shadow-md cursor-pointer"

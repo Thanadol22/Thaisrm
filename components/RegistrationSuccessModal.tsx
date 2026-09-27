@@ -100,6 +100,18 @@ export function RegistrationSuccessModal({
           </div>
         )}
 
+        {/* Spam Notice Tip */}
+        <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-3 text-left text-xs text-amber-900 leading-relaxed">
+          <p className="font-semibold text-amber-950 mb-0.5">
+            💡 {lang === 'th' ? 'คำแนะนำการรับอีเมล' : 'Email Delivery Tip'}
+          </p>
+          <p className="text-[11px] text-amber-800">
+            {lang === 'th'
+              ? 'หากไม่พบอีเมลในกล่องจดหมายหลัก กรุณาตรวจสอบในโฟลเดอร์ "จดหมายขยะ" และกด "ไม่ใช่จดหมายขยะ"'
+              : 'If you cannot find the email in your inbox, please check your Junk/Spam folder and mark as "Not Spam".'}
+          </p>
+        </div>
+
         {/* Buttons */}
         <div className="space-y-2 pt-1">
           {onProceed ? (

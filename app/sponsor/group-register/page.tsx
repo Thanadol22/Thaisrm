@@ -743,6 +743,9 @@ export default function SponsorGroupRegisterPage() {
                     <Clock className="w-3 h-3 text-slate-400" />
                     รหัสมีอายุ 10 นาที และจะถูกรีเซ็ตหากไม่มีการเคลื่อนไหวเกิน 5 นาที
                   </p>
+                  <div className="mt-2.5 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-[11px] text-amber-200 leading-relaxed">
+                    💡 <strong>คำแนะนำ:</strong> หากไม่พบอีเมลในกล่องจดหมายหลัก กรุณาตรวจสอบในโฟลเดอร์ &ldquo;จดหมายขยะ&rdquo; และกด &ldquo;ไม่ใช่จดหมายขยะ&rdquo;
+                  </div>
                 </div>
 
                 <button

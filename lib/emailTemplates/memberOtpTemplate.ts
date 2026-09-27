@@ -55,6 +55,13 @@ export function renderMemberOtpEmail(options: MemberOtpEmailOptions): string {
           </p>
         </div>
 
+        <!-- Spam Folder Notice -->
+        <div style="background: #f8fafc; border-left: 4px solid #f59e0b; border-radius: 6px; padding: 14px 16px; margin-top: 16px;">
+          <p style="margin: 0; font-size: 12px; color: #64748b; line-height: 1.5;">
+            💡 <strong>คำแนะนำเพิ่มเติม:</strong> หากไม่พบอีเมลในกล่องจดหมายหลัก กรุณาตรวจสอบในโฟลเดอร์ &ldquo;จดหมายขยะ&rdquo; และกด &ldquo;ไม่ใช่จดหมายขยะ&rdquo; เพื่อความสะดวกในการรับรหัสและข่าวสารในครั้งต่อไป
+          </p>
+        </div>
+
         <p style="margin: 24px 0 0; font-size: 13px; color: #94a3b8; text-align: center;">
           หากท่านไม่ได้เป็นผู้ทำรายการนี้ กรุณาเพิกเฉยต่ออีเมลฉบับนี้
         </p>

@@ -112,9 +112,10 @@ export function renderSponsorOtpEmail(options: SponsorOtpEmailOptions): string {
 
         <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 14px 18px; border-radius: 6px; margin-bottom: 24px;">
           <p style="margin: 0; font-size: 13px; color: #475569; line-height: 1.5;">
-            🔒 <strong>ข้อแนะนำความปลอดภัย:</strong><br/>
+            🔒 <strong>ข้อแนะนำความปลอดภัยและการรับข่าวสาร:</strong><br/>
             • รหัส OTP ใช้ได้เพียง 1 ครั้งเท่านั้น และจะขอใหม่ทุกครั้งที่เข้าสู่ระบบ<br/>
-            • ระบบจะทำการตัดเซสชัน (Logout) อัตโนมัติหากไม่มีการเคลื่อนไหวเกิน 5 นาที<br/>
+            • ระบบจะทำการตัดเซสชันออกจากระบบอัตโนมัติหากไม่มีการเคลื่อนไหวเกิน 5 นาที<br/>
+            • หากไม่พบอีเมลในกล่องจดหมายหลัก กรุณาตรวจสอบในโฟลเดอร์ &ldquo;จดหมายขยะ&rdquo; และกด &ldquo;ไม่ใช่จดหมายขยะ&rdquo; เพื่อความสะดวกในการรับข่าวสารอย่างต่อเนื่อง<br/>
             • หากคุณไม่ได้เป็นผู้ร้องขอรหัสนี้ กรุณาเพิกเฉยต่ออีเมลฉบับนี้
           </p>
         </div>

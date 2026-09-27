@@ -601,6 +601,11 @@ export function ProfileAndSponsorUpdateModal({
                     ? `รหัส OTP ถูกส่งไปยัง ${email} แล้ว (มีอายุ 10 นาที)`
                     : `OTP code has been sent to ${email} (valid for 10 minutes)`}
                 </p>
+                <div className="mt-2 pt-2 border-t border-amber-200/70 text-[11px] text-amber-800 leading-relaxed">
+                  💡 {lang === 'th'
+                    ? 'หากไม่พบอีเมลในกล่องจดหมายหลัก กรุณาตรวจสอบในโฟลเดอร์ "จดหมายขยะ" และกด "ไม่ใช่จดหมายขยะ"'
+                    : 'If not found in your inbox, please check your Junk/Spam folder and mark as "Not Spam"'}
+                </div>
               </div>
 
               {errorMsg && (

@@ -167,6 +167,16 @@ export function renderBaseEmailLayout({
           <tr>
             <td class="content-cell">
               ${contentHtml}
+
+              <!-- Spam folder notice & guidance -->
+              <div style="margin-top: 28px; padding: 14px 18px; background-color: #f8fafc; border-left: 4px solid #f59e0b; border-radius: 6px; font-size: 13px; line-height: 1.6; color: #64748b;">
+                <div style="font-weight: 700; color: #b45309; margin-bottom: 4px;">
+                  💡 คำแนะนำในการรับข่าวสาร
+                </div>
+                <div>
+                  หากท่านไม่พบอีเมลในกล่องจดหมายหลัก กรุณาตรวจสอบในโฟลเดอร์ <strong>&ldquo;จดหมายขยะ&rdquo;</strong> และกด <strong>&ldquo;ไม่ใช่จดหมายขยะ&rdquo;</strong> เพื่อให้มั่นใจว่าจะได้รับข่าวสารและเอกสารสำคัญในครั้งถัดไปอย่างต่อเนื่อง
+                </div>
+              </div>
             </td>
           </tr>
 

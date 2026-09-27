@@ -243,6 +243,9 @@ export function SponsorAuthModal({
                   <Clock className="w-3 h-3 text-slate-400" />
                   รหัสมีอายุ 10 นาที (เซสชันจะตัดอัตโนมัติหากไม่มีการเคลื่อนไหวเกิน 5 นาที)
                 </p>
+                <div className="mt-2 p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl text-[11px] text-amber-800 leading-relaxed">
+                  💡 <strong>คำแนะนำ:</strong> หากไม่พบอีเมลในกล่องจดหมายหลัก กรุณาตรวจสอบในโฟลเดอร์ &ldquo;จดหมายขยะ&rdquo; และกด &ldquo;ไม่ใช่จดหมายขยะ&rdquo;
+                </div>
               </div>
 
               <button
