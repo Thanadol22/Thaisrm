@@ -7,6 +7,7 @@ import {
   MembershipApprovalEmailOptions,
   MeetingApprovalEmailOptions,
   CompanyGroupMembershipApprovalEmailOptions,
+  MeetingApprovalItem,
 } from './emailTemplates/approvalTemplate';
 import {
   renderSlipRejectionEmail,
@@ -296,6 +297,8 @@ export interface SendRegistrationApprovedParams {
   amountPaid: number;
   isMember: boolean;
   qrCodeData?: string;
+  selectedActivities?: any;
+  items?: MeetingApprovalItem[];
 }
 
 /**
@@ -306,8 +309,11 @@ export async function sendRegistrationApprovedEmail(params: SendRegistrationAppr
     recipientName: params.recipientName,
     meetingName: params.meetingName,
     meetingDate: params.meetingDate,
+    ticketCode: params.ticketCode,
     amountPaid: params.amountPaid,
     isMember: params.isMember,
+    selectedActivities: params.selectedActivities,
+    items: params.items,
   });
 
   return dispatchEmail({

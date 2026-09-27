@@ -597,7 +597,11 @@ function PaymentContent() {
               isGroup: true,
               isPayLater: Boolean(isPayLater),
               companyName: (regData as any).companyName || regData?.couponData?.companyName,
-              groupContact: (regData as any).groupContact,
+              groupContact: (regData as any).groupContact || ((regData as any)?.sponsorSession ? {
+                coordinatorEmail: (regData as any)?.sponsorSession?.contactEmail,
+                coordinatorName: (regData as any)?.sponsorSession?.contactName || (regData as any)?.sponsorSession?.sponsorName,
+                coordinatorPhone: '',
+              } : undefined),
               attendees: (regData as any).attendees,
               amount: calculationResult.totalAmount,
               originalAmount: calculationResult.originalAmount,

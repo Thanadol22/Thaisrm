@@ -1079,6 +1079,11 @@ export function LoginView({
           totalAmount: groupTotalAmount,
           couponData: effectiveCoupon || undefined,
           sponsorSession: sponsorSession || undefined,
+          groupContact: sponsorSession ? {
+            coordinatorEmail: sponsorSession.contactEmail,
+            coordinatorName: sponsorSession.contactName || sponsorSession.sponsorName,
+            coordinatorPhone: '',
+          } : undefined,
           registeredAt: new Date().toISOString(),
         };
 

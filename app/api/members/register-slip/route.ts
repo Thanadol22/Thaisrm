@@ -129,14 +129,27 @@ export async function POST(request: NextRequest) {
         amount: Number(amount) || applicants.length * 1000,
       };
 
+      let effectiveCompanyEmail = groupContact?.coordinatorEmail?.trim() || null;
+      if (!effectiveCompanyEmail && companyName) {
+        try {
+          const spRec = await prisma.sponsors.findFirst({
+            where: { name: { equals: companyName.trim(), mode: 'insensitive' } },
+            select: { contact_email: true },
+          });
+          if (spRec?.contact_email) {
+            effectiveCompanyEmail = spRec.contact_email.trim();
+          }
+        } catch {}
+      }
+
       const slip = await prisma.payment_slips.create({
         data: {
           slip_id: slipId,
           meeting_id: safeMeetingId,
           member_no: null,
           guest_name: `${companyName || 'Corporate Group'} (${applicants.length} ท่าน)`,
-          guest_email: groupContact?.coordinatorEmail || applicants[0]?.email || null,
-          guest_phone: groupContact?.coordinatorPhone || applicants[0]?.mobile || null,
+          guest_email: effectiveCompanyEmail || groupContact?.coordinatorEmail || null,
+          guest_phone: groupContact?.coordinatorPhone || null,
           guest_workplace: companyName || null,
           is_member: false,
           ticket_code: ticketCode,

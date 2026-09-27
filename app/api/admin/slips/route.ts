@@ -178,6 +178,7 @@ export async function GET(request: NextRequest) {
 
       let allCouponUsages: any[] = [];
       let allCoupons: any[] = [];
+      let allSponsors: any[] = [];
       try {
         allCouponUsages = await prisma.coupon_usages.findMany({
           where: {
@@ -191,6 +192,7 @@ export async function GET(request: NextRequest) {
           },
         });
         allCoupons = await prisma.coupons.findMany();
+        allSponsors = await (prisma as any).sponsors.findMany();
       } catch (cErr) {
         console.warn('Could not query coupon data for slips:', cErr);
       }
@@ -220,9 +222,22 @@ export async function GET(request: NextRequest) {
             : parsedAct.memberPayload?.full_name_en || '';
 
         // For corporate, use coordinator contact only, NEVER personal attendee email/phone
-        const coordinatorEmail = parsedAct.groupPayload?.groupContact?.coordinatorEmail || null;
-        const coordinatorPhone = parsedAct.groupPayload?.groupContact?.coordinatorPhone || null;
-        const coordinatorName = parsedAct.groupPayload?.groupContact?.coordinatorName || null;
+        let coordinatorEmail = parsedAct.groupPayload?.groupContact?.coordinatorEmail || null;
+        let coordinatorPhone = parsedAct.groupPayload?.groupContact?.coordinatorPhone || null;
+        let coordinatorName = parsedAct.groupPayload?.groupContact?.coordinatorName || null;
+
+        if (isCorporate && !coordinatorEmail && companyName) {
+          const matchedSp = allSponsors.find((sp: any) =>
+            sp.name && (
+              sp.name.trim().toLowerCase() === companyName.trim().toLowerCase() ||
+              companyName.trim().toLowerCase().includes(sp.name.trim().toLowerCase())
+            )
+          );
+          if (matchedSp?.contact_email) {
+            coordinatorEmail = matchedSp.contact_email;
+            coordinatorName = matchedSp.contact_name || matchedSp.name || coordinatorName;
+          }
+        }
 
         const email = isCorporate
           ? (coordinatorEmail || '')
@@ -579,6 +594,179 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * Safely resolves the corporate sponsor's official contact email and coordinator name.
+ * Strictly excludes any individual registrant / attendee personal email addresses.
+ */
+async function resolveCorporateEmail(slip: any, groupPayload: any): Promise<{ email: string; name: string }> {
+  // 1. Gather all attendee / applicant emails to exclude them strictly
+  const attendeesList = groupPayload?.attendees || groupPayload?.applicants || [];
+  const attendeeEmails = new Set<string>();
+  if (Array.isArray(attendeesList)) {
+    for (const a of attendeesList) {
+      const em = (a.email || a.attendee_email)?.trim()?.toLowerCase();
+      if (em) attendeeEmails.add(em);
+    }
+  }
+  if (slip.members?.email) {
+    attendeeEmails.add(slip.members.email.trim().toLowerCase());
+  }
+
+  const compNameCandidate = (
+    groupPayload?.companyName ||
+    slip.guest_workplace ||
+    (slip.guest_name ? slip.guest_name.replace(/\s*\(\d+\s*ท่าน\)/, '').trim() : '')
+  )?.trim() || '';
+
+  // 2. Direct coordinator email from groupPayload (ensure it's not an attendee's personal email)
+  const directEmail =
+    groupPayload?.groupContact?.coordinatorEmail?.trim() ||
+    groupPayload?.companyEmail?.trim() ||
+    groupPayload?.coordinatorEmail?.trim() ||
+    groupPayload?.sponsorSession?.contactEmail?.trim() ||
+    groupPayload?.sponsorEmail?.trim();
+
+  if (directEmail && !attendeeEmails.has(directEmail.toLowerCase())) {
+    return {
+      email: directEmail,
+      name: groupPayload?.groupContact?.coordinatorName || compNameCandidate || 'ตัวแทนบริษัท',
+    };
+  }
+
+  // 3. From sponsor_group_members table (lookup sponsor_id -> sponsors.contact_email)
+  if (slip.ticket_code) {
+    try {
+      const sgmList = await prisma.$queryRaw<Array<{ sponsor_id: string | null; submitted_by_email: string | null }>>`
+        SELECT sponsor_id, submitted_by_email FROM sponsor_group_members
+        WHERE ticket_code = ${slip.ticket_code}
+        LIMIT 5
+      `;
+      for (const row of sgmList) {
+        if (row.sponsor_id) {
+          const sp = await (prisma as any).sponsors.findUnique({
+            where: { id: row.sponsor_id },
+            select: { contact_email: true, name: true, contact_name: true },
+          });
+          if (sp?.contact_email && !attendeeEmails.has(sp.contact_email.trim().toLowerCase())) {
+            return {
+              email: sp.contact_email.trim(),
+              name: sp.contact_name || sp.name || compNameCandidate || 'ตัวแทนบริษัท',
+            };
+          }
+        }
+        if (row.submitted_by_email && !attendeeEmails.has(row.submitted_by_email.trim().toLowerCase())) {
+          return {
+            email: row.submitted_by_email.trim(),
+            name: compNameCandidate || 'ตัวแทนบริษัท',
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('Could not query sponsor_group_members for corporate email:', err);
+    }
+  }
+
+  // 4. From meeting_attendances table (lookup sponsor_id -> sponsors.contact_email)
+  if (slip.meeting_id) {
+    try {
+      const attSponsors = await prisma.$queryRaw<Array<{ sponsor_id: string | null; sponsor_company_name: string | null }>>`
+        SELECT sponsor_id, sponsor_company_name FROM meeting_attendances
+        WHERE meeting_id = ${slip.meeting_id} AND sponsor_id IS NOT NULL
+          AND (
+            member_no = ${slip.member_no || ''} OR
+            sponsor_company_name = ${slip.guest_workplace || ''} OR
+            sponsor_company_name = ${compNameCandidate || ''}
+          )
+        LIMIT 5
+      `;
+      for (const row of attSponsors) {
+        if (row.sponsor_id) {
+          const sp = await (prisma as any).sponsors.findUnique({
+            where: { id: row.sponsor_id },
+            select: { contact_email: true, name: true, contact_name: true },
+          });
+          if (sp?.contact_email && !attendeeEmails.has(sp.contact_email.trim().toLowerCase())) {
+            return {
+              email: sp.contact_email.trim(),
+              name: sp.contact_name || sp.name || row.sponsor_company_name || compNameCandidate || 'ตัวแทนบริษัท',
+            };
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Could not query meeting_attendances for corporate email:', err);
+    }
+  }
+
+  // 5. From coupon_usages table (lookup coupon -> company_name -> sponsors.contact_email)
+  try {
+    const usages = await (prisma as any).coupon_usages.findMany({
+      where: {
+        OR: [
+          { slip_id: slip.slip_id },
+          { ticket_code: slip.ticket_code || '' },
+        ],
+      },
+      include: { coupon: true },
+      take: 5,
+    });
+    for (const u of usages) {
+      if (u.coupon?.company_name) {
+        const sp = await (prisma as any).sponsors.findFirst({
+          where: { name: { equals: u.coupon.company_name.trim(), mode: 'insensitive' } },
+          select: { contact_email: true, name: true, contact_name: true },
+        });
+        if (sp?.contact_email && !attendeeEmails.has(sp.contact_email.trim().toLowerCase())) {
+          return {
+            email: sp.contact_email.trim(),
+            name: sp.contact_name || sp.name || u.coupon.company_name,
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Could not query coupon_usages for corporate email:', err);
+  }
+
+  // 6. From company name lookup in sponsors table
+  if (compNameCandidate) {
+    try {
+      let sp = await (prisma as any).sponsors.findFirst({
+        where: { name: { equals: compNameCandidate, mode: 'insensitive' } },
+        select: { contact_email: true, name: true, contact_name: true },
+      });
+      if (!sp) {
+        sp = await (prisma as any).sponsors.findFirst({
+          where: {
+            OR: [
+              { name: { contains: compNameCandidate, mode: 'insensitive' } },
+            ],
+          },
+          select: { contact_email: true, name: true, contact_name: true },
+        });
+      }
+      if (sp?.contact_email && !attendeeEmails.has(sp.contact_email.trim().toLowerCase())) {
+        return {
+          email: sp.contact_email.trim(),
+          name: sp.contact_name || sp.name || compNameCandidate,
+        };
+      }
+    } catch (err) {
+      console.warn('Could not query sponsors table by company name:', err);
+    }
+  }
+
+  // 7. Check slip.guest_email ONLY IF it is NOT an attendee email
+  if (slip.guest_email && !attendeeEmails.has(slip.guest_email.trim().toLowerCase())) {
+    return {
+      email: slip.guest_email.trim(),
+      name: compNameCandidate || 'ตัวแทนบริษัท',
+    };
+  }
+
+  return { email: '', name: compNameCandidate || 'ตัวแทนบริษัท' };
+}
+
 // POST: Review slip (Approve / Reject / Reset)
 export async function POST(request: NextRequest) {
   const session = getAdminSessionFromRequest(request);
@@ -610,7 +798,7 @@ export async function POST(request: NextRequest) {
         SELECT 
           s.*,
           m.full_name_th, m.full_name_en, m.email AS member_email, m.mobile AS member_mobile, m.workplace AS member_workplace,
-          mtg.meeting_name
+          mtg.meeting_name, mtg.meeting_date, mtg.start_date, mtg.end_date
         FROM payment_slips s
         LEFT JOIN members m ON s.member_no = m.member_no
         LEFT JOIN meetings mtg ON s.meeting_id = mtg.meeting_id
@@ -631,6 +819,9 @@ export async function POST(request: NextRequest) {
           } : null,
           meetings: {
             meeting_name: r.meeting_name,
+            meeting_date: r.meeting_date,
+            start_date: r.start_date,
+            end_date: r.end_date,
           },
         };
       }
@@ -659,6 +850,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (slip.ticket_code?.startsWith('GRP-') || slip.slip_id?.includes('GRP')) {
+      isGroupConference = true;
+    }
+
     if (slip.selected_activities) {
       let actObj = slip.selected_activities;
       if (typeof actObj === 'string') {
@@ -672,7 +867,7 @@ export async function POST(request: NextRequest) {
         } else if (actObj.type === 'membership_registration') {
           isMembershipRegistration = true;
           memberPayload = actObj.memberPayload;
-        } else if (actObj.isGroup && actObj.attendees) {
+        } else if (actObj.attendees || (actObj.isGroup && (actObj.attendees || !actObj.applicants))) {
           isGroupConference = true;
           groupPayload = actObj;
         } else if (actObj.isFormatChange) {
@@ -681,6 +876,19 @@ export async function POST(request: NextRequest) {
         }
       }
     }
+
+    const isCorporate = Boolean(
+      isGroupMembership ||
+      isGroupConference ||
+      slip.ticket_code?.startsWith('MEMGRP') ||
+      slip.ticket_code?.startsWith('GRP') ||
+      slip.slip_id?.includes('GRP') ||
+      groupPayload?.isGroup ||
+      (groupPayload?.attendees && Array.isArray(groupPayload.attendees) && groupPayload.attendees.length > 0) ||
+      (groupPayload?.applicants && Array.isArray(groupPayload.applicants) && groupPayload.applicants.length > 0) ||
+      slip.guest_name?.includes('ท่าน') ||
+      Boolean(slip.guest_workplace && slip.ticket_code?.startsWith('GRP'))
+    );
 
     if (action === 'approve') {
       let assignedMemberNo = slip.member_no;
@@ -741,32 +949,20 @@ export async function POST(request: NextRequest) {
           }
 
           // Send approval summary email to company / coordinator
-          let companyEmail =
-            groupPayload.groupContact?.coordinatorEmail?.trim() ||
-            groupPayload.companyEmail?.trim();
-
+          let companyEmail = '';
           const companyName =
             groupPayload.companyName?.trim() ||
             slip.guest_workplace?.trim() ||
             'บริษัท / องค์กร';
-
-          if (!companyEmail && companyName) {
-            const sp = await (prisma as any).sponsors.findFirst({
-              where: { name: { equals: companyName, mode: 'insensitive' } },
-              select: { contact_email: true },
-            });
-            if (sp?.contact_email) {
-              companyEmail = sp.contact_email.trim();
-            }
-          }
-
-          if (!companyEmail && slip.guest_email) {
-            companyEmail = slip.guest_email.trim();
-          }
-
-          const coordinatorName =
+          let coordinatorName =
             groupPayload.groupContact?.coordinatorName?.trim() ||
             companyName;
+
+          const resolvedCorp = await resolveCorporateEmail(slip, groupPayload);
+          if (resolvedCorp.email) {
+            companyEmail = resolvedCorp.email;
+            coordinatorName = resolvedCorp.name || coordinatorName;
+          }
 
           const isPayLater =
             slip.slip_url === 'PAY_LATER' ||
@@ -961,18 +1157,52 @@ export async function POST(request: NextRequest) {
         }
       } else {
         // ONLY for conference/meeting registrations
-        const recipientEmail = slip.members?.email || slip.guest_email || '';
-        const recipientName = slip.members?.fullNameTh || slip.guest_name || 'ผู้ลงทะเบียน';
+        let meetingDateStr: string | undefined = undefined;
+        if (slip.meetings) {
+          const m = slip.meetings;
+          if (m.start_date && m.end_date) {
+            const start = new Date(m.start_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+            const end = new Date(m.end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+            meetingDateStr = start === end ? start : `${start} - ${end}`;
+          } else if (m.meeting_date) {
+            meetingDateStr = new Date(m.meeting_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+          }
+        }
 
-        if (recipientEmail) {
-          sendRegistrationApprovedEmail({
-            to: recipientEmail,
-            recipientName,
-            meetingName: slip.meetings?.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
-            ticketCode: slip.ticket_code || '',
-            amountPaid: slip.amount,
-            isMember: slip.is_member,
-          }).catch((mailErr) => console.error('Failed to send conference registration approval email:', mailErr));
+        if (isCorporate) {
+          // For Corporate Group Conference: Send approval confirmation ONLY to the corporate coordinator
+          const resolved = await resolveCorporateEmail(slip, groupPayload);
+          if (resolved.email) {
+            sendRegistrationApprovedEmail({
+              to: resolved.email,
+              recipientName: resolved.name || 'ตัวแทนบริษัท',
+              meetingName: slip.meetings?.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
+              meetingDate: meetingDateStr,
+              ticketCode: slip.ticket_code || '',
+              amountPaid: slip.amount,
+              isMember: slip.is_member,
+              selectedActivities: slip.selected_activities,
+            }).catch((mailErr) => console.error('Failed to send conference group approval email to corporate coordinator:', mailErr));
+          } else {
+            console.warn(`[Conference Group Approval] Could not resolve corporate email for slip ${slip.slip_id}`);
+          }
+        } else {
+          // Individual conference registration
+          const recipientEmail = slip.members?.email || slip.guest_email || '';
+          const recipientName = slip.members?.fullNameTh || slip.guest_name || 'ผู้ลงทะเบียน';
+
+          if (recipientEmail) {
+            sendRegistrationApprovedEmail({
+              to: recipientEmail,
+              recipientName,
+              meetingName: slip.meetings?.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
+              meetingDate: meetingDateStr,
+              ticketCode: slip.ticket_code || '',
+              amountPaid: slip.amount,
+              isMember: slip.is_member,
+              selectedActivities: slip.selected_activities,
+            }).catch((mailErr) => console.error('Failed to send conference registration approval email:', mailErr));
+          }
         }
       }
 
@@ -1124,17 +1354,26 @@ export async function POST(request: NextRequest) {
         isGroupMembership ||
         isGroupConference ||
         slip.ticket_code?.startsWith('MEMGRP') ||
-        groupPayload ||
-        slip.guest_name?.includes('ท่าน')
+        slip.ticket_code?.startsWith('GRP') ||
+        slip.slip_id?.includes('GRP') ||
+        groupPayload?.isGroup ||
+        (groupPayload?.attendees && Array.isArray(groupPayload.attendees) && groupPayload.attendees.length > 0) ||
+        (groupPayload?.applicants && Array.isArray(groupPayload.applicants) && groupPayload.applicants.length > 0) ||
+        slip.guest_name?.includes('ท่าน') ||
+        Boolean(slip.guest_workplace && slip.ticket_code?.startsWith('GRP'))
       );
 
-      const effectiveCompanyName = groupPayload?.companyName || slip.guest_workplace || slip.members?.workplace || (isCorporate ? slip.guest_name?.replace(/\s*\(\d+\s*ท่าน\)/, '') : '');
+      let recipientEmail = '';
+      let recipientName = '';
 
-      // Send rejection & resubmit email stub
-      const recipientEmail = slip.members?.email || slip.guest_email || memberPayload?.email || '';
-      const recipientName = isCorporate && effectiveCompanyName
-        ? effectiveCompanyName
-        : (slip.members?.fullNameTh || slip.guest_name || memberPayload?.full_name_th || 'ผู้สมัคร');
+      if (isCorporate) {
+        const resolved = await resolveCorporateEmail(slip, groupPayload);
+        recipientEmail = resolved.email;
+        recipientName = resolved.name;
+      } else {
+        recipientEmail = slip.members?.email || slip.guest_email || memberPayload?.email || '';
+        recipientName = slip.members?.fullNameTh || slip.guest_name || memberPayload?.full_name_th || 'ผู้สมัคร';
+      }
 
       // แสดงแค่ข้อมูลบริษัท ถ้าเป็นองค์กร/กลุ่ม อย่าดึงเบอร์โทรของผู้สมัครมาปน
       const applicantPhone = isCorporate ? undefined : (slip.members?.mobile || slip.guest_phone || memberPayload?.mobile || '');
@@ -1160,12 +1399,14 @@ export async function POST(request: NextRequest) {
             applicantPhone,
             applicantWorkplace,
             isCorporate,
-            companyName: effectiveCompanyName || undefined,
+            companyName: isCorporate ? recipientName : undefined,
             rejectType: effectiveRejectType,
           });
         } catch (mailErr) {
           console.error('Failed to send rejection email:', mailErr);
         }
+      } else {
+        console.warn(`[Reject Slip] Could not find recipient email for slip ${slip.slip_id}, isCorporate: ${isCorporate}`);
       }
 
       return NextResponse.json({

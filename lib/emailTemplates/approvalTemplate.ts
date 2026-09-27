@@ -72,15 +72,106 @@ export function renderMembershipApprovedEmail(options: MembershipApprovalEmailOp
   });
 }
 
+export interface MeetingApprovalItem {
+  id?: string;
+  name: string;
+  price?: number;
+  date?: string;
+  type?: string;
+  format?: string;
+}
+
+export function parseMeetingActivities(raw: any, fallbackAmount?: number): MeetingApprovalItem[] {
+  if (!raw) {
+    if (fallbackAmount !== undefined && Number(fallbackAmount) > 0) {
+      return [{ name: 'ค่าลงทะเบียนเข้าร่วมประชุม', price: Number(fallbackAmount) }];
+    }
+    return [];
+  }
+
+  let data = raw;
+  if (typeof raw === 'string') {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return [{ name: raw, price: fallbackAmount }];
+    }
+  }
+
+  if (Array.isArray(data)) {
+    return data.map((item: any) => {
+      if (typeof item === 'string') {
+        return { name: item, price: data.length === 1 ? fallbackAmount : undefined };
+      }
+      return {
+        id: item.id,
+        name: item.name || item.title || item.programNameTh || item.programNameEn || item.id || 'กิจกรรมการประชุม',
+        price: item.price !== undefined && Number(item.price) >= 0 ? Number(item.price) : (data.length === 1 ? fallbackAmount : undefined),
+        date: item.date || undefined,
+        type: item.type || undefined,
+        format: item.format || item.attendanceType || undefined,
+      };
+    });
+  }
+
+  if (typeof data === 'object' && data !== null) {
+    // 1. Group conference registration
+    if (data.isGroup && Array.isArray(data.attendees)) {
+      const items: MeetingApprovalItem[] = [];
+      data.attendees.forEach((att: any, idx: number) => {
+        const attName = att.nameTh || att.nameEn || `ผู้เข้าร่วมท่านที่ ${idx + 1}`;
+        const subActs = att.selectedActivities || [];
+        if (Array.isArray(subActs) && subActs.length > 0) {
+          const actNames = subActs.map((a: any) => a.name || a.title || 'กิจกรรม').join(' + ');
+          items.push({
+            name: `${attName} (${actNames})`,
+            price: Number(att.subtotal || att.price || 0),
+          });
+        } else {
+          items.push({
+            name: `${attName} - ${att.programNameTh || att.programNameEn || 'บัตรเข้าร่วมประชุม'}`,
+            price: Number(att.subtotal || att.price || 0),
+          });
+        }
+      });
+      return items;
+    }
+
+    // 2. Format change
+    if (data.isFormatChange) {
+      const origFmt = data.originalFormat === 'onsite' ? 'Onsite' : 'Online';
+      const targetFmt = data.targetFormat === 'onsite' ? 'Onsite' : 'Online';
+      return [{
+        name: `ค่าธรรมเนียมเปลี่ยนรูปแบบการเข้าร่วม (${origFmt} ➔ ${targetFmt})`,
+        price: Number(data.changeFee) || fallbackAmount,
+      }];
+    }
+
+    // 3. Wrapper { activities: [...] }
+    if (Array.isArray(data.activities)) {
+      return parseMeetingActivities(data.activities, fallbackAmount);
+    }
+  }
+
+  return [];
+}
+
 export interface MeetingApprovalEmailOptions {
   recipientName: string;
   meetingName: string;
   meetingDate?: string;
+  ticketCode?: string;
   amountPaid: number;
   isMember: boolean;
+  items?: MeetingApprovalItem[];
+  selectedActivities?: any;
 }
 
 export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions): string {
+  const items = (options.items && options.items.length > 0)
+    ? options.items
+    : parseMeetingActivities(options.selectedActivities, options.amountPaid);
+
   const content = `
     <div style="text-align: center; margin-bottom: 24px;">
       <div style="font-size: 44px; margin-bottom: 8px;">✅</div>
@@ -102,6 +193,12 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
           <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่องานประชุม</td>
           <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.meetingName}</td>
         </tr>
+        ${options.ticketCode ? `
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสการลงทะเบียน (Ticket Code)</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 14px; font-family: monospace;">${options.ticketCode}</td>
+        </tr>
+        ` : ''}
         ${options.meetingDate ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
           <td style="padding: 8px 0; color: #64748b; font-size: 14px;">กำหนดการจัดงาน</td>
@@ -116,9 +213,49 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
           <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ประเภทผู้เข้าร่วม</td>
           <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.isMember ? 'สมาชิกสมาคม (Member)' : 'บุคคลทั่วไป (Non-Member)'}</td>
         </tr>
+
+        ${items.length > 0 ? `
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td colspan="2" style="padding: 12px 0 10px 0;">
+            <div style="font-size: 12.5px; font-weight: 800; color: #0026b3; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+              📋 รายการที่ลงทะเบียน (${items.length} รายการ)
+            </div>
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                ${items.map((item, idx) => `
+                  <tr style="${idx < items.length - 1 ? 'border-bottom: 1px dashed #e2e8f0;' : ''}">
+                    <td style="padding: 7px 0; vertical-align: top;">
+                      <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; line-height: 1.4;">
+                        ${item.name}
+                      </div>
+                      ${item.date ? `
+                        <div style="font-size: 12px; color: #64748b; margin-top: 3px;">
+                          🗓️ ${item.date}
+                        </div>
+                      ` : ''}
+                    </td>
+                    <td style="padding: 7px 0 7px 12px; text-align: right; vertical-align: top; white-space: nowrap;">
+                      ${item.price !== undefined && Number(item.price) > 0 ? `
+                        <span style="font-size: 13.5px; font-weight: 700; color: #0f172a;">
+                          ${Number(item.price).toLocaleString()} บาท
+                        </span>
+                      ` : (item.price === 0 ? `
+                        <span style="font-size: 12px; font-weight: 700; color: #16a34a; background-color: #dcfce7; padding: 2px 8px; border-radius: 4px;">
+                          ฟรี
+                        </span>
+                      ` : '')}
+                    </td>
+                  </tr>
+                `).join('')}
+              </table>
+            </div>
+          </td>
+        </tr>
+        ` : ''}
+
         <tr>
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ยอดเงินที่ชำระ</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">${options.amountPaid.toLocaleString()} บาท</td>
+          <td style="padding: 10px 0 2px 0; color: #0f172a; font-size: 14px; font-weight: 700;">ยอดเงินที่ชำระ</td>
+          <td style="padding: 10px 0 2px 0; text-align: right; font-weight: 800; color: #16a34a; font-size: 16px;">${options.amountPaid.toLocaleString()} บาท</td>
         </tr>
       </table>
     </div>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { sendRegistrationApprovedEmail } from '@/lib/email';
 
 export async function POST(
   request: NextRequest,
@@ -111,6 +112,26 @@ export async function POST(
       // ห่อทุก DB write ด้วย Transaction เพื่อความ Atomic
       let slip: any;
       await prisma.$transaction(async (tx) => {
+        let effectiveCompanyEmail = groupContact?.coordinatorEmail?.trim() || (groupPayload as any)?.companyEmail?.trim() || (groupPayload as any)?.sponsorSession?.contactEmail?.trim() || null;
+        if (!effectiveCompanyEmail && effectiveSponsorId) {
+          const spRec = await tx.sponsors.findUnique({
+            where: { id: effectiveSponsorId },
+            select: { contact_email: true },
+          });
+          if (spRec?.contact_email) {
+            effectiveCompanyEmail = spRec.contact_email.trim();
+          }
+        }
+        if (!effectiveCompanyEmail && companyName) {
+          const spRec = await tx.sponsors.findFirst({
+            where: { name: { equals: companyName.trim(), mode: 'insensitive' } },
+            select: { contact_email: true },
+          });
+          if (spRec?.contact_email) {
+            effectiveCompanyEmail = spRec.contact_email.trim();
+          }
+        }
+
         // Create single group payment slip
         slip = await tx.payment_slips.create({
           data: {
@@ -118,7 +139,7 @@ export async function POST(
             meeting_id: meetingId,
             member_no: primaryMemberNo,
             guest_name: `${companyName || 'Corporate Group'} (${attendees.length} ท่าน)`,
-            guest_email: groupContact?.coordinatorEmail || attendees[0]?.email || null,
+            guest_email: effectiveCompanyEmail || groupContact?.coordinatorEmail || null,
             guest_phone: groupContact?.coordinatorPhone || null,
             guest_workplace: companyName || null,
             is_member: hasMemberAttendees,
@@ -186,7 +207,7 @@ export async function POST(
                   ${effectiveSponsorId}, ${meetingId}, ${attMemberNo}, ${attName}, ${attEmail},
                   ${att.phone || null}, ${attWorkplace}, ${ticketCode}, ${attendanceId || null},
                   ${couponCode || null}, ${attDiscount}, ${attNet},
-                  ${groupContact?.coordinatorEmail || attendees[0]?.email || null},
+                  ${effectiveCompanyEmail || groupContact?.coordinatorEmail || null},
                   ${isFreeRegistration ? 'confirmed' : 'pending'}, NOW(), NOW()
                 ) ON CONFLICT (meeting_id, member_no)
                 DO UPDATE SET
@@ -246,6 +267,33 @@ export async function POST(
           }
         }
       }, { timeout: 30000 }); // timeout 30s สำหรับกลุ่มใหญ่
+
+      if (isFreeRegistration) {
+        let meetingDateStr: string | undefined = undefined;
+        if (meeting) {
+          if (meeting.start_date && meeting.end_date) {
+            const start = new Date(meeting.start_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+            const end = new Date(meeting.end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+            meetingDateStr = start === end ? start : `${start} - ${end}`;
+          } else if (meeting.meeting_date) {
+            meetingDateStr = new Date(meeting.meeting_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+          }
+        }
+
+        const coordinatorEmail = groupContact?.coordinatorEmail || (groupPayload as any).companyEmail;
+        if (coordinatorEmail) {
+          sendRegistrationApprovedEmail({
+            to: coordinatorEmail,
+            recipientName: companyName || groupContact?.coordinatorName || 'ตัวแทนบริษัท',
+            meetingName: meeting.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
+            meetingDate: meetingDateStr,
+            ticketCode: ticketCode,
+            amountPaid: numericAmount,
+            isMember: Boolean(hasMemberAttendees),
+            selectedActivities: groupPayload,
+          }).catch((mailErr) => console.error('Failed to send free group registration confirmation email:', mailErr));
+        }
+      }
 
       return NextResponse.json({
         success: true,
@@ -528,6 +576,30 @@ export async function POST(
       } catch (couponErr) {
         console.error('Failed to log coupon usage:', couponErr);
       }
+    }
+
+    if (isFreeRegistration && effectiveAttendeeEmail) {
+      let meetingDateStr: string | undefined = undefined;
+      if (meeting) {
+        if (meeting.start_date && meeting.end_date) {
+          const start = new Date(meeting.start_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+          const end = new Date(meeting.end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+          meetingDateStr = start === end ? start : `${start} - ${end}`;
+        } else if (meeting.meeting_date) {
+          meetingDateStr = new Date(meeting.meeting_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+        }
+      }
+
+      sendRegistrationApprovedEmail({
+        to: effectiveAttendeeEmail,
+        recipientName: effectiveAttendeeName || 'ผู้ลงทะเบียน',
+        meetingName: meeting.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
+        meetingDate: meetingDateStr,
+        ticketCode: ticketCode,
+        amountPaid: numericAmount,
+        isMember: Boolean(isMember),
+        selectedActivities: selectedActivities,
+      }).catch((mailErr) => console.error('Failed to send free individual registration confirmation email:', mailErr));
     }
 
     return NextResponse.json({

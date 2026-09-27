@@ -162,8 +162,8 @@ export function parseSlipActivities(raw?: SlipActivityItem[] | string | any, fal
       price: (item.price !== undefined && Number(item.price) > 0)
         ? Number(item.price)
         : (raw.length === 1 && fallbackAmount !== undefined && Number(fallbackAmount) > 0
-            ? Number(fallbackAmount)
-            : Number(item.price || 0)),
+          ? Number(fallbackAmount)
+          : Number(item.price || 0)),
     }));
   }
   if (typeof raw === 'object') {
@@ -241,7 +241,7 @@ export function AdminSlipsView() {
           setRejectReason(json.data.slip_rejection_reason);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Reset to page 1 on filter or search change
@@ -286,12 +286,12 @@ export function AdminSlipsView() {
           prev.map((s) =>
             s.id === id
               ? {
-                  ...s,
-                  status: 'approved',
-                  notes: undefined,
-                  memberNo: approvedMemberNo || s.memberNo,
-                  isMember: Boolean(approvedMemberNo || s.isMember),
-                }
+                ...s,
+                status: 'approved',
+                notes: undefined,
+                memberNo: approvedMemberNo || s.memberNo,
+                isMember: Boolean(approvedMemberNo || s.isMember),
+              }
               : s
           )
         );
@@ -299,12 +299,12 @@ export function AdminSlipsView() {
           setSelectedSlip((prev) =>
             prev
               ? {
-                  ...prev,
-                  status: 'approved',
-                  notes: undefined,
-                  memberNo: approvedMemberNo || prev.memberNo,
-                  isMember: Boolean(approvedMemberNo || prev.isMember),
-                }
+                ...prev,
+                status: 'approved',
+                notes: undefined,
+                memberNo: approvedMemberNo || prev.memberNo,
+                isMember: Boolean(approvedMemberNo || prev.isMember),
+              }
               : null
           );
         }
@@ -317,8 +317,8 @@ export function AdminSlipsView() {
           approvedMemberNo
             ? (lang === 'th' ? `✓ อนุมัติสิทธิ์และสร้างบัญชีสมาชิกเรียบร้อยแล้ว (รหัส: ${approvedMemberNo})` : `✓ Access approved and member created (No: ${approvedMemberNo})`)
             : isPayLaterSlip
-            ? (lang === 'th' ? '✓ อนุมัติคำขอและสร้างบัญชีสมาชิกเรียบร้อยแล้ว (สถานะ: รอชำระเงิน/รอสลิป)' : '✓ Request approved (Awaiting Payment)')
-            : (lang === 'th' ? '✓ อนุมัติรายการเรียบร้อยแล้ว' : '✓ Approved successfully')
+              ? (lang === 'th' ? '✓ อนุมัติคำขอและสร้างบัญชีสมาชิกเรียบร้อยแล้ว (สถานะ: รอชำระเงิน/รอสลิป)' : '✓ Request approved (Awaiting Payment)')
+              : (lang === 'th' ? '✓ อนุมัติรายการเรียบร้อยแล้ว' : '✓ Approved successfully')
         );
       } else {
         showToast(`✕ ${json.error || 'เกิดข้อผิดพลาดในการอนุมัติ'}`);
@@ -469,14 +469,14 @@ export function AdminSlipsView() {
       // Also search group applicants names / email / phone
       const matchesApplicants = Boolean(
         s.groupPayload?.applicants &&
-          Array.isArray(s.groupPayload.applicants) &&
-          s.groupPayload.applicants.some(
-            (app: any) =>
-              (app.full_name_th && app.full_name_th.toLowerCase().includes(q)) ||
-              (app.full_name_en && app.full_name_en.toLowerCase().includes(q)) ||
-              (app.email && app.email.toLowerCase().includes(q)) ||
-              (app.mobile && app.mobile.toLowerCase().includes(q))
-          )
+        Array.isArray(s.groupPayload.applicants) &&
+        s.groupPayload.applicants.some(
+          (app: any) =>
+            (app.full_name_th && app.full_name_th.toLowerCase().includes(q)) ||
+            (app.full_name_en && app.full_name_en.toLowerCase().includes(q)) ||
+            (app.email && app.email.toLowerCase().includes(q)) ||
+            (app.mobile && app.mobile.toLowerCase().includes(q))
+        )
       );
 
       return (
@@ -567,18 +567,16 @@ export function AdminSlipsView() {
       <div className="flex items-center p-1.5 bg-slate-100 rounded-2xl w-full border border-slate-200 shadow-2xs gap-1.5 overflow-x-auto">
         <button
           onClick={() => setCategoryFilter('all')}
-          className={`flex-1 min-w-[130px] flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
-            categoryFilter === 'all'
+          className={`flex-1 min-w-[130px] flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${categoryFilter === 'all'
               ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-          }`}
+            }`}
         >
           <Layers className="w-4 h-4 text-blue-600" />
           <span>{lang === 'th' ? 'ทุกประเภท' : 'All Types'}</span>
           <span
-            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-              categoryFilter === 'all' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-600'
-            }`}
+            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${categoryFilter === 'all' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-600'
+              }`}
           >
             {totalCount}
           </span>
@@ -586,18 +584,16 @@ export function AdminSlipsView() {
 
         <button
           onClick={() => setCategoryFilter('individual')}
-          className={`flex-1 min-w-[160px] flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
-            categoryFilter === 'individual'
+          className={`flex-1 min-w-[160px] flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${categoryFilter === 'individual'
               ? 'bg-white text-slate-900 shadow-sm border border-purple-200 ring-1 ring-purple-400/20'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-          }`}
+            }`}
         >
           <User className="w-4 h-4 text-purple-600" />
           <span>{lang === 'th' ? 'บุคคลทั่วไป / สมาชิกเดี่ยว' : 'Individual & Member'}</span>
           <span
-            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-              categoryFilter === 'individual' ? 'bg-purple-100 text-purple-800' : 'bg-slate-200 text-slate-600'
-            }`}
+            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${categoryFilter === 'individual' ? 'bg-purple-100 text-purple-800' : 'bg-slate-200 text-slate-600'
+              }`}
           >
             {individualSlips.length}
           </span>
@@ -605,18 +601,16 @@ export function AdminSlipsView() {
 
         <button
           onClick={() => setCategoryFilter('corporate')}
-          className={`flex-1 min-w-[160px] flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
-            categoryFilter === 'corporate'
+          className={`flex-1 min-w-[160px] flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${categoryFilter === 'corporate'
               ? 'bg-white text-slate-900 shadow-sm border border-indigo-200 ring-1 ring-indigo-400/20'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-          }`}
+            }`}
         >
           <Building2 className="w-4 h-4 text-indigo-600" />
           <span>{lang === 'th' ? 'องค์กร / กลุ่มบริษัททั้งหมด' : 'Corporate Group (All)'}</span>
           <span
-            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-              categoryFilter === 'corporate' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-600'
-            }`}
+            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${categoryFilter === 'corporate' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-600'
+              }`}
           >
             {corporateSlips.length}
           </span>
@@ -624,18 +618,16 @@ export function AdminSlipsView() {
 
         <button
           onClick={() => setCategoryFilter('corporate_pay_later')}
-          className={`flex-1 min-w-[165px] flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
-            categoryFilter === 'corporate_pay_later'
+          className={`flex-1 min-w-[165px] flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${categoryFilter === 'corporate_pay_later'
               ? 'bg-amber-500 text-amber-950 shadow-sm border border-amber-600 ring-2 ring-amber-400/40 font-black'
               : 'text-amber-800 bg-amber-50/80 hover:bg-amber-100 border border-amber-200/70'
-          }`}
+            }`}
         >
           <CreditCard className="w-4 h-4 text-amber-900" />
           <span>{lang === 'th' ? 'กลุ่มรอชำระเงิน' : 'Corporate Pay Later'}</span>
           <span
-            className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-              categoryFilter === 'corporate_pay_later' ? 'bg-amber-950 text-amber-100' : 'bg-amber-200 text-amber-900'
-            }`}
+            className={`text-[10px] px-2 py-0.5 rounded-full font-black ${categoryFilter === 'corporate_pay_later' ? 'bg-amber-950 text-amber-100' : 'bg-amber-200 text-amber-900'
+              }`}
           >
             {corporatePayLaterSlips.length}
           </span>
@@ -646,11 +638,10 @@ export function AdminSlipsView() {
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 sm:gap-3">
         <div
           onClick={() => setStatusFilter('all')}
-          className={`p-3.5 rounded-2xl border transition cursor-pointer ${
-            statusFilter === 'all'
+          className={`p-3.5 rounded-2xl border transition cursor-pointer ${statusFilter === 'all'
               ? 'bg-blue-50/80 border-[#0026b3] shadow-sm'
               : 'bg-white border-slate-200 hover:border-slate-300'
-          }`}
+            }`}
         >
           <p className="text-[11px] font-bold text-slate-500">{lang === 'th' ? 'ทั้งหมด (ในหมวดนี้)' : 'All (In Category)'}</p>
           <p className="text-xl font-black text-slate-900 mt-0.5">{categoryTotalCount}</p>
@@ -658,11 +649,10 @@ export function AdminSlipsView() {
 
         <div
           onClick={() => setStatusFilter('pending')}
-          className={`p-3.5 rounded-2xl border transition cursor-pointer ${
-            statusFilter === 'pending'
+          className={`p-3.5 rounded-2xl border transition cursor-pointer ${statusFilter === 'pending'
               ? 'bg-amber-50 border-amber-400 shadow-sm'
               : 'bg-white border-slate-200 hover:border-slate-300'
-          }`}
+            }`}
         >
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-bold text-amber-800">{lang === 'th' ? 'รอตรวจสอบ' : 'Pending Review'}</p>
@@ -673,11 +663,10 @@ export function AdminSlipsView() {
 
         <div
           onClick={() => setStatusFilter('pay_later')}
-          className={`p-3.5 rounded-2xl border transition cursor-pointer ${
-            statusFilter === 'pay_later'
+          className={`p-3.5 rounded-2xl border transition cursor-pointer ${statusFilter === 'pay_later'
               ? 'bg-orange-50 border-orange-400 shadow-sm ring-1 ring-orange-400/30'
               : 'bg-white border-slate-200 hover:border-slate-300'
-          }`}
+            }`}
         >
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-bold text-orange-800">{lang === 'th' ? 'รอชำระเงิน' : 'Pay Later'}</p>
@@ -688,11 +677,10 @@ export function AdminSlipsView() {
 
         <div
           onClick={() => setStatusFilter('approved')}
-          className={`p-3.5 rounded-2xl border transition cursor-pointer ${
-            statusFilter === 'approved'
+          className={`p-3.5 rounded-2xl border transition cursor-pointer ${statusFilter === 'approved'
               ? 'bg-emerald-50 border-emerald-400 shadow-sm'
               : 'bg-white border-slate-200 hover:border-slate-300'
-          }`}
+            }`}
         >
           <p className="text-[11px] font-bold text-emerald-800">{lang === 'th' ? 'อนุมัติแล้ว' : 'Approved'}</p>
           <p className="text-xl font-black text-emerald-900 mt-0.5">{categoryApprovedCount}</p>
@@ -700,11 +688,10 @@ export function AdminSlipsView() {
 
         <div
           onClick={() => setStatusFilter('rejected')}
-          className={`p-3.5 rounded-2xl border transition cursor-pointer ${
-            statusFilter === 'rejected'
+          className={`p-3.5 rounded-2xl border transition cursor-pointer ${statusFilter === 'rejected'
               ? 'bg-rose-50 border-rose-400 shadow-sm'
               : 'bg-white border-slate-200 hover:border-slate-300'
-          }`}
+            }`}
         >
           <p className="text-[11px] font-bold text-rose-800">{lang === 'th' ? 'ปฏิเสธ / แก้ไข' : 'Rejected'}</p>
           <p className="text-xl font-black text-rose-900 mt-0.5">{categoryRejectedCount}</p>
@@ -740,17 +727,15 @@ export function AdminSlipsView() {
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
           <button
             onClick={() => setStatusFilter('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-              statusFilter === 'all'
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${statusFilter === 'all'
                 ? 'bg-slate-900 text-white shadow-xs'
                 : 'text-slate-600 bg-slate-100 hover:bg-slate-200'
-            }`}
+              }`}
           >
             <span>{lang === 'th' ? 'ทั้งหมด' : 'All'}</span>
             <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
-                statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
-              }`}
+              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+                }`}
             >
               {categoryTotalCount}
             </span>
@@ -758,17 +743,15 @@ export function AdminSlipsView() {
 
           <button
             onClick={() => setStatusFilter('pending')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-              statusFilter === 'pending'
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${statusFilter === 'pending'
                 ? 'bg-amber-500 text-amber-950 font-black shadow-xs'
                 : 'text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/60'
-            }`}
+              }`}
           >
             <span>{lang === 'th' ? 'รอตรวจ' : 'Pending'}</span>
             <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
-                statusFilter === 'pending' ? 'bg-amber-950/20 text-amber-950' : 'bg-amber-200/80 text-amber-900'
-              }`}
+              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${statusFilter === 'pending' ? 'bg-amber-950/20 text-amber-950' : 'bg-amber-200/80 text-amber-900'
+                }`}
             >
               {categoryPendingCount}
             </span>
@@ -776,17 +759,15 @@ export function AdminSlipsView() {
 
           <button
             onClick={() => setStatusFilter('pay_later')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-              statusFilter === 'pay_later'
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${statusFilter === 'pay_later'
                 ? 'bg-orange-500 text-orange-950 font-black shadow-xs'
                 : 'text-orange-800 bg-orange-50 hover:bg-orange-100 border border-orange-200/60'
-            }`}
+              }`}
           >
             <span>{lang === 'th' ? 'รอชำระเงิน' : 'Pay Later'}</span>
             <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
-                statusFilter === 'pay_later' ? 'bg-orange-950/20 text-orange-950' : 'bg-orange-200/80 text-orange-900'
-              }`}
+              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${statusFilter === 'pay_later' ? 'bg-orange-950/20 text-orange-950' : 'bg-orange-200/80 text-orange-900'
+                }`}
             >
               {categoryPayLaterCount}
             </span>
@@ -794,17 +775,15 @@ export function AdminSlipsView() {
 
           <button
             onClick={() => setStatusFilter('approved')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-              statusFilter === 'approved'
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${statusFilter === 'approved'
                 ? 'bg-emerald-600 text-white font-black shadow-xs'
                 : 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/60'
-            }`}
+              }`}
           >
             <span>{lang === 'th' ? 'อนุมัติแล้ว' : 'Approved'}</span>
             <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
-                statusFilter === 'approved' ? 'bg-white/20 text-white' : 'bg-emerald-200/80 text-emerald-900'
-              }`}
+              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${statusFilter === 'approved' ? 'bg-white/20 text-white' : 'bg-emerald-200/80 text-emerald-900'
+                }`}
             >
               {categoryApprovedCount}
             </span>
@@ -812,17 +791,15 @@ export function AdminSlipsView() {
 
           <button
             onClick={() => setStatusFilter('rejected')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-              statusFilter === 'rejected'
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${statusFilter === 'rejected'
                 ? 'bg-rose-600 text-white font-black shadow-xs'
                 : 'text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200/60'
-            }`}
+              }`}
           >
             <span>{lang === 'th' ? 'ปฏิเสธ' : 'Rejected'}</span>
             <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
-                statusFilter === 'rejected' ? 'bg-white/20 text-white' : 'bg-rose-200/80 text-rose-900'
-              }`}
+              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${statusFilter === 'rejected' ? 'bg-white/20 text-white' : 'bg-rose-200/80 text-rose-900'
+                }`}
             >
               {categoryRejectedCount}
             </span>
@@ -879,13 +856,12 @@ export function AdminSlipsView() {
                   )}
                   {/* Small corner status badge */}
                   <span
-                    className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-tl-lg flex items-center justify-center ${
-                      slip.status === 'approved'
+                    className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-tl-lg flex items-center justify-center ${slip.status === 'approved'
                         ? 'bg-emerald-500 text-white'
                         : slip.status === 'pending'
-                        ? 'bg-amber-500 text-white'
-                        : 'bg-rose-500 text-white'
-                    }`}
+                          ? 'bg-amber-500 text-white'
+                          : 'bg-rose-500 text-white'
+                      }`}
                   >
                     {slip.status === 'approved' && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                     {slip.status === 'pending' && <Clock className="w-2.5 h-2.5" />}
@@ -915,17 +891,16 @@ export function AdminSlipsView() {
                       const isPayLater = slip.bank?.includes('ชำระเงินภายหลัง') || slip.bank?.toLowerCase().includes('pay later') || slip.slipUrl === 'PAY_LATER' || slip.slipUrl === '/placeholder-slip.png' || !slip.slipUrl;
                       return (
                         <span
-                          className={`text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 ${
-                            slip.status === 'approved'
+                          className={`text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 ${slip.status === 'approved'
                               ? isPayLater
                                 ? 'bg-sky-100 text-sky-900 border border-sky-300 shadow-2xs'
                                 : 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs'
                               : slip.status === 'pending'
-                              ? isPayLater
-                                ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs'
-                                : 'bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs'
-                              : 'bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs'
-                          }`}
+                                ? isPayLater
+                                  ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs'
+                                  : 'bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs'
+                                : 'bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs'
+                            }`}
                         >
                           {slip.status === 'approved' && (
                             isPayLater
@@ -957,11 +932,10 @@ export function AdminSlipsView() {
                         );
                         const count = attendees?.length || 1;
                         return (
-                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border flex items-center gap-1 shadow-2xs ${
-                            isMemberGroup
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border flex items-center gap-1 shadow-2xs ${isMemberGroup
                               ? 'bg-blue-50 text-[#0026b3] border-blue-200'
                               : 'bg-sky-50 text-sky-800 border-sky-200'
-                          }`}>
+                            }`}>
                             <Building2 className={`w-3 h-3 ${isMemberGroup ? 'text-[#0026b3]' : 'text-sky-600'}`} />
                             <span>
                               {lang === 'th'
@@ -1037,40 +1011,36 @@ export function AdminSlipsView() {
                             return (
                               <span
                                 key={act.id || i}
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold shadow-2xs ${
-                                  act.type === 'format_change' || slip.isFormatChange
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold shadow-2xs ${act.type === 'format_change' || slip.isFormatChange
                                     ? 'bg-amber-50 text-amber-950 border border-amber-300 ring-1 ring-amber-400/30'
                                     : act.type === 'membership_registration' || act.type === 'membership_group_registration'
-                                    ? 'bg-purple-50 text-purple-900 border border-purple-200'
-                                    : 'bg-indigo-50 text-indigo-900 border border-indigo-200'
-                                }`}
+                                      ? 'bg-purple-50 text-purple-900 border border-purple-200'
+                                      : 'bg-indigo-50 text-indigo-900 border border-indigo-200'
+                                  }`}
                               >
-                                <BookOpen className={`w-3 h-3 shrink-0 ${
-                                  act.type === 'format_change' || slip.isFormatChange
+                                <BookOpen className={`w-3 h-3 shrink-0 ${act.type === 'format_change' || slip.isFormatChange
                                     ? 'text-amber-600'
                                     : act.type === 'membership_registration' || act.type === 'membership_group_registration'
-                                    ? 'text-purple-600'
-                                    : 'text-indigo-600'
-                                }`} />
+                                      ? 'text-purple-600'
+                                      : 'text-indigo-600'
+                                  }`} />
                                 <span>{act.name}</span>
                                 {effectivePrice > 0 ? (
-                                  <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border font-mono ${
-                                    act.type === 'format_change' || slip.isFormatChange
+                                  <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border font-mono ${act.type === 'format_change' || slip.isFormatChange
                                       ? 'text-amber-800 bg-white border-amber-200'
                                       : act.type === 'membership_registration' || act.type === 'membership_group_registration'
-                                      ? 'text-purple-700 bg-white border-purple-100'
-                                      : 'text-indigo-700 bg-white border-indigo-100'
-                                  }`}>
+                                        ? 'text-purple-700 bg-white border-purple-100'
+                                        : 'text-indigo-700 bg-white border-indigo-100'
+                                    }`}>
                                     ฿{effectivePrice.toLocaleString()}
                                   </span>
                                 ) : act.price !== undefined ? (
-                                  <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border font-mono ${
-                                    act.type === 'format_change' || slip.isFormatChange
+                                  <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border font-mono ${act.type === 'format_change' || slip.isFormatChange
                                       ? 'text-amber-800 bg-white border-amber-200'
                                       : act.type === 'membership_registration' || act.type === 'membership_group_registration'
-                                      ? 'text-purple-700 bg-white border-purple-100'
-                                      : 'text-indigo-700 bg-white border-indigo-100'
-                                  }`}>
+                                        ? 'text-purple-700 bg-white border-purple-100'
+                                        : 'text-indigo-700 bg-white border-indigo-100'
+                                    }`}>
                                     ฿{Number(act.price).toLocaleString()}
                                   </span>
                                 ) : null}
@@ -1149,11 +1119,10 @@ export function AdminSlipsView() {
                       <button
                         onClick={(e) => handleApprove(slip.id, e)}
                         disabled={isProcessing}
-                        className={`px-3 py-2 text-[#061d08] rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 ${
-                          processingSlipId === slip.id
+                        className={`px-3 py-2 text-[#061d08] rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 ${processingSlipId === slip.id
                             ? 'bg-emerald-300 opacity-90 cursor-wait'
                             : 'bg-[#4ade80] hover:bg-[#3ec424]'
-                        }`}
+                          }`}
                         title={lang === 'th' ? 'อนุมัติ' : 'Approve'}
                       >
                         {processingSlipId === slip.id ? (
@@ -1214,10 +1183,10 @@ export function AdminSlipsView() {
                       {selectedSlip.isMembershipRegistration
                         ? (lang === 'th' ? 'คำขอสมัครสมาชิกสมาคม & สลิปโอนเงิน' : 'Membership Application & Slip')
                         : (selectedSlip.isGroupConference || selectedSlip.groupPayload?.attendees || selectedSlip.ticketCode?.startsWith('GRP-'))
-                        ? (lang === 'th' ? 'คำขอลงทะเบียนประชุมแบบกลุ่ม & สลิปโอนเงิน' : 'Group Conference Registration & Slip')
-                        : (selectedSlip.isGroupMembership || selectedSlip.groupPayload?.applicants || selectedSlip.ticketCode?.startsWith('MEMGRP'))
-                        ? (lang === 'th' ? 'คำขอสมัครสมาชิกแบบกลุ่ม & สลิปโอนเงิน' : 'Group Membership Application & Slip')
-                        : (lang === 'th' ? 'รายละเอียดสลิปโอนเงิน' : 'Slip Details')}
+                          ? (lang === 'th' ? 'คำขอลงทะเบียนประชุมแบบกลุ่ม & สลิปโอนเงิน' : 'Group Conference Registration & Slip')
+                          : (selectedSlip.isGroupMembership || selectedSlip.groupPayload?.applicants || selectedSlip.ticketCode?.startsWith('MEMGRP'))
+                            ? (lang === 'th' ? 'คำขอสมัครสมาชิกแบบกลุ่ม & สลิปโอนเงิน' : 'Group Membership Application & Slip')
+                            : (lang === 'th' ? 'รายละเอียดสลิปโอนเงิน' : 'Slip Details')}
                     </h3>
                     <p className="text-xs text-slate-500 font-mono">Ref: {selectedSlip.refNo}</p>
                   </div>
@@ -1390,10 +1359,10 @@ export function AdminSlipsView() {
                                 (selectedSlip.email &&
                                   app.email?.trim().toLowerCase() === selectedSlip.email.trim().toLowerCase())
                               ) && (
-                                <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded shadow-2xs whitespace-nowrap">
-                                  ⚠️ ใช้อีเมลเดียวกับบริษัท
-                                </span>
-                              )}
+                                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded shadow-2xs whitespace-nowrap">
+                                    ⚠️ ใช้อีเมลเดียวกับบริษัท
+                                  </span>
+                                )}
                             </div>
                           </div>
 
@@ -1473,20 +1442,20 @@ export function AdminSlipsView() {
                                 // Check coupon discount for this attendee (ข้อ 3 & 4)
                                 const attUsage = selectedSlip.couponUsages?.find(
                                   (cu) => (att.memberNo && cu.memberNo === att.memberNo) ||
-                                          (att.email && cu.attendeeEmail?.toLowerCase() === att.email.toLowerCase()) ||
-                                          (att.nameTh && cu.attendeeName === att.nameTh)
+                                    (att.email && cu.attendeeEmail?.toLowerCase() === att.email.toLowerCase()) ||
+                                    (att.nameTh && cu.attendeeName === att.nameTh)
                                 );
 
                                 const isCouponActive = Boolean(selectedSlip.couponCode || selectedSlip.couponInfo?.code);
                                 const isFreeCoupon = selectedSlip.couponInfo?.discountType === 'free';
-                                const hasMainProgram = attActivities.some(a => 
-                                  a.name.toLowerCase().includes('main') || 
-                                  a.name.includes('การประชุมหลัก') || 
+                                const hasMainProgram = attActivities.some(a =>
+                                  a.name.toLowerCase().includes('main') ||
+                                  a.name.includes('การประชุมหลัก') ||
                                   a.name.includes('Main Program')
                                 );
 
-                                const attDiscount = attUsage?.discountApplied 
-                                  ? Number(attUsage.discountApplied) 
+                                const attDiscount = attUsage?.discountApplied
+                                  ? Number(attUsage.discountApplied)
                                   : (Number(att.discountTotal) || Number(att.discountAmount) || (isFreeCoupon && hasMainProgram ? 4000 : 0));
 
                                 const hasDiscount = attDiscount > 0 || (isFreeCoupon && hasMainProgram) || Boolean(att.discountAppliedNotice);
@@ -1496,17 +1465,15 @@ export function AdminSlipsView() {
                                 return (
                                   <div
                                     key={idx}
-                                    className={`bg-white border rounded-2xl p-3 sm:p-3.5 text-xs text-slate-800 shadow-2xs transition flex flex-col sm:flex-row items-start justify-between gap-3 ${
-                                      hasDiscount ? 'border-emerald-200 hover:border-emerald-400 bg-emerald-50/20' : 'border-sky-100 hover:border-sky-300'
-                                    }`}
+                                    className={`bg-white border rounded-2xl p-3 sm:p-3.5 text-xs text-slate-800 shadow-2xs transition flex flex-col sm:flex-row items-start justify-between gap-3 ${hasDiscount ? 'border-emerald-200 hover:border-emerald-400 bg-emerald-50/20' : 'border-sky-100 hover:border-sky-300'
+                                      }`}
                                   >
                                     <div className="min-w-0 flex-1 w-full space-y-1.5">
                                       {/* Row 1: Number + Thai Name + Member Badge + Mobile Action */}
                                       <div className="flex items-center justify-between gap-2">
                                         <div className="flex items-center gap-2 font-bold text-slate-900 flex-wrap min-w-0">
-                                          <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
-                                            hasDiscount ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-[#0026b3]'
-                                          }`}>
+                                          <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${hasDiscount ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-[#0026b3]'
+                                            }`}>
                                             {idx + 1}
                                           </span>
                                           <span className="text-sm font-extrabold text-slate-900 truncate">{attName}</span>
@@ -1600,8 +1567,8 @@ export function AdminSlipsView() {
                                           </span>
                                           <div className="flex items-center gap-1.5 flex-wrap">
                                             {attActivities.map((act, actIdx) => {
-                                              const isMainProgram = act.name.toLowerCase().includes('main') || 
-                                                act.name.includes('การประชุมหลัก') || 
+                                              const isMainProgram = act.name.toLowerCase().includes('main') ||
+                                                act.name.includes('การประชุมหลัก') ||
                                                 act.name.includes('Main Program');
                                               const isActDiscounted = hasDiscount && isMainProgram && (isFreeCoupon || attDiscount >= (act.price || 4000));
                                               const rawActPrice = Number(act.price) || (isMainProgram ? 4000 : 0);
@@ -1610,11 +1577,10 @@ export function AdminSlipsView() {
                                               return (
                                                 <span
                                                   key={actIdx}
-                                                  className={`text-[10px] font-bold border px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-2xs ${
-                                                    isActDiscounted
+                                                  className={`text-[10px] font-bold border px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-2xs ${isActDiscounted
                                                       ? 'bg-emerald-50 text-emerald-950 border-emerald-300 ring-1 ring-emerald-400/20'
                                                       : 'bg-sky-50 text-[#0026b3] border-sky-200'
-                                                  }`}
+                                                    }`}
                                                 >
                                                   <BookOpen className={`w-3 h-3 shrink-0 ${isActDiscounted ? 'text-emerald-600' : 'text-[#0026b3]'}`} />
                                                   <span className="truncate max-w-[200px]">{act.name}</span>
@@ -1704,17 +1670,16 @@ export function AdminSlipsView() {
                       {lang === 'th' ? 'สถานะผู้สมัคร' : 'Status'}
                     </span>
                     <span
-                      className={`font-black text-xs sm:text-sm text-right ${
-                        selectedSlip.isGroupConference || selectedSlip.ticketCode?.startsWith('GRP-')
+                      className={`font-black text-xs sm:text-sm text-right ${selectedSlip.isGroupConference || selectedSlip.ticketCode?.startsWith('GRP-')
                           ? 'text-[#0026b3]'
                           : selectedSlip.isGroupMembership || selectedSlip.groupPayload?.applicants
-                          ? 'text-indigo-800'
-                          : selectedSlip.isMember
-                          ? 'text-[#0026b3]'
-                          : selectedSlip.isMembershipRegistration
-                          ? 'text-purple-700'
-                          : 'text-amber-800'
-                      }`}
+                            ? 'text-indigo-800'
+                            : selectedSlip.isMember
+                              ? 'text-[#0026b3]'
+                              : selectedSlip.isMembershipRegistration
+                                ? 'text-purple-700'
+                                : 'text-amber-800'
+                        }`}
                     >
                       {(() => {
                         const attendees = selectedSlip.groupPayload?.attendees;
@@ -1806,8 +1771,8 @@ export function AdminSlipsView() {
                             {selectedSlip.couponInfo?.discountType === 'free'
                               ? '(สิทธิ์ฟรี Main Congress)'
                               : selectedSlip.couponInfo?.discountValue
-                              ? `(ส่วนลด ${selectedSlip.couponInfo.discountValue})`
-                              : ''}
+                                ? `(ส่วนลด ${selectedSlip.couponInfo.discountValue})`
+                                : ''}
                           </span>
                         </span>
                       </div>
@@ -1962,11 +1927,10 @@ export function AdminSlipsView() {
                     <button
                       onClick={() => handleApprove(selectedSlip.id)}
                       disabled={isProcessing}
-                      className={`px-3 sm:px-5 py-2 sm:py-2.5 text-[#061d08] text-xs font-black rounded-xl transition cursor-pointer shadow-md flex items-center gap-1.5 active:scale-95 whitespace-nowrap ${
-                        processingSlipId === selectedSlip.id
+                      className={`px-3 sm:px-5 py-2 sm:py-2.5 text-[#061d08] text-xs font-black rounded-xl transition cursor-pointer shadow-md flex items-center gap-1.5 active:scale-95 whitespace-nowrap ${processingSlipId === selectedSlip.id
                           ? 'bg-emerald-300 opacity-90 cursor-wait'
                           : 'bg-[#4ade80] hover:bg-[#3ec424]'
-                      }`}
+                        }`}
                       title={lang === 'th' ? 'อนุมัติการชำระเงิน' : 'Approve Payment'}
                     >
                       {processingSlipId === selectedSlip.id ? (
@@ -2017,11 +1981,10 @@ export function AdminSlipsView() {
                       setRejectType('info');
                       setRejectReason('ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบและแก้ไขข้อมูลให้ถูกต้อง');
                     }}
-                    className={`p-2.5 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${
-                      rejectType === 'info'
+                    className={`p-2.5 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${rejectType === 'info'
                         ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-300 text-rose-950 shadow-xs'
                         : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-1.5 font-extrabold text-xs">
                       <span>⚠️</span>
@@ -2041,11 +2004,10 @@ export function AdminSlipsView() {
                       setRejectType('slip');
                       setRejectReason('หลักฐานการโอนเงิน (สลิป) ไม่ถูกต้อง หรือไม่ชัดเจน กรุณาแนบสลิปใหม่');
                     }}
-                    className={`p-2.5 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${
-                      rejectType === 'slip'
+                    className={`p-2.5 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${rejectType === 'slip'
                         ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-300 text-rose-950 shadow-xs'
                         : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-1.5 font-extrabold text-xs">
                       <span>🧾</span>

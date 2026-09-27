@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
     }
 
     let memberPayload: any = null;
+    let groupPayload: any = null;
     let isMembershipRegistration = false;
     let isGroup = false;
     let rejectType: 'info' | 'slip' = 'info';
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
     if (slip.selected_activities) {
       let actObj = slip.selected_activities;
       if (typeof actObj === 'string') {
-        try { actObj = JSON.parse(actObj); } catch {}
+        try { actObj = JSON.parse(actObj); } catch { }
       }
       if (actObj && typeof actObj === 'object') {
         if (actObj.rejectType) {
@@ -64,8 +65,14 @@ export async function GET(request: NextRequest) {
         if (actObj.type === 'membership_registration' || actObj.memberPayload) {
           isMembershipRegistration = true;
           memberPayload = actObj.memberPayload;
-        } else if (actObj.type === 'membership_group_registration' || actObj.isGroup) {
+        } else if (
+          actObj.type === 'membership_group_registration' ||
+          actObj.isGroup ||
+          (actObj.attendees && Array.isArray(actObj.attendees)) ||
+          (actObj.applicants && Array.isArray(actObj.applicants))
+        ) {
           isGroup = true;
+          groupPayload = actObj;
         }
       }
     }
@@ -79,16 +86,59 @@ export async function GET(request: NextRequest) {
     if (slip.ticket_code?.startsWith('MEM-') || slip.meeting_id === 'membership') {
       isMembershipRegistration = true;
     }
+    if (slip.ticket_code?.startsWith('MEMGRP')) {
+      isGroup = true;
+      isMembershipRegistration = true;
+    }
 
     const isCorporate = Boolean(
       isGroup ||
       slip.ticket_code?.startsWith('MEMGRP') ||
-      slip.guest_name?.includes('ท่าน')
+      slip.ticket_code?.startsWith('GRP-') ||
+      slip.guest_name?.includes('ท่าน') ||
+      groupPayload
     );
 
     let companyName = '';
     if (isCorporate) {
-      companyName = slip.guest_workplace || (slip.guest_name ? slip.guest_name.replace(/\s*\(\d+\s*ท่าน\)/, '') : '');
+      companyName = groupPayload?.companyName || slip.guest_workplace || (slip.guest_name ? slip.guest_name.replace(/\s*\(\d+\s*ท่าน\)/, '') : '');
+    }
+
+    const attendeesList = groupPayload?.attendees || groupPayload?.applicants || [];
+    const attendeeEmails = new Set<string>();
+    if (Array.isArray(attendeesList)) {
+      for (const a of attendeesList) {
+        const em = (a.email || a.attendee_email)?.trim()?.toLowerCase();
+        if (em) attendeeEmails.add(em);
+      }
+    }
+    if (slip.members?.email) {
+      attendeeEmails.add(slip.members.email.trim().toLowerCase());
+    }
+
+    let coordinatorName = groupPayload?.groupContact?.coordinatorName || '';
+    let coordinatorEmail = groupPayload?.groupContact?.coordinatorEmail || '';
+    let coordinatorPhone = groupPayload?.groupContact?.coordinatorPhone || '';
+
+    if (coordinatorEmail && attendeeEmails.has(coordinatorEmail.trim().toLowerCase())) {
+      coordinatorEmail = '';
+    }
+
+    if (!coordinatorEmail && slip.guest_email && !attendeeEmails.has(slip.guest_email.trim().toLowerCase())) {
+      coordinatorEmail = slip.guest_email.trim();
+    }
+
+    if (isCorporate && !coordinatorEmail && companyName) {
+      try {
+        const sp = await (prisma as any).sponsors.findFirst({
+          where: { name: { equals: companyName.trim(), mode: 'insensitive' } },
+          select: { contact_email: true, contact_name: true },
+        });
+        if (sp?.contact_email && !attendeeEmails.has(sp.contact_email.trim().toLowerCase())) {
+          coordinatorEmail = sp.contact_email.trim();
+          coordinatorName = coordinatorName || sp.contact_name || companyName;
+        }
+      } catch { }
     }
 
     const nameTh = isCorporate
@@ -101,13 +151,15 @@ export async function GET(request: NextRequest) {
       ? slip.members?.fullNameEn || ''
       : memberPayload?.full_name_en || '';
 
-    const email = slip.is_member
-      ? slip.members?.email || ''
-      : slip.guest_email || memberPayload?.email || '';
+    const email = isCorporate
+      ? (coordinatorEmail || slip.guest_email || '')
+      : (slip.is_member
+        ? slip.members?.email || ''
+        : slip.guest_email || memberPayload?.email || '');
 
     // ถ้าเป็นข้อมูลบริษัท อย่าดึงเบอร์โทรของคนสมัครมาปน
     const phone = isCorporate
-      ? ''
+      ? (coordinatorPhone || '')
       : (slip.is_member
         ? slip.members?.mobile || ''
         : slip.guest_phone || memberPayload?.mobile || '');
@@ -141,9 +193,20 @@ export async function GET(request: NextRequest) {
         isMember: slip.is_member,
         memberNo: slip.member_no,
         isMembershipRegistration,
-        isGroup,
+        isGroup: Boolean(isGroup || groupPayload),
         isCorporate,
         companyName,
+        groupPayload: groupPayload ? {
+          ...groupPayload,
+          companyName: groupPayload.companyName || companyName,
+          groupContact: groupPayload.groupContact || {
+            coordinatorName,
+            coordinatorEmail,
+            coordinatorPhone,
+          },
+          attendees: groupPayload.attendees || [],
+          applicants: groupPayload.applicants || [],
+        } : null,
         amount: slip.amount,
         bank: slip.bank,
         transferDate: slip.transfer_date,
@@ -186,6 +249,7 @@ export async function POST(request: NextRequest) {
       address,
       jobCategory,
       memberPayload: customMemberPayload,
+      groupPayload: customGroupPayload,
     } = body;
 
     if (!token) {
@@ -210,7 +274,7 @@ export async function POST(request: NextRequest) {
     }
 
     const finalSlipUrl = slipUrl || slip.slip_url;
-    if (!finalSlipUrl || finalSlipUrl === 'PAY_LATER' && !slipUrl) {
+    if (!finalSlipUrl || (finalSlipUrl === 'PAY_LATER' && !slipUrl)) {
       return NextResponse.json(
         { success: false, error: 'กรุณาแนบรูปภาพสลิปหลักฐานการชำระเงิน' },
         { status: 400 }
@@ -222,15 +286,30 @@ export async function POST(request: NextRequest) {
     const cleanPhone = phone?.trim() || slip.guest_phone || slip.members?.mobile || '';
     const cleanWorkplace = workplace?.trim() || slip.guest_workplace || slip.members?.workplace || '';
 
-    // Handle updating selected_activities if this was a membership registration
+    // Handle updating selected_activities if this was a group registration or individual membership registration
     let updatedActivities = slip.selected_activities;
     if (updatedActivities) {
       let actObj = updatedActivities;
       if (typeof actObj === 'string') {
-        try { actObj = JSON.parse(actObj); } catch {}
+        try { actObj = JSON.parse(actObj); } catch { }
       }
       if (actObj && typeof actObj === 'object') {
-        if (actObj.memberPayload || actObj.type === 'membership_registration') {
+        if (customGroupPayload) {
+          actObj = {
+            ...actObj,
+            ...customGroupPayload,
+            companyName: customGroupPayload.companyName || actObj.companyName || cleanWorkplace,
+            groupContact: customGroupPayload.groupContact || {
+              coordinatorName: cleanNameTh,
+              coordinatorEmail: cleanEmail,
+              coordinatorPhone: cleanPhone,
+            },
+            attendees: customGroupPayload.attendees || actObj.attendees || [],
+            applicants: customGroupPayload.applicants || actObj.applicants || [],
+            rejectType: undefined,
+          };
+          updatedActivities = actObj;
+        } else if (actObj.memberPayload || actObj.type === 'membership_registration') {
           actObj.memberPayload = {
             ...(actObj.memberPayload || {}),
             ...(customMemberPayload || {}),
@@ -243,12 +322,25 @@ export async function POST(request: NextRequest) {
             ...(address ? { address: address.trim() } : {}),
             ...(jobCategory ? { job_category: jobCategory.trim() } : {}),
           };
+          actObj.rejectType = undefined;
           updatedActivities = actObj;
         }
       }
+    } else if (customGroupPayload) {
+      updatedActivities = customGroupPayload;
     }
 
-    // Update payment_slips record
+    const isGroupResubmit = Boolean(
+      customGroupPayload ||
+      (updatedActivities && typeof updatedActivities === 'object' && (updatedActivities.isGroup || updatedActivities.attendees || updatedActivities.applicants))
+    );
+
+    const groupCompany = customGroupPayload?.companyName || cleanWorkplace || 'Corporate Group';
+    const groupAttendeesCount = customGroupPayload?.attendees?.length || customGroupPayload?.applicants?.length || 0;
+    const groupCoordEmail = customGroupPayload?.groupContact?.coordinatorEmail || cleanEmail;
+    const groupCoordPhone = customGroupPayload?.groupContact?.coordinatorPhone || cleanPhone;
+
+    // Update payment_slips record in place (ไม่สร้าง record ใหม่!)
     await (prisma as any).payment_slips.update({
       where: { resubmit_token: token },
       data: {
@@ -257,10 +349,12 @@ export async function POST(request: NextRequest) {
         transfer_date: transferDate || slip.transfer_date,
         transfer_time: transferTime || slip.transfer_time,
         ref_no: refNo || slip.ref_no,
-        guest_name: !slip.is_member ? cleanNameTh : slip.guest_name,
-        guest_email: !slip.is_member ? cleanEmail : slip.guest_email,
-        guest_phone: !slip.is_member ? cleanPhone : slip.guest_phone,
-        guest_workplace: !slip.is_member ? cleanWorkplace : slip.guest_workplace,
+        guest_name: isGroupResubmit
+          ? `${groupCompany} (${groupAttendeesCount} ท่าน)`
+          : (!slip.is_member ? cleanNameTh : slip.guest_name),
+        guest_email: isGroupResubmit ? groupCoordEmail : (!slip.is_member ? cleanEmail : slip.guest_email),
+        guest_phone: isGroupResubmit ? groupCoordPhone : (!slip.is_member ? cleanPhone : slip.guest_phone),
+        guest_workplace: isGroupResubmit ? groupCompany : (!slip.is_member ? cleanWorkplace : slip.guest_workplace),
         selected_activities: updatedActivities,
         status: 'pending',
         rejection_reason: null,
@@ -268,7 +362,59 @@ export async function POST(request: NextRequest) {
     });
 
     // Synchronize meeting_attendances back to pending and update details
-    if (slip.member_no) {
+    if (isGroupResubmit && customGroupPayload?.attendees && Array.isArray(customGroupPayload.attendees)) {
+      // Synchronize all group conference attendees into meeting_attendances
+      for (const att of customGroupPayload.attendees) {
+        const attName = att.nameTh || att.nameEn || 'Attendee';
+        const attEmail = att.email?.trim()?.toLowerCase() || '';
+        const attWorkplace = att.workplace || groupCompany;
+        const attMemberNo = att.memberNo?.trim() || null;
+        const attPhone = att.phone?.trim() || null;
+
+        if (attMemberNo) {
+          await prisma.$executeRaw`
+            INSERT INTO meeting_attendances (
+              meeting_id, member_no, attendance_status, workplace, attendee_phone
+            ) VALUES (
+              ${slip.meeting_id}, ${attMemberNo}, 'Pending_Payment', ${attWorkplace}, ${attPhone}
+            ) ON CONFLICT (meeting_id, member_no)
+            DO UPDATE SET
+              attendance_status = 'Pending_Payment',
+              workplace = COALESCE(${attWorkplace}, meeting_attendances.workplace),
+              attendee_phone = COALESCE(${attPhone}, meeting_attendances.attendee_phone)
+          `;
+        } else if (attEmail) {
+          const existingAtt = await prisma.meeting_attendances.findFirst({
+            where: {
+              meeting_id: slip.meeting_id,
+              attendee_email: { equals: attEmail, mode: 'insensitive' },
+            },
+          });
+          if (existingAtt) {
+            await prisma.meeting_attendances.update({
+              where: { attendance_id: existingAtt.attendance_id },
+              data: {
+                attendance_status: 'Non-Member-Pending',
+                attendee_name: attName,
+                attendee_phone: attPhone,
+                workplace: attWorkplace,
+              },
+            });
+          } else {
+            await prisma.meeting_attendances.create({
+              data: {
+                meeting_id: slip.meeting_id,
+                attendee_name: attName,
+                attendee_email: attEmail,
+                attendee_phone: attPhone,
+                workplace: attWorkplace,
+                attendance_status: 'Non-Member-Pending',
+              },
+            });
+          }
+        }
+      }
+    } else if (slip.member_no) {
       await prisma.$executeRaw`
         UPDATE meeting_attendances
         SET attendance_status = 'Pending_Payment'
