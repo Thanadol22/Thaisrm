@@ -528,6 +528,22 @@ export async function POST(
     const attendanceStatus = isFreeRegistration ? 'Registered' : (isMember ? 'Pending_Payment' : 'Non-Member-Pending');
     const effectiveSlipUrl = slipUrl || (couponRecord ? `COUPON_SPONSORED:${couponRecord.company_name}` : 'FREE_REGISTRATION');
 
+    let effectiveSelectedActivities = selectedActivities || null;
+    if (effectiveSelectedActivities && Array.isArray(effectiveSelectedActivities)) {
+      effectiveSelectedActivities = {
+        activities: effectiveSelectedActivities,
+        nameTh: guestName,
+        nameEn: body.guestNameEn || body.nameEn || null,
+        email: guestEmail,
+        phone: guestPhone,
+        workplace: guestWorkplace,
+        position: body.guestPosition || body.position || null,
+      };
+    } else if (effectiveSelectedActivities && typeof effectiveSelectedActivities === 'object' && !effectiveSelectedActivities.nameEn) {
+      effectiveSelectedActivities.nameEn = body.guestNameEn || body.nameEn || effectiveSelectedActivities.nameEn || null;
+      effectiveSelectedActivities.position = body.guestPosition || body.position || effectiveSelectedActivities.position || null;
+    }
+
     // 2. Record payment slip in payment_slips table
     let slip: any = null;
     if ((prisma as any).payment_slips) {
@@ -549,13 +565,13 @@ export async function POST(
           ref_no: refNo || (couponRecord ? `COUPON:${couponRecord.code}` : null),
           slip_url: effectiveSlipUrl,
           status: registrationStatus,
-          selected_activities: selectedActivities || null,
+          selected_activities: effectiveSelectedActivities,
           reviewed_by: isFreeRegistration ? (couponRecord ? `SYSTEM:COUPON(${couponRecord.code})` : 'SYSTEM:AUTO_FREE') : null,
           reviewed_at: isFreeRegistration ? new Date() : null,
         },
       });
     } else {
-      const actJson = selectedActivities ? JSON.stringify(selectedActivities) : null;
+      const actJson = effectiveSelectedActivities ? JSON.stringify(effectiveSelectedActivities) : null;
       await prisma.$executeRaw`
         INSERT INTO payment_slips (
           slip_id, meeting_id, member_no, guest_name, guest_email, guest_phone, guest_workplace,

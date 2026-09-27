@@ -635,13 +635,40 @@ function PaymentContent() {
         } else {
           // Individual Conference Registration Submission
           const isMember = calculationResult.isMemberUser;
-          const selectedActivitiesPayload = calculationResult.items.map(item => ({
+          const itemsList = calculationResult.items.map(item => ({
             id: item.id,
             name: item.name,
             type: item.type,
             price: item.price,
             date: item.date,
           }));
+
+          const selectedActivitiesPayload = {
+            activities: itemsList,
+            type: 'conference_individual_registration',
+            nameTh: regData?.nameTh,
+            nameEn: regData?.nameEn,
+            email: regData?.email,
+            phone: regData?.phone || regData?.mobile,
+            workplace: regData?.workplace,
+            position: regData?.position,
+            positionCode: regData?.positionCode,
+            memberNo: regData?.memberNo,
+            attendanceType: regData?.attendanceType,
+            attendees: [
+              {
+                nameTh: regData?.nameTh,
+                nameEn: regData?.nameEn,
+                email: regData?.email,
+                phone: regData?.phone || regData?.mobile,
+                workplace: regData?.workplace,
+                position: regData?.position,
+                positionCode: regData?.positionCode,
+                memberNo: regData?.memberNo,
+                attendanceType: regData?.attendanceType,
+              }
+            ]
+          };
 
           const res = await fetch(`/api/meetings/${meetingId}/register`, {
             method: 'POST',
@@ -650,9 +677,11 @@ function PaymentContent() {
               isMember: isMember,
               memberNo: isMember ? regData?.memberNo : undefined,
               guestName: !isMember ? (regData?.nameTh || regData?.nameEn || 'Guest Attendee') : undefined,
+              guestNameEn: !isMember ? regData?.nameEn : undefined,
               guestEmail: !isMember ? (regData?.email || 'guest@tsrm.org') : undefined,
               guestPhone: !isMember ? (regData?.phone || regData?.mobile || undefined) : undefined,
               guestWorkplace: !isMember ? (regData?.workplace || null) : undefined,
+              guestPosition: !isMember ? (regData?.position || null) : undefined,
               amount: calculationResult.totalAmount,
               originalAmount: calculationResult.originalAmount,
               couponCode: regData?.couponData?.code || undefined,

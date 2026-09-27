@@ -49,12 +49,13 @@ export async function GET(request: NextRequest) {
 
     let memberPayload: any = null;
     let groupPayload: any = null;
+    let actObj: any = null;
     let isMembershipRegistration = false;
     let isGroup = false;
     let rejectType: 'info' | 'slip' = 'info';
 
     if (slip.selected_activities) {
-      let actObj = slip.selected_activities;
+      actObj = slip.selected_activities;
       if (typeof actObj === 'string') {
         try { actObj = JSON.parse(actObj); } catch { }
       }
@@ -104,7 +105,33 @@ export async function GET(request: NextRequest) {
       companyName = groupPayload?.companyName || slip.guest_workplace || (slip.guest_name ? slip.guest_name.replace(/\s*\(\d+\s*ท่าน\)/, '') : '');
     }
 
-    const attendeesList = groupPayload?.attendees || groupPayload?.applicants || [];
+    // Try finding matched member if guest email exists and slip.members is null
+    let matchedMember = slip.members;
+    if (!matchedMember && (slip.guest_email || slip.member_no)) {
+      try {
+        matchedMember = await prisma.member.findFirst({
+          where: {
+            OR: [
+              ...(slip.member_no ? [{ member_no: slip.member_no }] : []),
+              ...(slip.guest_email ? [{ email: { equals: slip.guest_email.trim(), mode: 'insensitive' as const } }] : []),
+            ],
+          },
+          select: {
+            member_no: true,
+            fullNameTh: true,
+            fullNameEn: true,
+            email: true,
+            mobile: true,
+            workplace: true,
+            position: true,
+            address: true,
+            job_category: true,
+          },
+        });
+      } catch { }
+    }
+
+    const attendeesList = groupPayload?.attendees || groupPayload?.applicants || actObj?.attendees || [];
     const attendeeEmails = new Set<string>();
     if (Array.isArray(attendeesList)) {
       for (const a of attendeesList) {
@@ -144,35 +171,40 @@ export async function GET(request: NextRequest) {
     const nameTh = isCorporate
       ? companyName || slip.guest_name || ''
       : (slip.is_member
-        ? slip.members?.fullNameTh || ''
-        : slip.guest_name || memberPayload?.full_name_th || '');
+        ? slip.members?.fullNameTh || matchedMember?.fullNameTh || ''
+        : slip.guest_name || actObj?.nameTh || actObj?.attendees?.[0]?.nameTh || memberPayload?.full_name_th || matchedMember?.fullNameTh || '');
 
-    const nameEn = slip.is_member
-      ? slip.members?.fullNameEn || ''
-      : memberPayload?.full_name_en || '';
+    const nameEn = isCorporate
+      ? ''
+      : (slip.is_member
+        ? slip.members?.fullNameEn || matchedMember?.fullNameEn || ''
+        : actObj?.nameEn || actObj?.attendees?.[0]?.nameEn || groupPayload?.attendees?.[0]?.nameEn || memberPayload?.full_name_en || matchedMember?.fullNameEn || '');
 
     const email = isCorporate
       ? (coordinatorEmail || slip.guest_email || '')
       : (slip.is_member
-        ? slip.members?.email || ''
-        : slip.guest_email || memberPayload?.email || '');
+        ? slip.members?.email || matchedMember?.email || ''
+        : slip.guest_email || actObj?.email || actObj?.attendees?.[0]?.email || memberPayload?.email || matchedMember?.email || '');
 
     // ถ้าเป็นข้อมูลบริษัท อย่าดึงเบอร์โทรของคนสมัครมาปน
     const phone = isCorporate
       ? (coordinatorPhone || '')
       : (slip.is_member
-        ? slip.members?.mobile || ''
-        : slip.guest_phone || memberPayload?.mobile || '');
+        ? slip.members?.mobile || matchedMember?.mobile || ''
+        : slip.guest_phone || actObj?.phone || actObj?.attendees?.[0]?.phone || memberPayload?.mobile || matchedMember?.mobile || '');
 
     const workplace = isCorporate
       ? companyName
       : (slip.is_member
-        ? slip.members?.workplace || ''
-        : slip.guest_workplace || memberPayload?.workplace || '');
+        ? slip.members?.workplace || matchedMember?.workplace || ''
+        : slip.guest_workplace || actObj?.workplace || actObj?.attendees?.[0]?.workplace || memberPayload?.workplace || matchedMember?.workplace || '');
 
-    const position = slip.members?.position || memberPayload?.position || '';
-    const address = slip.members?.address || memberPayload?.address || '';
-    const jobCategory = slip.members?.job_category || memberPayload?.job_category || '';
+    const position = isCorporate
+      ? ''
+      : (slip.members?.position || actObj?.position || actObj?.attendees?.[0]?.position || groupPayload?.attendees?.[0]?.position || memberPayload?.position || matchedMember?.position || '');
+
+    const address = slip.members?.address || actObj?.address || memberPayload?.address || matchedMember?.address || '';
+    const jobCategory = slip.members?.job_category || actObj?.jobCategory || memberPayload?.job_category || matchedMember?.job_category || '';
 
     // Resolve coupon information for resubmit page
     let couponCode = groupPayload?.couponCode || groupPayload?.couponData?.code || null;
@@ -384,10 +416,29 @@ export async function POST(request: NextRequest) {
           };
           actObj.rejectType = undefined;
           updatedActivities = actObj;
+        } else {
+          actObj = {
+            ...(typeof actObj === 'object' && !Array.isArray(actObj) ? actObj : { activities: actObj }),
+            nameTh: cleanNameTh,
+            nameEn: nameEn?.trim() || '',
+            email: cleanEmail,
+            workplace: cleanWorkplace,
+            position: position?.trim() || '',
+            rejectType: undefined,
+          };
+          updatedActivities = actObj;
         }
       }
     } else if (customGroupPayload) {
       updatedActivities = customGroupPayload;
+    } else if (nameEn || position) {
+      updatedActivities = {
+        nameTh: cleanNameTh,
+        nameEn: nameEn?.trim() || '',
+        email: cleanEmail,
+        workplace: cleanWorkplace,
+        position: position?.trim() || '',
+      };
     }
 
     const isGroupResubmit = Boolean(

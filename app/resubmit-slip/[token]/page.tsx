@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { TsrmLogo } from '@/components/TsrmLogo';
 import { uploadImageToStorage } from '@/lib/blobUpload';
+import { PositionSelect, POSITION_CATEGORY_OPTIONS, normalizePosition } from '@/components/PositionSelect';
 
 interface ResubmitPageProps {
   params: Promise<{ token: string }>;
@@ -74,6 +75,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
   const [phone, setPhone] = useState('');
   const [workplace, setWorkplace] = useState('');
   const [position, setPosition] = useState('');
+  const [positionOther, setPositionOther] = useState('');
   const [address, setAddress] = useState('');
 
   // Slip upload state
@@ -100,7 +102,20 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
           setEmail(d.email || '');
           setPhone(d.phone || '');
           setWorkplace(d.workplace || '');
-          setPosition(d.position || '');
+
+          const rawPos = d.position || '';
+          const normalized = normalizePosition(rawPos);
+          if (POSITION_CATEGORY_OPTIONS.some(o => o.value === normalized)) {
+            setPosition(normalized);
+            setPositionOther('');
+          } else if (rawPos) {
+            setPosition('0 อื่นๆ');
+            setPositionOther(rawPos);
+          } else {
+            setPosition('');
+            setPositionOther('');
+          }
+
           setAddress(d.address || '');
 
           const isInfo = d.rejectType === 'info' || (d.rejectionReason?.includes('ข้อมูล') && !d.rejectionReason?.includes('สลิป'));
@@ -197,6 +212,10 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
     try {
       setSubmitting(true);
 
+      const finalPosition = position === '0 อื่นๆ' || position === 'อื่นๆ'
+        ? positionOther.trim()
+        : (position.trim() || positionOther.trim());
+
       let finalSlipUrl = slipData.oldSlipUrl;
       if (newSlipFile) {
         const uploadResult = await uploadImageToStorage(newSlipFile, 'slips');
@@ -218,7 +237,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
           email: email.trim(),
           phone: slipData.isCorporate || !slipData.isMembershipRegistration ? '' : phone.trim(),
           workplace: slipData.isCorporate ? nameTh.trim() : workplace.trim(),
-          position: position.trim(),
+          position: finalPosition,
           address: slipData.isMembershipRegistration ? address.trim() : '',
         }),
       });
@@ -540,17 +559,14 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
                 </div>
 
                 {/* Position */}
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700 flex items-center gap-1">
-                    <Briefcase className="w-3.5 h-3.5 text-slate-400" />
-                    <span>ตำแหน่ง / สาขาวิชาชีพ</span>
-                  </label>
-                  <input
-                    type="text"
+                <div className="space-y-1.5 sm:col-span-2">
+                  <PositionSelect
                     value={position}
-                    onChange={(e) => setPosition(e.target.value)}
-                    placeholder="เช่น แพทย์, พยาบาล, นักวิทยาศาสตร์"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
+                    onChange={(val) => setPosition(val)}
+                    otherValue={positionOther}
+                    onOtherChange={(val) => setPositionOther(val)}
+                    label="ตำแหน่ง / สาขาวิชาชีพ"
+                    placeholder="-- เลือกตำแหน่ง / สาขาวิชาชีพ --"
                   />
                 </div>
 
@@ -634,16 +650,13 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
 
                 {/* Position */}
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="font-bold text-slate-700 flex items-center gap-1">
-                    <Briefcase className="w-3.5 h-3.5 text-slate-400" />
-                    <span>ตำแหน่ง / สาขาวิชาชีพ</span>
-                  </label>
-                  <input
-                    type="text"
+                  <PositionSelect
                     value={position}
-                    onChange={(e) => setPosition(e.target.value)}
-                    placeholder="เช่น แพทย์, พยาบาล, นักวิทยาศาสตร์"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
+                    onChange={(val) => setPosition(val)}
+                    otherValue={positionOther}
+                    onOtherChange={(val) => setPositionOther(val)}
+                    label="ตำแหน่ง / สาขาวิชาชีพ"
+                    placeholder="-- เลือกตำแหน่ง / สาขาวิชาชีพ --"
                   />
                 </div>
               </div>
