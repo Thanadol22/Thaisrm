@@ -151,13 +151,34 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
           alert('กรุณากรอกอีเมลประสานงาน');
           return;
         }
-      } else {
+      } else if (slipData.isMembershipRegistration) {
         if (!nameTh.trim()) {
-          alert('กรุณากรอกชื่อ-นามสกุล (ภาษาไทย)');
+          alert('กรุณากรอกชื่อ-นามสกุล ภาษาไทย');
           return;
         }
         if (!email.trim()) {
           alert('กรุณากรอกอีเมล');
+          return;
+        }
+        if (!phone.trim()) {
+          alert('กรุณากรอกเบอร์โทรศัพท์มือถือ');
+          return;
+        }
+        if (!workplace.trim()) {
+          alert('กรุณากรอกหน่วยงาน / โรงพยาบาล / สถานที่ทำงาน');
+          return;
+        }
+      } else {
+        if (!nameTh.trim()) {
+          alert('กรุณากรอกชื่อ-นามสกุล ภาษาไทย');
+          return;
+        }
+        if (!email.trim()) {
+          alert('กรุณากรอกอีเมล');
+          return;
+        }
+        if (!workplace.trim()) {
+          alert('กรุณากรอกหน่วยงาน / โรงพยาบาล / สถานที่ทำงาน');
           return;
         }
       }
@@ -195,10 +216,10 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
           nameTh: nameTh.trim(),
           nameEn: nameEn.trim(),
           email: email.trim(),
-          phone: slipData.isCorporate ? '' : phone.trim(),
+          phone: slipData.isCorporate || !slipData.isMembershipRegistration ? '' : phone.trim(),
           workplace: slipData.isCorporate ? nameTh.trim() : workplace.trim(),
           position: position.trim(),
-          address: address.trim(),
+          address: slipData.isMembershipRegistration ? address.trim() : '',
         }),
       });
 
@@ -325,9 +346,9 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
           </div>
           <p className="text-[11px] text-rose-700/80 font-medium">
             {isInfoMode
-              ? '* กรุณาตรวจสอบและแก้ไขข้อมูลในแบบฟอร์มด้านล่างให้ถูกต้อง จากนั้นกดยืนยันเพื่อส่งให้เจ้าหน้าที่ตรวจสอบใหม่ (ไม่ต้องแนบสลิปใหม่ครับ)'
+              ? '* กรุณาตรวจสอบและแก้ไขข้อมูลในแบบฟอร์มด้านล่างให้ถูกต้อง จากนั้นกดยืนยันเพื่อส่งให้เจ้าหน้าที่ตรวจสอบใหม่ (ไม่ต้องแนบหลักฐานการโอนเงินใหม่)'
               : isSlipMode
-              ? '* กรุณาแนบรูปภาพหลักฐานการโอนเงิน (สลิป) ใหม่ที่มียอดเงินและรายละเอียดถูกต้องด้านล่าง'
+              ? '* กรุณาแนบรูปภาพหลักฐานการโอนเงินใหม่ที่มียอดเงินและรายละเอียดถูกต้องด้านล่าง'
               : '* กรุณาตรวจสอบและแก้ไขข้อมูลในฟอร์มด้านล่างให้ถูกต้อง หรือแนบหลักฐานการโอนเงินใหม่'}
           </p>
         </div>
@@ -364,7 +385,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
               <div className="flex justify-between py-1.5 items-center">
                 <span className="text-slate-500">คูปองที่ใช้:</span>
                 <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
-                  🎟️ {slipData.couponCode} {slipData.couponInfo?.discountType === 'free' ? '(สิทธิ์ฟรี Main Congress)' : ''}
+                  🎟️ {slipData.couponCode} {slipData.couponInfo?.discountType === 'free' ? 'สิทธิ์ฟรีเข้าร่วมประชุม' : ''}
                 </span>
               </div>
             )}
@@ -401,6 +422,8 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
                 <span>
                   {slipData.isCorporate
                     ? 'แบบฟอร์มตรวจสอบและแก้ไขข้อมูลบริษัท / นิติบุคคล'
+                    : slipData.isMembershipRegistration
+                    ? 'แบบฟอร์มแก้ไขข้อมูลการสมัครสมาชิก'
                     : 'แบบฟอร์มแก้ไขข้อมูลผู้ลงทะเบียน'}
                 </span>
               </h3>
@@ -438,14 +461,14 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
                   />
                 </div>
               </div>
-            ) : (
-              /* กรณีบุคคลทั่วไป / สมาชิกเดี่ยว */
+            ) : slipData.isMembershipRegistration ? (
+              /* กรณีการสมัครสมาชิก: มีเบอร์โทรศัพท์และที่อยู่ตามข้อมูลสมัครสมาชิก */
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                 {/* Full Name TH */}
                 <div className="space-y-1.5">
                   <label className="font-bold text-slate-700 flex items-center gap-1">
                     <User className="w-3.5 h-3.5 text-slate-400" />
-                    <span>ชื่อ - นามสกุล (ภาษาไทย) <span className="text-rose-500">*</span></span>
+                    <span>ชื่อ - นามสกุล ภาษาไทย <span className="text-rose-500">*</span></span>
                   </label>
                   <input
                     type="text"
@@ -460,13 +483,13 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
                 <div className="space-y-1.5">
                   <label className="font-bold text-slate-700 flex items-center gap-1">
                     <User className="w-3.5 h-3.5 text-slate-400" />
-                    <span>ชื่อ - นามสกุล (ภาษาอังกฤษ)</span>
+                    <span>ชื่อ - นามสกุล ภาษาอังกฤษ</span>
                   </label>
                   <input
                     type="text"
                     value={nameEn}
                     onChange={(e) => setNameEn(e.target.value)}
-                    placeholder="Full Name (English)"
+                    placeholder="Full Name English"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
                   />
                 </div>
@@ -475,7 +498,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
                 <div className="space-y-1.5">
                   <label className="font-bold text-slate-700 flex items-center gap-1">
                     <Mail className="w-3.5 h-3.5 text-slate-400" />
-                    <span>อีเมล (Email) <span className="text-rose-500">*</span></span>
+                    <span>อีเมล <span className="text-rose-500">*</span></span>
                   </label>
                   <input
                     type="email"
@@ -546,6 +569,84 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
                   />
                 </div>
               </div>
+            ) : (
+              /* กรณีการลงทะเบียนเข้าร่วมประชุม (Conference Registration): แสดงเฉพาะข้อมูลที่ใช้ลงทะเบียนจริง ไม่ต้องมีเบอร์โทรหรือที่อยู่ */
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                {/* Full Name TH */}
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700 flex items-center gap-1">
+                    <User className="w-3.5 h-3.5 text-slate-400" />
+                    <span>ชื่อ - นามสกุล ภาษาไทย <span className="text-rose-500">*</span></span>
+                  </label>
+                  <input
+                    type="text"
+                    value={nameTh}
+                    onChange={(e) => setNameTh(e.target.value)}
+                    placeholder="ระบุชื่อ-นามสกุล ภาษาไทย"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
+                  />
+                </div>
+
+                {/* Full Name EN */}
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700 flex items-center gap-1">
+                    <User className="w-3.5 h-3.5 text-slate-400" />
+                    <span>ชื่อ - นามสกุล ภาษาอังกฤษ</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={nameEn}
+                    onChange={(e) => setNameEn(e.target.value)}
+                    placeholder="Full Name English"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
+                  />
+                </div>
+
+                {/* Email */}
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700 flex items-center gap-1">
+                    <Mail className="w-3.5 h-3.5 text-slate-400" />
+                    <span>อีเมล <span className="text-rose-500">*</span></span>
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="example@mail.com"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
+                  />
+                </div>
+
+                {/* Workplace */}
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700 flex items-center gap-1">
+                    <Building className="w-3.5 h-3.5 text-slate-400" />
+                    <span>หน่วยงาน / โรงพยาบาล / สถานที่ทำงาน <span className="text-rose-500">*</span></span>
+                  </label>
+                  <input
+                    type="text"
+                    value={workplace}
+                    onChange={(e) => setWorkplace(e.target.value)}
+                    placeholder="ชื่อโรงพยาบาล หรือหน่วยงานต้นสังกัด"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
+                  />
+                </div>
+
+                {/* Position */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="font-bold text-slate-700 flex items-center gap-1">
+                    <Briefcase className="w-3.5 h-3.5 text-slate-400" />
+                    <span>ตำแหน่ง / สาขาวิชาชีพ</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={position}
+                    onChange={(e) => setPosition(e.target.value)}
+                    placeholder="เช่น แพทย์, พยาบาล, นักวิทยาศาสตร์"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
+                  />
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -556,7 +657,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>หลักฐานการโอนเงิน (สลิป)</span>
+                <span>หลักฐานการโอนเงิน</span>
               </h3>
               {slipData.oldSlipUrl && slipData.oldSlipUrl !== 'PAY_LATER' && (
                 <button
@@ -565,7 +666,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
                   className="text-xs font-bold text-[#0026b3] hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <Eye className="w-3.5 h-3.5" />
-                  <span>{previewOldSlip ? 'ซ่อนสลิปเดิม' : 'ดูสลิปเดิม'}</span>
+                  <span>{previewOldSlip ? 'ซ่อนหลักฐานเดิม' : 'ดูหลักฐานเดิม'}</span>
                 </button>
               )}
             </div>
@@ -576,7 +677,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
                 <div>
                   <p className="font-black text-xs text-emerald-950">หลักฐานการโอนเงินถูกต้องแล้ว</p>
                   <p className="text-[11px] text-emerald-700/90 font-normal mt-0.5">
-                    ระบบจะใช้สลิปการโอนเงินเดิมของท่าน ท่านเพียงแก้ไขข้อมูลในแบบฟอร์มด้านบนให้ถูกต้อง แล้วกดยืนยันได้ทันที
+                    ระบบจะใช้หลักฐานการโอนเงินเดิมของท่าน ท่านเพียงแก้ไขข้อมูลในแบบฟอร์มด้านบนให้ถูกต้อง แล้วกดยืนยันได้ทันที
                   </p>
                 </div>
               </div>
@@ -619,7 +720,7 @@ export default function ResubmitSlipPage({ params }: ResubmitPageProps) {
               <div className="pt-1">
                 <label className="text-[11px] text-slate-500 hover:text-[#0026b3] underline font-semibold cursor-pointer flex items-center gap-1">
                   <Upload className="w-3.5 h-3.5" />
-                  <span>ต้องการเปลี่ยนรูปสลิปใหม่ด้วย (ไม่บังคับ) คลิกที่นี่</span>
+                  <span>ต้องการแนบหลักฐานการโอนเงินใหม่เพิ่มเติม คลิกที่นี่</span>
                   <input
                     type="file"
                     accept="image/*"
