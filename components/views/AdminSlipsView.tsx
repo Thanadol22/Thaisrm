@@ -147,6 +147,104 @@ export interface SlipRecord {
     finalAmount?: number;
   }>;
   discountTotal?: number;
+  isPayLater?: boolean;
+  isPendingPaymentReview?: boolean;
+  hasActualSlip?: boolean;
+}
+
+export const hasActualSlip = (s?: SlipRecord | null) =>
+  Boolean(
+    s?.slipUrl &&
+    s.slipUrl !== 'PAY_LATER' &&
+    s.slipUrl !== 'pay_later_pending' &&
+    s.slipUrl !== '/placeholder-slip.png' &&
+    s.slipUrl !== 'GROUP_REGISTRATION' &&
+    s.slipUrl !== 'GROUP_MEMBERSHIP' &&
+    !s.slipUrl.startsWith('TEMP_')
+  );
+
+export const isRegisteredAsPayLater = (s?: SlipRecord | null) =>
+  Boolean(
+    s?.isPayLater ||
+    s?.slipUrl === 'PAY_LATER' ||
+    s?.slipUrl === 'pay_later_pending' ||
+    s?.bank?.includes('ชำระเงินภายหลัง') ||
+    s?.bank?.toLowerCase().includes('pay later') ||
+    s?.slipUrl === '/placeholder-slip.png' ||
+    !s?.slipUrl
+  );
+
+export type SlipLifecycleStage =
+  | 'awaiting_access_approval'   // รออนุมัติสิทธิ์
+  | 'approved_awaiting_payment'  // อนุมัติสิทธิ์แล้ว - รอชำระเงิน
+  | 'pending_payment_review'     // แนบสลิปแล้ว - รอตรวจสอบยอดเงิน
+  | 'payment_approved'           // ชำระเงินเรียบร้อยแล้ว
+  | 'rejected'                   // ปฏิเสธ
+  | 'standard_pending';          // รอตรวจสอบ
+
+export function getSlipLifecycleStage(s: SlipRecord): SlipLifecycleStage {
+  if (s.status === 'rejected') return 'rejected';
+
+  const hasSlip = hasActualSlip(s);
+  const isPayLater = isRegisteredAsPayLater(s);
+
+  if (hasSlip) {
+    if (s.status === 'approved') return 'payment_approved';
+    return 'pending_payment_review';
+  }
+
+  // ไม่มีสลิปจริงแนบ
+  if (isPayLater) {
+    if (s.status === 'approved') return 'approved_awaiting_payment';
+    return 'awaiting_access_approval';
+  }
+
+  if (s.status === 'approved') return 'payment_approved';
+  return 'standard_pending';
+}
+
+export function renderSlipStatusBadge(s: SlipRecord, lang: 'th' | 'en' = 'th') {
+  const stage = getSlipLifecycleStage(s);
+
+  switch (stage) {
+    case 'awaiting_access_approval':
+      return (
+        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+          {lang === 'th' ? '⏳ รออนุมัติสิทธิ์' : '⏳ Awaiting Approval'}
+        </span>
+      );
+    case 'approved_awaiting_payment':
+      return (
+        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-sky-100 text-sky-900 border border-sky-300 shadow-2xs">
+          {lang === 'th' ? '✓ อนุมัติสิทธิ์แล้ว - รอชำระเงิน' : '✓ Access Approved - Awaiting Payment'}
+        </span>
+      );
+    case 'pending_payment_review':
+      return (
+        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-indigo-100 text-indigo-900 border border-indigo-300 shadow-2xs">
+          {lang === 'th' ? '⏳ แนบสลิปแล้ว - รอตรวจสอบยอดเงิน' : '⏳ Slip Uploaded - Awaiting Payment Review'}
+        </span>
+      );
+    case 'payment_approved':
+      return (
+        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+          {lang === 'th' ? '✓ ชำระเงินเรียบร้อยแล้ว' : '✓ Payment Completed'}
+        </span>
+      );
+    case 'rejected':
+      return (
+        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
+          {lang === 'th' ? '✕ ปฏิเสธ' : '✕ Rejected'}
+        </span>
+      );
+    case 'standard_pending':
+    default:
+      return (
+        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
+          {lang === 'th' ? '⏳ รอตรวจสอบ' : '⏳ Pending'}
+        </span>
+      );
+  }
 }
 
 export function parseSlipActivities(raw?: SlipActivityItem[] | string | any, fallbackAmount?: number): SlipActivityItem[] {
@@ -327,16 +425,14 @@ export function AdminSlipsView() {
           );
         }
         const targetSlip = slips.find((s) => s.id === id) || selectedSlip;
-        const isPayLaterSlip =
-          targetSlip?.bank?.includes('ชำระเงินภายหลัง') ||
-          targetSlip?.bank?.toLowerCase().includes('pay later') ||
-          targetSlip?.slipUrl === 'PAY_LATER';
+        const hasSlip = hasActualSlip(targetSlip);
+        const isPayLater = isRegisteredAsPayLater(targetSlip);
         showToast(
           approvedMemberNo
-            ? (lang === 'th' ? `✓ อนุมัติสิทธิ์และสร้างบัญชีสมาชิกเรียบร้อยแล้ว (รหัส: ${approvedMemberNo})` : `✓ Access approved and member created (No: ${approvedMemberNo})`)
-            : isPayLaterSlip
-              ? (lang === 'th' ? '✓ อนุมัติคำขอและสร้างบัญชีสมาชิกเรียบร้อยแล้ว (สถานะ: รอชำระเงิน/รอสลิป)' : '✓ Request approved (Awaiting Payment)')
-              : (lang === 'th' ? '✓ อนุมัติรายการเรียบร้อยแล้ว' : '✓ Approved successfully')
+            ? (lang === 'th' ? `✓ อนุมัติสิทธิ์และสร้างบัญชีสมาชิกเรียบร้อยแล้ว (รหัสสมาชิก: ${approvedMemberNo})` : `✓ Access approved and member created (No: ${approvedMemberNo})`)
+            : (!hasSlip && isPayLater)
+              ? (lang === 'th' ? '✓ อนุมัติสิทธิ์เรียบร้อยแล้ว (สถานะ: รอชำระเงิน/รอสลิป)' : '✓ Access approved (Awaiting Payment)')
+              : (lang === 'th' ? '✓ อนุมัติการชำระเงินเรียบร้อยแล้ว' : '✓ Payment approved successfully')
         );
       } else {
         showToast(`✕ ${json.error || 'เกิดข้อผิดพลาดในการอนุมัติ'}`);
@@ -415,15 +511,7 @@ export function AdminSlipsView() {
       s.ticketCode?.startsWith('GRP-')
     );
 
-  const isPayLaterSlip = (s: SlipRecord) =>
-    Boolean(
-      s.bank?.includes('ชำระเงินภายหลัง') ||
-      s.bank?.toLowerCase().includes('pay later') ||
-      s.slipUrl === 'PAY_LATER' ||
-      s.slipUrl === 'pay_later_pending' ||
-      s.slipUrl === '/placeholder-slip.png' ||
-      !s.slipUrl
-    );
+  const isPayLaterSlip = (s: SlipRecord) => isRegisteredAsPayLater(s);
 
   // Slips filtered only by Category (used for scoped metrics and status filter counts)
   const categorySlips = React.useMemo(() => {
@@ -920,35 +1008,7 @@ export function AdminSlipsView() {
                   {/* Row 2: Status & Essential Badges directly UNDER the name */}
                   <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                     {/* Primary Approval / Payment Status */}
-                    {(() => {
-                      const isPayLater = slip.bank?.includes('ชำระเงินภายหลัง') || slip.bank?.toLowerCase().includes('pay later') || slip.slipUrl === 'PAY_LATER' || slip.slipUrl === '/placeholder-slip.png' || !slip.slipUrl;
-                      return (
-                        <span
-                          className={`text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 ${slip.status === 'approved'
-                              ? isPayLater
-                                ? 'bg-sky-100 text-sky-900 border border-sky-300 shadow-2xs'
-                                : 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs'
-                              : slip.status === 'pending'
-                                ? isPayLater
-                                  ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs'
-                                  : 'bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs'
-                                : 'bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs'
-                            }`}
-                        >
-                          {slip.status === 'approved' && (
-                            isPayLater
-                              ? (lang === 'th' ? '✓ อนุมัติสิทธิ์แล้ว (รอชำระเงิน)' : '✓ Access Approved (Awaiting Payment)')
-                              : (lang === 'th' ? '✓ อนุมัติแล้ว' : '✓ Approved')
-                          )}
-                          {slip.status === 'pending' && (
-                            isPayLater
-                              ? (lang === 'th' ? '⏳ รออนุมัติสิทธิ์' : '⏳ Awaiting Approval')
-                              : (lang === 'th' ? '⏳ รอตรวจสอบ' : '⏳ Pending')
-                          )}
-                          {slip.status === 'rejected' && (lang === 'th' ? '✕ ปฏิเสธ' : '✕ Rejected')}
-                        </span>
-                      );
-                    })()}
+                    {renderSlipStatusBadge(slip, lang)}
 
                     {/* Essential Participant Role Badge (แสดงเฉพาะสถานะสำคัญ) */}
                     {slip.isMembershipRegistration ? (
@@ -1450,9 +1510,14 @@ export function AdminSlipsView() {
                       ))}
                     </div>
 
-                    {selectedSlip.status === 'pending' && isPayLaterSlip(selectedSlip) && (
+                    {selectedSlip.status === 'pending' && !hasActualSlip(selectedSlip) && isRegisteredAsPayLater(selectedSlip) && (
                       <p className="text-[11px] text-indigo-900 bg-indigo-100/80 p-3 rounded-xl font-medium leading-relaxed border border-indigo-200">
-                        🏢 เมื่อกด <strong>&ldquo;อนุมัติ&rdquo;</strong> ระบบจะทำการอนุมัติและสร้างบัญชีสมาชิกให้กับผู้สมัครทุกคนในกลุ่ม พร้อมออกเลขที่สมาชิกอัตโนมัติ โดยสถานะการชำระเงินจะยังคงเป็น <strong>&ldquo;รอชำระเงิน / รอแนบสลิป&rdquo;</strong> เพื่อให้บริษัทแนบสลิปเข้ามาในภายหลัง
+                        🏢 เมื่อกด <strong>&ldquo;อนุมัติสิทธิ์&rdquo;</strong> ระบบจะทำการอนุมัติและสร้างบัญชีสมาชิกให้กับผู้สมัครทุกคนในกลุ่ม พร้อมออกเลขที่สมาชิกอัตโนมัติ โดยสถานะจะเปลี่ยนเป็น <strong>&ldquo;อนุมัติสิทธิ์แล้ว - รอชำระเงิน&rdquo;</strong> เพื่อให้บริษัทดำเนินการแนบสลิปเข้ามาในภายหลัง
+                      </p>
+                    )}
+                    {selectedSlip.status === 'pending' && hasActualSlip(selectedSlip) && (
+                      <p className="text-[11px] text-emerald-950 bg-emerald-100/80 p-3 rounded-xl font-medium leading-relaxed border border-emerald-300">
+                        💳 บริษัทได้แนบหลักฐานสลิปโอนเงินเข้ามาแล้ว เมื่อกด <strong>&ldquo;อนุมัติการชำระเงิน&rdquo;</strong> ระบบจะทำการยืนยันการชำระเงินและออกใบเสร็จรับเงินสมบูรณ์
                       </p>
                     )}
                   </div>
@@ -1714,9 +1779,14 @@ export function AdminSlipsView() {
                         );
                       })()}
 
-                      {selectedSlip.status === 'pending' && isPayLaterSlip(selectedSlip) && (
+                      {selectedSlip.status === 'pending' && !hasActualSlip(selectedSlip) && isRegisteredAsPayLater(selectedSlip) && (
                         <p className="text-[11px] text-sky-950 bg-sky-100/80 p-3 rounded-xl font-medium leading-relaxed border border-sky-200">
-                          🏢 เมื่อกด <strong>&ldquo;อนุมัติ&rdquo;</strong> ระบบจะทำการอนุมัติสิทธิ์การเข้าร่วมประชุมให้กับผู้ลงทะเบียนทุกคนในกลุ่ม
+                          🏢 เมื่อกด <strong>&ldquo;อนุมัติสิทธิ์&rdquo;</strong> ระบบจะทำการอนุมัติสิทธิ์การเข้าร่วมประชุมให้กับผู้ลงทะเบียนทุกคนในกลุ่ม โดยสถานะจะเปลี่ยนเป็น <strong>&ldquo;อนุมัติสิทธิ์แล้ว - รอชำระเงิน&rdquo;</strong>
+                        </p>
+                      )}
+                      {selectedSlip.status === 'pending' && hasActualSlip(selectedSlip) && (
+                        <p className="text-[11px] text-emerald-950 bg-emerald-100/80 p-3 rounded-xl font-medium leading-relaxed border border-emerald-300">
+                          💳 บริษัทได้แนบหลักฐานสลิปโอนเงินเข้ามาแล้ว เมื่อกด <strong>&ldquo;อนุมัติการชำระเงิน&rdquo;</strong> ระบบจะทำการยืนยันการชำระเงินและออกใบเสร็จรับเงินสมบูรณ์
                         </p>
                       )}
                     </div>
@@ -2119,7 +2189,13 @@ export function AdminSlipsView() {
                           ? 'bg-emerald-300 opacity-90 cursor-wait'
                           : 'bg-[#4ade80] hover:bg-[#3ec424]'
                         }`}
-                      title={lang === 'th' ? 'อนุมัติการชำระเงิน' : 'Approve Payment'}
+                      title={
+                        hasActualSlip(selectedSlip)
+                          ? (lang === 'th' ? 'อนุมัติการชำระเงิน' : 'Approve Payment')
+                          : isRegisteredAsPayLater(selectedSlip)
+                            ? (lang === 'th' ? 'อนุมัติสิทธิ์การเข้าร่วม' : 'Approve Access')
+                            : (lang === 'th' ? 'อนุมัติรายการ' : 'Approve')
+                      }
                     >
                       {processingSlipId === selectedSlip.id ? (
                         <>
@@ -2129,7 +2205,13 @@ export function AdminSlipsView() {
                       ) : (
                         <>
                           <CheckCircle2 className="w-4 h-4 text-[#061d08] shrink-0" />
-                          <span className="hidden sm:inline">{lang === 'th' ? 'อนุมัติการชำระเงิน' : 'Approve'}</span>
+                          <span className="hidden sm:inline">
+                            {hasActualSlip(selectedSlip)
+                              ? (lang === 'th' ? 'อนุมัติการชำระเงิน' : 'Approve Payment')
+                              : isRegisteredAsPayLater(selectedSlip)
+                                ? (lang === 'th' ? 'อนุมัติสิทธิ์การเข้าร่วม' : 'Approve Access')
+                                : (lang === 'th' ? 'อนุมัติรายการ' : 'Approve')}
+                          </span>
                         </>
                       )}
                     </button>

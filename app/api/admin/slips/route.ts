@@ -1131,6 +1131,23 @@ export async function GET(request: NextRequest) {
           couponInfo: couponInfo || null,
           couponUsages: couponUsagesList,
           discountTotal: discountTotal || 0,
+          // ── สถานะย่อยสำหรับ Pay Later flow ──
+          isPayLater: Boolean(
+            s.slip_url === 'PAY_LATER' ||
+            s.slip_url === 'pay_later_pending' ||
+            (typeof s.bank === 'string' && (s.bank.includes('ชำระเงินภายหลัง') || s.bank.toLowerCase().includes('pay later')))
+          ),
+          // true = มีสลิปจริง + pending = "ส่งสลิปแล้ว รอตรวจสอบการชำระ"
+          isPendingPaymentReview: Boolean(
+            s.slip_url &&
+            s.slip_url !== 'PAY_LATER' &&
+            s.slip_url !== 'pay_later_pending' &&
+            s.slip_url !== '/placeholder-slip.png' &&
+            s.slip_url !== 'GROUP_REGISTRATION' &&
+            s.slip_url !== 'GROUP_MEMBERSHIP' &&
+            !s.slip_url.startsWith('TEMP_') &&
+            s.status === 'pending'
+          ),
         };
       });
     }
@@ -1556,9 +1573,22 @@ export async function POST(request: NextRequest) {
             coordinatorName = resolvedCorp.name || coordinatorName;
           }
 
-          const isPayLater =
+          const hasActualSlip = Boolean(
+            slip.slip_url &&
+            slip.slip_url !== 'PAY_LATER' &&
+            slip.slip_url !== 'pay_later_pending' &&
+            slip.slip_url !== '/placeholder-slip.png' &&
+            slip.slip_url !== 'GROUP_REGISTRATION' &&
+            slip.slip_url !== 'GROUP_MEMBERSHIP' &&
+            !slip.slip_url.startsWith('TEMP_')
+          );
+
+          // หากมีสลิปจริงที่แนบเข้ามาแล้ว ไม่ต้องแสดงสถานะรอชำระ (isPayLater = false -> แสดงชำระเงินเรียบร้อยแล้ว)
+          const isPayLater = !hasActualSlip && Boolean(
             slip.slip_url === 'PAY_LATER' ||
-            (typeof slip.bank === 'string' && slip.bank.includes('ชำระเงินภายหลัง'));
+            slip.slip_url === 'pay_later_pending' ||
+            (typeof slip.bank === 'string' && (slip.bank.includes('ชำระเงินภายหลัง') || slip.bank.toLowerCase().includes('pay later')))
+          );
 
           if (companyEmail && approvedApplicants.length > 0) {
             try {

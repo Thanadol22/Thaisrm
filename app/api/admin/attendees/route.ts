@@ -282,12 +282,13 @@ export async function GET(request: NextRequest) {
 
       // Ticket and Payment details
       let paymentStatus: 'paid' | 'pending' | 'rejected' | 'unpaid' = 'unpaid';
-      if (matchingSlip) {
+      if (att.attendance_status === 'Registered' || att.attendance_status === 'Attended') {
+        // หากได้รับการอนุมัติสิทธิ์แล้ว ให้คงสถานะชำระแล้ว (paid) ไว้เสมอ
+        paymentStatus = 'paid';
+      } else if (matchingSlip) {
         if (matchingSlip.status === 'approved') paymentStatus = 'paid';
         else if (matchingSlip.status === 'pending') paymentStatus = 'pending';
         else if (matchingSlip.status === 'rejected') paymentStatus = 'rejected';
-      } else if (att.attendance_status === 'Registered' || att.attendance_status === 'Attended') {
-        paymentStatus = 'paid';
       } else if (att.attendance_status === 'Rejected') {
         paymentStatus = 'rejected';
       } else if (att.attendance_status === 'Pending_Payment' || att.attendance_status === 'Non-Member-Pending') {

@@ -426,7 +426,8 @@ export async function POST(req: NextRequest) {
     const rawGroupMembers = Array.from(aggregatedMembersMap.values());
 
     // Calculate totals and overall financial status
-    const pendingReviewSlips = sponsorSlips.filter((s) => s.itemStatus === 'pending_review');
+    const pendingPaymentReviewSlips = sponsorSlips.filter((s) => s.itemStatus === 'pending_payment_review');
+    const awaitingAccessSlips = sponsorSlips.filter((s) => s.itemStatus === 'awaiting_payment' || s.itemStatus === 'pending_review');
     const awaitingPaymentSlips = sponsorSlips.filter((s) => s.requiresSlipUpload);
     const rejectedSlips = sponsorSlips.filter((s) => s.itemStatus === 'rejected');
 
@@ -435,11 +436,13 @@ export async function POST(req: NextRequest) {
 
     const hasOutstanding = awaitingPaymentSlips.length > 0;
 
-    let overallPaymentStatus: 'approved' | 'approved_awaiting_payment' | 'pending_review' | 'rejected' | 'unpaid' | 'free_quota' = 'approved';
+    let overallPaymentStatus: 'approved' | 'approved_awaiting_payment' | 'pending_review' | 'pending_payment_review' | 'rejected' | 'unpaid' | 'free_quota' = 'approved';
     if (awaitingPaymentSlips.length > 0) {
       const hasApprovedAwaiting = awaitingPaymentSlips.some((s) => s.itemStatus === 'approved_awaiting_payment');
       overallPaymentStatus = hasApprovedAwaiting ? 'approved_awaiting_payment' : 'unpaid';
-    } else if (pendingReviewSlips.length > 0) {
+    } else if (pendingPaymentReviewSlips.length > 0) {
+      overallPaymentStatus = 'pending_payment_review';
+    } else if (awaitingAccessSlips.length > 0) {
       overallPaymentStatus = 'pending_review';
     } else if (rejectedSlips.length > 0) {
       overallPaymentStatus = 'rejected';
