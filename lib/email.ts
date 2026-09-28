@@ -45,6 +45,11 @@ export interface SmtpConfig {
   from?: string;
 }
 
+const globalForMail = globalThis as unknown as {
+  cachedTransporter?: nodemailer.Transporter | null;
+  cachedTransporterKey?: string;
+};
+
 /**
  * Get configured Nodemailer Transporter
  */
@@ -59,7 +64,37 @@ export function getMailTransporter(customConfig?: SmtpConfig) {
     return null; // Return null if SMTP is not fully configured to trigger fallback log mode
   }
 
-  return nodemailer.createTransport({
+  // If customConfig is provided, create a dedicated instance
+  if (customConfig) {
+    return nodemailer.createTransport({
+      pool: true,
+      maxConnections: 3,
+      maxMessages: 50,
+      host,
+      port,
+      secure,
+      auth: {
+        user,
+        pass,
+      },
+      tls: {
+        rejectUnauthorized: process.env.NODE_ENV === 'production',
+      },
+      connectionTimeout: 6000,
+      greetingTimeout: 6000,
+      socketTimeout: 8000,
+    });
+  }
+
+  const key = `${host}:${port}:${user}:${secure}`;
+  if (globalForMail.cachedTransporter && globalForMail.cachedTransporterKey === key) {
+    return globalForMail.cachedTransporter;
+  }
+
+  const transporter = nodemailer.createTransport({
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
     host,
     port,
     secure,
@@ -70,10 +105,14 @@ export function getMailTransporter(customConfig?: SmtpConfig) {
     tls: {
       rejectUnauthorized: process.env.NODE_ENV === 'production',
     },
-    connectionTimeout: 8000,
-    greetingTimeout: 8000,
-    socketTimeout: 10000,
+    connectionTimeout: 6000,
+    greetingTimeout: 6000,
+    socketTimeout: 8000,
   });
+
+  globalForMail.cachedTransporter = transporter;
+  globalForMail.cachedTransporterKey = key;
+  return transporter;
 }
 
 export function getDefaultFromAddress(): string {

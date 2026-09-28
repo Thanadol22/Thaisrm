@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
 
     // ส่งอีเมล OTP ไปยังตัวแทน (ส่ง plainOtp ไม่ใช่ hash)
     try {
-      await sendSponsorOtpEmail(email, {
+      const emailPromise = sendSponsorOtpEmail(email, {
         companyName: sponsor.name,
         contactEmail: email,
         otpCode: plainOtp,
@@ -208,6 +208,11 @@ export async function POST(req: NextRequest) {
         meetingName,
         systemType,
       });
+
+      await Promise.race([
+        emailPromise,
+        new Promise((resolve) => setTimeout(() => resolve({ success: true, pendingDelivery: true }), 600)),
+      ]);
     } catch (emailErr) {
       console.error('[RequestOTP] Failed to send email:', emailErr);
     }
