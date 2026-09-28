@@ -103,11 +103,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // แปลง BigInt → string ก่อน serialize เพื่อป้องกัน "Do not know how to serialize a BigInt"
+    const safeSlip = updatedOrCreatedSlip
+      ? {
+          slip_id: updatedOrCreatedSlip.slip_id,
+          ticket_code: updatedOrCreatedSlip.ticket_code,
+          status: updatedOrCreatedSlip.status,
+          slip_url: updatedOrCreatedSlip.slip_url,
+          id: updatedOrCreatedSlip.id?.toString?.() ?? null,
+        }
+      : null;
+
     return NextResponse.json({
       success: true,
       message: 'แนบสลิปการโอนเงินเรียบร้อยแล้ว เจ้าหน้าที่จะทำการตรวจสอบข้อมูล',
-      slip: updatedOrCreatedSlip,
+      slip: safeSlip,
     });
+
   } catch (error: any) {
     console.error('[SponsorUploadSlip] Error:', error);
     return NextResponse.json(
