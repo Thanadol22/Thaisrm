@@ -103,9 +103,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ส่งอีเมล OTP ตามประเภทผู้ใช้งาน
-    let emailPromise: Promise<any>;
+    let emailResult: any = null;
     if (userType === 'member') {
-      emailPromise = sendMemberOtpEmail(email, {
+      emailResult = await sendMemberOtpEmail(email, {
         otpCode,
         recipientName: member.fullNameTh || member.fullNameEn || 'สมาชิกสมาคมฯ',
         memberNo: member.member_no || 'ไม่ระบุ',
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
       }
 
       const systemType = body.systemType || body.mode || 'registration';
-      emailPromise = sendSponsorOtpEmail(email, {
+      emailResult = await sendSponsorOtpEmail(email, {
         otpCode,
         companyName: sponsor.name,
         contactEmail: email,
@@ -133,18 +133,6 @@ export async function POST(req: NextRequest) {
         expiresInMinutes: 10,
         systemType,
       });
-    }
-
-    // Await with a short timeout (600ms) so that if SMTP is fast we capture the delivery status,
-    // but if SMTP takes longer, we don't hold up the user interface with a long loading spinner.
-    let emailResult: any = null;
-    try {
-      emailResult = await Promise.race([
-        emailPromise,
-        new Promise((resolve) => setTimeout(() => resolve({ success: true, pendingDelivery: true }), 600)),
-      ]);
-    } catch (e) {
-      console.warn('[UnifiedRequestOTP] Email dispatch warning:', e);
     }
 
     return NextResponse.json({

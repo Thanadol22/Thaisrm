@@ -131,17 +131,12 @@ export async function POST(req: NextRequest) {
 
     // ส่งอีเมล OTP (plaintext — ไม่ใช่ hash)
     try {
-      const emailPromise = sendMemberOtpEmail(member.email, {
+      await sendMemberOtpEmail(member.email, {
         otpCode: plainOtp,
         recipientName: member.fullNameTh || 'สมาชิก',
         memberNo: member.member_no,
         expiresInMinutes: 10,
       });
-
-      await Promise.race([
-        emailPromise,
-        new Promise((resolve) => setTimeout(() => resolve({ success: true, pendingDelivery: true }), 600)),
-      ]);
     } catch (emailErr) {
       console.error('[MemberOTP] Failed to send email:', emailErr);
       // ไม่ return error เพื่อป้องกัน enumeration

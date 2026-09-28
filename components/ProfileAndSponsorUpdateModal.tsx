@@ -657,7 +657,7 @@ export function ProfileAndSponsorUpdateModal({
                   {loading ? (
                     <>
                       <RotateCw className="w-4 h-4 animate-spin" />
-                      <span>{lang === 'th' ? 'กำลังตรวจสอบ...' : 'Verifying...'}</span>
+                      <span>{lang === 'th' ? 'กำลังส่งรหัส OTP...' : 'Sending OTP...'}</span>
                     </>
                   ) : (
                     <>
