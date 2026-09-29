@@ -155,13 +155,13 @@ export function SignupView({
 
   // Multi-applicant state
   const [applicants, setApplicants] = useState<ApplicantFormData[]>([
-    createInitialApplicant('1', adminSponsorSession?.sponsorName || ''),
+    createInitialApplicant('1'),
   ]);
 
   const handleSponsorLogout = () => {
     setSponsorSession(adminSponsorSession);
     setRegMode(adminSponsorSession ? 'group' : 'individual');
-    setApplicants([createInitialApplicant('1', adminSponsorSession?.sponsorName || '')]);
+    setApplicants([createInitialApplicant('1')]);
     setActiveApplicantIdx(0);
   };
 
@@ -261,10 +261,9 @@ export function SignupView({
   };
 
   const handleAddApplicant = () => {
-    const defaultWorkplace = sponsorSession?.sponsorName || applicants[0]?.workplace || '';
     const newId = Date.now().toString();
     const newIdx = applicants.length;
-    setApplicants(prev => [...prev, createInitialApplicant(newId, defaultWorkplace)]);
+    setApplicants(prev => [...prev, createInitialApplicant(newId)]);
     triggerPersonSwitch(newIdx);
   };
 
@@ -278,7 +277,7 @@ export function SignupView({
   };
 
   const handleCopyWorkplaceToAll = () => {
-    const wp = sponsorSession?.sponsorName || currentApplicant?.workplace?.trim() || applicants[0]?.workplace?.trim() || '';
+    const wp = currentApplicant?.workplace?.trim() || applicants[0]?.workplace?.trim() || '';
     if (!wp) {
       alert(lang === 'th' ? 'กรุณาระบุสถานที่ทำงานก่อนคัดลอก' : 'Please enter workplace first');
       return;
@@ -1097,11 +1096,6 @@ export function SignupView({
                     <span className="flex items-center gap-1">
                       {t.signup.workplaceLabel} <span className="text-red-500">*</span>
                     </span>
-                    {sponsorSession?.sponsorName && (
-                      <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
-                        🏢 {lang === 'th' ? 'ออโต้ฟิลจากชื่อบริษัท' : 'Auto-filled from company'}
-                      </span>
-                    )}
                   </label>
                   <div className="relative flex items-center">
                     <Building className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none shrink-0" />
@@ -1590,13 +1584,6 @@ export function SignupView({
           setSponsorSecondsRemaining(300);
           setSponsorSession(sessionData);
           setRegMode('group');
-          const compName = sessionData.sponsorName?.trim() || '';
-          if (compName) {
-            setApplicants(prev => prev.map(app => ({
-              ...app,
-              workplace: compName,
-            })));
-          }
         }}
       />
     </div>

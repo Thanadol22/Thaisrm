@@ -504,7 +504,7 @@ export function LoginView({
             email: '',
             position: '',
             positionOther: '',
-            workplace: sponsorSession?.sponsorName || '',
+            workplace: '',
             memberCheckStatus: 'idle',
             memberCheckMessage: '',
             verifiedMember: null,
@@ -516,7 +516,6 @@ export function LoginView({
   };
 
   const handleAddAttendee = () => {
-    const defaultWorkplace = sponsorSession?.sponsorName || attendees[0]?.workplace || '';
     const newId = Date.now().toString();
     const defaultProgId = effectiveActivities.length > 0 ? (effectiveActivities.find(a => a.type === 'main')?.id || effectiveActivities[0].id) : 'main';
     const newIdx = attendees.length;
@@ -527,7 +526,7 @@ export function LoginView({
         nameTh: '',
         nameEn: '',
         email: '',
-        workplace: defaultWorkplace,
+        workplace: '',
         position: '',
         positionOther: '',
         memberNo: '',
@@ -549,7 +548,7 @@ export function LoginView({
   };
 
   const handleCopyWorkplaceToAll = () => {
-    const wp = currentAttendee?.workplace?.trim() || sponsorSession?.sponsorName || '';
+    const wp = currentAttendee?.workplace?.trim() || '';
     if (!wp) {
       alert(lang === 'th' ? 'กรุณาระบุหน่วยงาน/สถานที่ทำงานของท่านปัจจุบันก่อนคัดลอก' : 'Please enter workplace first');
       return;
@@ -575,7 +574,7 @@ export function LoginView({
             email: '',
             position: '',
             positionOther: '',
-            workplace: sponsorSession?.sponsorName || '',
+            workplace: '',
             memberCheckStatus: 'idle',
             memberCheckMessage: '',
             verifiedMember: null,
@@ -652,7 +651,7 @@ export function LoginView({
             const nextNameEn = data.member.fullNameEn || '';
             const nextEmail = data.member.email || att.email || '';
             const nextPosition = data.member.position || '';
-            const nextWorkplace = data.member.workplace || att.workplace || sponsorSession?.sponsorName || '';
+            const nextWorkplace = data.member.workplace || att.workplace || '';
 
             return {
               ...att,
@@ -685,7 +684,7 @@ export function LoginView({
               email: '',
               position: '',
               positionOther: '',
-              workplace: sponsorSession?.sponsorName || '',
+              workplace: '',
               memberCheckStatus: 'invalid',
               memberCheckMessage: lang === 'th'
                 ? '⚠️ สมาชิกหมายเลขนี้ได้ลงทะเบียนงานประชุมนี้แล้ว'
@@ -703,7 +702,7 @@ export function LoginView({
               email: '',
               position: '',
               positionOther: '',
-              workplace: sponsorSession?.sponsorName || '',
+              workplace: '',
               memberCheckStatus: 'expired',
               memberCheckMessage: lang === 'th' ? '⚠️ สถานะสมาชิกภาพหมดอายุ' : '⚠️ Membership expired',
               verifiedMember: null,
@@ -719,7 +718,7 @@ export function LoginView({
               email: '',
               position: '',
               positionOther: '',
-              workplace: sponsorSession?.sponsorName || '',
+              workplace: '',
               memberCheckStatus: 'invalid',
               memberCheckMessage: lang === 'th'
                 ? `❌ ไม่พบเลขสมาชิก "${memNo}" ในระบบ กรุณาตรวจสอบให้ถูกต้อง หรือลบออกหากไม่ใช่สมาชิก`
@@ -738,7 +737,7 @@ export function LoginView({
             email: '',
             position: '',
             positionOther: '',
-            workplace: sponsorSession?.sponsorName || '',
+            workplace: '',
             memberCheckStatus: 'invalid',
             memberCheckMessage: lang === 'th' ? 'เกิดข้อผิดพลาดในการตรวจสอบ' : 'Verification error',
             verifiedMember: null,
@@ -749,18 +748,6 @@ export function LoginView({
 
     return () => clearTimeout(timer);
   }, [currentAttendee?.memberNo, activeAttendeeIdx, activeMeeting?.meeting_id, sponsorSession?.sponsorId]);
-
-  // Sponsor session auto-fills workplace
-  useEffect(() => {
-    if (sponsorSession?.sponsorName) {
-      setAttendees(prev =>
-        prev.map(att => ({
-          ...att,
-          workplace: att.workplace || sponsorSession.sponsorName,
-        }))
-      );
-    }
-  }, [sponsorSession]);
 
   // แอดมินทำรายการแทนบริษัท: ดึงคูปองปัจจุบันของบริษัทมากรอกและตรวจสอบให้อัตโนมัติ
   // (คูปองใช้ได้ 1 ครั้ง หลังบันทึกระบบจะออกรหัสใหม่ให้ตามสิทธิ์คงเหลือ)
@@ -2339,13 +2326,6 @@ export function LoginView({
           setSponsorSecondsRemaining(300);
           setSponsorSession(sessionData);
           setRegMode('group');
-          const compName = sessionData.sponsorName?.trim() || '';
-          if (compName) {
-            setAttendees(prev => prev.map(att => ({
-              ...att,
-              workplace: compName
-            })));
-          }
         }}
       />
 
