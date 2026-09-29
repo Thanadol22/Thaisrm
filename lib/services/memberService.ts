@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import QRCode from 'qrcode';
+import { recordManualStatusOverride } from '@/lib/services/membershipStatusService';
 import { sanitizeMemberInput, sanitizeString } from '@/lib/validators/memberValidator';
 import {
   Member,
@@ -639,6 +640,16 @@ export async function updateMember(id: string | number | bigint, rawInput: Updat
       },
     });
   });
+
+  // แอดมินปรับสถานะด้วยตนเอง -> ถือว่าต่ออายุแล้ว การประมวลผล 4 ครั้งล่าสุดจะนับเฉพาะการประชุมหลังจากนี้
+  const previousStatus = (existing.membership_status || 'Active').trim().toLowerCase();
+  if (input.membership_status && input.membership_status.trim().toLowerCase() !== previousStatus) {
+    try {
+      await recordManualStatusOverride(member_no, input.membership_status);
+    } catch (err) {
+      console.error('Failed to record manual membership status override:', err);
+    }
+  }
 
   invalidateMemberStatsCache();
   return toMemberDto(updated);

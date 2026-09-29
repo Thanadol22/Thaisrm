@@ -39,6 +39,114 @@ export interface SyncStatusResult {
   }>;
 }
 
+const MANUAL_STATUS_OVERRIDES_KEY = 'membership_status_manual_overrides';
+
+interface ManualStatusOverride {
+  status: 'Active' | 'Inactive';
+  at: string; // เวลาที่แอดมินปรับสถานะด้วยตนเอง (ISO)
+}
+
+function normalizeStatus(status: string | null | undefined): 'Active' | 'Inactive' {
+  return (status || 'Active').trim().toLowerCase() === 'active' ? 'Active' : 'Inactive';
+}
+
+/**
+ * ดึงรายการสมาชิกที่แอดมินปรับสถานะด้วยตนเอง
+ * เก็บใน system_settings เป็น JSON { [member_no]: { status, at } } (ไม่แตะโครงสร้างตาราง members)
+ */
+async function getManualStatusOverrides(): Promise<Record<string, ManualStatusOverride>> {
+  try {
+    const rows = await prisma.$queryRawUnsafe<Array<{ value: string }>>(
+      `SELECT value FROM system_settings WHERE key = $1 LIMIT 1`,
+      MANUAL_STATUS_OVERRIDES_KEY
+    );
+    if (rows && rows.length > 0 && rows[0].value) {
+      return JSON.parse(rows[0].value) as Record<string, ManualStatusOverride>;
+    }
+  } catch (err) {
+    console.error('Failed to read membership_status_manual_overrides:', err);
+  }
+  return {};
+}
+
+/**
+ * บันทึกว่าแอดมินปรับสถานะสมาชิกด้วยตนเอง (ถือว่าต่ออายุ/ยืนยันสถานะแล้ว)
+ * การประมวลผลตามกฎ 4 ครั้งล่าสุดจะนับเฉพาะการประชุมที่จัดหลังจากเวลาที่ปรับสถานะนี้
+ */
+export async function recordManualStatusOverride(memberNo: string, status: string): Promise<void> {
+  const overrides = await getManualStatusOverrides();
+  overrides[memberNo] = { status: normalizeStatus(status), at: new Date().toISOString() };
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO system_settings (key, value, description, updated_at)
+     VALUES ($1, $2, 'Manual membership status overrides', NOW())
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+    MANUAL_STATUS_OVERRIDES_KEY,
+    JSON.stringify(overrides)
+  );
+}
+
+interface RuleOutcome {
+  status: 'Active' | 'Inactive';
+  reason: string;
+  applicableMeetings: QualifyingMeeting[];
+  attendedCount: number;
+  missedCount: number;
+}
+
+/**
+ * คำนวณสถานะสมาชิกสามัญตามกฎขาดประชุม 4 ครั้งล่าสุด
+ * รอบที่นำมาประเมินเริ่มนับจากวันที่ล่าสุดระหว่างวันสมัคร กับวันที่แอดมินปรับสถานะด้วยตนเอง
+ */
+function applyAttendanceRule(
+  qualifyingMeetings: QualifyingMeeting[],
+  attendedIds: Set<string>,
+  appliedAt: Date | null,
+  override?: ManualStatusOverride
+): RuleOutcome {
+  const appliedTime = appliedAt ? new Date(appliedAt).getTime() : null;
+  const overrideTime = override ? new Date(override.at).getTime() : null;
+  const startTime = Math.max(appliedTime ?? -Infinity, overrideTime ?? -Infinity);
+  // ใช้เวลาที่ปรับสถานะเป็นจุดเริ่มนับ (ไม่ใช่วันสมัคร)
+  const fromOverride = overrideTime !== null && overrideTime >= (appliedTime ?? -Infinity);
+
+  const applicableMeetings = Number.isFinite(startTime)
+    ? qualifyingMeetings.filter((m) => new Date(m.start_date || m.meeting_date).getTime() >= startTime)
+    : qualifyingMeetings;
+  const attendedCount = applicableMeetings.filter((m) => attendedIds.has(m.meeting_id)).length;
+  const missedCount = applicableMeetings.length - attendedCount;
+  const base = { applicableMeetings, attendedCount, missedCount };
+
+  if (attendedCount > 0) {
+    return { ...base, status: 'Active', reason: `เข้าร่วมประชุม ${attendedCount}/${applicableMeetings.length} ครั้งล่าสุด` };
+  }
+
+  // ไม่มีวันเริ่มนับ (ไม่มีวันสมัครและไม่เคยปรับสถานะ) -> ประเมินตาม 4 ครั้งล่าสุดตรงๆ
+  if (!Number.isFinite(startTime)) {
+    return { ...base, status: 'Inactive', reason: `ขาดการประชุมติดต่อกัน ${missedCount} ครั้งล่าสุด (สถานะหมดอายุ)` };
+  }
+
+  if (applicableMeetings.length < 4) {
+    if (fromOverride && override) {
+      return {
+        ...base,
+        status: override.status,
+        reason: applicableMeetings.length === 0
+          ? 'แอดมินปรับสถานะแล้ว ยังไม่มีรอบการประชุมหลังวันที่ปรับสถานะ'
+          : `แอดมินปรับสถานะแล้ว ยังไม่ครบ 4 รอบประเมินหลังวันที่ปรับสถานะ (ขาด ${missedCount}/4 ครั้ง)`,
+      };
+    }
+    return {
+      ...base,
+      status: 'Active',
+      reason: applicableMeetings.length === 0
+        ? 'สมาชิกใหม่ ยังไม่มีรอบการประชุมหลังวันที่สมัคร'
+        : `สมาชิกใหม่ ยังไม่ครบ 4 รอบประเมินหลังวันสมัคร (ขาด ${missedCount}/4 ครั้ง)`,
+    };
+  }
+
+  return { ...base, status: 'Inactive', reason: `ขาดการประชุมติดต่อกัน ${missedCount} ครั้งล่าสุด (สถานะหมดอายุ)` };
+}
+
 /**
  * ดึงรอบการประชุม 4 ครั้งล่าสุดที่มีผลต่อการคงสถานะสมาชิก
  * นับเฉพาะการประชุมที่เริ่มแล้วหรือจบแล้วล่าสุด (completed, ongoing หรือ meeting_date/start_date <= วันที่ปัจจุบัน)
@@ -124,105 +232,21 @@ export async function evaluateMemberAttendanceStatus(
   }
 
   const memberAttendedIds = new Set(member.meeting_attendances.map((a) => a.meeting_id));
-  const totalAttendances = member.meeting_attendances.length;
-
-  // 2. กรณีมีวันที่สมัคร (applied_at)
-  if (member.applied_at) {
-    const appliedTime = new Date(member.applied_at).getTime();
-    const applicableMeetings = qualifyingMeetings.filter((m) => {
-      const meetingTime = new Date(m.start_date || m.meeting_date).getTime();
-      return meetingTime >= appliedTime;
-    });
-
-    // หากยังไม่มีรอบการประชุมหลังวันสมัคร -> คงสถานะ Active (สมาชิกใหม่)
-    if (applicableMeetings.length === 0) {
-      return {
-        member_no: member.member_no,
-        membership_type: membershipType,
-        current_status: currentStatus,
-        calculated_status: 'Active',
-        is_lifelong: false,
-        qualifying_meetings_total: 0,
-        attended_count: 0,
-        missed_count: 0,
-        attended_meeting_ids: [],
-        qualifying_meetings: [],
-        reason: 'สมาชิกใหม่ ยังไม่มีรอบการประชุมหลังวันที่สมัคร',
-      };
-    }
-
-    const attendedCount = applicableMeetings.filter((m) => memberAttendedIds.has(m.meeting_id)).length;
-    const missedCount = applicableMeetings.length - attendedCount;
-
-    if (attendedCount > 0) {
-      return {
-        member_no: member.member_no,
-        membership_type: membershipType,
-        current_status: currentStatus,
-        calculated_status: 'Active',
-        is_lifelong: false,
-        qualifying_meetings_total: applicableMeetings.length,
-        attended_count: attendedCount,
-        missed_count: missedCount,
-        attended_meeting_ids: Array.from(memberAttendedIds),
-        qualifying_meetings: applicableMeetings,
-        reason: `เข้าร่วมประชุม ${attendedCount} จาก ${applicableMeetings.length} ครั้งล่าสุด`,
-      };
-    }
-
-    // กรณีขาดประชุมทุกครั้งหลังวันสมัคร แต่ยังไม่ครบ 4 รอบประเมิน -> ยังคงเป็น Active
-    if (applicableMeetings.length < 4) {
-      return {
-        member_no: member.member_no,
-        membership_type: membershipType,
-        current_status: currentStatus,
-        calculated_status: 'Active',
-        is_lifelong: false,
-        qualifying_meetings_total: applicableMeetings.length,
-        attended_count: 0,
-        missed_count: missedCount,
-        attended_meeting_ids: [],
-        qualifying_meetings: applicableMeetings,
-        reason: `สมาชิกใหม่ ยังไม่ครบ 4 รอบประเมินหลังวันสมัคร (ขาด ${applicableMeetings.length}/4 ครั้ง)`,
-      };
-    }
-
-    // ขาดประชุมครบ 4 ครั้งล่าสุดหลังวันสมัคร
-    return {
-      member_no: member.member_no,
-      membership_type: membershipType,
-      current_status: currentStatus,
-      calculated_status: 'Inactive',
-      is_lifelong: false,
-      qualifying_meetings_total: applicableMeetings.length,
-      attended_count: 0,
-      missed_count: missedCount,
-      attended_meeting_ids: [],
-      qualifying_meetings: applicableMeetings,
-      reason: `ขาดการประชุมติดต่อกัน ${missedCount} ครั้งล่าสุด (สถานะหมดอายุ)`,
-    };
-  }
-
-  // 3. กรณีไม่มีวันที่สมัคร (applied_at เป็น null)
-  // ประเมินตามรอบการประชุม 4 ครั้งล่าสุด
-  const attendedInQualifying = qualifyingMeetings.filter((m) => memberAttendedIds.has(m.meeting_id)).length;
-  const missedInQualifying = qualifyingMeetings.length - attendedInQualifying;
-  const isQualifyingActive = attendedInQualifying > 0;
+  const overrides = await getManualStatusOverrides();
+  const outcome = applyAttendanceRule(qualifyingMeetings, memberAttendedIds, member.applied_at, overrides[member.member_no]);
 
   return {
     member_no: member.member_no,
     membership_type: membershipType,
     current_status: currentStatus,
-    calculated_status: isQualifyingActive ? 'Active' : 'Inactive',
+    calculated_status: outcome.status,
     is_lifelong: false,
-    qualifying_meetings_total: qualifyingMeetings.length,
-    attended_count: attendedInQualifying,
-    missed_count: missedInQualifying,
+    qualifying_meetings_total: outcome.applicableMeetings.length,
+    attended_count: outcome.attendedCount,
+    missed_count: outcome.missedCount,
     attended_meeting_ids: Array.from(memberAttendedIds),
-    qualifying_meetings: qualifyingMeetings,
-    reason: isQualifyingActive
-      ? `เข้าร่วมประชุม ${attendedInQualifying} จาก ${qualifyingMeetings.length} ครั้งล่าสุด`
-      : `ขาดการประชุมติดต่อกัน ${missedInQualifying} ครั้งล่าสุด (สถานะหมดอายุ)`,
+    qualifying_meetings: outcome.applicableMeetings,
+    reason: outcome.reason,
   };
 }
 
@@ -231,6 +255,7 @@ export async function evaluateMemberAttendanceStatus(
  */
 export async function batchSyncAllMemberStatuses(dryRun = false): Promise<SyncStatusResult> {
   const qualifyingMeetings = await getQualifyingActiveMeetings(4);
+  const overrides = await getManualStatusOverrides();
 
   // ดึงสมาชิกทั้งหมดพร้อมประวัติการเข้าประชุม
   const members = await prisma.member.findMany({
@@ -275,45 +300,12 @@ export async function batchSyncAllMemberStatuses(dryRun = false): Promise<SyncSt
       newStatus = 'Active';
       reason = 'สมาชิกตลอดชีพ (สิทธิ์คงสถานะตลอดชีพ)';
       attendedCount = totalAttendances;
-    } else if (m.applied_at) {
-      const appliedTime = new Date(m.applied_at).getTime();
-      const applicableMeetings = qualifyingMeetings.filter((qm) => {
-        const meetingTime = new Date(qm.start_date || qm.meeting_date).getTime();
-        return meetingTime >= appliedTime;
-      });
-      qualifyingCount = applicableMeetings.length;
-
-      if (applicableMeetings.length === 0) {
-        newStatus = 'Active';
-        reason = 'สมาชิกใหม่ ยังไม่มีรอบการประชุมหลังวันที่สมัคร';
-        attendedCount = 0;
-      } else {
-        attendedCount = applicableMeetings.filter((qm) => memberAttendedIds.has(qm.meeting_id)).length;
-        const missedCount = applicableMeetings.length - attendedCount;
-
-        if (attendedCount > 0) {
-          newStatus = 'Active';
-          reason = `เข้าร่วมประชุม ${attendedCount}/${applicableMeetings.length} ครั้งล่าสุด`;
-        } else if (applicableMeetings.length < 4) {
-          newStatus = 'Active';
-          reason = `สมาชิกใหม่ ยังไม่ครบ 4 รอบประเมินหลังวันสมัคร (ขาด ${missedCount}/4 ครั้ง)`;
-        } else {
-          newStatus = 'Inactive';
-          reason = `ขาดการประชุมติดต่อกัน ${missedCount} ครั้งล่าสุด (สถานะหมดอายุ)`;
-        }
-      }
     } else {
-      // ไม่มีวันสมัครระบุ (applied_at เป็น null) -> ประเมินตาม 4 ครั้งล่าสุด
-      attendedCount = qualifyingMeetings.filter((qm) => memberAttendedIds.has(qm.meeting_id)).length;
-      const missedCount = qualifyingMeetings.length - attendedCount;
-
-      if (attendedCount > 0) {
-        newStatus = 'Active';
-        reason = `เข้าร่วมประชุม ${attendedCount}/${qualifyingMeetings.length} ครั้งล่าสุด`;
-      } else {
-        newStatus = 'Inactive';
-        reason = `ขาดการประชุมติดต่อกัน ${missedCount} ครั้งล่าสุด (สถานะหมดอายุ)`;
-      }
+      const outcome = applyAttendanceRule(qualifyingMeetings, memberAttendedIds, m.applied_at, overrides[m.member_no]);
+      newStatus = outcome.status;
+      reason = outcome.reason;
+      attendedCount = outcome.attendedCount;
+      qualifyingCount = outcome.applicableMeetings.length;
     }
 
     if (newStatus.toLowerCase() !== currentStatus.toLowerCase()) {
