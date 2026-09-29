@@ -67,6 +67,10 @@ export type RegistrationPaymentData = {
     discountAmount: number;
   };
   registeredAt?: string;
+  /** ลงทะเบียนกิจกรรมเพิ่มเติม: รายการเดิมที่อนุมัติแล้วซึ่งจะรวมเข้าด้วยเมื่ออนุมัติ */
+  addOnToSlipId?: string;
+  addOnTicketCode?: string | null;
+  registeredActivities?: Array<{ id: string; name: string; type?: string }>;
 };
 
 export type AdminPaymentStatus = 'paid' | 'pending';
@@ -284,7 +288,12 @@ export function PaymentFlow({
         let discountNotice: string | undefined = undefined;
 
         // Apply chronological coupon discount
-        if (remainingFreeSeats > 0) {
+        if (att.isAddOn) {
+          // ลงทะเบียนเพิ่มเติมของผู้ที่ลงทะเบียนแล้ว: ไม่ใช้สิทธิ์คูปอง และไม่ตัดโควต้าฟรีของบริษัท
+          discountNotice = lang === 'th'
+            ? `➕ ลงทะเบียนเพิ่มเติม${att.addOnOriginalTicketCode ? ` สำหรับรายการ ${att.addOnOriginalTicketCode}` : ''} คิดเฉพาะกิจกรรมที่เพิ่ม`
+            : `➕ Add-on${att.addOnOriginalTicketCode ? ` for ${att.addOnOriginalTicketCode}` : ''}: added activities only`;
+        } else if (remainingFreeSeats > 0) {
           // Free sponsor coupon covers ONLY the Main Program
           let attDisc = 0;
           itemizedActs = itemizedActs.map(a => {
@@ -743,6 +752,7 @@ export function PaymentFlow({
                 ? 'PAY_LATER'
                 : (isFreeOrSponsored ? `SPONSORED:${regData?.couponData?.companyName || 'COUPON'}` : slipFileUrl),
               selectedActivities: selectedActivitiesPayload,
+              addOnToSlipId: regData?.addOnToSlipId || undefined,
             }),
           });
 
@@ -918,6 +928,9 @@ export function PaymentFlow({
         uploadedSlipData={uploadedSlipData}
         onRemoveSlip={handleRemoveSlip}
         onConfirmPayment={handleConfirmPayment}
+        isAddOn={paymentType === 'registration' && Boolean(regData?.addOnToSlipId)}
+        addOnTicketCode={regData?.addOnTicketCode}
+        registeredActivityNames={(regData?.registeredActivities || []).map((a) => a.name).filter(Boolean)}
       />
 
       <SlipUploadModal

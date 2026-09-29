@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getAddOnEligibility, parseSlipPayload } from '@/lib/services/registrationAddOnService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -64,6 +65,7 @@ export async function GET(
           message: isApproved
             ? 'ท่านได้ลงทะเบียนเข้าร่วมงานประชุมนี้เรียบร้อยแล้ว'
             : 'ท่านมีรายการลงทะเบียนเข้าร่วมงานประชุมนี้แล้ว กำลังอยู่ระหว่างรอเจ้าหน้าที่ตรวจสอบการชำระเงิน',
+          ...(await buildAddOnInfo(meetingId, { memberNo })),
         });
       }
     }
@@ -106,6 +108,7 @@ export async function GET(
           message: isApproved
             ? `อีเมลนี้ (${email}) ได้ลงทะเบียนเข้าร่วมงานประชุมนี้เรียบร้อยแล้ว`
             : `อีเมลนี้ (${email}) มีรายการลงทะเบียนแล้ว กำลังอยู่ระหว่างรอเจ้าหน้าที่ตรวจสอบการชำระเงิน`,
+          ...(await buildAddOnInfo(meetingId, { email })),
         });
       }
     }
@@ -123,4 +126,33 @@ export async function GET(
       { status: 500 }
     );
   }
+}
+
+/** ข้อมูลสำหรับการลงทะเบียนเพิ่มเติม (เพิ่มกิจกรรมเข้ารายการที่อนุมัติแล้ว) */
+async function buildAddOnInfo(meetingId: string, identity: { memberNo?: string; email?: string }) {
+  const eligibility = await getAddOnEligibility(meetingId, identity);
+  const addOnMessages: Record<string, string> = {
+    unsupported: 'รายการลงทะเบียนของท่านเป็นแบบกลุ่มหรือบันทึกโดยเจ้าหน้าที่ หากต้องการลงทะเบียนกิจกรรมเพิ่มเติม กรุณาติดต่อเจ้าหน้าที่สมาคมฯ',
+  };
+
+  if (eligibility.state !== 'eligible') {
+    return { canAddOn: false, addOnState: eligibility.state, addOnMessage: addOnMessages[eligibility.state] || null };
+  }
+
+  const { originalSlip, pendingAddOnSlips, registeredActivities } = eligibility;
+  const payload = parseSlipPayload(originalSlip.selected_activities);
+  return {
+    canAddOn: true,
+    addOnState: eligibility.state,
+    addOnMessage: null,
+    addOn: {
+      originalSlipId: originalSlip.slip_id,
+      ticketCode: originalSlip.ticket_code,
+      originalStatus: originalSlip.status,
+      pendingAddOnCount: pendingAddOnSlips.length,
+      attendanceType: payload?.attendanceType || null,
+      registeredActivityIds: registeredActivities.map((a) => a.id),
+      registeredActivities,
+    },
+  };
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getSystemSettings } from '@/lib/services/settingsService';
+import { isAddOnPayload } from '@/lib/services/registrationAddOnService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -122,7 +123,7 @@ export async function GET(
       if (typeof act === 'string') {
         try { act = JSON.parse(act); } catch {}
       }
-      return !act?.isFormatChange;
+      return !act?.isFormatChange && !isAddOnPayload(act);
     }) || matchingSlips[0];
 
     // Fallback: If not found in payment_slips, check meeting_attendances table

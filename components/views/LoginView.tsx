@@ -77,9 +77,44 @@ export interface ConferenceAttendee {
   verifiedMember?: any;
   /** ฟิลด์ที่ดึงค่ามาจากข้อมูลสมาชิก (มีค่า) → ล็อกไม่ให้แก้ไข ส่วนฟิลด์ที่ว่างยังแก้ไขได้ */
   lockedFields?: MemberLockableField[];
+  /** แบบกลุ่ม: สมาชิกที่ลงทะเบียนงานนี้แล้ว — เลือกได้เฉพาะกิจกรรมเพิ่มเติม */
+  registeredAddOn?: GroupAddOnInfo | null;
 }
 
+/** ข้อมูลการลงทะเบียนเดิมของผู้เข้าร่วมในโหมดกลุ่ม (จากการตรวจสอบเลขสมาชิก) */
+interface GroupAddOnInfo {
+  memberNo: string;
+  originalSlipId: string | null;
+  ticketCode: string | null;
+  originalStatus?: string | null;
+  registeredActivityIds: string[];
+  registeredActivities: Array<{ id: string; name: string; type?: string; pending?: boolean }>;
+}
+
+const sameMemberNo = (a?: string | null, b?: string | null) =>
+  !!a && !!b && a.trim().replace(/^0+/, '') === b.trim().replace(/^0+/, '');
+
+/** ข้อมูลลงทะเบียนเพิ่มเติมของผู้เข้าร่วมคนนี้ ใช้ได้เฉพาะเมื่อเลขสมาชิกยังตรงกับที่ตรวจสอบไว้ */
+const groupAddOnOf = (att?: ConferenceAttendee): GroupAddOnInfo | null =>
+  att?.registeredAddOn && sameMemberNo(att.registeredAddOn.memberNo, att.memberNo) ? att.registeredAddOn : null;
+
 type MemberLockableField = 'nameTh' | 'nameEn' | 'email' | 'workplace' | 'position';
+
+/** ข้อมูลรายการลงทะเบียนเดิม (อนุมัติแล้ว) สำหรับการลงทะเบียนกิจกรรมเพิ่มเติม */
+interface AddOnInfo {
+  identityKey: string;
+  originalSlipId: string;
+  ticketCode: string | null;
+  originalStatus?: 'pending' | 'approved';
+  attendanceType: 'onsite' | 'online' | null;
+  registeredActivityIds: string[];
+  /** pending = อยู่ในรายการที่ยังรอเจ้าหน้าที่ตรวจสอบ */
+  registeredActivities: Array<{ id: string; name: string; type?: string; pending?: boolean }>;
+}
+
+/** ตัวระบุผู้ลงทะเบียน: เลขสมาชิก หรืออีเมลสำหรับบุคคลทั่วไป */
+const addOnIdentityKey = (att?: { memberNo?: string; email?: string }) =>
+  att?.memberNo?.trim() || att?.email?.trim().toLowerCase() || '';
 
 const lockedFieldsFrom = (values: Partial<Record<MemberLockableField, string>>): MemberLockableField[] =>
   (Object.keys(values) as MemberLockableField[]).filter((k) => !!values[k]?.toString().trim());
@@ -482,6 +517,22 @@ export function LoginView({
   }, [activeMeeting, lang]);
 
   const currentAttendee = attendees[activeAttendeeIdx] || attendees[0];
+
+  // ลงทะเบียนเพิ่มเติม: ใช้ได้เฉพาะรายบุคคล และต้องตรงกับผู้ลงทะเบียนที่ตรวจสอบไว้
+  const [addOnInfo, setAddOnInfo] = useState<AddOnInfo | null>(null);
+  const activeAddOn =
+    regMode === 'individual' && addOnInfo && addOnInfo.identityKey === addOnIdentityKey(attendees[0])
+      ? addOnInfo
+      : null;
+  // กิจกรรมที่ลงทะเบียนแล้วของผู้ลงทะเบียนที่กำลังแก้ไข (รายบุคคลหรือแต่ละคนในกลุ่ม)
+  const currentAddOn: Pick<AddOnInfo, 'ticketCode' | 'originalStatus' | 'registeredActivityIds' | 'registeredActivities'> | null =
+    regMode === 'individual'
+      ? activeAddOn
+      : (() => {
+        const g = groupAddOnOf(currentAttendee);
+        return g ? { ...g, originalStatus: g.originalStatus === 'pending' ? 'pending' : 'approved' } : null;
+      })();
+
   const isMemberFieldLocked = (field: MemberLockableField) =>
     currentAttendee?.memberCheckStatus === 'valid' && !!currentAttendee.lockedFields?.includes(field);
 
@@ -607,6 +658,7 @@ export function LoginView({
               // ── ยืนยันตัวตน sponsor (required) ──
               sponsorId: sponsorSession.sponsorId,
               contactEmail: sponsorSession.contactEmail,
+              allowAddOn: true,
             }),
           });
           data = await res.json();
@@ -629,21 +681,27 @@ export function LoginView({
               membership_status: status,
             };
             let alreadyRegistered = false;
+            let regData: any = null;
             if (activeMeeting?.meeting_id && m.member_no) {
               const regRes = await fetch(
                 `/api/meetings/${encodeURIComponent(activeMeeting.meeting_id)}/check-registration?memberNo=${encodeURIComponent(m.member_no)}`
               );
-              const regData = await regRes.json().catch(() => null);
+              regData = await regRes.json().catch(() => null);
               alreadyRegistered = !!regData?.isRegistered;
             }
-            data = alreadyRegistered
-              ? { valid: false, alreadyRegistered: true }
+            const addOn = alreadyRegistered && regData?.canAddOn && regData.addOn ? regData.addOn : null;
+            if (addOn) {
+              setAddOnInfo({ ...addOn, identityKey: memNo });
+            }
+            data = alreadyRegistered && !addOn
+              ? { valid: false, alreadyRegistered: true, addOnMessage: regData?.addOnMessage || null }
               : !status || status.toLowerCase() === 'active'
-                ? { valid: true, member }
+                ? { valid: true, member, addOn }
                 : { valid: false, member };
           }
         }
         if (data.valid && data.member) {
+          const addOnRegisteredIds: string[] = data.addOn?.registeredActivityIds || [];
           setAttendees(prev => prev.map((att, idx) => {
             if (idx !== activeAttendeeIdx) return att;
             // Autofill fields strictly from verified member profile
@@ -668,10 +726,22 @@ export function LoginView({
                 workplace: data.member.workplace,
                 position: data.member.position,
               }),
-              memberCheckMessage: lang === 'th'
-                ? `✅ พบข้อมูลสมาชิก: ${data.member.fullNameTh || data.member.fullNameEn} (#${data.member.member_no})`
-                : `✅ Member found: ${data.member.fullNameTh || data.member.fullNameEn} (#${data.member.member_no})`,
+              memberCheckMessage: data.addOn
+                ? (lang === 'th'
+                  ? `✅ ${data.member.fullNameTh || data.member.fullNameEn} #${data.member.member_no} ลงทะเบียนงานประชุมนี้แล้ว สามารถเลือกกิจกรรมเพิ่มเติมได้`
+                  : `✅ ${data.member.fullNameEn || data.member.fullNameTh} #${data.member.member_no} is already registered. You can add more activities.`)
+                : (lang === 'th'
+                  ? `✅ พบข้อมูลสมาชิก: ${data.member.fullNameTh || data.member.fullNameEn} (#${data.member.member_no})`
+                  : `✅ Member found: ${data.member.fullNameTh || data.member.fullNameEn} (#${data.member.member_no})`),
               verifiedMember: data.member,
+              // ลงทะเบียนเพิ่มเติม: ล้างกิจกรรมที่ลงทะเบียนไว้แล้วออกจากรายการที่เลือก
+              registeredAddOn: sponsorSession && data.addOn ? data.addOn : null,
+              ...(data.addOn
+                ? {
+                  selectedPrograms: att.selectedPrograms.filter(id => !addOnRegisteredIds.includes(id)),
+                  attendanceType: data.addOn.attendanceType || att.attendanceType,
+                }
+                : {}),
             };
           }));
         } else if (data.alreadyRegistered) {
@@ -687,7 +757,7 @@ export function LoginView({
               workplace: '',
               memberCheckStatus: 'invalid',
               memberCheckMessage: lang === 'th'
-                ? '⚠️ สมาชิกหมายเลขนี้ได้ลงทะเบียนงานประชุมนี้แล้ว'
+                ? `⚠️ สมาชิกหมายเลขนี้ได้ลงทะเบียนงานประชุมนี้แล้ว${data.addOnMessage ? ` ${data.addOnMessage}` : ''}`
                 : '⚠️ This member has already registered for this conference',
               verifiedMember: null,
             };
@@ -780,6 +850,7 @@ export function LoginView({
   }, [adminSponsorSession?.sponsorId, activeMeeting?.meeting_id]);
 
   const toggleProgramForCurrentAttendee = (key: string) => {
+    if (currentAddOn?.registeredActivityIds.includes(key)) return; // ลงทะเบียนไว้แล้ว
     const currentProgs = currentAttendee?.selectedPrograms || [];
     let nextProgs: string[];
     if (currentProgs.includes(key)) {
@@ -1144,6 +1215,24 @@ export function LoginView({
             };
           });
 
+        // แบบกลุ่ม: ผู้ที่ลงทะเบียนแล้วลงได้เฉพาะกิจกรรมเพิ่มเติม
+        const groupAddOn = regMode === 'group' ? groupAddOnOf(att) : null;
+        if (groupAddOn) {
+          const registeredIds = new Set(groupAddOn.registeredActivityIds.map(String));
+          const remaining = selectedActivityObjects.filter(a => !registeredIds.has(String(a.id)));
+          if (remaining.length === 0) {
+            alert(
+              lang === 'th'
+                ? `ผู้ลงทะเบียนคนที่ ${i + 1} ลงทะเบียนกิจกรรมที่เลือกไว้แล้ว กรุณาเลือกกิจกรรมที่ต้องการลงเพิ่ม หรือลบผู้ลงทะเบียนท่านนี้ออก`
+                : `Attendee #${i + 1} is already registered for the selected activities. Please choose additional activities or remove this attendee.`
+            );
+            setActiveAttendeeIdx(i);
+            setVerifyingMember(false);
+            return;
+          }
+          selectedActivityObjects.splice(0, selectedActivityObjects.length, ...remaining);
+        }
+
         const attendeeSubtotal = selectedActivityObjects.reduce((sum, item) => sum + item.price, 0);
         groupTotalAmount += attendeeSubtotal;
 
@@ -1178,31 +1267,85 @@ export function LoginView({
           programNameTh: programLabel || activeMeeting.meeting_name,
           programNameEn: programLabel || activeMeeting.meeting_name,
           subtotal: attendeeSubtotal,
+          ...(groupAddOn
+            ? {
+              isAddOn: true,
+              addOnOriginalSlipId: groupAddOn.originalSlipId,
+              addOnOriginalTicketCode: groupAddOn.ticketCode,
+              registeredActivities: groupAddOn.registeredActivities,
+            }
+            : {}),
         });
       }
 
 
       // If single individual registration, keep backward compatible structure
       if (regMode === 'individual' && processedAttendees.length === 1) {
-        const single = processedAttendees[0];
+        let single = processedAttendees[0];
 
-        // Check duplicate
+        // Check duplicate — ผู้ที่ลงทะเบียนและได้รับอนุมัติแล้วสามารถลงทะเบียนกิจกรรมเพิ่มเติมได้
+        let addOnForSubmit: AddOnInfo | null = null;
         try {
           const checkRes = await fetch(
             `/api/meetings/${encodeURIComponent(activeMeeting.meeting_id)}/check-registration?memberNo=${encodeURIComponent(single.memberNo)}&email=${encodeURIComponent(single.email)}`
           );
           const checkData = await checkRes.json();
           if (checkData.success && checkData.isRegistered) {
-            alert(
-              checkData.message ||
-              (lang === 'th'
-                ? 'ท่านได้ลงทะเบียนเข้าร่วมงานประชุมนี้ในระบบเรียบร้อยแล้ว ไม่สามารถลงทะเบียนซ้ำได้'
-                : 'You have already registered for this conference.')
-            );
-            return;
+            if (!checkData.canAddOn || !checkData.addOn) {
+              alert(
+                [checkData.message, checkData.addOnMessage].filter(Boolean).join('\n') ||
+                (lang === 'th'
+                  ? 'ท่านได้ลงทะเบียนเข้าร่วมงานประชุมนี้ในระบบเรียบร้อยแล้ว ไม่สามารถลงทะเบียนซ้ำได้'
+                  : 'You have already registered for this conference.')
+              );
+              return;
+            }
+            addOnForSubmit = { ...checkData.addOn, identityKey: addOnIdentityKey(attendeesToSubmit[0]) };
+            setAddOnInfo(addOnForSubmit);
           }
         } catch (checkErr) {
           console.error('Error checking duplicate:', checkErr);
+        }
+
+        if (addOnForSubmit) {
+          if (effectiveCoupon) {
+            alert(
+              lang === 'th'
+                ? 'ไม่สามารถใช้คูปองกับการลงทะเบียนกิจกรรมเพิ่มเติมได้ กรุณาลบรหัสคูปองออกก่อนดำเนินการต่อ'
+                : 'Coupons cannot be used when adding activities to an existing registration. Please remove the coupon code.'
+            );
+            return;
+          }
+
+          const registeredIds = new Set(addOnForSubmit.registeredActivityIds);
+          const remaining = single.selectedActivities.filter((a: any) => !registeredIds.has(String(a.id)));
+          const registeredNames = addOnForSubmit.registeredActivities.map(a => a.name).filter(Boolean).join(', ');
+          if (remaining.length === 0) {
+            alert(
+              lang === 'th'
+                ? `ท่านได้ลงทะเบียนกิจกรรมที่เลือกไว้แล้ว: ${registeredNames}\nกรุณาเลือกกิจกรรมอื่นที่ต้องการลงทะเบียนเพิ่มเติม`
+                : `You have already registered for: ${registeredNames}\nPlease select other activities to add.`
+            );
+            return;
+          }
+          const remainingNames = remaining.map((a: any) => a.name).join(', ');
+          const proceed = confirm(
+            lang === 'th'
+              ? `ท่านลงทะเบียนงานประชุมนี้ไว้แล้ว ${addOnForSubmit.ticketCode ? `รหัส ${addOnForSubmit.ticketCode}` : ''}\n\nระบบจะลงทะเบียนเพิ่มเติมเฉพาะ: ${remainingNames}\nยอดชำระคิดเฉพาะกิจกรรมที่เพิ่ม และจะรวมเข้ากับรายการเดิมหลังเจ้าหน้าที่ตรวจสอบการชำระเงิน\n\nต้องการดำเนินการต่อหรือไม่`
+              : `You are already registered ${addOnForSubmit.ticketCode ? `(${addOnForSubmit.ticketCode})` : ''}.\n\nOnly these activities will be added: ${remainingNames}\nYou pay only for the added activities; they will be merged into your registration after payment is verified.\n\nContinue?`
+          );
+          if (!proceed) return;
+
+          const remainingLabel = remaining.map((a: any) => a.name).join(' + ');
+          single = {
+            ...single,
+            selectedActivities: remaining,
+            selectedProgramIds: remaining.map((a: any) => a.id),
+            programKey: remaining.map((a: any) => a.id).join(','),
+            programNameTh: remainingLabel,
+            programNameEn: remainingLabel,
+            subtotal: remaining.reduce((sum: number, a: any) => sum + a.price, 0),
+          };
         }
 
         const singlePayload = {
@@ -1232,6 +1375,13 @@ export function LoginView({
           totalAmount: single.subtotal,
           couponData: effectiveCoupon || undefined,
           registeredAt: new Date().toISOString(),
+          ...(addOnForSubmit
+            ? {
+              addOnToSlipId: addOnForSubmit.originalSlipId,
+              addOnTicketCode: addOnForSubmit.ticketCode,
+              registeredActivities: addOnForSubmit.registeredActivities,
+            }
+            : {}),
         };
 
         if (single.isExpiredMember) {
@@ -2012,8 +2162,51 @@ export function LoginView({
                         </div>
 
                         <div className="grid grid-cols-1 gap-2">
+                          {currentAddOn && regMode === 'group' && (
+                            <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-[11px] sm:text-xs font-semibold leading-relaxed">
+                              {lang === 'th'
+                                ? `ผู้ลงทะเบียนท่านนี้ลงทะเบียนงานประชุมนี้ไว้แล้ว${currentAddOn.ticketCode ? ` รหัส ${currentAddOn.ticketCode}` : ''} เลือกเฉพาะกิจกรรมที่ต้องการลงเพิ่ม คิดค่าใช้จ่ายเฉพาะกิจกรรมที่เพิ่ม และไม่ใช้สิทธิ์คูปองของบริษัท เมื่อเจ้าหน้าที่อนุมัติ ระบบจะรวมกิจกรรมเข้ากับรายการลงทะเบียนเดิมของผู้ลงทะเบียนท่านนี้`
+                                : `This attendee is already registered${currentAddOn.ticketCode ? ` (${currentAddOn.ticketCode})` : ''}. Select only the activities to add; only those are charged and the company coupon is not applied. Once approved, they are merged into this attendee's existing registration.`}
+                            </div>
+                          )}
+                          {activeAddOn && (
+                            <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-[11px] sm:text-xs font-semibold leading-relaxed">
+                              {lang === 'th'
+                                ? `ท่านลงทะเบียนงานประชุมนี้ไว้แล้ว${activeAddOn.ticketCode ? ` รหัส ${activeAddOn.ticketCode}` : ''}${activeAddOn.originalStatus === 'pending' ? ' ซึ่งอยู่ระหว่างรอเจ้าหน้าที่ตรวจสอบ' : ''} เลือกเฉพาะกิจกรรมที่ต้องการเพิ่ม ยอดชำระคิดเฉพาะกิจกรรมที่เพิ่ม และระบบจะรวมเข้ากับรายการเดิมหลังเจ้าหน้าที่ตรวจสอบการชำระเงิน`
+                                : `You are already registered${activeAddOn.ticketCode ? ` (${activeAddOn.ticketCode})` : ''}${activeAddOn.originalStatus === 'pending' ? ', pending staff review' : ''}. Select only the activities you want to add; you pay only for those, and they will be merged into your registration after payment is verified.`}
+                            </div>
+                          )}
                           {effectiveActivities.map((act) => {
-                            const isSelected = currentAttendee.selectedPrograms.includes(act.id);
+                            const isAlreadyRegistered = Boolean(currentAddOn?.registeredActivityIds.includes(act.id));
+                            const isRegistrationPending = Boolean(
+                              currentAddOn?.registeredActivities.find(r => String(r.id) === String(act.id))?.pending
+                            );
+                            const isSelected = !isAlreadyRegistered && currentAttendee.selectedPrograms.includes(act.id);
+
+                            if (isAlreadyRegistered) {
+                              return (
+                                <div
+                                  key={act.id}
+                                  className="p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 bg-slate-100/80 text-slate-500 flex items-center justify-between gap-3 cursor-not-allowed"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <span className={`inline-block text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded border mb-1 ${
+                                      isRegistrationPending
+                                        ? 'bg-amber-100 text-amber-700 border-amber-200'
+                                        : 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                    }`}>
+                                      {isRegistrationPending
+                                        ? (lang === 'th' ? 'ลงทะเบียนแล้ว รอตรวจสอบ' : 'Registered, pending review')
+                                        : (lang === 'th' ? 'ลงทะเบียนแล้ว' : 'Registered')}
+                                    </span>
+                                    <h4 className="text-xs sm:text-sm font-bold leading-snug" title={act.name}>
+                                      {act.name}
+                                    </h4>
+                                  </div>
+                                  <Lock className="w-4 h-4 text-slate-400 shrink-0" />
+                                </div>
+                              );
+                            }
 
                             return (
                               <button

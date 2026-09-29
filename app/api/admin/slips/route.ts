@@ -12,6 +12,15 @@ import { createMember } from '@/lib/services/memberService';
 import { getSystemSettings } from '@/lib/services/settingsService';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 import { createReceiptForApprovedSlip } from '@/lib/services/receiptService';
+import {
+  ADD_ON_MERGED_STATUS,
+  AddOnMergeError,
+  isAddOnPayload,
+  mergeAddOnSlip,
+  mergeGroupAddOnAttendees,
+  parseSlipPayload,
+  slipActivityList,
+} from '@/lib/services/registrationAddOnService';
 
 // GET: Fetch all payment slips for Admin Review
 export async function GET(request: NextRequest) {
@@ -407,6 +416,7 @@ export async function GET(request: NextRequest) {
           });
         } else if (Array.isArray(attendees) && attendees.length > 0) {
           attendees.forEach((att: any, idx: number) => {
+            if (att.isAddOn) return; // ผู้ที่ลงเพิ่มไม่ได้ใช้สิทธิ์คูปอง
             const acts = att.selectedActivities || [];
             const hasMain = acts.some((a: any) =>
               a.name?.toLowerCase().includes('main') ||
@@ -431,6 +441,7 @@ export async function GET(request: NextRequest) {
       } else if (Array.isArray(attendees) && attendees.length > couponUsagesList.length && (couponRecord || couponCode)) {
         // Supplement any missing group attendees to couponUsagesList
         attendees.forEach((att: any, idx: number) => {
+          if (att.isAddOn) return; // ผู้ที่ลงเพิ่มไม่ได้ใช้สิทธิ์คูปอง
           const alreadyInList = couponUsagesList.some(
             (cu: any) => (att.memberNo && cu.memberNo === att.memberNo) ||
               (att.email && cu.attendeeEmail?.toLowerCase() === att.email.toLowerCase()) ||
@@ -474,7 +485,9 @@ export async function GET(request: NextRequest) {
     if (slipsModel) {
       const whereClause: any = {};
       if (meetingId) whereClause.meeting_id = meetingId;
+      // รายการเพิ่มเติมที่รวมเข้ารายการเดิมแล้วจะแสดงเป็นประวัติการชำระของรายการเดิมแทน
       if (status && status !== 'all') whereClause.status = status;
+      else whereClause.status = { not: ADD_ON_MERGED_STATUS };
 
       const slips = await slipsModel.findMany({
         where: whereClause,
@@ -604,8 +617,57 @@ export async function GET(request: NextRequest) {
         console.warn('Could not query coupon data for slips:', cErr);
       }
 
+      // ── การลงทะเบียนเพิ่มเติม: รายการเดิมของรายการที่รออนุมัติ และประวัติรายการที่รวมแล้ว ──
+      const pendingAddOnOriginalIds: string[] = slips
+        .filter((s: any) => isAddOnPayload(s.selected_activities))
+        .map((s: any) => parseSlipPayload(s.selected_activities)?.originalSlipId)
+        .filter(Boolean);
+      const addOnOriginalsById = new Map<string, any>();
+      const pendingAddOnCountByOriginal = new Map<string, number>();
+      slips.forEach((s: any) => {
+        if (s.status !== 'pending' || !isAddOnPayload(s.selected_activities)) return;
+        const originalId = parseSlipPayload(s.selected_activities)?.originalSlipId;
+        if (originalId) pendingAddOnCountByOriginal.set(originalId, (pendingAddOnCountByOriginal.get(originalId) || 0) + 1);
+      });
+      const mergedAddOnsByOriginal = new Map<string, any[]>();
+      try {
+        const [originals, mergedAddOns] = await Promise.all([
+          pendingAddOnOriginalIds.length > 0
+            ? prisma.payment_slips.findMany({ where: { slip_id: { in: pendingAddOnOriginalIds } } })
+            : Promise.resolve([]),
+          prisma.payment_slips.findMany({
+            where: { status: ADD_ON_MERGED_STATUS, ...(meetingId ? { meeting_id: meetingId } : {}) },
+            orderBy: { created_at: 'asc' },
+          }),
+        ]);
+        originals.forEach((o: any) => addOnOriginalsById.set(o.slip_id, o));
+        mergedAddOns.forEach((a: any) => {
+          const originalId = parseSlipPayload(a.selected_activities)?.originalSlipId;
+          if (!originalId) return;
+          const list = mergedAddOnsByOriginal.get(originalId) || [];
+          list.push({
+            slipId: a.slip_id,
+            ticketCode: a.ticket_code || '',
+            amount: a.amount,
+            bank: a.bank || '',
+            transferDate: a.transfer_date || '',
+            transferTime: a.transfer_time || '',
+            refNo: a.ref_no || '',
+            slipUrl: a.slip_url,
+            activities: slipActivityList(a.selected_activities),
+            reviewedBy: a.reviewed_by || '',
+            reviewedAt: a.reviewed_at ? new Date(a.reviewed_at).toISOString() : null,
+          });
+          mergedAddOnsByOriginal.set(originalId, list);
+        });
+      } catch (addOnErr) {
+        console.warn('Could not query add-on registrations:', addOnErr);
+      }
+
       formattedSlips = slips.map((s: any) => {
         const parsedAct = parseActivitiesData(s.selected_activities, s.amount);
+        const addOnPayload = isAddOnPayload(s.selected_activities) ? parseSlipPayload(s.selected_activities) : null;
+        const addOnOriginal = addOnPayload ? addOnOriginalsById.get(addOnPayload.originalSlipId) : null;
 
         const hasMemberAttendees = Boolean(
           parsedAct.hasMemberAttendees ||
@@ -744,7 +806,9 @@ export async function GET(request: NextRequest) {
           }
         );
 
-        const ticketType = parsedAct.isFormatChange
+        const ticketType = addOnPayload
+          ? '➕ ลงทะเบียนเพิ่มเติม'
+          : parsedAct.isFormatChange
           ? `🔄 ขอเปลี่ยนเป็น ${parsedAct.formatChangePayload?.targetFormat === 'onsite' ? 'Onsite' : 'Online'}`
           : parsedAct.isMembership
             ? (parsedAct.isGroupMembership ? 'Group Membership' : 'Membership Registration')
@@ -764,8 +828,17 @@ export async function GET(request: NextRequest) {
             ? 'สมัครสมาชิกสมาคม'
             : parsedAct.isFormatChange
               ? `แจ้งเปลี่ยนรูปแบบ - ${s.meetings?.meeting_name || ''}`
-              : (s.meetings?.meeting_name || ''),
+              : addOnPayload
+                ? `ลงทะเบียนเพิ่มเติม - ${s.meetings?.meeting_name || ''}`
+                : (s.meetings?.meeting_name || ''),
           memberNo: s.member_no,
+          isAddOn: Boolean(addOnPayload),
+          originalSlipId: addOnPayload?.originalSlipId || null,
+          originalTicketCode: addOnPayload?.originalTicketCode || addOnOriginal?.ticket_code || null,
+          originalActivities: addOnOriginal ? slipActivityList(addOnOriginal.selected_activities) : [],
+          originalStatus: addOnOriginal?.status || null,
+          pendingAddOnCount: pendingAddOnCountByOriginal.get(s.slip_id) || 0,
+          addOnPayments: mergedAddOnsByOriginal.get(s.slip_id) || [],
           isMember: Boolean(s.is_member || hasMemberAttendees),
           isMembershipRegistration: parsedAct.isMembership,
           isGroupMembership: parsedAct.isGroupMembership,
@@ -1430,6 +1503,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (slip.status === ADD_ON_MERGED_STATUS) {
+      return NextResponse.json(
+        { success: false, error: 'รายการนี้ถูกรวมเข้ากับรายการลงทะเบียนเดิมแล้ว ไม่สามารถเปลี่ยนสถานะได้' },
+        { status: 400 }
+      );
+    }
+
+    // ลงทะเบียนเพิ่มเติม: อนุมัติแล้วรวมกิจกรรมและยอดเงินเข้ารายการเดิม
+    if (action === 'approve' && isAddOnPayload(slip.selected_activities)) {
+      return approveAddOnSlip(slip, reviewer || 'Admin');
+    }
+
     // Check if this slip is a membership registration or format change request
     let isMembershipRegistration = false;
     let isGroupMembership = false;
@@ -1928,6 +2013,13 @@ export async function POST(request: NextRequest) {
             });
           }
         }
+      }
+
+      // 4.1 ผู้ที่ลงทะเบียนเพิ่มเติมในรายการกลุ่ม: รวมกิจกรรมที่เพิ่มเข้ารายการลงทะเบียนเดิมของแต่ละคน
+      if (isGroupConference) {
+        await mergeGroupAddOnAttendees(slipId).catch((mergeErr) =>
+          console.error('Failed to merge group add-on attendees:', mergeErr)
+        );
       }
 
       // 5. Send approval confirmation email after the response is sent (with DB Fallbacks)
@@ -2491,3 +2583,71 @@ export async function POST(request: NextRequest) {
   }
 }
 
+async function approveAddOnSlip(slip: any, reviewer: string) {
+  let merged: Awaited<ReturnType<typeof mergeAddOnSlip>>;
+  try {
+    merged = await mergeAddOnSlip(slip.slip_id, reviewer);
+  } catch (err) {
+    if (err instanceof AddOnMergeError) {
+      return NextResponse.json({ success: false, error: err.message }, { status: 400 });
+    }
+    throw err;
+  }
+
+  const { original, newActivities } = merged;
+
+  // ส่งอีเมลยืนยันการลงทะเบียนฉบับปรับปรุง (รวมกิจกรรมทั้งหมด) หลังตอบกลับแอดมินแล้ว
+  after(async () => {
+    try {
+      const member = original.member_no
+        ? await prisma.member.findUnique({ where: { member_no: original.member_no } })
+        : null;
+      const payload = parseSlipPayload(original.selected_activities) || {};
+      const recipientEmail = (member?.email || original.guest_email || payload.email || '').trim();
+      if (!recipientEmail) {
+        console.warn(`⚠️ [ADD-ON APPROVAL] No recipient email for slip ${original.slip_id}`);
+        return;
+      }
+
+      const meeting = await prisma.meetings.findUnique({ where: { meeting_id: original.meeting_id } });
+      let meetingDateStr: string | undefined;
+      if (meeting?.start_date && meeting?.end_date) {
+        const start = new Date(meeting.start_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+        const end = new Date(meeting.end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+        meetingDateStr = start === end ? start : `${start} - ${end}`;
+      } else if (meeting?.meeting_date) {
+        meetingDateStr = new Date(meeting.meeting_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+      }
+
+      await sendRegistrationApprovedEmail({
+        to: recipientEmail,
+        recipientName: member?.fullNameTh || original.guest_name || payload.nameTh || 'ผู้ลงทะเบียน',
+        nameEn: member?.fullNameEn || payload.nameEn || undefined,
+        memberNo: original.member_no || undefined,
+        position: member?.position || payload.position || undefined,
+        workplace: payload.workplace || member?.workplace || original.guest_workplace || undefined,
+        email: recipientEmail,
+        phone: member?.mobile || original.guest_phone || payload.phone || undefined,
+        attendanceType: payload.attendanceType || undefined,
+        meetingName: meeting?.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
+        meetingDate: meetingDateStr,
+        ticketCode: original.ticket_code || '',
+        amountPaid: original.amount,
+        isMember: original.is_member,
+        selectedActivities: original.selected_activities,
+      });
+    } catch (mailErr) {
+      console.error('❌ [ADD-ON APPROVAL EMAIL ERROR]:', mailErr);
+    }
+  });
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      status: 'approved',
+      isAddOnMerged: true,
+      originalSlipId: original.slip_id,
+      message: `อนุมัติและรวมกิจกรรมเพิ่มเติม ${newActivities.length} รายการเข้ากับรายการลงทะเบียนเดิม (${original.ticket_code || original.slip_id}) เรียบร้อยแล้ว`,
+    },
+  });
+}

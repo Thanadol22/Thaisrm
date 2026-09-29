@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma';
+import { isAddOnPayload } from '@/lib/services/registrationAddOnService';
 
 export interface DailyProgramInfo {
   id?: string;
@@ -276,12 +277,14 @@ export async function ensureDailyCheckinsForMeeting(
   });
 
   // Fetch payment slips for ticket codes
-  const slips = await prisma.payment_slips.findMany({
-    where: {
-      meeting_id: meetingId,
-      status: { not: 'rejected' },
-    },
-  });
+  const slips = (
+    await prisma.payment_slips.findMany({
+      where: {
+        meeting_id: meetingId,
+        status: { notIn: ['rejected', 'merged'] },
+      },
+    })
+  ).filter((s) => !isAddOnPayload(s.selected_activities)); // บัตรเข้างานใช้รหัสของรายการหลักเท่านั้น
 
   const slipMapByMember = new Map<string, any>();
   const slipMapByEmail = new Map<string, any>();

@@ -17,6 +17,65 @@ export interface SponsorCouponResult {
   meetingName: string | null;
 }
 
+const MAIN_PROGRAM_LABELS = ['การประชุมหลัก', 'main program', 'main congress', 'main'];
+
+const normalizeProgramName = (name: unknown) =>
+  String(name || '').replace(/\s*\(Main Congress\)/gi, '').trim().toLowerCase();
+
+const isMainActivity = (act: any) => act?.type === 'main' || act?.id === 'main';
+
+/**
+ * โปรแกรมที่คูปองครอบคลุม (เก็บใน remarks เป็น JSON จากหน้าจัดการคูปอง)
+ * ไม่มีข้อมูล = ครอบคลุมเฉพาะการประชุมหลัก
+ */
+export function getCouponProgramScope(remarks: string | null | undefined): { all: boolean; programs: string[] } {
+  if (remarks && remarks.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(remarks);
+      if (parsed?.allPrograms === true) return { all: true, programs: [] };
+      if (Array.isArray(parsed?.programs) && parsed.programs.length > 0) {
+        return { all: false, programs: parsed.programs.map(normalizeProgramName).filter(Boolean) };
+      }
+    } catch {
+      // remarks ไม่ใช่ JSON ใช้ค่าเริ่มต้น
+    }
+  }
+  return { all: false, programs: [MAIN_PROGRAM_LABELS[0]] };
+}
+
+/**
+ * ตรวจว่ารายการที่ลงทะเบียนมีโปรแกรมที่คูปองครอบคลุมหรือไม่
+ * activities ว่าง = ลงเฉพาะการประชุมหลัก
+ */
+export function isCouponApplicableToActivities(
+  coupon: { remarks?: string | null },
+  activities: any[] | null | undefined
+): boolean {
+  const scope = getCouponProgramScope(coupon.remarks);
+  if (scope.all) return true;
+
+  const list = Array.isArray(activities) && activities.length > 0 ? activities : [{ id: 'main', type: 'main' }];
+  const coversMain = scope.programs.some((p) => MAIN_PROGRAM_LABELS.includes(p));
+  return list.some((act) => {
+    if (isMainActivity(act) && coversMain) return true;
+    const name = normalizeProgramName(act?.name);
+    return Boolean(name) && scope.programs.includes(name);
+  });
+}
+
+/**
+ * รายการโปรแกรมของผู้ลงทะเบียนในกลุ่ม: ใช้ selectedActivities ก่อน หากไม่มีจึงแปลงจาก selectedProgramIds
+ */
+export function resolveAttendeeActivities(att: any, meetingActivities: unknown): any[] {
+  const own = att?.activities || att?.selectedActivities;
+  if (Array.isArray(own) && own.length > 0 && typeof own[0] === 'object') return own;
+
+  const ids: string[] = att?.selectedProgramIds || att?.selectedPrograms || [];
+  const acts = Array.isArray(meetingActivities) ? (meetingActivities as any[]) : [];
+  if (ids.length > 0 && acts.length > 0) return acts.filter((a) => ids.includes(a?.id));
+  return [];
+}
+
 function buildCouponPrefix(companyName: string): string {
   const words = (companyName || '').toUpperCase().replace(/[^A-Z0-9\s]/g, '').split(/\s+/).filter(Boolean);
   if (words.length >= 2) return (words[0].slice(0, 2) + words[1].slice(0, 1)).toUpperCase();

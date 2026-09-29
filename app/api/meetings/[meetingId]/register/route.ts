@@ -2,7 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isPersonalEmail, personalEmailRequiredMessage } from '@/lib/validators/emailPolicy';
 import { sendRegistrationApprovedEmail, sendAttendeeSponsoredRegistrationEmail } from '@/lib/email';
-import { retireUsedSponsorCoupon } from '@/lib/services/sponsorCouponService';
+import {
+  isCouponApplicableToActivities,
+  resolveAttendeeActivities,
+  retireUsedSponsorCoupon,
+} from '@/lib/services/sponsorCouponService';
+import {
+  getAddOnEligibility,
+  getMemberRegistrationSummary,
+  mergeAddOnSlip,
+  mergeGroupAddOnAttendees,
+  slipActivityList,
+} from '@/lib/services/registrationAddOnService';
 
 export async function POST(
   request: NextRequest,
@@ -33,6 +44,7 @@ export async function POST(
       couponCode,
       originalAmount,
       isPayLater,
+      addOnToSlipId,
     } = body;
 
     if (!meetingId) {
@@ -91,9 +103,62 @@ export async function POST(
         }
       }
 
+      // ผู้ที่ลงทะเบียนงานนี้แล้ว: ลงได้เฉพาะกิจกรรมเพิ่มเติม (isAddOn) และห้ามเลือกกิจกรรมที่ลงไว้แล้ว
+      for (let i = 0; i < attendees.length; i++) {
+        const att = attendees[i];
+        const attMemberNo = att?.memberNo ? String(att.memberNo).trim() : '';
+        if (!attMemberNo) {
+          att.isAddOn = false;
+          continue;
+        }
+        const registration = await getMemberRegistrationSummary(meetingId, attMemberNo);
+        const label = `ผู้ลงทะเบียนลำดับที่ ${i + 1} ${att.nameTh || att.nameEn || ''} #${attMemberNo}`.trim();
+
+        if (!registration.registered) {
+          att.isAddOn = false;
+          delete att.addOnOriginalSlipId;
+          continue;
+        }
+        if (!att.isAddOn) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `${label}: ได้ลงทะเบียนงานประชุมนี้แล้ว กรุณาตรวจสอบเลขสมาชิกอีกครั้ง แล้วเลือกเฉพาะกิจกรรมที่ต้องการลงเพิ่ม`,
+              code: 'DUPLICATE_REGISTRATION',
+            },
+            { status: 400 }
+          );
+        }
+
+        const registeredIds = new Set(registration.registeredActivities.map((a) => a.id));
+        const requested = resolveAttendeeActivities(att, meeting.activities);
+        if (requested.length === 0) {
+          return NextResponse.json(
+            { success: false, error: `${label}: กรุณาเลือกกิจกรรมที่ต้องการลงทะเบียนเพิ่มเติมอย่างน้อย 1 รายการ` },
+            { status: 400 }
+          );
+        }
+        const duplicated = requested.filter((a: any) => registeredIds.has(String(a?.id)));
+        if (duplicated.length > 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `${label}: ลงทะเบียนกิจกรรมนี้ไว้แล้ว ${duplicated.map((a: any) => a?.name || a?.id).join(', ')}`,
+              code: 'DUPLICATE_REGISTRATION',
+            },
+            { status: 400 }
+          );
+        }
+        // ใช้ข้อมูลจากฐานข้อมูลเป็นหลัก ไม่เชื่อค่าที่ส่งมาจากหน้าเว็บ
+        att.addOnOriginalSlipId = registration.originalSlipId;
+        att.addOnOriginalTicketCode = registration.originalTicketCode;
+        att.registeredActivities = registration.registeredActivities;
+      }
+
       // ตรวจสอบคูปองอีกครั้งฝั่งเซิร์ฟเวอร์ (คูปองที่ใช้ไปแล้วจะถูกปิด ไม่สามารถใช้ซ้ำได้)
+      let groupCoupon: Awaited<ReturnType<typeof prisma.coupons.findUnique>> = null;
       if (couponCode) {
-        const groupCoupon = await prisma.coupons.findUnique({ where: { code: String(couponCode).trim().toUpperCase() } });
+        groupCoupon = await prisma.coupons.findUnique({ where: { code: String(couponCode).trim().toUpperCase() } });
         if (groupCoupon) {
           let couponError = '';
           if (!groupCoupon.is_active) couponError = 'รหัสคูปองนี้ถูกใช้งานหรือปิดใช้งานแล้ว กรุณาใช้คูปองปัจจุบันของบริษัท';
@@ -105,6 +170,17 @@ export async function POST(
           }
         }
       }
+
+      // นับเป็นการใช้สิทธิ์คูปองเฉพาะผู้ที่ได้รับส่วนลดจริง และลงโปรแกรมที่คูปองครอบคลุม
+      // (เช่น คูปองฟรีการประชุมหลัก แต่ลงเฉพาะเวิร์กช็อป จะไม่ตัดโควต้า)
+      const couponCoveredAttendees = groupCoupon
+        ? attendees.filter(
+            (a: any) =>
+              !a.isAddOn &&
+              Number(a.discountTotal || a.discountAmount || 0) > 0 &&
+              isCouponApplicableToActivities(groupCoupon!, resolveAttendeeActivities(a, meeting.activities))
+          )
+        : [];
 
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
       const ticketCode = `GRP-${new Date().getFullYear()}-${randomSuffix}`;
@@ -145,7 +221,10 @@ export async function POST(
       const effectiveSponsorName = sponsorRecord?.name || companyName || null;
 
       const hasMemberAttendees = Array.isArray(attendees) && attendees.some((a: any) => a.isMember || a.memberNo);
-      const primaryMemberNo = hasMemberAttendees ? attendees.find((a: any) => a.memberNo)?.memberNo?.trim() || null : null;
+      // เลขสมาชิกของรายการ: ใช้ผู้ลงทะเบียนใหม่ก่อน เพื่อไม่ให้รายการนี้ไปแทนที่รายการหลักของผู้ที่ลงเพิ่ม
+      const primaryMemberNo = hasMemberAttendees
+        ? attendees.find((a: any) => a.memberNo && !a.isAddOn)?.memberNo?.trim() || null
+        : null;
 
       // ห่อทุก DB write ด้วย Transaction เพื่อความ Atomic
       let slip: any;
@@ -319,25 +398,25 @@ export async function POST(
           }
         }
 
-        // Update sponsor quota if assigned
-        if (effectiveSponsorId) {
+        // หักโควต้าบริษัทเฉพาะผู้ที่ได้รับส่วนลดจากคูปองจริง (ลงทะเบียนเต็มราคาไม่ถือว่าใช้สิทธิ์)
+        if (effectiveSponsorId && couponCoveredAttendees.length > 0) {
           await tx.$executeRaw`
             UPDATE sponsor_quotas 
-            SET used_seats = used_seats + ${attendees.length}, updated_at = NOW()
+            SET used_seats = used_seats + ${couponCoveredAttendees.length}, updated_at = NOW()
             WHERE sponsor_id = ${effectiveSponsorId} AND meeting_id = ${meetingId}
           `;
         }
 
         // Log coupon usages
-        if (couponCode) {
+        if (couponCode && couponCoveredAttendees.length > 0) {
           const couponRec = await tx.coupons.findFirst({ where: { code: couponCode } });
           if (couponRec) {
             await tx.$executeRaw`
               UPDATE coupons 
-              SET used_count = used_count + ${attendees.length}, updated_at = NOW()
+              SET used_count = used_count + ${couponCoveredAttendees.length}, updated_at = NOW()
               WHERE id = ${couponRec.id}
             `;
-            for (const att of attendees) {
+            for (const att of couponCoveredAttendees) {
               await tx.$executeRaw`
                 INSERT INTO coupon_usages (
                   coupon_id, meeting_id, member_no, attendee_name, attendee_email,
@@ -355,8 +434,17 @@ export async function POST(
         }
       }, { timeout: 30000 }); // timeout 30s สำหรับกลุ่มใหญ่
 
+      // ไม่มีค่าใช้จ่าย (อนุมัติอัตโนมัติ): รวมกิจกรรมของผู้ที่ลงเพิ่มเข้ารายการเดิมทันที
+      if (isFreeRegistration && attendees.some((a: any) => a.isAddOn)) {
+        try {
+          await mergeGroupAddOnAttendees(slip.slip_id);
+        } catch (mergeErr) {
+          console.error('Failed to merge group add-on attendees:', mergeErr);
+        }
+      }
+
       // คูปองบริษัทใช้ได้ 1 ครั้ง: ปิดรหัสที่ใช้แล้วและออกรหัสใหม่สำหรับสิทธิ์คงเหลือ (โควต้าถูกหักใน Transaction แล้ว)
-      if (couponCode) {
+      if (couponCode && couponCoveredAttendees.length > 0) {
         try {
           await retireUsedSponsorCoupon(couponCode);
         } catch (rotateErr) {
@@ -544,7 +632,7 @@ export async function POST(
       `;
       const existingAttendance = memberAttendances?.[0];
 
-      if (existingSlip || existingAttendance) {
+      if (!addOnToSlipId && (existingSlip || existingAttendance)) {
         const isApproved = existingSlip?.status === 'approved' || existingAttendance?.attendance_status === 'Registered';
         return NextResponse.json(
           {
@@ -596,7 +684,7 @@ export async function POST(
       `;
       const existingGuestAttendance = guestAttendances?.[0];
 
-      if (existingGuestSlip || existingGuestAttendance) {
+      if (!addOnToSlipId && (existingGuestSlip || existingGuestAttendance)) {
         const isApproved = existingGuestSlip?.status === 'approved' || existingGuestAttendance?.attendance_status === 'Registered';
         return NextResponse.json(
           {
@@ -610,6 +698,51 @@ export async function POST(
         );
       }
     }
+
+    // ลงทะเบียนกิจกรรมเพิ่มเติม: ต้องมีรายการเดิมที่อนุมัติแล้ว และเลือกเฉพาะกิจกรรมที่ยังไม่ได้ลงทะเบียน
+    let addOnOriginalSlip: any = null;
+    if (addOnToSlipId) {
+      if (couponCode && String(couponCode).trim()) {
+        return NextResponse.json(
+          { success: false, error: 'ไม่สามารถใช้คูปองกับการลงทะเบียนกิจกรรมเพิ่มเติมได้' },
+          { status: 400 }
+        );
+      }
+
+      const eligibility = await getAddOnEligibility(
+        meetingId,
+        isMember ? { memberNo: validMemberNo } : { email: guestEmail }
+      );
+      if (eligibility.state !== 'eligible' || eligibility.originalSlip.slip_id !== addOnToSlipId) {
+        const reason =
+          eligibility.state === 'unsupported'
+            ? 'รายการลงทะเบียนของท่านเป็นแบบกลุ่มหรือบันทึกโดยเจ้าหน้าที่ กรุณาติดต่อเจ้าหน้าที่สมาคมฯ เพื่อลงทะเบียนเพิ่มเติม'
+            : 'ไม่พบรายการลงทะเบียนเดิม ไม่สามารถลงทะเบียนเพิ่มเติมได้ กรุณาลองใหม่อีกครั้ง';
+        return NextResponse.json({ success: false, error: reason, code: 'ADD_ON_NOT_ALLOWED' }, { status: 400 });
+      }
+
+      const registeredIds = new Set(eligibility.registeredActivities.map((a) => a.id));
+      const requestedActivities = slipActivityList(selectedActivities);
+      if (requestedActivities.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'กรุณาเลือกกิจกรรมที่ต้องการลงทะเบียนเพิ่มเติมอย่างน้อย 1 รายการ' },
+          { status: 400 }
+        );
+      }
+      const duplicated = requestedActivities.filter((a: any) => registeredIds.has(String(a?.id)));
+      if (duplicated.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `ท่านได้ลงทะเบียนกิจกรรมนี้ไว้แล้ว: ${duplicated.map((a: any) => a?.name || a?.id).join(', ')}`,
+            code: 'DUPLICATE_REGISTRATION',
+          },
+          { status: 400 }
+        );
+      }
+      addOnOriginalSlip = eligibility.originalSlip;
+    }
+    const isAddOn = Boolean(addOnOriginalSlip);
 
     // 1. Check & Validate Coupon if supplied
     let couponRecord: any = null;
@@ -661,11 +794,14 @@ export async function POST(
       }
     }
 
-    // Generate unique Ticket Code: TSRM-YYYY-XXXX
+    // Generate unique Ticket Code: TSRM-YYYY-XXXX (รายการเพิ่มเติมใช้รหัสเดิมต่อท้ายด้วย -ADD เพื่อไม่ให้ชนกับบัตรเข้างานเดิม)
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const ticketCode = `TSRM-${new Date().getFullYear()}-${randomSuffix}`;
+    const ticketCode = isAddOn
+      ? `${addOnOriginalSlip.ticket_code || 'TSRM'}-ADD${Date.now().toString(36).slice(-4).toUpperCase()}`
+      : `TSRM-${new Date().getFullYear()}-${randomSuffix}`;
     const slipId = `SLIP-${Date.now().toString(36).toUpperCase()}`;
-    const registrationStatus = isFreeRegistration ? 'approved' : 'pending';
+    // รายการเพิ่มเติมบันทึกเป็น pending เสมอ แล้วรวมเข้ารายการเดิมเมื่ออนุมัติ (กรณีฟรีจะรวมทันทีด้านล่าง)
+    const registrationStatus = isFreeRegistration && !isAddOn ? 'approved' : 'pending';
     const attendanceStatus = isFreeRegistration ? 'Registered' : (isMember ? 'Pending_Payment' : 'Non-Member-Pending');
     const effectiveSlipUrl = slipUrl || (couponRecord ? `COUPON_SPONSORED:${couponRecord.company_name}` : 'FREE_REGISTRATION');
 
@@ -714,6 +850,16 @@ export async function POST(
       };
     }
 
+    if (isAddOn) {
+      effectiveSelectedActivities = {
+        ...effectiveSelectedActivities,
+        type: 'conference_add_on_registration',
+        isAddOn: true,
+        originalSlipId: addOnOriginalSlip.slip_id,
+        originalTicketCode: addOnOriginalSlip.ticket_code,
+      };
+    }
+
     // 2. Record payment slip in payment_slips table
     let slip: any = null;
     if ((prisma as any).payment_slips) {
@@ -736,8 +882,8 @@ export async function POST(
           slip_url: effectiveSlipUrl,
           status: registrationStatus,
           selected_activities: effectiveSelectedActivities,
-          reviewed_by: isFreeRegistration ? (couponRecord ? `SYSTEM:COUPON(${couponRecord.code})` : 'SYSTEM:AUTO_FREE') : null,
-          reviewed_at: isFreeRegistration ? new Date() : null,
+          reviewed_by: registrationStatus === 'approved' ? (couponRecord ? `SYSTEM:COUPON(${couponRecord.code})` : 'SYSTEM:AUTO_FREE') : null,
+          reviewed_at: registrationStatus === 'approved' ? new Date() : null,
         },
       });
     } else {
@@ -752,10 +898,32 @@ export async function POST(
           ${!isMember ? (guestPhone || null) : null}, ${!isMember ? (guestWorkplace || null) : null},
           ${!!isMember}, ${ticketCode}, ${numericAmount}, ${bank || (couponRecord ? `สิทธิ์คูปอง: ${couponRecord.company_name}` : null)}, ${transferDate || null},
           ${transferTime || null}, ${refNo || (couponRecord ? `COUPON:${couponRecord.code}` : null)}, ${effectiveSlipUrl}, 
-          ${registrationStatus}, ${actJson}::jsonb, ${isFreeRegistration ? 'SYSTEM:AUTO' : null}, ${isFreeRegistration ? new Date() : null}, NOW(), NOW()
+          ${registrationStatus}, ${actJson}::jsonb, ${registrationStatus === 'approved' ? 'SYSTEM:AUTO' : null}, ${registrationStatus === 'approved' ? new Date() : null}, NOW(), NOW()
         )
       `;
       slip = { slip_id: slipId };
+    }
+
+    // กิจกรรมเพิ่มเติมที่ไม่มีค่าใช้จ่าย: รวมเข้ารายการเดิมทันที ไม่ต้องรอเจ้าหน้าที่
+    if (isAddOn) {
+      if (isFreeRegistration) {
+        await mergeAddOnSlip(slip.slip_id, 'SYSTEM:AUTO_FREE', { allowPendingOriginal: true });
+      }
+      return NextResponse.json({
+        success: true,
+        data: {
+          slipId: slip.slip_id,
+          ticketCode: addOnOriginalSlip.ticket_code,
+          status: isFreeRegistration ? 'approved' : 'pending',
+          isAddOn: true,
+          isFreeRegistration,
+          message: isFreeRegistration
+            ? 'เพิ่มกิจกรรมเข้ารายการลงทะเบียนเดิมเรียบร้อยแล้ว'
+            : addOnOriginalSlip.status === 'approved'
+              ? 'บันทึกการลงทะเบียนกิจกรรมเพิ่มเติมแล้ว เมื่อเจ้าหน้าที่ตรวจสอบการชำระเงิน ระบบจะรวมเข้ากับรายการลงทะเบียนเดิมให้อัตโนมัติ'
+              : 'บันทึกการลงทะเบียนกิจกรรมเพิ่มเติมแล้ว เจ้าหน้าที่จะตรวจสอบรายการเดิมและรายการนี้ แล้วรวมเป็นรายการเดียวกันให้อัตโนมัติ',
+        },
+      });
     }
 
     // 3. Record attendance in meeting_attendances table ONLY IF isFreeRegistration (Auto-Approved)
@@ -812,7 +980,11 @@ export async function POST(
     }
 
     // 4. Record Coupon Usage & increment used_count if coupon was used
-    if (couponRecord) {
+    // ลงเฉพาะโปรแกรมที่คูปองไม่ครอบคลุม ไม่ถือว่าใช้สิทธิ์คูปอง (ไม่ตัดโควต้า)
+    const individualActivities = Array.isArray((effectiveSelectedActivities as any)?.activities)
+      ? (effectiveSelectedActivities as any).activities
+      : [];
+    if (couponRecord && isCouponApplicableToActivities(couponRecord, individualActivities)) {
       try {
         await (prisma as any).coupon_usages.create({
           data: {

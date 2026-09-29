@@ -110,4 +110,5 @@ export interface AttendeeItem {
   slipId?: string | null;
   rejectionReason?: string | null;
   programs?: Array<{ id: string; name: string }>;
+  attendanceType?: 'onsite' | 'online';
 }

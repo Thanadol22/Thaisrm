@@ -80,6 +80,7 @@ export function VerifyAttendeesPanel({
   const [filterCheckIn, setFilterCheckIn] = useState<'all' | 'checked_in' | 'not_checked_in'>('all');
   const [filterPayment, setFilterPayment] = useState<'all' | 'paid' | 'pending' | 'rejected'>('all');
   const [filterProgram, setFilterProgram] = useState<string>('all');
+  const [filterAttendanceType, setFilterAttendanceType] = useState<'all' | 'onsite' | 'online'>('all');
   const [selectedAttendee, setSelectedAttendee] = useState<AttendeeItem | null>(null);
 
   // Status Edit Modal State
@@ -213,6 +214,8 @@ export function VerifyAttendeesPanel({
   const filteredAttendees = useMemo(() => {
     return programAttendees.filter((a) => {
       const matchStatus = filterCheckIn === 'all' || a.checkInStatus === filterCheckIn;
+      const matchAttendanceType =
+        filterAttendanceType === 'all' || (a.attendanceType || 'onsite') === filterAttendanceType;
       const matchPayment =
         filterPayment === 'all' ||
         (filterPayment === 'pending'
@@ -228,9 +231,9 @@ export function VerifyAttendeesPanel({
         a.phone.includes(q) ||
         a.workplace.toLowerCase().includes(q) ||
         a.ticketCode.toLowerCase().includes(q);
-      return matchStatus && matchPayment && matchSearch;
+      return matchStatus && matchAttendanceType && matchPayment && matchSearch;
     });
-  }, [programAttendees, filterCheckIn, filterPayment, search]);
+  }, [programAttendees, filterCheckIn, filterAttendanceType, filterPayment, search]);
 
   // Total pages and Paginated Slice (5 items per page default)
   const totalPages = Math.max(1, Math.ceil(filteredAttendees.length / pageSize));
@@ -238,7 +241,7 @@ export function VerifyAttendeesPanel({
   // Reset current page when filters change or if current page exceeds total pages
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedMeetingId, filterCheckIn, filterPayment, filterProgram, search, pageSize]);
+  }, [selectedMeetingId, filterCheckIn, filterAttendanceType, filterPayment, filterProgram, search, pageSize]);
 
   const paginatedAttendees = useMemo(() => {
     const validPage = Math.min(Math.max(1, currentPage), totalPages);
@@ -256,6 +259,7 @@ export function VerifyAttendeesPanel({
   ).length;
   const rejectedInRound = programAttendees.filter((a) => a.paymentStatus === 'rejected').length;
   const checkedInInProgram = programAttendees.filter((a) => a.checkInStatus === 'checked_in').length;
+  const onlineInProgram = programAttendees.filter((a) => a.attendanceType === 'online').length;
   const rateInRound = totalInRound > 0 ? Math.round((checkedInInRound / totalInRound) * 100) : 0;
 
   // Export CSV handler
@@ -560,6 +564,17 @@ export function VerifyAttendeesPanel({
             </select>
           )}
 
+          {/* Attendance Type Dropdown */}
+          <select
+            value={filterAttendanceType}
+            onChange={(e) => setFilterAttendanceType(e.target.value as any)}
+            className="bg-white border border-slate-300 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none shadow-xs cursor-pointer focus:border-[#0026b3]"
+          >
+            <option value="all">รูปแบบการเข้าร่วม: ทั้งหมด</option>
+            <option value="onsite">ออนไซต์ ({programAttendees.length - onlineInProgram})</option>
+            <option value="online">ออนไลน์ ({onlineInProgram})</option>
+          </select>
+
           {/* Payment Status Dropdown */}
           <select
             value={filterPayment}
@@ -635,7 +650,18 @@ export function VerifyAttendeesPanel({
                       )}
                     </td>
                     <td className="px-5 py-4">
-                      <div className="text-slate-700 font-semibold">{a.memberType}</div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-slate-700 font-semibold">{a.memberType}</span>
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border whitespace-nowrap ${
+                            a.attendanceType === 'online'
+                              ? 'bg-violet-50 text-violet-700 border-violet-200'
+                              : 'bg-sky-50 text-sky-700 border-sky-200'
+                          }`}
+                        >
+                          {a.attendanceType === 'online' ? 'ออนไลน์' : 'ออนไซต์'}
+                        </span>
+                      </div>
                       <div className="text-xs text-[#0026b3] font-mono font-medium">{a.ticketCode}</div>
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap">

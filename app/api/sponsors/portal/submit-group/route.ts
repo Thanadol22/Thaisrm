@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { retireUsedSponsorCoupon } from '@/lib/services/sponsorCouponService';
+import { isCouponApplicableToActivities, retireUsedSponsorCoupon } from '@/lib/services/sponsorCouponService';
 import crypto from 'crypto';
 import { sendAttendeeTicketEmail, sendAttendeeSponsoredRegistrationEmail, sendRegistrationApprovedEmail } from '@/lib/email';
 
@@ -114,7 +114,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const effectiveCouponCode = couponRecord?.code || (couponCode ? couponCode.trim().toUpperCase() : null);
+    // ช่องทางนี้ลงทะเบียนเฉพาะการประชุมหลัก: คูปองที่ไม่ครอบคลุมการประชุมหลักจะไม่ถูกนับการใช้สิทธิ์
+    const couponNotApplicable = Boolean(couponRecord) && !isCouponApplicableToActivities(couponRecord, []);
+    if (couponNotApplicable) {
+      couponRecord = null;
+    }
+
+    const effectiveCouponCode =
+      couponRecord?.code || (couponCode && !couponNotApplicable ? couponCode.trim().toUpperCase() : null);
 
     // 5. ดำเนินการตรวจสอบและบันทึกข้อมูลสมาชิกแต่ละคน
     const results: any[] = [];

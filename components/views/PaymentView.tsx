@@ -100,6 +100,10 @@ interface PaymentViewProps {
   uploadedSlipData?: { fileName: string; fileUrl: string } | null;
   onRemoveSlip?: () => void;
   onConfirmPayment: (isPayLater?: boolean) => void;
+  /** ลงทะเบียนกิจกรรมเพิ่มเติม: รหัสรายการลงทะเบียนเดิม และกิจกรรมที่ลงทะเบียนไว้แล้ว */
+  isAddOn?: boolean;
+  addOnTicketCode?: string | null;
+  registeredActivityNames?: string[];
 }
 
 export function PaymentView({
@@ -127,6 +131,9 @@ export function PaymentView({
   submitting = false,
   adminPaymentStatus = null,
   onAdminPaymentStatusChange,
+  isAddOn = false,
+  addOnTicketCode,
+  registeredActivityNames = [],
   onNavigateBack,
   onOpenUploadModal,
   onCopyBank,
@@ -445,6 +452,21 @@ export function PaymentView({
               </div>
             ) : isRegistration ? (
               <>
+                {isAddOn && (
+                  <div className="mb-2 p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-[11px] sm:text-xs font-semibold leading-relaxed space-y-1">
+                    <p>
+                      {lang === 'th'
+                        ? `ลงทะเบียนกิจกรรมเพิ่มเติมสำหรับรายการเดิม${addOnTicketCode ? ` รหัส ${addOnTicketCode}` : ''} ยอดชำระด้านล่างคิดเฉพาะกิจกรรมที่เพิ่ม`
+                        : `Adding activities to your existing registration${addOnTicketCode ? ` ${addOnTicketCode}` : ''}. The amount below covers only the added activities.`}
+                    </p>
+                    {registeredActivityNames.length > 0 && (
+                      <p className="text-emerald-700/90 font-medium">
+                        {lang === 'th' ? 'ลงทะเบียนไว้แล้ว: ' : 'Already registered: '}
+                        {registeredActivityNames.join(', ')}
+                      </p>
+                    )}
+                  </div>
+                )}
                 {displayItems.length > 0 ? (
                   <div className="space-y-2 pb-2">
                     <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block">

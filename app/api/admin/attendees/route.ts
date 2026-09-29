@@ -1,29 +1,80 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
+import { isAddOnPayload } from '@/lib/services/registrationAddOnService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 type AttendeeProgram = { id: string; name: string };
 
+type AttendeeMatch = { memberNo?: string | null; email?: string | null; phone?: string | null };
+
+function parseActivities(rawActivities: any): any {
+  if (typeof rawActivities !== 'string') return rawActivities || null;
+  try {
+    return JSON.parse(rawActivities);
+  } catch {
+    return null;
+  }
+}
+
+function isGroupActivities(parsed: any): boolean {
+  return Boolean(
+    parsed &&
+      !Array.isArray(parsed) &&
+      (parsed.isGroup || parsed.type === 'conference_group_registration') &&
+      Array.isArray(parsed.attendees)
+  );
+}
+
+// หา attendee ในสลิปกลุ่มที่ตรงกับ member_no / email / phone
+function findGroupPerson(parsed: any, match: AttendeeMatch): any | null {
+  const cleanNo = match.memberNo ? String(match.memberNo).trim().replace(/^0+/, '') : '';
+  const cleanEmail = match.email?.trim().toLowerCase() || '';
+  const cleanPhone = match.phone?.trim() || '';
+  return (
+    parsed.attendees.find((g: any) => {
+      const gNo = String(g?.memberNo || g?.member_no || '').trim().replace(/^0+/, '');
+      const gEmail = String(g?.email || g?.attendee_email || '').trim().toLowerCase();
+      const gPhone = String(g?.phone || g?.mobile || g?.attendee_phone || '').trim();
+      return (cleanNo && gNo === cleanNo) || (cleanEmail && gEmail === cleanEmail) || (cleanPhone && gPhone === cleanPhone);
+    }) || null
+  );
+}
+
+/**
+ * รูปแบบการเข้าร่วม (ออนไซต์ / ออนไลน์) จาก selected_activities ของสลิป
+ * ไม่มีข้อมูลถือว่าเป็นออนไซต์ ตามค่าเริ่มต้นของฟอร์มลงทะเบียน
+ */
+function extractAttendanceType(rawActivities: any, match: AttendeeMatch): 'onsite' | 'online' {
+  const parsed = parseActivities(rawActivities);
+  if (!parsed) return 'onsite';
+  const isOnline = (v: any) => String(v || '').toLowerCase() === 'online';
+
+  if (Array.isArray(parsed)) return parsed.some((a: any) => isOnline(a?.format)) ? 'online' : 'onsite';
+  if (typeof parsed !== 'object') return 'onsite';
+
+  if (isGroupActivities(parsed)) {
+    const person = findGroupPerson(parsed, match);
+    return person && (isOnline(person.attendanceType) || isOnline(person.format)) ? 'online' : 'onsite';
+  }
+
+  return isOnline(parsed.attendanceType) ||
+    isOnline(parsed.format) ||
+    isOnline(parsed.targetFormat) ||
+    isOnline(parsed.memberPayload?.attendanceType)
+    ? 'online'
+    : 'onsite';
+}
+
 /**
  * ดึงรายการโปรแกรมที่ผู้เข้าร่วมเลือกจาก selected_activities ของสลิป
  * - สลิปรายบุคคล: ใช้ activities ระดับบนสุด
  * - สลิปกลุ่ม: หา attendee ที่ตรงกับ member_no / email / phone แล้วใช้ activities ของคนนั้น
  */
-function extractAttendeePrograms(
-  rawActivities: any,
-  match: { memberNo?: string | null; email?: string | null; phone?: string | null }
-): AttendeeProgram[] {
-  let parsed = rawActivities;
-  if (typeof parsed === 'string') {
-    try {
-      parsed = JSON.parse(parsed);
-    } catch {
-      return [];
-    }
-  }
+function extractAttendeePrograms(rawActivities: any, match: AttendeeMatch): AttendeeProgram[] {
+  const parsed = parseActivities(rawActivities);
   if (!parsed) return [];
 
   const toPrograms = (list: any[]): AttendeeProgram[] =>
@@ -38,17 +89,8 @@ function extractAttendeePrograms(
   if (Array.isArray(parsed)) return toPrograms(parsed);
   if (typeof parsed !== 'object') return [];
 
-  const groupAttendees = parsed.isGroup || parsed.type === 'conference_group_registration' ? parsed.attendees : null;
-  if (Array.isArray(groupAttendees)) {
-    const cleanNo = match.memberNo ? String(match.memberNo).trim().replace(/^0+/, '') : '';
-    const cleanEmail = match.email?.trim().toLowerCase() || '';
-    const cleanPhone = match.phone?.trim() || '';
-    const person = groupAttendees.find((g: any) => {
-      const gNo = String(g?.memberNo || g?.member_no || '').trim().replace(/^0+/, '');
-      const gEmail = String(g?.email || g?.attendee_email || '').trim().toLowerCase();
-      const gPhone = String(g?.phone || g?.mobile || g?.attendee_phone || '').trim();
-      return (cleanNo && gNo === cleanNo) || (cleanEmail && gEmail === cleanEmail) || (cleanPhone && gPhone === cleanPhone);
-    });
+  if (isGroupActivities(parsed)) {
+    const person = findGroupPerson(parsed, match);
     if (!person) return [];
     for (const list of [person.activities, person.selectedActivities, person.selectedProgramIds, person.selectedPrograms]) {
       if (Array.isArray(list) && list.length > 0) return toPrograms(list);
@@ -138,6 +180,8 @@ export async function GET(request: NextRequest) {
           selected_activities: true,
         },
       });
+      // รายการลงทะเบียนเพิ่มเติมไม่ใช่รายการหลักของผู้เข้าร่วม (อนุมัติแล้วจะรวมเข้ารายการเดิม)
+      slips = slips.filter((s: any) => !isAddOnPayload(s.selected_activities));
     }
 
     // Fetch sponsor group members to enrich ticket_code & slip matching
@@ -210,6 +254,8 @@ export async function GET(request: NextRequest) {
         const attendees = actObj.attendees || actObj.applicants || [];
         if (Array.isArray(attendees)) {
           attendees.forEach((att: any) => {
+            // ผู้ที่ลงเพิ่มซึ่งมีรายการเดิมอยู่แล้ว ใช้รายการเดิมเป็นรายการหลัก (กิจกรรมถูกรวมไว้ที่รายการเดิม)
+            if (att.isAddOn && att.addOnOriginalSlipId) return;
             if (att.memberNo) registerMemberKey(att.memberNo);
             if (att.member_no) registerMemberKey(att.member_no);
             if (att.email) registerEmailKey(att.email);
@@ -379,18 +425,21 @@ export async function GET(request: NextRequest) {
         ? new Date(att.checkin_time).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) + ' น.'
         : undefined;
 
-      const programs = matchingSlip
-        ? extractAttendeePrograms(matchingSlip.selected_activities, {
-            memberNo: att.member_no,
-            email: email || att.attendee_email,
-            phone: phone || att.attendee_phone,
-          })
-        : [];
+      const attendeeMatch = {
+        memberNo: att.member_no,
+        email: email || att.attendee_email,
+        phone: phone || att.attendee_phone,
+      };
+      const programs = matchingSlip ? extractAttendeePrograms(matchingSlip.selected_activities, attendeeMatch) : [];
+      const attendanceType = matchingSlip
+        ? extractAttendanceType(matchingSlip.selected_activities, attendeeMatch)
+        : 'onsite';
 
       return {
         id: att.attendance_id.toString(),
         code,
         programs,
+        attendanceType,
         nameTh,
         nameEn,
         id4Digits,

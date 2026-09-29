@@ -157,7 +157,10 @@ export async function POST(req: NextRequest) {
           FROM meeting_attendances a
           LEFT JOIN members m ON a.member_no = m.member_no
           LEFT JOIN payment_slips s ON (
-            s.meeting_id = a.meeting_id AND (
+            s.meeting_id = a.meeting_id
+            AND s.status <> 'merged'
+            AND COALESCE(s.selected_activities->>'isAddOn', 'false') <> 'true'
+            AND (
               (a.member_no IS NOT NULL AND s.member_no = a.member_no) OR 
               (a.attendee_email IS NOT NULL AND LOWER(s.guest_email) = LOWER(a.attendee_email))
             )

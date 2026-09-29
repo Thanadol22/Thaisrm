@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getMemberRegistrationSummary } from '@/lib/services/registrationAddOnService';
 
 // ฟังก์ชันช่วย normalize ชื่อเพื่อเปรียบเทียบ (ตัดคำนำหน้าส่วนหัว, ช่องว่าง, อักขระพิเศษ)
 function normalizeName(name: string): string {
@@ -54,6 +55,8 @@ export async function POST(req: NextRequest) {
     const nameThInput = (body.nameTh || '').toString().trim();
     const nameEnInput = (body.nameEn || '').toString().trim();
     const meetingId = (body.meetingId || '').toString().trim();
+    // ฟอร์มลงทะเบียนแบบกลุ่มที่รองรับการลงทะเบียนกิจกรรมเพิ่มเติมสำหรับผู้ที่ลงทะเบียนแล้ว
+    const allowAddOn = body.allowAddOn === true;
 
 
 
@@ -107,7 +110,21 @@ export async function POST(req: NextRequest) {
 
     // 3. ตรวจสอบว่าสมาชิกเคยลงทะเบียนในงานประชุมนี้แล้วหรือยัง (ถ้ามี meetingId)
     let alreadyRegistered = false;
-    if (meetingId) {
+    let addOn: Record<string, unknown> | null = null;
+    if (meetingId && allowAddOn) {
+      // ลงทะเบียนแล้วยังเพิ่มกิจกรรมได้: ส่งรายการกิจกรรมที่ลงไว้แล้วกลับไปให้ฟอร์มล็อกไว้
+      const registration = await getMemberRegistrationSummary(meetingId, member.member_no);
+      if (registration.registered) {
+        addOn = {
+          memberNo: member.member_no,
+          originalSlipId: registration.originalSlipId,
+          ticketCode: registration.originalTicketCode,
+          originalStatus: registration.originalStatus,
+          registeredActivityIds: registration.registeredActivities.map((a) => a.id),
+          registeredActivities: registration.registeredActivities,
+        };
+      }
+    } else if (meetingId) {
       const existingAttendance = await prisma.meeting_attendances.findFirst({
         where: {
           meeting_id: meetingId,
@@ -133,6 +150,7 @@ export async function POST(req: NextRequest) {
         success: true,
         valid: true,
         isLookup: true,
+        addOn,
         message: `พบข้อมูลสมาชิก: ${member.fullNameTh || member.fullNameEn || member.member_no}`,
         member: {
           member_no: member.member_no,
@@ -193,6 +211,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       valid: true,
+      addOn,
       message: 'ตรวจสอบสมาชิกสำเร็จ ข้อมูลถูกต้อง',
       member: {
         member_no: member.member_no,
