@@ -74,7 +74,14 @@ export interface ConferenceAttendee {
   memberCheckStatus?: 'idle' | 'checking' | 'valid' | 'invalid' | 'mismatch' | 'expired';
   memberCheckMessage?: string;
   verifiedMember?: any;
+  /** ฟิลด์ที่ดึงค่ามาจากข้อมูลสมาชิก (มีค่า) → ล็อกไม่ให้แก้ไข ส่วนฟิลด์ที่ว่างยังแก้ไขได้ */
+  lockedFields?: MemberLockableField[];
 }
+
+type MemberLockableField = 'nameTh' | 'nameEn' | 'email' | 'workplace' | 'position';
+
+const lockedFieldsFrom = (values: Partial<Record<MemberLockableField, string>>): MemberLockableField[] =>
+  (Object.keys(values) as MemberLockableField[]).filter((k) => !!values[k]?.toString().trim());
 
 interface LoginViewProps {
   onNavigateToSignup: () => void;
@@ -372,6 +379,9 @@ export function LoginView({
                       attendanceType: att.attendanceType || 'onsite',
                       memberCheckStatus: att.memberNo ? 'valid' : 'idle',
                       memberCheckMessage: att.memberNo ? '✓ ข้อมูลที่เคยตรวจสอบแล้ว' : '',
+                      lockedFields: att.memberNo
+                        ? (att.lockedFields || lockedFieldsFrom({ nameTh: att.nameTh, nameEn: att.nameEn, email: att.email, workplace: att.workplace, position: att.positionCode || att.position }))
+                        : [],
                     })));
                   } else {
                     setRegMode('individual');
@@ -388,6 +398,9 @@ export function LoginView({
                       attendanceType: savedDraft.attendanceType || 'onsite',
                       memberCheckStatus: savedDraft.memberNo ? 'valid' : 'idle',
                       memberCheckMessage: '',
+                      lockedFields: savedDraft.memberNo
+                        ? (savedDraft.lockedFields || lockedFieldsFrom({ nameTh: savedDraft.nameTh, nameEn: savedDraft.nameEn, email: savedDraft.email, workplace: savedDraft.workplace, position: savedDraft.positionCode || savedDraft.position }))
+                        : [],
                     }]);
                   }
 
@@ -460,6 +473,8 @@ export function LoginView({
   }, [activeMeeting, lang]);
 
   const currentAttendee = attendees[activeAttendeeIdx] || attendees[0];
+  const isMemberFieldLocked = (field: MemberLockableField) =>
+    currentAttendee?.memberCheckStatus === 'valid' && !!currentAttendee.lockedFields?.includes(field);
 
   const updateCurrentAttendee = (field: keyof ConferenceAttendee, value: any) => {
     setAttendees(prev => prev.map((att, idx) => {
@@ -638,6 +653,13 @@ export function LoginView({
               position: nextPosition,
               workplace: nextWorkplace,
               memberCheckStatus: 'valid',
+              lockedFields: lockedFieldsFrom({
+                nameTh: data.member.fullNameTh,
+                nameEn: data.member.fullNameEn,
+                email: data.member.email,
+                workplace: data.member.workplace,
+                position: data.member.position,
+              }),
               memberCheckMessage: lang === 'th'
                 ? `✅ พบข้อมูลสมาชิก: ${data.member.fullNameTh || data.member.fullNameEn} (#${data.member.member_no})`
                 : `✅ Member found: ${data.member.fullNameTh || data.member.fullNameEn} (#${data.member.member_no})`,
@@ -690,7 +712,9 @@ export function LoginView({
               positionOther: '',
               workplace: sponsorSession?.sponsorName || '',
               memberCheckStatus: 'invalid',
-              memberCheckMessage: lang === 'th' ? '❌ ไม่พบเลขสมาชิกนี้ในระบบ' : '❌ Member ID not found',
+              memberCheckMessage: lang === 'th'
+                ? `❌ ไม่พบเลขสมาชิก "${memNo}" ในระบบ กรุณาตรวจสอบให้ถูกต้อง หรือลบออกหากไม่ใช่สมาชิก`
+                : `❌ Member No. "${memNo}" not found. Please check it, or clear it if you are not a member.`,
               verifiedMember: null,
             };
           }));
@@ -886,6 +910,31 @@ export function LoginView({
           setActiveAttendeeIdx(i);
           return;
         }
+      }
+
+      // ป้องกันการส่งเลขสมาชิกที่ไม่มีอยู่จริง (ทั้งรายบุคคลและกลุ่ม)
+      if (att.memberNo && att.memberNo.trim()) {
+        if (att.memberCheckStatus === 'checking' || !att.memberCheckStatus || att.memberCheckStatus === 'idle') {
+          alert(
+            lang === 'th'
+              ? `ระบบกำลังตรวจสอบเลขสมาชิก ${personLabel} กรุณารอสักครู่แล้วกดลงทะเบียนอีกครั้ง`
+              : `Member No. ${personLabel} is still being verified. Please wait a moment and try again.`
+          );
+          setActiveAttendeeIdx(i);
+          return;
+        }
+        if (att.memberCheckStatus === 'invalid' && regMode === 'individual') {
+          alert(
+            lang === 'th'
+              ? `เลขสมาชิก "${att.memberNo.trim()}" ไม่สามารถใช้ลงทะเบียนได้: ${(att.memberCheckMessage || '').replace(/^[❌⚠️\s]+/u, '')}`
+              : `Member No. "${att.memberNo.trim()}" cannot be used: ${(att.memberCheckMessage || '').replace(/^[❌⚠️\s]+/u, '')}`
+          );
+          setActiveAttendeeIdx(i);
+          return;
+        }
+      }
+
+      if (regMode === 'group') {
         if (att.memberCheckStatus === 'mismatch' || att.memberCheckStatus === 'invalid') {
           alert(
             lang === 'th'
@@ -1021,7 +1070,16 @@ export function LoginView({
                 isMemberCalculated = true;
               }
             } else {
-              isMemberCalculated = false;
+              // เลขสมาชิกไม่มีอยู่จริง → ไม่อนุญาตให้ลงทะเบียนต่อ
+              const personLabel = regMode === 'group' ? (lang === 'th' ? ` (ผู้ลงทะเบียนคนที่ ${i + 1})` : ` (Attendee #${i + 1})`) : '';
+              alert(
+                lang === 'th'
+                  ? `ไม่พบเลขสมาชิก "${rawMemberNo}" ในระบบ${personLabel} กรุณาตรวจสอบเลขสมาชิกให้ถูกต้อง หรือลบเลขสมาชิกออกหากไม่ใช่สมาชิก`
+                  : `Member No. "${rawMemberNo}" was not found${personLabel}. Please check it, or clear it if you are not a member.`
+              );
+              setActiveAttendeeIdx(i);
+              setVerifyingMember(false);
+              return;
             }
           } catch (err) {
             console.error('Member verification error for attendee', i, err);
@@ -1765,7 +1823,7 @@ export function LoginView({
                           <div className="sm:col-span-2 bg-emerald-50/90 border border-emerald-200/90 rounded-xl px-3 py-2 flex items-center justify-between text-xs text-emerald-900 font-semibold animate-fade-in shadow-2xs">
                             <div className="flex items-center gap-2">
                               <Lock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              <span>{lang === 'th' ? 'ระบบล็อกข้อมูลตามฐานข้อมูลสมาชิกเพื่อความถูกต้อง (ลบเลขสมาชิกออกหากต้องการแก้ไขด้วยตนเอง)' : 'Fields locked based on member profile (Clear Member ID to edit manually)'}</span>
+                              <span>{lang === 'th' ? 'ระบบล็อกข้อมูลที่ดึงจากฐานข้อมูลสมาชิกเพื่อความถูกต้อง ช่องที่ยังว่างสามารถกรอกเพิ่มเติมได้' : 'Fields filled from the member profile are locked. Empty fields can still be edited.'}</span>
                             </div>
                           </div>
                         )}
@@ -1776,7 +1834,7 @@ export function LoginView({
                             <label className="text-[11px] sm:text-xs font-bold text-slate-700">
                               {lang === 'th' ? 'ชื่อ-นามสกุล' : 'Full Name (Thai)'} <span className="text-rose-500 font-bold">*</span>
                             </label>
-                            {currentAttendee.memberCheckStatus === 'valid' && (
+                            {isMemberFieldLocked('nameTh') && (
                               <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                                 <Lock className="w-2.5 h-2.5" />
                                 {lang === 'th' ? 'ข้อมูลสมาชิก' : 'Member DB'}
@@ -1788,11 +1846,11 @@ export function LoginView({
                             <input
                               type="text"
                               value={currentAttendee.nameTh}
-                              readOnly={currentAttendee.memberCheckStatus === 'valid'}
+                              readOnly={isMemberFieldLocked('nameTh')}
                               onChange={(e) => updateCurrentAttendee('nameTh', e.target.value)}
                               placeholder={lang === 'th' ? 'ชื่อ-นามสกุล' : 'Full Name (Thai)'}
                               className={`w-full pl-9 sm:pl-10 pr-3.5 py-2.5 rounded-xl border text-sm font-medium transition min-h-[44px] ${
-                                currentAttendee.memberCheckStatus === 'valid'
+                                isMemberFieldLocked('nameTh')
                                   ? 'bg-slate-100/90 text-slate-700 border-slate-200 cursor-not-allowed select-none font-semibold'
                                   : 'bg-slate-50 text-slate-900 border-slate-200 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none'
                               }`}
@@ -1806,7 +1864,7 @@ export function LoginView({
                             <label className="text-[11px] sm:text-xs font-bold text-slate-700">
                               {lang === 'th' ? 'ชื่อ-นามสกุล ภาษาอังกฤษ' : 'Full Name (English)'} <span className="text-rose-500 font-bold">*</span>
                             </label>
-                            {currentAttendee.memberCheckStatus === 'valid' && (
+                            {isMemberFieldLocked('nameEn') && (
                               <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                                 <Lock className="w-2.5 h-2.5" />
                                 {lang === 'th' ? 'ข้อมูลสมาชิก' : 'Member DB'}
@@ -1818,11 +1876,11 @@ export function LoginView({
                             <input
                               type="text"
                               value={currentAttendee.nameEn}
-                              readOnly={currentAttendee.memberCheckStatus === 'valid'}
+                              readOnly={isMemberFieldLocked('nameEn')}
                               onChange={(e) => updateCurrentAttendee('nameEn', e.target.value)}
                               placeholder="Full Name (English)"
                               className={`w-full pl-9 sm:pl-10 pr-3.5 py-2.5 rounded-xl border text-sm font-medium transition min-h-[44px] ${
-                                currentAttendee.memberCheckStatus === 'valid'
+                                isMemberFieldLocked('nameEn')
                                   ? 'bg-slate-100/90 text-slate-700 border-slate-200 cursor-not-allowed select-none font-semibold'
                                   : 'bg-slate-50 text-slate-900 border-slate-200 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none'
                               }`}
@@ -1838,7 +1896,7 @@ export function LoginView({
                             label={
                               <span className="flex items-center justify-between w-full">
                                 <span>{lang === 'th' ? 'อีเมล' : 'Email Address'}</span>
-                                {currentAttendee.memberCheckStatus === 'valid' && (
+                                {isMemberFieldLocked('email') && (
                                   <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                                     <Lock className="w-2.5 h-2.5" />
                                     {lang === 'th' ? 'ข้อมูลสมาชิก' : 'Member DB'}
@@ -1852,7 +1910,7 @@ export function LoginView({
                                 ? (lang === 'th' ? 'ระบบจะส่ง QR Code เข้าร่วมงานไปยังอีเมลสมาชิกนี้' : 'Event QR Code will be sent to this member email.')
                                 : (lang === 'th' ? 'กรุณากรอกอีเมลที่มีอยู่จริง เพื่อรับ QR Code เข้าร่วมงาน' : 'Please provide a valid email to receive your Event QR Code.')
                             }
-                            disabled={currentAttendee.memberCheckStatus === 'valid'}
+                            disabled={isMemberFieldLocked('email')}
                             required
                           />
                         </div>
@@ -1863,7 +1921,7 @@ export function LoginView({
                             <label className="text-[11px] sm:text-xs font-bold text-slate-700">
                               {lang === 'th' ? 'หน่วยงาน / บริษัท' : 'Organization / Workplace'} <span className="text-rose-500 font-bold">*</span>
                             </label>
-                            {(currentAttendee.memberCheckStatus === 'valid' || (regMode === 'group' && !!sponsorSession?.sponsorName)) && (
+                            {(isMemberFieldLocked('workplace') || (regMode === 'group' && !!sponsorSession?.sponsorName)) && (
                               <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                                 <Lock className="w-2.5 h-2.5" />
                                 {sponsorSession?.sponsorName ? (lang === 'th' ? 'บริษัทสปอนเซอร์' : 'Sponsor Company') : (lang === 'th' ? 'ข้อมูลสมาชิก' : 'Member DB')}
@@ -1875,11 +1933,11 @@ export function LoginView({
                             <input
                               type="text"
                               value={currentAttendee.workplace}
-                              readOnly={currentAttendee.memberCheckStatus === 'valid' || (regMode === 'group' && !!sponsorSession?.sponsorName)}
+                              readOnly={isMemberFieldLocked('workplace') || (regMode === 'group' && !!sponsorSession?.sponsorName)}
                               onChange={(e) => updateCurrentAttendee('workplace', e.target.value)}
                               placeholder={lang === 'th' ? 'โรงพยาบาล / คลินิก / บริษัท' : 'Hospital / Clinic / Company'}
                               className={`w-full pl-9 sm:pl-10 pr-3.5 py-2.5 rounded-xl border text-sm font-medium transition min-h-[44px] ${
-                                currentAttendee.memberCheckStatus === 'valid' || (regMode === 'group' && !!sponsorSession?.sponsorName)
+                                isMemberFieldLocked('workplace') || (regMode === 'group' && !!sponsorSession?.sponsorName)
                                   ? 'bg-slate-100/90 text-slate-700 border-slate-200 cursor-not-allowed select-none font-semibold'
                                   : 'bg-slate-50 text-slate-900 border-slate-200 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none'
                               }`}
@@ -1895,11 +1953,11 @@ export function LoginView({
                             otherValue={currentAttendee.positionOther}
                             onOtherChange={(val) => updateCurrentAttendee('positionOther', val)}
                             required
-                            disabled={currentAttendee.memberCheckStatus === 'valid'}
+                            disabled={isMemberFieldLocked('position')}
                             label={
                               <span className="flex items-center justify-between w-full">
                                 <span>{lang === 'th' ? 'ตำแหน่ง' : 'Position'}</span>
-                                {currentAttendee.memberCheckStatus === 'valid' && (
+                                {isMemberFieldLocked('position') && (
                                   <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                                     <Lock className="w-2.5 h-2.5" />
                                     {lang === 'th' ? 'ข้อมูลสมาชิก' : 'Member DB'}
