@@ -13,6 +13,8 @@ interface RegistrationSuccessModalProps {
   message?: string;
   statusBadge?: string;
   type?: 'registration' | 'membership';
+  /** ซ่อนข้อความเรื่องการส่งอีเมล (เช่น แอดมินทำรายการแทนแบบรอสลิป ซึ่งยังไม่มีการส่งอีเมล) */
+  hideEmailInfo?: boolean;
 }
 
 export function RegistrationSuccessModal({
@@ -23,6 +25,7 @@ export function RegistrationSuccessModal({
   message,
   statusBadge,
   type = 'registration',
+  hideEmailInfo = false,
 }: RegistrationSuccessModalProps) {
   const { t, lang } = useLanguage();
   const [mounted, setMounted] = useState(false);
@@ -76,7 +79,7 @@ export function RegistrationSuccessModal({
         </div>
 
         {/* Info Card (Membership verification vs Conference QR entrance) */}
-        {type === 'membership' ? (
+        {hideEmailInfo ? null : type === 'membership' ? (
           <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-3.5 space-y-2.5 text-left text-xs text-slate-700">
             <div className="flex items-center gap-2.5 text-[#0026b3] font-bold">
               <Mail className="w-4 h-4 shrink-0 text-[#0026b3]" />
@@ -101,7 +104,7 @@ export function RegistrationSuccessModal({
         )}
 
         {/* Spam Notice Tip */}
-        <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-3 text-left text-xs text-amber-900 leading-relaxed">
+        <div className={`${hideEmailInfo ? 'hidden' : ''} bg-amber-50/90 border border-amber-200 rounded-2xl p-3 text-left text-xs text-amber-900 leading-relaxed`}>
           <p className="font-semibold text-amber-950 mb-0.5">
             💡 {lang === 'th' ? 'คำแนะนำการรับอีเมล' : 'Email Delivery Tip'}
           </p>

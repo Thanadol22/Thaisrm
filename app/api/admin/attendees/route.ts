@@ -276,7 +276,22 @@ export async function GET(request: NextRequest) {
       const nameEn = isMember ? mem?.fullNameEn || '' : '';
       const email = isMember ? mem?.email || '' : att.attendee_email || '';
       const phone = isMember ? mem?.mobile || '' : att.attendee_phone || '';
-      const workplace = isMember ? mem?.workplace || '' : att.workplace || '';
+      // สมาชิก: ใช้หน่วยงานที่กรอกในฟอร์มลงทะเบียนครั้งนี้ก่อน หากไม่มีจึงใช้ข้อมูลจากทะเบียนสมาชิก
+      let slipWorkplace = '';
+      if (isMember && matchingSlip?.selected_activities) {
+        let slipAct = matchingSlip.selected_activities;
+        if (typeof slipAct === 'string') {
+          try {
+            slipAct = JSON.parse(slipAct);
+          } catch {
+            slipAct = null;
+          }
+        }
+        if (slipAct && typeof slipAct === 'object' && !Array.isArray(slipAct)) {
+          slipWorkplace = slipAct.workplace || slipAct.memberPayload?.workplace || '';
+        }
+      }
+      const workplace = isMember ? att.workplace || slipWorkplace || mem?.workplace || '' : att.workplace || '';
       const id4Digits = isMember ? mem?.idLast4 || phone.slice(-4) : phone.slice(-4);
       const code = isMember ? mem?.member_no || '' : `G-${att.attendance_id.toString().padStart(4, '0')}`;
 

@@ -88,6 +88,10 @@ interface PaymentViewProps {
   discountAmount?: number;
   originalAmount?: number;
   submitting?: boolean;
+  /** แอดมินทำรายการแทน: สถานะการชำระเงินที่เลือกเอง (ไม่ขึ้นกับการแนบสลิป) */
+  adminPaymentStatus?: 'paid' | 'pending' | null;
+  /** ส่งค่านี้เมื่อเป็นแอดมินทำรายการ: แสดงตัวเลือกสถานะและไม่บังคับแนบสลิป */
+  onAdminPaymentStatusChange?: (status: 'paid' | 'pending') => void;
   onNavigateBack?: () => void;
   onOpenUploadModal: () => void;
   onCopyBank: () => void;
@@ -121,6 +125,8 @@ export function PaymentView({
   discountAmount = 0,
   originalAmount,
   submitting = false,
+  adminPaymentStatus = null,
+  onAdminPaymentStatusChange,
   onNavigateBack,
   onOpenUploadModal,
   onCopyBank,
@@ -136,6 +142,8 @@ export function PaymentView({
   const isRegistration = paymentType === 'registration';
   const [paymentMode, setPaymentMode] = React.useState<'transfer' | 'pay_later'>('transfer');
   const isPayLaterMode = isGroup && !isCouponSponsored && paymentMode === 'pay_later';
+  const isAdminEntry = Boolean(onAdminPaymentStatusChange);
+  const showAdminStatusPicker = isAdminEntry && !isCouponSponsored;
 
   const handleBack = () => {
     if (onNavigateBack) {
@@ -617,7 +625,58 @@ export function PaymentView({
         </div>
 
         {/* Corporate / Group Payment Method Switcher */}
-        {isGroup && !isCouponSponsored && (
+        {/* Admin Payment Status Picker (independent of slip attachment) */}
+        {showAdminStatusPicker && (
+          <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-2xs space-y-3">
+            <span className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-2">
+              <Shield className="w-4 h-4 text-[#0026b3]" />
+              สถานะการชำระเงิน <span className="text-rose-500">*</span>
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {([
+                {
+                  id: 'paid' as const,
+                  label: 'ชำระแล้ว',
+                  desc: 'ได้รับชำระแล้ว ระบบจะอนุมัติรายการทันที',
+                  Icon: CheckCircle2,
+                  active: 'border-emerald-500 bg-emerald-50/60 ring-2 ring-emerald-500/20',
+                  iconActive: 'bg-emerald-500 text-white',
+                },
+                {
+                  id: 'pending' as const,
+                  label: 'รอชำระ',
+                  desc: 'บันทึกไว้ก่อน อนุมัติที่เมนูตรวจสอบการชำระเงินเมื่อได้รับชำระ',
+                  Icon: Clock,
+                  active: 'border-amber-500 bg-amber-50/60 ring-2 ring-amber-500/25',
+                  iconActive: 'bg-amber-500 text-white',
+                },
+              ]).map(({ id, label, desc, Icon, active, iconActive }) => {
+                const selected = adminPaymentStatus === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => onAdminPaymentStatusChange?.(id)}
+                    className={`p-3 sm:p-3.5 rounded-2xl border-2 text-left transition flex items-start gap-3 cursor-pointer ${
+                      selected ? `${active} text-slate-900` : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${selected ? iconActive : 'bg-slate-100 text-slate-500'}`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs sm:text-sm font-black block">{label}</span>
+                      <span className="text-[11px] text-slate-500 block mt-0.5">{desc}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-slate-500">การแนบสลิปไม่มีผลต่อสถานะ แนบหรือไม่แนบก็ได้</p>
+          </div>
+        )}
+
+        {isGroup && !isCouponSponsored && !isAdminEntry && (
           <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-2xs space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-2">
@@ -844,14 +903,44 @@ export function PaymentView({
                 <Upload className="w-5 h-5 stroke-[2.5] text-[#0026b3] shrink-0" />
                 <span>{lang === 'th' ? 'คลิกที่นี่เพื่อแนบสลิปหลักฐานการโอนเงิน' : 'Click here to upload payment slip'}</span>
               </div>
-              <span className="text-[11px] font-extrabold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md shrink-0">
-                {lang === 'th' ? '* จำเป็นต้องแนบสลิป' : '* Slip Required'}
-              </span>
+              {isAdminEntry ? (
+                <span className="text-[11px] font-extrabold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md shrink-0">
+                  {lang === 'th' ? 'ไม่บังคับแนบสลิป' : 'Slip Optional'}
+                </span>
+              ) : (
+                <span className="text-[11px] font-extrabold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md shrink-0">
+                  {lang === 'th' ? '* จำเป็นต้องแนบสลิป' : '* Slip Required'}
+                </span>
+              )}
             </button>
           ) : null}
 
           {/* Confirm Button */}
-          {isPayLaterMode ? (
+          {showAdminStatusPicker ? (
+            <button
+              type="button"
+              onClick={() => onConfirmPayment(false)}
+              disabled={submitting || !adminPaymentStatus}
+              className={`w-full font-black text-sm sm:text-base py-3.5 sm:py-4 rounded-2xl shadow-md transition active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
+                adminPaymentStatus === 'paid'
+                  ? 'bg-[#4ade80] hover:bg-[#3ec424] text-[#061d08] ring-4 ring-[#4ade80]/20'
+                  : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-blue-900/10'
+              }`}
+            >
+              {adminPaymentStatus === 'pending' ? (
+                <Clock className="w-5 h-5 stroke-[2.5]" />
+              ) : (
+                <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
+              )}
+              <span>
+                {adminPaymentStatus === 'paid'
+                  ? 'บันทึกรายการ สถานะชำระแล้ว'
+                  : adminPaymentStatus === 'pending'
+                  ? 'บันทึกรายการ สถานะรอชำระ'
+                  : 'เลือกสถานะการชำระเงินก่อนบันทึก'}
+              </span>
+            </button>
+          ) : isPayLaterMode ? (
             <button
               type="button"
               onClick={() => onConfirmPayment(true)}

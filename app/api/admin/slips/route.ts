@@ -728,7 +728,7 @@ export async function GET(request: NextRequest) {
         const workplace = isCorporate
           ? companyName
           : isMember
-            ? (s.members?.workplace || '')
+            ? (guestPayload.workplace || parsedAct.memberPayload?.workplace || s.members?.workplace || '')
             : (s.guest_workplace || parsedAct.memberPayload?.workplace || guestPayload.workplace || '');
 
         // Resolve coupon and discount

@@ -484,7 +484,12 @@ export async function POST(
       effectiveAttendeeName = member.fullNameTh || member.fullNameEn || effectiveAttendeeName;
       effectiveAttendeeEmail = member.email || effectiveAttendeeEmail;
       effectiveAttendeePhone = member.mobile || effectiveAttendeePhone;
-      effectiveAttendeeWorkplace = member.workplace || effectiveAttendeeWorkplace;
+      // ใช้หน่วยงานที่กรอกในฟอร์มลงทะเบียนครั้งนี้ก่อน หากเว้นว่างจึงใช้ข้อมูลจากทะเบียนสมาชิก
+      const formWorkplace =
+        selectedActivities && typeof selectedActivities === 'object' && !Array.isArray(selectedActivities)
+          ? String(selectedActivities.workplace || '').trim()
+          : '';
+      effectiveAttendeeWorkplace = effectiveAttendeeWorkplace || formWorkplace || member.workplace || null;
 
       // Duplicate registration check for member
       const memberSlips = await prisma.$queryRaw<Array<{ slip_id: string; status: string }>>`
@@ -726,11 +731,12 @@ export async function POST(
       if (isMember && validMemberNo) {
         await prisma.$executeRaw`
           INSERT INTO meeting_attendances (
-            meeting_id, member_no, attendance_status
+            meeting_id, member_no, workplace, attendance_status
           ) VALUES (
-            ${meetingId}, ${validMemberNo}, 'Registered'
+            ${meetingId}, ${validMemberNo}, ${effectiveAttendeeWorkplace}, 'Registered'
           ) ON CONFLICT (meeting_id, member_no)
-          DO UPDATE SET attendance_status = 'Registered'
+          DO UPDATE SET attendance_status = 'Registered',
+            workplace = COALESCE(EXCLUDED.workplace, meeting_attendances.workplace)
         `;
       } else {
         // Create or update non-member attendance record

@@ -97,6 +97,10 @@ interface LoginViewProps {
     given_name?: string | null;
     family_name?: string | null;
   } | null;
+  /** แอดมินทำรายการแทนบริษัท: ล็อกเป็นแบบกลุ่มในนามบริษัทนี้ (ไม่ต้องยืนยัน OTP) */
+  adminSponsorSession?: SponsorSessionData | null;
+  /** แอดมิน: ส่งข้อมูลกลับแทนการไปหน้าชำระเงิน */
+  onAdminSubmit?: (type: 'registration' | 'membership', payload: unknown) => void;
 }
 
 function formatMeetingDateDisplay(meetingOrDate?: any, lang: 'th' | 'en' = 'th'): string {
@@ -179,8 +183,11 @@ export function LoginView({
   defaultTab = 'conference',
   autofillTarget = null,
   initialGoogleUser,
+  adminSponsorSession = null,
+  onAdminSubmit,
 }: LoginViewProps) {
   const router = useRouter();
+  const isAdminMode = Boolean(adminSponsorSession);
   const { lang, toggleLang, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'conference' | 'membership'>(defaultTab);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -192,12 +199,12 @@ export function LoginView({
   const [loadingMeeting, setLoadingMeeting] = useState(true);
 
   // Registration Mode: Individual vs Group
-  const [regMode, setRegMode] = useState<'individual' | 'group'>('individual');
+  const [regMode, setRegMode] = useState<'individual' | 'group'>(adminSponsorSession ? 'group' : 'individual');
   const [activeAttendeeIdx, setActiveAttendeeIdx] = useState(0);
 
   // Corporate Sponsor Auth Modal state & Inactivity Tracker (5 Mins)
   const [sponsorAuthModalOpen, setSponsorAuthModalOpen] = useState(false);
-  const [sponsorSession, setSponsorSession] = useState<SponsorSessionData | null>(null);
+  const [sponsorSession, setSponsorSession] = useState<SponsorSessionData | null>(adminSponsorSession);
   const [sponsorSecondsRemaining, setSponsorSecondsRemaining] = useState<number>(300);
   const lastSponsorActivityRef = useRef<number>(Date.now());
 
@@ -307,8 +314,8 @@ export function LoginView({
   };
 
   const handleSponsorLogout = () => {
-    setSponsorSession(null);
-    setRegMode('individual');
+    setSponsorSession(adminSponsorSession);
+    setRegMode(adminSponsorSession ? 'group' : 'individual');
     setCouponState(null);
     setCouponCodeInput('');
     setCouponError('');
@@ -330,6 +337,7 @@ export function LoginView({
       memberCheckMessage: '',
     }]);
     setActiveAttendeeIdx(0);
+    if (isAdminMode) return;
     try {
       localStorage.removeItem('conference_registration');
     } catch (e) { }
@@ -422,7 +430,7 @@ export function LoginView({
                   setLoadingMeeting(false);
                   return;
                 }
-              } else {
+              } else if (!isAdminMode) {
                 // Normal refresh / visit: clear old stale storage
                 if (typeof window !== 'undefined') {
                   localStorage.removeItem('conference_registration');
@@ -815,7 +823,7 @@ export function LoginView({
     setActiveTab(tab);
     handleSponsorLogout();
     setAutofillSuccess(false);
-    if (typeof window !== 'undefined' && window.location.search) {
+    if (!isAdminMode && typeof window !== 'undefined' && window.location.search) {
       window.history.replaceState({}, '', window.location.pathname);
     }
   };
@@ -837,7 +845,8 @@ export function LoginView({
 
   // Inactivity tracking when sponsor session is active (5 minutes timeout)
   useEffect(() => {
-    if (!sponsorSession) return;
+    // แอดมินทำรายการแทนบริษัท ไม่ใช้การตัดเซสชันอัตโนมัติ 5 นาที
+    if (!sponsorSession || isAdminMode) return;
 
     // Reset last activity timestamp immediately on session start / restore
     lastSponsorActivityRef.current = Date.now();
@@ -887,7 +896,7 @@ export function LoginView({
       document.removeEventListener('visibilitychange', checkAndSyncTime);
       clearInterval(interval);
     };
-  }, [sponsorSession, lang]);
+  }, [sponsorSession, lang, isAdminMode]);
 
   // Submit conference registration (Individual or Group)
   const handleSubmitRegistration = async (e: React.FormEvent) => {
@@ -1049,28 +1058,9 @@ export function LoginView({
 
             if (result.success && result.data) {
               memberDataFound = result.data;
+              // ใช้สถานะล่าสุดในฐานข้อมูล (membership_status) เป็นหลัก ให้ตรงกับหน้าจัดการสมาชิก
               const status = (memberDataFound.membership_status || '').toLowerCase().trim();
-              let active = status === 'active' || status === '';
-
-              if (status === 'inactive' || status === 'expired' || status === 'cancelled') {
-                active = false;
-              }
-
-              if (result.attendanceEvaluation?.calculated_status === 'Inactive') {
-                active = false;
-                memberDataFound.membership_status = result.attendanceEvaluation.reason || 'หมดอายุ (ขาดประชุม 4 ครั้ง)';
-              }
-
-              if (memberDataFound.expire_date) {
-                const expDate = new Date(memberDataFound.expire_date);
-                if (!isNaN(expDate.getTime())) {
-                  const now = new Date();
-                  now.setHours(0, 0, 0, 0);
-                  if (expDate.getTime() < now.getTime()) {
-                    active = false;
-                  }
-                }
-              }
+              const active = status === 'active' || status === '';
 
               if (!active) {
                 isExpiredMember = true;
@@ -1238,6 +1228,10 @@ export function LoginView({
           return;
         }
 
+        if (onAdminSubmit) {
+          onAdminSubmit('registration', singlePayload);
+          return;
+        }
         localStorage.setItem('conference_registration', JSON.stringify(singlePayload));
       } else {
         // Corporate / Group Registration Payload
@@ -1263,6 +1257,10 @@ export function LoginView({
           registeredAt: new Date().toISOString(),
         };
 
+        if (onAdminSubmit) {
+          onAdminSubmit('registration', groupPayload);
+          return;
+        }
         localStorage.setItem('conference_registration', JSON.stringify(groupPayload));
       }
 
@@ -1276,6 +1274,11 @@ export function LoginView({
   };
 
   const handleProceedExpiredNonMember = () => {
+    if (onAdminSubmit && pendingRegPayload) {
+      setExpiredModalOpen(false);
+      onAdminSubmit('registration', pendingRegPayload);
+      return;
+    }
     if (pendingRegPayload) {
       try {
         localStorage.setItem('conference_registration', JSON.stringify(pendingRegPayload));
@@ -1297,8 +1300,9 @@ export function LoginView({
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[640px]">
+    <div className={`flex-1 flex flex-col justify-between animate-fade-in ${isAdminMode ? '' : 'min-h-[640px]'}`}>
       {/* Header Blue Card Section */}
+      {!isAdminMode && (
       <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-3.5 xs:px-5 sm:px-8 lg:px-12 pt-3.5 sm:pt-7 pb-5 sm:pb-8 rounded-b-[24px] sm:rounded-b-[36px] shadow-xl relative overflow-hidden">
         <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute bottom-0 -left-12 w-40 h-40 bg-[#4ade80]/15 rounded-full blur-2xl pointer-events-none" />
@@ -1387,9 +1391,10 @@ export function LoginView({
           </div>
         </div>
       </div>
+      )}
 
       {/* Content Body */}
-      <div className="px-3 xs:px-4 sm:px-8 lg:px-12 py-4 sm:py-7 flex-1 flex flex-col justify-between max-w-5xl xl:max-w-6xl mx-auto w-full">
+      <div className={`${isAdminMode ? 'px-0 py-1' : 'px-3 xs:px-4 sm:px-8 lg:px-12 py-4 sm:py-7'} flex-1 flex flex-col justify-between max-w-5xl xl:max-w-6xl mx-auto w-full`}>
         <div className="space-y-3.5 sm:space-y-6">
 
           {/* Main Action Segmented Buttons (Conference vs Membership) */}
@@ -1509,6 +1514,7 @@ export function LoginView({
                   {/* Mode Selector: Individual vs Group */}
                   <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-2 sm:p-2.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
                     <div className="grid grid-cols-1 xs:grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+                      {!isAdminMode && (
                       <button
                         type="button"
                         onClick={() => {
@@ -1524,6 +1530,7 @@ export function LoginView({
                         <User className="w-4 h-4 shrink-0" />
                         <span className="whitespace-nowrap">{lang === 'th' ? 'ลงทะเบียนรายบุคคล' : 'Individual'}</span>
                       </button>
+                      )}
 
                       <button
                         type="button"
@@ -1575,20 +1582,22 @@ export function LoginView({
                         </div>
                         <div className="min-w-0">
                           <div className="text-xs font-bold text-slate-800 truncate">
-                            เข้าสู่ระบบในนาม: <span className="text-blue-700">{sponsorSession.sponsorName}</span> ({sponsorSession.tier} Sponsor)
+                            {isAdminMode ? 'แอดมินทำรายการในนาม:' : 'เข้าสู่ระบบในนาม:'} <span className="text-blue-700">{sponsorSession.sponsorName}</span> ({sponsorSession.tier} Sponsor)
                           </div>
                           <div className="text-[11px] text-slate-500 truncate">
                             ผู้ประสานงาน: {sponsorSession.contactEmail} (โควต้าคูปองฟรี)
                           </div>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={handleSponsorLogout}
-                        className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold px-2.5 py-1 bg-white hover:bg-rose-50 rounded-lg border border-rose-200 transition-colors cursor-pointer self-end xs:self-auto shrink-0"
-                      >
-                        ออกจากระบบบริษัท
-                      </button>
+                      {!isAdminMode && (
+                        <button
+                          type="button"
+                          onClick={handleSponsorLogout}
+                          className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold px-2.5 py-1 bg-white hover:bg-rose-50 rounded-lg border border-rose-200 transition-colors cursor-pointer self-end xs:self-auto shrink-0"
+                        >
+                          ออกจากระบบบริษัท
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -2251,15 +2260,16 @@ export function LoginView({
             <div className="w-full animate-fade-in">
               <SignupView
                 isEmbedded={true}
+                adminSponsorSession={adminSponsorSession}
                 onNavigateToLogin={() => handleTabChange('conference')}
-                onSubmitSignup={handleMembershipComplete}
+                onSubmitSignup={onAdminSubmit ? (payload) => onAdminSubmit('membership', payload) : handleMembershipComplete}
               />
             </div>
           )}
         </div>
 
         {/* Security Badge */}
-        <div className="text-center pt-4 sm:pt-6 pb-2 space-y-2">
+        <div className={`${isAdminMode ? 'hidden' : ''} text-center pt-4 sm:pt-6 pb-2 space-y-2`}>
           <div className="flex items-center justify-center gap-2">
             <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-slate-500">
               <Shield className="w-3.5 h-3.5 text-[#0026b3]" />

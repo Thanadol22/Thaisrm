@@ -59,6 +59,8 @@ interface SignupViewProps {
     family_name?: string | null;
   } | null;
   isEmbedded?: boolean;
+  /** แอดมินทำรายการแทนบริษัท: ล็อกเป็นแบบกลุ่มในนามบริษัทนี้ (ไม่ต้องยืนยัน OTP) */
+  adminSponsorSession?: SponsorSessionData | null;
 }
 
 export interface EducationRow {
@@ -131,17 +133,19 @@ export function SignupView({
   onGoogleSignUp,
   onClearForm,
   initialUserData,
-  isEmbedded = false
+  isEmbedded = false,
+  adminSponsorSession = null,
 }: SignupViewProps) {
   const router = useRouter();
+  const isAdminMode = Boolean(adminSponsorSession);
   const [consentChecked, setConsentChecked] = useState(false);
   const { lang, toggleLang, t } = useLanguage();
 
   // Mode: Individual vs Group / Corporate
-  const [regMode, setRegMode] = useState<'individual' | 'group'>('individual');
+  const [regMode, setRegMode] = useState<'individual' | 'group'>(adminSponsorSession ? 'group' : 'individual');
   const [activeApplicantIdx, setActiveApplicantIdx] = useState(0);
   const [sponsorAuthModalOpen, setSponsorAuthModalOpen] = useState(false);
-  const [sponsorSession, setSponsorSession] = useState<SponsorSessionData | null>(null);
+  const [sponsorSession, setSponsorSession] = useState<SponsorSessionData | null>(adminSponsorSession);
   const [sponsorSecondsRemaining, setSponsorSecondsRemaining] = useState<number>(300);
   const lastSponsorActivityRef = useRef<number>(Date.now());
 
@@ -151,19 +155,20 @@ export function SignupView({
 
   // Multi-applicant state
   const [applicants, setApplicants] = useState<ApplicantFormData[]>([
-    createInitialApplicant('1'),
+    createInitialApplicant('1', adminSponsorSession?.sponsorName || ''),
   ]);
 
   const handleSponsorLogout = () => {
-    setSponsorSession(null);
-    setRegMode('individual');
-    setApplicants([createInitialApplicant('1')]);
+    setSponsorSession(adminSponsorSession);
+    setRegMode(adminSponsorSession ? 'group' : 'individual');
+    setApplicants([createInitialApplicant('1', adminSponsorSession?.sponsorName || '')]);
     setActiveApplicantIdx(0);
   };
 
   // Inactivity tracking when sponsor session is active (5 minutes timeout)
   useEffect(() => {
-    if (!sponsorSession) return;
+    // แอดมินทำรายการแทนบริษัท ไม่ใช้การตัดเซสชันอัตโนมัติ 5 นาที
+    if (!sponsorSession || isAdminMode) return;
 
     // Reset last activity timestamp immediately on session start / restore
     lastSponsorActivityRef.current = Date.now();
@@ -212,7 +217,7 @@ export function SignupView({
       document.removeEventListener('visibilitychange', checkAndSyncTime);
       clearInterval(interval);
     };
-  }, [sponsorSession, lang]);
+  }, [sponsorSession, lang, isAdminMode]);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -678,7 +683,7 @@ export function SignupView({
 
       if (regMode === 'individual' && processedApplicants.length === 1) {
         const singlePayload = processedApplicants[0];
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && !isAdminMode) {
           localStorage.setItem('membership_registration', JSON.stringify(singlePayload));
         }
         if (onSubmitSignup) {
@@ -700,7 +705,7 @@ export function SignupView({
           submittedAt: new Date().toISOString(),
         };
 
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && !isAdminMode) {
           localStorage.setItem('membership_registration', JSON.stringify(groupPayload));
         }
         if (onSubmitSignup) {
@@ -722,6 +727,7 @@ export function SignupView({
         {/* Mode Selector: Individual vs Group */}
         <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-2 sm:p-2.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
           <div className="grid grid-cols-1 xs:grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+            {!isAdminMode && (
             <button
               type="button"
               onClick={() => {
@@ -737,6 +743,7 @@ export function SignupView({
               <User className="w-4 h-4 shrink-0" />
               <span className="whitespace-nowrap">{lang === 'th' ? 'สมัครสมาชิกรายบุคคล' : 'Individual'}</span>
             </button>
+            )}
 
             <button
               type="button"
@@ -794,7 +801,7 @@ export function SignupView({
               </div>
               <div>
                 <p className="text-xs font-bold text-slate-800">
-                  {lang === 'th' ? 'สมัครสมาชิกในนาม:' : 'Registering as:'}{' '}
+                  {isAdminMode ? 'แอดมินทำรายการในนาม:' : lang === 'th' ? 'สมัครสมาชิกในนาม:' : 'Registering as:'}{' '}
                   <span className="text-[#0026b3]">{sponsorSession.sponsorName}</span>
                   <span className="ml-1 text-[11px] font-normal text-slate-500">({sponsorSession.tier} Sponsor)</span>
                 </p>
@@ -803,13 +810,15 @@ export function SignupView({
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleSponsorLogout}
-              className="text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition cursor-pointer shadow-2xs shrink-0"
-            >
-              {lang === 'th' ? 'ออกจากระบบบริษัท' : 'Exit Sponsor Mode'}
-            </button>
+            {!isAdminMode && (
+              <button
+                type="button"
+                onClick={handleSponsorLogout}
+                className="text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition cursor-pointer shadow-2xs shrink-0"
+              >
+                {lang === 'th' ? 'ออกจากระบบบริษัท' : 'Exit Sponsor Mode'}
+              </button>
+            )}
           </div>
         )}
 

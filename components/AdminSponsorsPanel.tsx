@@ -45,6 +45,7 @@ import { CouponModal, CouponItem } from '@/components/CouponModal';
 import { CouponUsagesModal } from '@/components/CouponUsagesModal';
 import { SponsorCouponHistoryModal } from '@/components/SponsorCouponHistoryModal';
 import { PaginationControls } from '@/components/PaginationControls';
+import { AdminCompanyMemberModal } from '@/components/AdminCompanyMemberModal';
 
 import { statusLabelTh } from '@/lib/statusLabels';
 interface SponsorQuota {
@@ -129,6 +130,7 @@ export default function AdminSponsorsPanel({
   const [historyLoading, setHistoryLoading] = useState(false);
 
   const [addSponsorOpen, setAddSponsorOpen] = useState(false);
+  const [companyMemberOpen, setCompanyMemberOpen] = useState(false);
   const [newSponsorForm, setNewSponsorForm] = useState({
     name: '',
     tier: 'Silver' as 'Platinum' | 'Gold' | 'Silver',
@@ -670,6 +672,13 @@ export default function AdminSponsorsPanel({
             >
               <Building2 className="w-4 h-4 text-slate-600" />
               <span>เพิ่มบริษัท</span>
+            </button>
+            <button
+              onClick={() => setCompanyMemberOpen(true)}
+              className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <UserCheck className="w-4 h-4 text-slate-600" />
+              <span>เพิ่มสมาชิกบริษัท</span>
             </button>
           </div>
         </div>
@@ -1538,6 +1547,17 @@ export default function AdminSponsorsPanel({
           </div>,
           document.body
         )}
+
+      {/* MODAL: ADMIN ADDS COMPANY MEMBERS (REGISTER / MEMBERSHIP) */}
+      <AdminCompanyMemberModal
+        isOpen={companyMemberOpen}
+        onClose={() => setCompanyMemberOpen(false)}
+        companies={sponsors}
+        onSuccess={(msg) => {
+          showToast(msg);
+          fetchSponsors();
+        }}
+      />
 
       {/* ======================================================= */}
       {/* MODAL: ADD NEW SPONSOR */}
