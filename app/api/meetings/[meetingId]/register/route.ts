@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isPersonalEmail, personalEmailRequiredMessage } from '@/lib/validators/emailPolicy';
 import { sendRegistrationApprovedEmail, sendAttendeeSponsoredRegistrationEmail } from '@/lib/email';
+import { retireUsedSponsorCoupon } from '@/lib/services/sponsorCouponService';
 
 export async function POST(
   request: NextRequest,
@@ -87,6 +88,21 @@ export async function POST(
             },
             { status: 400 }
           );
+        }
+      }
+
+      // ตรวจสอบคูปองอีกครั้งฝั่งเซิร์ฟเวอร์ (คูปองที่ใช้ไปแล้วจะถูกปิด ไม่สามารถใช้ซ้ำได้)
+      if (couponCode) {
+        const groupCoupon = await prisma.coupons.findUnique({ where: { code: String(couponCode).trim().toUpperCase() } });
+        if (groupCoupon) {
+          let couponError = '';
+          if (!groupCoupon.is_active) couponError = 'รหัสคูปองนี้ถูกใช้งานหรือปิดใช้งานแล้ว กรุณาใช้คูปองปัจจุบันของบริษัท';
+          else if (groupCoupon.used_count >= groupCoupon.max_uses) couponError = 'โควตาสิทธิ์คูปองนี้ถูกใช้งานครบแล้ว';
+          else if (groupCoupon.expire_date && new Date(groupCoupon.expire_date).getTime() + 86400000 < Date.now()) couponError = 'รหัสคูปองนี้หมดอายุแล้ว ไม่สามารถใช้งานได้';
+          else if (groupCoupon.meeting_id && groupCoupon.meeting_id !== meetingId) couponError = 'รหัสคูปองนี้ไม่ตรงกับรอบการประชุมที่เลือก';
+          if (couponError) {
+            return NextResponse.json({ success: false, error: couponError }, { status: 400 });
+          }
         }
       }
 
@@ -338,6 +354,15 @@ export async function POST(
           }
         }
       }, { timeout: 30000 }); // timeout 30s สำหรับกลุ่มใหญ่
+
+      // คูปองบริษัทใช้ได้ 1 ครั้ง: ปิดรหัสที่ใช้แล้วและออกรหัสใหม่สำหรับสิทธิ์คงเหลือ (โควต้าถูกหักใน Transaction แล้ว)
+      if (couponCode) {
+        try {
+          await retireUsedSponsorCoupon(couponCode);
+        } catch (rotateErr) {
+          console.error('Failed to rotate sponsor coupon:', rotateErr);
+        }
+      }
 
       if (isFreeRegistration) {
         let meetingDateStr: string | undefined = undefined;
@@ -814,6 +839,12 @@ export async function POST(
         });
       } catch (couponErr) {
         console.error('Failed to log coupon usage:', couponErr);
+      }
+
+      try {
+        await retireUsedSponsorCoupon(couponRecord.code, { deductQuotaSeats: 1, meetingId });
+      } catch (rotateErr) {
+        console.error('Failed to rotate sponsor coupon:', rotateErr);
       }
     }
 

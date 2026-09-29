@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { sendSponsorOtpEmail } from '@/lib/email';
+import { ensureActiveSponsorCoupon, SPONSOR_TEST_COUPON_CODE } from '@/lib/services/sponsorCouponService';
 import crypto from 'crypto';
 
 
@@ -74,126 +75,15 @@ export async function POST(req: NextRequest) {
       `;
     }
 
-    // 2. ตรวจสอบคูปองของบริษัทในรอบการประชุมปัจจุบัน
-    let couponRecord: any = null;
-    let meetingName = '34th TSRM2026 V.2';
-
-    if (prismaAny.coupons) {
-      couponRecord = await prismaAny.coupons.findFirst({
-        where: {
-          company_name: { equals: sponsor.name, mode: 'insensitive' },
-          is_active: true,
-        },
-        include: {
-          meetings: {
-            select: { meeting_name: true },
-          },
-        },
-        orderBy: { created_at: 'desc' },
-      });
-    } else {
-      const cList: any[] = await prisma.$queryRaw`
-        SELECT c.*, m.meeting_name
-        FROM coupons c
-        LEFT JOIN meetings m ON c.meeting_id = m.meeting_id
-        WHERE LOWER(c.company_name) = LOWER(${sponsor.name}) AND c.is_active = true
-        ORDER BY c.created_at DESC
-        LIMIT 1
-      `;
-      couponRecord = cList[0] || null;
-    }
-
-    let activeRotatedCouponCode: string | undefined = undefined;
-    let remainingQuota = 0;
-    let totalQuota = 0;
-
-    // ตรวจสอบโควต้าทั้งหมดของบริษัทจาก sponsor_quotas
-    let sponsorQuotaRecord: any = null;
-    if (prismaAny.sponsor_quotas) {
-      sponsorQuotaRecord = await prismaAny.sponsor_quotas.findFirst({
-        where: {
-          sponsor_id: sponsor.id,
-        },
-        orderBy: { created_at: 'desc' },
-      });
-    }
-
-    if (couponRecord) {
-      totalQuota = sponsorQuotaRecord?.quota_seats || couponRecord.max_uses || 0;
-      // คำนวณสิทธิ์คงเหลือจากโควต้าจริง
-      const usedSeats = sponsorQuotaRecord ? sponsorQuotaRecord.used_seats : (couponRecord.used_count || 0);
-      remainingQuota = Math.max(0, totalQuota - usedSeats);
-
-      if (couponRecord.meetings?.meeting_name) {
-        meetingName = couponRecord.meetings.meeting_name;
-      } else if (couponRecord.meeting_name) {
-        meetingName = couponRecord.meeting_name;
-      }
-
-      if (remainingQuota > 0) {
-        if (couponRecord.code === 'T34-TEST-111111' || email === 'test@sponsor.com') {
-          activeRotatedCouponCode = 'T34-TEST-111111';
-        } else if (couponRecord.used_count === 0 && couponRecord.is_active) {
-          // หากรหัสปัจจุบันยังไม่เคยมีใครใช้สิทธิ์ ให้ใช้รหัสเดิมต่อเนื่องได้
-          activeRotatedCouponCode = couponRecord.code;
-        } else {
-          // หากรหัสเดิมมีการใช้งานไปแล้ว (used_count > 0) ต้องสร้างรหัสคูปองใหม่แยกแถว
-          // เพื่อรักษาประวัติการใช้สิทธิ์ของรหัสเดิมไว้ ไม่ให้ถูกเขียนทับ
-          const chars = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
-          const words = (sponsor.name || '').toUpperCase().replace(/[^A-Z0-9\s]/g, '').split(/\s+/).filter(Boolean);
-          let prefix = 'SPN';
-          if (words.length >= 2) {
-            prefix = (words[0].slice(0, 2) + words[1].slice(0, 1)).toUpperCase();
-          } else if (words.length === 1) {
-            prefix = words[0].slice(0, 3).toUpperCase();
-          }
-
-          let token = '';
-          for (let i = 0; i < 6; i++) {
-            token += chars.charAt(Math.floor(Math.random() * chars.length));
-          }
-          activeRotatedCouponCode = `T34-${prefix}-${token}`;
-
-          // ปิดการใช้งานรหัสเดิม โดยคง max_uses เดิมไว้เพื่อรักษาประวัติจำนวนสิทธิ์ที่มี ณ ตอนนั้น
-          if (prismaAny.coupons) {
-            await prismaAny.coupons.update({
-              where: { id: couponRecord.id },
-              data: {
-                is_active: false,
-                updated_at: new Date(),
-              },
-            });
-
-            // สร้างแถวคูปองใหม่สำหรับสิทธิ์คงเหลือ
-            await prismaAny.coupons.create({
-              data: {
-                code: activeRotatedCouponCode,
-                company_name: sponsor.name,
-                meeting_id: couponRecord.meeting_id,
-                discount_type: couponRecord.discount_type || 'free',
-                discount_value: couponRecord.discount_value || 0,
-                applicable_type: couponRecord.applicable_type || 'all',
-                max_uses: remainingQuota,
-                used_count: 0,
-                expire_date: couponRecord.expire_date,
-                is_active: true,
-                remarks: couponRecord.remarks,
-              },
-            });
-          } else {
-            await prisma.$executeRaw`
-              UPDATE coupons 
-              SET is_active = false, updated_at = NOW() 
-              WHERE id = ${couponRecord.id}
-            `;
-            await prisma.$executeRaw`
-              INSERT INTO coupons (id, code, company_name, meeting_id, discount_type, discount_value, applicable_type, max_uses, used_count, is_active, remarks, created_at, updated_at)
-              VALUES (gen_random_uuid()::text, ${activeRotatedCouponCode}, ${sponsor.name}, ${couponRecord.meeting_id}, 'free', 0, 'all', ${remainingQuota}, 0, true, ${couponRecord.remarks || null}, NOW(), NOW())
-            `;
-          }
-        }
-      }
-    }
+    // 2. ดึงคูปองปัจจุบันของบริษัท (1 คูปอง / 1 ครั้ง: รหัสที่ถูกใช้แล้วจะถูกปิดและออกรหัสใหม่ตามสิทธิ์คงเหลือ)
+    const couponInfo = await ensureActiveSponsorCoupon({ id: sponsor.id, name: sponsor.name });
+    const meetingName = couponInfo.meetingName || '34th TSRM2026 V.2';
+    const remainingQuota = couponInfo.remainingQuota;
+    const totalQuota = couponInfo.totalQuota;
+    const activeRotatedCouponCode: string | undefined =
+      remainingQuota > 0 && email === 'test@sponsor.com'
+        ? SPONSOR_TEST_COUPON_CODE
+        : couponInfo.coupon?.code || undefined;
 
     // ส่งอีเมล OTP ไปยังตัวแทน (ส่ง plainOtp ไม่ใช่ hash)
     try {

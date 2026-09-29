@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { retireUsedSponsorCoupon } from '@/lib/services/sponsorCouponService';
 import crypto from 'crypto';
 import { sendAttendeeTicketEmail, sendAttendeeSponsoredRegistrationEmail, sendRegistrationApprovedEmail } from '@/lib/email';
 
@@ -398,6 +399,15 @@ export async function POST(req: NextRequest) {
           },
         },
       });
+
+      // คูปองบริษัทใช้ได้ 1 ครั้ง: ปิดรหัสที่ใช้แล้วและออกรหัสใหม่สำหรับสิทธิ์คงเหลือ
+      if (results.length > 0) {
+        try {
+          await retireUsedSponsorCoupon(couponRecord.code);
+        } catch (rotateErr) {
+          console.error('[SubmitGroupRegistration] Failed to rotate sponsor coupon:', rotateErr);
+        }
+      }
     }
 
     return NextResponse.json({
