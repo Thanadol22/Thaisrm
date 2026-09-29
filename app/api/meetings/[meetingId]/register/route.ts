@@ -468,14 +468,21 @@ export async function POST(
         );
       }
 
-      // Check member in database
-      const member = await prisma.member.findUnique({
-        where: { member_no: memberNo },
+      // Check member in database — ค้นหาแบบเดียวกับหน้าตรวจสอบสมาชิก (รองรับเลขที่มี/ไม่มีศูนย์นำหน้า)
+      const rawNo = String(memberNo).trim();
+      const member = await prisma.member.findFirst({
+        where: {
+          OR: [
+            { member_no: rawNo },
+            { member_no: rawNo.padStart(4, '0') },
+            { member_no: rawNo.replace(/^0+/, '') },
+          ],
+        },
       });
 
       if (!member) {
         return NextResponse.json(
-          { success: false, error: 'Member record not found' },
+          { success: false, error: `ไม่พบเลขสมาชิก "${rawNo}" ในระบบ กรุณาตรวจสอบเลขสมาชิกอีกครั้ง` },
           { status: 404 }
         );
       }

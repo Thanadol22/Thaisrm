@@ -1150,7 +1150,7 @@ export function LoginView({
           workplace: finalWorkplace,
           position: finalPosition,
           positionCode: att.position,
-          memberNo: rawMemberNo,
+          memberNo: memberDataFound?.member_no || rawMemberNo,
           isMember: isMemberCalculated,
           isExpiredMember: isExpiredMember,
           memberStatus: isExpiredMember ? 'expired' : (isMemberCalculated ? 'active' : 'non_member'),
