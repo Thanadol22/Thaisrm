@@ -5,6 +5,65 @@ import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+type AttendeeProgram = { id: string; name: string };
+
+/**
+ * ดึงรายการโปรแกรมที่ผู้เข้าร่วมเลือกจาก selected_activities ของสลิป
+ * - สลิปรายบุคคล: ใช้ activities ระดับบนสุด
+ * - สลิปกลุ่ม: หา attendee ที่ตรงกับ member_no / email / phone แล้วใช้ activities ของคนนั้น
+ */
+function extractAttendeePrograms(
+  rawActivities: any,
+  match: { memberNo?: string | null; email?: string | null; phone?: string | null }
+): AttendeeProgram[] {
+  let parsed = rawActivities;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return [];
+    }
+  }
+  if (!parsed) return [];
+
+  const toPrograms = (list: any[]): AttendeeProgram[] =>
+    list
+      .map((a: any) =>
+        typeof a === 'string'
+          ? { id: a, name: '' }
+          : { id: String(a?.id ?? ''), name: String(a?.name ?? '') }
+      )
+      .filter((p) => p.id || p.name);
+
+  if (Array.isArray(parsed)) return toPrograms(parsed);
+  if (typeof parsed !== 'object') return [];
+
+  const groupAttendees = parsed.isGroup || parsed.type === 'conference_group_registration' ? parsed.attendees : null;
+  if (Array.isArray(groupAttendees)) {
+    const cleanNo = match.memberNo ? String(match.memberNo).trim().replace(/^0+/, '') : '';
+    const cleanEmail = match.email?.trim().toLowerCase() || '';
+    const cleanPhone = match.phone?.trim() || '';
+    const person = groupAttendees.find((g: any) => {
+      const gNo = String(g?.memberNo || g?.member_no || '').trim().replace(/^0+/, '');
+      const gEmail = String(g?.email || g?.attendee_email || '').trim().toLowerCase();
+      const gPhone = String(g?.phone || g?.mobile || g?.attendee_phone || '').trim();
+      return (cleanNo && gNo === cleanNo) || (cleanEmail && gEmail === cleanEmail) || (cleanPhone && gPhone === cleanPhone);
+    });
+    if (!person) return [];
+    for (const list of [person.activities, person.selectedActivities, person.selectedProgramIds, person.selectedPrograms]) {
+      if (Array.isArray(list) && list.length > 0) return toPrograms(list);
+    }
+    return [];
+  }
+
+  const list = Array.isArray(parsed.activities)
+    ? parsed.activities
+    : Array.isArray(parsed.selectedActivities)
+      ? parsed.selectedActivities
+      : [];
+  return toPrograms(list);
+}
+
 /**
  * GET /api/admin/attendees
  * ดึงรายชื่อผู้ลงทะเบียน/ผู้เข้าร่วมประชุมทั้งหมดจากฐานข้อมูลจริง
@@ -320,9 +379,18 @@ export async function GET(request: NextRequest) {
         ? new Date(att.checkin_time).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) + ' น.'
         : undefined;
 
+      const programs = matchingSlip
+        ? extractAttendeePrograms(matchingSlip.selected_activities, {
+            memberNo: att.member_no,
+            email: email || att.attendee_email,
+            phone: phone || att.attendee_phone,
+          })
+        : [];
+
       return {
         id: att.attendance_id.toString(),
         code,
+        programs,
         nameTh,
         nameEn,
         id4Digits,

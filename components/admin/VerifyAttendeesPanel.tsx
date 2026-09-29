@@ -79,6 +79,7 @@ export function VerifyAttendeesPanel({
   const [search, setSearch] = useState('');
   const [filterCheckIn, setFilterCheckIn] = useState<'all' | 'checked_in' | 'not_checked_in'>('all');
   const [filterPayment, setFilterPayment] = useState<'all' | 'paid' | 'pending' | 'rejected'>('all');
+  const [filterProgram, setFilterProgram] = useState<string>('all');
   const [selectedAttendee, setSelectedAttendee] = useState<AttendeeItem | null>(null);
 
   // Status Edit Modal State
@@ -174,9 +175,43 @@ export function VerifyAttendeesPanel({
     );
   }, [attendees, activeMeetingId, currentMeeting]);
 
+  // Programs (activities) of the selected round
+  const meetingPrograms = useMemo<Array<{ id: string; name: string; type?: string }>>(() => {
+    if (!currentMeeting || !Array.isArray(currentMeeting.activities)) return [];
+    return currentMeeting.activities
+      .filter((act: any) => act && act.id)
+      .map((act: any) => ({ id: String(act.id), name: String(act.name || act.id), type: act.type }));
+  }, [currentMeeting]);
+
+  useEffect(() => {
+    setFilterProgram('all');
+  }, [activeMeetingId]);
+
+  // ผู้ที่ไม่มีข้อมูลโปรแกรมในสลิป ถือว่าลงทะเบียนเฉพาะการประชุมหลัก
+  const attendeeHasProgram = (a: AttendeeItem, prog: { id: string; name: string; type?: string }) => {
+    if (!a.programs || a.programs.length === 0) return prog.type === 'main' || prog.id === 'main';
+    return a.programs.some((p) => p.id === prog.id || (!!p.name && p.name === prog.name));
+  };
+
+  const getAttendeeProgramNames = (a: AttendeeItem): string[] => {
+    if (meetingPrograms.length > 0) {
+      return meetingPrograms.filter((prog) => attendeeHasProgram(a, prog)).map((prog) => prog.name);
+    }
+    return (a.programs || []).map((p) => p.name || p.id).filter(Boolean);
+  };
+
+  const selectedProgram = meetingPrograms.find((p) => p.id === filterProgram);
+
+  // Narrow round attendees by the selected program
+  const programAttendees = useMemo(() => {
+    if (!selectedProgram) return roundAttendees;
+    return roundAttendees.filter((a) => attendeeHasProgram(a, selectedProgram));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundAttendees, selectedProgram]);
+
   // Secondary filtering (search, check-in status, payment status)
   const filteredAttendees = useMemo(() => {
-    return roundAttendees.filter((a) => {
+    return programAttendees.filter((a) => {
       const matchStatus = filterCheckIn === 'all' || a.checkInStatus === filterCheckIn;
       const matchPayment =
         filterPayment === 'all' ||
@@ -195,7 +230,7 @@ export function VerifyAttendeesPanel({
         a.ticketCode.toLowerCase().includes(q);
       return matchStatus && matchPayment && matchSearch;
     });
-  }, [roundAttendees, filterCheckIn, filterPayment, search]);
+  }, [programAttendees, filterCheckIn, filterPayment, search]);
 
   // Total pages and Paginated Slice (5 items per page default)
   const totalPages = Math.max(1, Math.ceil(filteredAttendees.length / pageSize));
@@ -203,7 +238,7 @@ export function VerifyAttendeesPanel({
   // Reset current page when filters change or if current page exceeds total pages
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedMeetingId, filterCheckIn, filterPayment, search, pageSize]);
+  }, [selectedMeetingId, filterCheckIn, filterPayment, filterProgram, search, pageSize]);
 
   const paginatedAttendees = useMemo(() => {
     const validPage = Math.min(Math.max(1, currentPage), totalPages);
@@ -215,11 +250,12 @@ export function VerifyAttendeesPanel({
   const totalInRound = roundAttendees.length;
   const checkedInInRound = roundAttendees.filter((a) => a.checkInStatus === 'checked_in').length;
   const notCheckedInInRound = totalInRound - checkedInInRound;
-  const paidInRound = roundAttendees.filter((a) => a.paymentStatus === 'paid').length;
-  const pendingInRound = roundAttendees.filter(
+  const paidInRound = programAttendees.filter((a) => a.paymentStatus === 'paid').length;
+  const pendingInRound = programAttendees.filter(
     (a) => a.paymentStatus === 'pending' || a.paymentStatus === 'unpaid'
   ).length;
-  const rejectedInRound = roundAttendees.filter((a) => a.paymentStatus === 'rejected').length;
+  const rejectedInRound = programAttendees.filter((a) => a.paymentStatus === 'rejected').length;
+  const checkedInInProgram = programAttendees.filter((a) => a.checkInStatus === 'checked_in').length;
   const rateInRound = totalInRound > 0 ? Math.round((checkedInInRound / totalInRound) * 100) : 0;
 
   // Export CSV handler
@@ -236,6 +272,7 @@ export function VerifyAttendeesPanel({
       'ประเภทบัตร',
       'รหัสตั๋ว',
       'รอบการประชุม',
+      'โปรแกรมที่ลงทะเบียน',
       'สถานะชำระเงิน',
       'สถานะเช็คอิน',
       'เวลาเช็คอิน',
@@ -252,6 +289,7 @@ export function VerifyAttendeesPanel({
       `"${a.ticketType}"`,
       a.ticketCode,
       `"${a.meetingTitle}"`,
+      `"${getAttendeeProgramNames(a).join(', ')}"`,
       a.paymentStatus === 'paid' ? 'ชำระแล้ว' : a.paymentStatus === 'rejected' ? 'สลิปถูกปฏิเสธ' : 'รอชำระ',
       a.checkInStatus === 'checked_in' ? 'เช็คอินแล้ว' : 'ยังไม่เข้าร่วม',
       a.checkInTime || '-',
@@ -262,7 +300,9 @@ export function VerifyAttendeesPanel({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    const roundSlug = selectedMeetingId === 'all' ? 'all-rounds' : selectedMeetingId.toLowerCase();
+    const roundSlug =
+      (selectedMeetingId === 'all' ? 'all-rounds' : selectedMeetingId.toLowerCase()) +
+      (selectedProgram ? `_${selectedProgram.id.toLowerCase()}` : '');
     link.setAttribute('download', `attendees_${roundSlug}_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
@@ -486,9 +526,9 @@ export function VerifyAttendeesPanel({
           {/* Check-In Status Tabs */}
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 overflow-x-auto">
             {[
-              { id: 'all', label: `ทั้งหมด (${roundAttendees.length})` },
-              { id: 'checked_in', label: `เช็คอินแล้ว (${checkedInInRound})` },
-              { id: 'not_checked_in', label: `ยังไม่เข้าร่วม (${notCheckedInInRound})` },
+              { id: 'all', label: `ทั้งหมด (${programAttendees.length})` },
+              { id: 'checked_in', label: `เช็คอินแล้ว (${checkedInInProgram})` },
+              { id: 'not_checked_in', label: `ยังไม่เข้าร่วม (${programAttendees.length - checkedInInProgram})` },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -503,6 +543,22 @@ export function VerifyAttendeesPanel({
               </button>
             ))}
           </div>
+
+          {/* Program Dropdown */}
+          {meetingPrograms.length > 0 && (
+            <select
+              value={filterProgram}
+              onChange={(e) => setFilterProgram(e.target.value)}
+              className="bg-white border border-slate-300 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none shadow-xs cursor-pointer focus:border-[#0026b3] max-w-[260px]"
+            >
+              <option value="all">โปรแกรม: ทั้งหมด</option>
+              {meetingPrograms.map((prog) => (
+                <option key={prog.id} value={prog.id}>
+                  {prog.name} ({roundAttendees.filter((a) => attendeeHasProgram(a, prog)).length})
+                </option>
+              ))}
+            </select>
+          )}
 
           {/* Payment Status Dropdown */}
           <select
@@ -560,6 +616,23 @@ export function VerifyAttendeesPanel({
                         <CalendarDays className="w-3 h-3 shrink-0 text-[#0026b3]" />
                         <span className="truncate">{meeting ? meeting.titleTh : a.meetingTitle}</span>
                       </span>
+                      {getAttendeeProgramNames(a).length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5 max-w-[220px]">
+                          {getAttendeeProgramNames(a).map((name) => (
+                            <span
+                              key={name}
+                              className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border truncate max-w-full ${
+                                selectedProgram?.name === name
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-slate-50 text-slate-600 border-slate-200'
+                              }`}
+                              title={name}
+                            >
+                              {name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-5 py-4">
                       <div className="text-slate-700 font-semibold">{a.memberType}</div>
@@ -888,6 +961,14 @@ export function VerifyAttendeesPanel({
                       {selectedAttendee.meetingTitle}
                     </span>
                   </div>
+                  {getAttendeeProgramNames(selectedAttendee).length > 0 && (
+                    <div className="flex justify-between gap-3">
+                      <span className="text-slate-500 shrink-0">โปรแกรมที่ลงทะเบียน:</span>
+                      <span className="text-slate-800 font-bold text-right max-w-[260px]">
+                        {getAttendeeProgramNames(selectedAttendee).join(', ')}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-slate-500">สถานที่ทำงาน:</span>
                     <span className="text-slate-800 font-bold">{selectedAttendee.workplace}</span>

@@ -109,4 +109,5 @@ export interface AttendeeItem {
   checkInTime?: string;
   slipId?: string | null;
   rejectionReason?: string | null;
+  programs?: Array<{ id: string; name: string }>;
 }
