@@ -504,7 +504,7 @@ export async function processDailyQrScan(
     record: {
       id: trimmed,
       name: 'ไม่พบข้อมูลในระบบ',
-      ticketType: 'N/A',
+      ticketType: '-',
       email: 'N/A',
       checkInTime: 'N/A',
       status: 'invalid',

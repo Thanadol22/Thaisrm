@@ -46,6 +46,7 @@ import { CouponUsagesModal } from '@/components/CouponUsagesModal';
 import { SponsorCouponHistoryModal } from '@/components/SponsorCouponHistoryModal';
 import { PaginationControls } from '@/components/PaginationControls';
 
+import { statusLabelTh } from '@/lib/statusLabels';
 interface SponsorQuota {
   id?: string;
   sponsor_id?: string;
@@ -1432,7 +1433,7 @@ export default function AdminSponsorsPanel({
                                 : 'bg-slate-100 text-slate-600 border border-slate-200'
                             }`}
                           >
-                            {row.status || row.attendance_status || 'Registered'}
+                            {statusLabelTh(row.status || row.attendance_status || 'Registered')}
                           </span>
                         </td>
                       </tr>
@@ -1514,7 +1515,7 @@ export default function AdminSponsorsPanel({
                             </td>
                             <td className="py-3 px-3.5 text-center">
                               <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                {row.attendanceStatus || 'Registered'}
+                                {statusLabelTh(row.attendanceStatus || 'Registered')}
                               </span>
                             </td>
                           </tr>

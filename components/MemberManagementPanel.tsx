@@ -48,6 +48,7 @@ import {
   CalendarCheck2,
 } from 'lucide-react';
 
+import { statusLabelTh } from '@/lib/statusLabels';
 export function MemberManagementPanel() {
   const [mounted, setMounted] = useState(false);
 
@@ -1158,7 +1159,7 @@ export function MemberManagementPanel() {
                               <div className="text-[10px] text-slate-500">{d.reason}</div>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
-                              <span className="text-[10px] text-slate-400 line-through">{d.previous_status}</span>
+                              <span className="text-[10px] text-slate-400 line-through">{statusLabelTh(d.previous_status)}</span>
                               <span>→</span>
                               <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
                                 d.new_status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'

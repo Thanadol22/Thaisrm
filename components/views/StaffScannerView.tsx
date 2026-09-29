@@ -322,7 +322,7 @@ export function StaffScannerView() {
         setLastScanned({
           id: trimmed,
           name: json.error || t.staff.unidentified,
-          ticketType: 'N/A',
+          ticketType: '-',
           email: 'N/A',
           checkInTime: 'N/A',
           status: 'invalid',
@@ -334,7 +334,7 @@ export function StaffScannerView() {
       setLastScanned({
         id: trimmed,
         name: 'เกิดข้อผิดพลาดในการเชื่อมต่อ',
-        ticketType: 'N/A',
+        ticketType: '-',
         email: 'N/A',
         checkInTime: 'N/A',
         status: 'invalid',

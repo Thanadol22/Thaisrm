@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import prisma from '@/lib/prisma';
 import { createOtpSessionToken } from '@/lib/security/otpSessionAuth';
+import { statusLabelTh } from '@/lib/statusLabels';
 
 export async function POST(req: NextRequest) {
   try {
@@ -386,7 +387,7 @@ export async function POST(req: NextRequest) {
             ticket_code: att.ticket_code || '-',
             discount_amount: 0,
             net_price: 0,
-            status: att.attendance_status === 'Registered' ? 'ยืนยันสิทธิ์แล้ว' : att.attendance_status,
+            status: att.attendance_status === 'Registered' ? 'ยืนยันสิทธิ์แล้ว' : statusLabelTh(att.attendance_status),
             meeting_id: att.meeting_id,
             meeting_name: att.meetings?.meeting_name || att.meeting_id,
             created_at: att.created_at,

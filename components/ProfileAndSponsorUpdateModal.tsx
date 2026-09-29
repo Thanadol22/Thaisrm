@@ -39,6 +39,7 @@ import { SmartEmailInput } from '@/components/SmartEmailInput';
 import { ThaiDatePicker } from '@/components/ThaiDatePicker';
 import { uploadImageToStorage } from '@/lib/blobUpload';
 
+import { statusLabelTh } from '@/lib/statusLabels';
 interface EducationItem {
   edu_id?: string;
   degree: string;
@@ -778,7 +779,7 @@ export function ProfileAndSponsorUpdateModal({
                       #{memberData.member_no}
                     </span>
                     <span className="text-xs font-semibold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-lg">
-                      {memberData.membership_type} • {memberData.membership_status}
+                      {statusLabelTh(memberData.membership_type)} • {statusLabelTh(memberData.membership_status)}
                     </span>
                   </div>
                   <h4 className="font-extrabold text-slate-900 text-base mt-1.5">
@@ -1754,7 +1755,7 @@ export function ProfileAndSponsorUpdateModal({
                             </td>
                             <td className="p-2.5 text-center">
                               <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[11px] font-semibold">
-                                {m.status}
+                                {statusLabelTh(m.status)}
                               </span>
                             </td>
                           </tr>

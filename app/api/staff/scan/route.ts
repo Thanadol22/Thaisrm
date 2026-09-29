@@ -233,7 +233,7 @@ export async function POST(req: NextRequest) {
         record: {
           id: trimmedSearch,
           name: 'ไม่พบข้อมูลในระบบ',
-          ticketType: 'N/A',
+          ticketType: '-',
           email: 'N/A',
           checkInTime: 'N/A',
           status: 'invalid',
@@ -253,8 +253,8 @@ export async function POST(req: NextRequest) {
       : (matchedAttendance.attendee_name || 'ผู้ลงทะเบียนทั่วไป');
     const displayEmail = isMember ? (mem?.email || '-') : (matchedAttendance.attendee_email || '-');
     const displayTicketType = isMember
-      ? `${mem?.membership_type === 'Lifelong' ? 'สมาชิกตลอดชีพ' : 'สมาชิกสามัญ'} Pass`
-      : 'บุคคลทั่วไป (Non-Member Pass)';
+      ? (mem?.membership_type === 'Lifelong' ? 'บัตรสมาชิกตลอดชีพ' : 'บัตรสมาชิกสามัญ')
+      : 'บัตรบุคคลทั่วไป';
     const displayCode = matchingSlip?.ticket_code || (isMember ? `TSRM-MEM-${mem?.member_no}` : `TSRM-TKT-${matchedAttendance.attendance_id}`);
 
     // Case 1.5: REJECTED SLIP / ATTENDANCE

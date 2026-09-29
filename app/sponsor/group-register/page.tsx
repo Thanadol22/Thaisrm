@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
 
+import { statusLabelTh } from '@/lib/statusLabels';
 interface SponsorSession {
   sponsorId: string;
   sponsorName: string;
@@ -1364,7 +1365,7 @@ export default function SponsorGroupRegisterPage() {
                         </td>
                         <td className="py-3 px-4">
                           <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            {item.attendanceStatus || 'Registered'}
+                            {statusLabelTh(item.attendanceStatus || 'Registered')}
                           </span>
                         </td>
                       </tr>

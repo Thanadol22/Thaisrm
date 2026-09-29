@@ -32,6 +32,7 @@ import {
   Eye,
 } from 'lucide-react';
 
+import { statusLabelTh } from '@/lib/statusLabels';
 interface MemberDetailModalProps {
   member: Member | any | null;
   isOpen: boolean;
@@ -259,7 +260,7 @@ export function MemberDetailModal({
                       ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30'
                       : 'bg-rose-500/20 text-rose-300 border-rose-400/30'
                   }`}>
-                    {member.membership_status.toLowerCase() === 'active' ? 'ปกติ' : member.membership_status.toLowerCase() === 'inactive' ? 'หมดอายุ' : member.membership_status}
+                    {statusLabelTh(member.membership_status)}
                   </span>
                 ) : null}
               </div>

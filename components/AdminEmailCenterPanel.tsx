@@ -36,6 +36,7 @@ import { renderAttendeeOnlineEmail } from '@/lib/emailTemplates/attendeeOnlineTe
 import { renderCustomBroadcastEmail } from '@/lib/emailTemplates/customTemplate';
 import { formatThaiDate, DailyProgramInfo } from '@/lib/services/dailyCheckinService';
 
+import { statusLabelTh } from '@/lib/statusLabels';
 interface MeetingOption {
   meeting_id: string;
   meeting_name: string;
@@ -269,7 +270,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
       ? ' (เฉพาะผู้ลงทะเบียนออนไลน์)'
       : (formatFilter === 'onsite' ? ' (เฉพาะผู้ลงทะเบียน Onsite)' : ' (ทุกรูปแบบการเข้าร่วม)');
 
-    const confirmMsg = `ยืนยันการส่งอีเมล ${modeDesc}${formatDesc} สำหรับงาน "${meeting?.meeting_name || selectedMeetingId}" (กลุ่ม: ${statusFilter})?`;
+    const confirmMsg = `ยืนยันการส่งอีเมล ${modeDesc}${formatDesc} สำหรับงาน "${meeting?.meeting_name || selectedMeetingId}" (กลุ่ม: ${statusFilter === 'all' ? 'ทั้งหมด' : statusLabelTh(statusFilter)})?`;
     if (!window.confirm(confirmMsg)) return;
 
     try {
@@ -1052,10 +1053,10 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
-                  { id: 'Registered', label: 'ลงทะเบียนแล้ว', desc: 'สถานะ Registered' },
+                  { id: 'Registered', label: 'ลงทะเบียนแล้ว', desc: 'ผู้ที่ลงทะเบียนในงาน' },
                   { id: 'all', label: 'ทั้งหมด', desc: 'ทุกสถานะในงาน' },
-                  { id: 'Checked_In', label: 'เช็คอินแล้ว', desc: 'Checked-in' },
-                  { id: 'Non-Member', label: 'บุคคลทั่วไป', desc: 'Non-Member' },
+                  { id: 'Checked_In', label: 'เช็คอินแล้ว', desc: 'ผู้ที่เช็คอินเข้างานแล้ว' },
+                  { id: 'Non-Member', label: 'บุคคลทั่วไป', desc: 'ผู้เข้าร่วมที่ไม่ใช่สมาชิก' },
                 ].map((st) => (
                   <button
                     key={st.id}
