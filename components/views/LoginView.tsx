@@ -549,7 +549,7 @@ export function LoginView({
   };
 
   const handleCopyWorkplaceToAll = () => {
-    const wp = sponsorSession?.sponsorName || currentAttendee?.workplace?.trim() || '';
+    const wp = currentAttendee?.workplace?.trim() || sponsorSession?.sponsorName || '';
     if (!wp) {
       alert(lang === 'th' ? 'กรุณาระบุหน่วยงาน/สถานที่ทำงานของท่านปัจจุบันก่อนคัดลอก' : 'Please enter workplace first');
       return;
@@ -652,7 +652,7 @@ export function LoginView({
             const nextNameEn = data.member.fullNameEn || '';
             const nextEmail = data.member.email || att.email || '';
             const nextPosition = data.member.position || '';
-            const nextWorkplace = sponsorSession?.sponsorName || data.member.workplace || att.workplace || '';
+            const nextWorkplace = data.member.workplace || att.workplace || sponsorSession?.sponsorName || '';
 
             return {
               ...att,
@@ -761,6 +761,36 @@ export function LoginView({
       );
     }
   }, [sponsorSession]);
+
+  // แอดมินทำรายการแทนบริษัท: ดึงคูปองปัจจุบันของบริษัทมากรอกและตรวจสอบให้อัตโนมัติ
+  // (คูปองใช้ได้ 1 ครั้ง หลังบันทึกระบบจะออกรหัสใหม่ให้ตามสิทธิ์คงเหลือ)
+  const [adminCouponQuota, setAdminCouponQuota] = useState<{ remaining: number; total: number } | null>(null);
+  useEffect(() => {
+    const sponsorId = adminSponsorSession?.sponsorId;
+    if (!sponsorId || !activeMeeting?.meeting_id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/sponsors/${sponsorId}/current-coupon`, { cache: 'no-store' });
+        const data = await res.json();
+        if (cancelled || !data.success) return;
+        setAdminCouponQuota({ remaining: data.remainingQuota || 0, total: data.totalQuota || 0 });
+        if (data.coupon?.code) {
+          setCouponCodeInput(data.coupon.code);
+          await handleApplyCoupon(data.coupon.code);
+        } else {
+          setCouponState(null);
+          setCouponCodeInput('');
+        }
+      } catch (err) {
+        console.error('Failed to load sponsor coupon:', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminSponsorSession?.sponsorId, activeMeeting?.meeting_id]);
 
   const toggleProgramForCurrentAttendee = (key: string) => {
     const currentProgs = currentAttendee?.selectedPrograms || [];
@@ -1133,7 +1163,7 @@ export function LoginView({
         const finalNameTh = (isMemberCalculated && memberDataFound?.fullNameTh) ? memberDataFound.fullNameTh : att.nameTh.trim();
         const finalNameEn = (isMemberCalculated && memberDataFound?.fullNameEn) ? memberDataFound.fullNameEn : att.nameEn.trim();
         const finalEmail = (isMemberCalculated && memberDataFound?.email) ? memberDataFound.email : att.email.trim();
-        const finalWorkplace = (isMemberCalculated && memberDataFound?.workplace) ? memberDataFound.workplace : att.workplace.trim();
+        const finalWorkplace = att.workplace.trim() || (isMemberCalculated && memberDataFound?.workplace) || '';
         const finalPosition = (isMemberCalculated && memberDataFound?.position)
           ? memberDataFound.position
           : ((att.position === 'อื่นๆ' || att.position === '0 อื่นๆ')
@@ -1585,7 +1615,10 @@ export function LoginView({
                             {isAdminMode ? 'แอดมินทำรายการในนาม:' : 'เข้าสู่ระบบในนาม:'} <span className="text-blue-700">{sponsorSession.sponsorName}</span> ({sponsorSession.tier} Sponsor)
                           </div>
                           <div className="text-[11px] text-slate-500 truncate">
-                            ผู้ประสานงาน: {sponsorSession.contactEmail} (โควต้าคูปองฟรี)
+                            ผู้ประสานงาน: {sponsorSession.contactEmail}
+                            {isAdminMode && adminCouponQuota
+                              ? ` • สิทธิ์คูปองคงเหลือ ${adminCouponQuota.remaining.toLocaleString()}/${adminCouponQuota.total.toLocaleString()} ที่นั่ง`
+                              : ' (โควต้าคูปองฟรี)'}
                           </div>
                         </div>
                       </div>
@@ -1940,26 +1973,16 @@ export function LoginView({
                             <label className="text-[11px] sm:text-xs font-bold text-slate-700">
                               {lang === 'th' ? 'หน่วยงาน / บริษัท' : 'Organization / Workplace'} <span className="text-rose-500 font-bold">*</span>
                             </label>
-                            {(isMemberFieldLocked('workplace') || (regMode === 'group' && !!sponsorSession?.sponsorName)) && (
-                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                                <Lock className="w-2.5 h-2.5" />
-                                {sponsorSession?.sponsorName ? (lang === 'th' ? 'บริษัทสปอนเซอร์' : 'Sponsor Company') : (lang === 'th' ? 'ข้อมูลสมาชิก' : 'Member DB')}
-                              </span>
-                            )}
                           </div>
+                          {/* ไม่ล็อคช่องหน่วยงาน: กรอกอัตโนมัติจากข้อมูลเดิมของสมาชิก แต่แก้ไขได้ */}
                           <div className="relative">
                             <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                             <input
                               type="text"
                               value={currentAttendee.workplace}
-                              readOnly={isMemberFieldLocked('workplace') || (regMode === 'group' && !!sponsorSession?.sponsorName)}
                               onChange={(e) => updateCurrentAttendee('workplace', e.target.value)}
                               placeholder={lang === 'th' ? 'โรงพยาบาล / คลินิก / บริษัท' : 'Hospital / Clinic / Company'}
-                              className={`w-full pl-9 sm:pl-10 pr-3.5 py-2.5 rounded-xl border text-sm font-medium transition min-h-[44px] ${
-                                isMemberFieldLocked('workplace') || (regMode === 'group' && !!sponsorSession?.sponsorName)
-                                  ? 'bg-slate-100/90 text-slate-700 border-slate-200 cursor-not-allowed select-none font-semibold'
-                                  : 'bg-slate-50 text-slate-900 border-slate-200 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none'
-                              }`}
+                              className="w-full pl-9 sm:pl-10 pr-3.5 py-2.5 rounded-xl border text-sm font-medium transition min-h-[44px] bg-slate-50 text-slate-900 border-slate-200 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none"
                             />
                           </div>
                         </div>
