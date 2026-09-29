@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import prisma from '@/lib/prisma';
 import crypto from 'crypto';
 import { 
@@ -1537,12 +1537,18 @@ export async function POST(request: NextRequest) {
               applicantMemberNo = created.member_no || '';
               if (applicant.email) {
                 try {
-                  console.log(`📧 [SLIP APPROVAL] Sending group member approval email to: ${applicant.email} (Member: ${applicantMemberNo})`);
-                  await sendMembershipApprovedEmail({
-                    to: applicant.email,
-                    recipientName: applicant.full_name_th || applicant.full_name_en || 'สมาชิก',
-                    memberNo: applicantMemberNo,
-                    amountPaid: 1000,
+                  const applicantEmail = applicant.email;
+                  const applicantName = applicant.full_name_th || applicant.full_name_en || 'สมาชิก';
+                  const newMemberNo = applicantMemberNo;
+                  // ส่งอีเมลหลังตอบกลับผู้ดูแลแล้ว เพื่อไม่ให้การอนุมัติต้องรอ SMTP
+                  after(async () => {
+                    console.log(`📧 [SLIP APPROVAL] Sending group member approval email to: ${applicantEmail} (Member: ${newMemberNo})`);
+                    await sendMembershipApprovedEmail({
+                      to: applicantEmail,
+                      recipientName: applicantName,
+                      memberNo: newMemberNo,
+                      amountPaid: 1000,
+                    }).catch((e) => console.error('Failed to send group member approval email:', e));
                   });
                 } catch (e) {
                   console.error('Failed to send group member approval email:', e);
@@ -1591,20 +1597,21 @@ export async function POST(request: NextRequest) {
           );
 
           if (companyEmail && approvedApplicants.length > 0) {
-            try {
-              console.log(`📧 [SLIP APPROVAL] Sending company group membership approval email to: ${companyEmail}`);
-              await sendCompanyGroupMembershipApprovedEmail({
-                to: companyEmail,
-                companyName,
-                coordinatorName,
-                ticketCode: slip.ticket_code || slip.slip_id,
-                amountPaid: slip.amount || approvedApplicants.length * 1000,
-                isPayLater,
-                applicants: approvedApplicants,
-              });
-            } catch (companyMailErr) {
-              console.error('Failed to send company group approval email:', companyMailErr);
-            }
+            const companyMailParams = {
+              to: companyEmail,
+              companyName,
+              coordinatorName,
+              ticketCode: slip.ticket_code || slip.slip_id,
+              amountPaid: slip.amount || approvedApplicants.length * 1000,
+              isPayLater,
+              applicants: approvedApplicants,
+            };
+            after(async () => {
+              console.log(`📧 [SLIP APPROVAL] Sending company group membership approval email to: ${companyMailParams.to}`);
+              await sendCompanyGroupMembershipApprovedEmail(companyMailParams).catch((companyMailErr) =>
+                console.error('Failed to send company group approval email:', companyMailErr)
+              );
+            });
           }
         } catch (grpCreateErr: any) {
           console.error('Failed to create group members on slip approval:', grpCreateErr);
@@ -1923,7 +1930,8 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 5. Send approval confirmation email (Reliable Awaited Dispatch with DB Fallbacks)
+      // 5. Send approval confirmation email after the response is sent (with DB Fallbacks)
+      after(async () => {
       try {
 
         if (isMembershipRegistration) {
@@ -2052,7 +2060,7 @@ export async function POST(request: NextRequest) {
             // 2. Send sponsored registration approval notification to EACH individual attendee
             const companyName = groupPayload?.companyName?.trim() || slip.guest_workplace?.trim() || resolved.name || 'บริษัทผู้สนับสนุน';
 
-            for (const att of attendeesList) {
+            await Promise.all(attendeesList.map(async (att: any) => {
               let attEmail = (att.email || att.attendee_email)?.trim();
               let attName = att.nameTh || att.nameEn || att.fullName || att.fullNameTh || att.attendee_name || '';
               let attMemberNo = att.memberNo ? String(att.memberNo).trim() : undefined;
@@ -2129,7 +2137,7 @@ export async function POST(request: NextRequest) {
               } else {
                 console.warn(`⚠️ [SLIP APPROVAL] Skipping attendee email: No valid email found for attendee "${attName || attMemberNo || 'unknown'}"`);
               }
-            }
+            }));
           } else {
             // Individual conference registration (or single attendee fallback)
             let parsedActObj: any = null;
@@ -2189,6 +2197,7 @@ export async function POST(request: NextRequest) {
       } catch (mailDispatchErr) {
         console.error('❌ [SLIP APPROVAL EMAIL DISPATCH ERROR]:', mailDispatchErr);
       }
+      });
 
       // 6. Auto-generate / link receipt in receipts table for this approved transaction
       await createReceiptForApprovedSlip(slipId).catch((err) =>
@@ -2435,6 +2444,7 @@ export async function POST(request: NextRequest) {
       const resubmitUrl = `${baseUrl}/resubmit-slip/${resubmitToken}`;
 
       if (recipientEmail) {
+        after(async () => {
         try {
           const mailResult = await sendSlipRejectionEmail({
             to: recipientEmail,
@@ -2457,6 +2467,7 @@ export async function POST(request: NextRequest) {
         } catch (mailErr) {
           console.error(`[Reject Slip] Failed to send rejection email to ${recipientEmail}:`, mailErr);
         }
+        });
       } else {
         console.warn(`[Reject Slip] Could not find recipient email for slip ${slip.slip_id}, isCorporate: ${isCorporate}`);
       }
