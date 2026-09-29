@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { isPersonalEmail, personalEmailRequiredMessage } from '@/lib/validators/emailPolicy';
 import { sendRegistrationApprovedEmail, sendAttendeeSponsoredRegistrationEmail } from '@/lib/email';
 
 export async function POST(
@@ -71,6 +72,22 @@ export async function POST(
           { success: false, error: 'กรุณาระบุรายชื่อผู้ลงทะเบียนอย่างน้อย 1 ท่าน' },
           { status: 400 }
         );
+      }
+
+      // ห้ามใช้อีเมลองค์กรสำหรับผู้ลงทะเบียนที่ไม่ใช่สมาชิก (สมาชิกใช้อีเมลจากฐานข้อมูล)
+      for (let i = 0; i < attendees.length; i++) {
+        const att = attendees[i];
+        const attEmail = att?.email?.trim();
+        if (!att?.memberNo && attEmail && !isPersonalEmail(attEmail)) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `ผู้ลงทะเบียนลำดับที่ ${i + 1}: ${personalEmailRequiredMessage('th')}`,
+              code: 'PERSONAL_EMAIL_REQUIRED',
+            },
+            { status: 400 }
+          );
+        }
       }
 
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
@@ -508,6 +525,13 @@ export async function POST(
       if (!guestName || !guestEmail) {
         return NextResponse.json(
           { success: false, error: 'Full name and email are required for non-member registration' },
+          { status: 400 }
+        );
+      }
+
+      if (!isPersonalEmail(guestEmail)) {
+        return NextResponse.json(
+          { success: false, error: personalEmailRequiredMessage('th'), code: 'PERSONAL_EMAIL_REQUIRED' },
           { status: 400 }
         );
       }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { isPersonalEmail, personalEmailRequiredMessage } from '@/lib/validators/emailPolicy';
 import { CreateMemberInput } from '@/types/member';
 
 export async function POST(request: NextRequest) {
@@ -68,6 +69,18 @@ export async function POST(request: NextRequest) {
         const app = applicants[i];
         const appEmail = app.email?.trim()?.toLowerCase();
         if (appEmail) {
+          // 0. ห้ามใช้อีเมลองค์กร อนุญาตเฉพาะอีเมลส่วนตัว
+          if (!isPersonalEmail(appEmail)) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `ผู้สมัครลำดับที่ ${i + 1} (${app.full_name_th || 'ผู้สมัคร'}): ${personalEmailRequiredMessage('th')}`,
+                code: 'PERSONAL_EMAIL_REQUIRED',
+              },
+              { status: 400 }
+            );
+          }
+
           // 1. Check if applicant email matches coordinator/sponsor email submitted
           const coordEmail = groupContact?.coordinatorEmail?.trim()?.toLowerCase();
           if (coordEmail && appEmail === coordEmail) {
@@ -206,8 +219,15 @@ export async function POST(request: NextRequest) {
 
     const email = memberPayload.email?.trim()?.toLowerCase();
 
-    // 1. ตรวจสอบว่าไม่ใช่อีเมลเดียวกับบริษัทสปอนเซอร์
+    // 1. ตรวจสอบว่าเป็นอีเมลส่วนตัว และไม่ใช่อีเมลเดียวกับบริษัทสปอนเซอร์
     if (email) {
+      if (!isPersonalEmail(email)) {
+        return NextResponse.json(
+          { success: false, error: personalEmailRequiredMessage('th'), code: 'PERSONAL_EMAIL_REQUIRED' },
+          { status: 400 }
+        );
+      }
+
       const sponsorMatch = await (prisma as any).sponsors.findFirst({
         where: { contact_email: { equals: email, mode: 'insensitive' } },
         select: { name: true },

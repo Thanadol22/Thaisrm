@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { PositionSelect, isScientistPosition } from '@/components/PositionSelect';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
+import { isPersonalEmail, personalEmailRequiredMessage } from '@/lib/validators/emailPolicy';
 import { SponsorAuthModal, SponsorSessionData } from '@/components/SponsorAuthModal';
 import { ThaiDatePicker } from '@/components/ThaiDatePicker';
 import { useLanguage } from '@/context/LanguageContext';
@@ -466,7 +467,14 @@ export function SignupView({
         return;
       }
 
-      // 1.5.1 Check if email matches sponsor company / coordinator email
+      // 1.5.1 ห้ามใช้อีเมลองค์กร อนุญาตเฉพาะอีเมลส่วนตัว
+      if (!isPersonalEmail(cleanEmail)) {
+        setSubmitError(`${personalEmailRequiredMessage(lang === 'th' ? 'th' : 'en')} ${personLabel}`);
+        triggerPersonSwitch(i);
+        return;
+      }
+
+      // 1.5.2 Check if email matches sponsor company / coordinator email
       if (sponsorSession?.contactEmail && cleanEmail === sponsorSession.contactEmail.trim().toLowerCase()) {
         setSubmitError(
           lang === 'th'
@@ -1050,6 +1058,7 @@ export function SignupView({
                   label={t.signup.emailLabel}
                   placeholder={t.signup.emailPlaceholder}
                   required
+                  personalOnly
                 />
                 {sponsorSession?.contactEmail &&
                   currentApplicant.email.trim().toLowerCase() === sponsorSession.contactEmail.trim().toLowerCase() && (

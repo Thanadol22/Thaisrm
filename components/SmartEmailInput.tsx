@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Mail, Sparkles, Check, AlertCircle, Info } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { getEmailDomain, isPersonalEmail, personalEmailRequiredMessage } from '@/lib/validators/emailPolicy';
 
 export interface SmartEmailInputProps {
   value: string;
@@ -20,6 +21,8 @@ export interface SmartEmailInputProps {
   onBlur?: () => void;
   helperText?: React.ReactNode;
   showHelperText?: boolean;
+  /** แสดงคำเตือนเมื่อกรอกอีเมลองค์กร (อนุญาตเฉพาะอีเมลส่วนตัว) */
+  personalOnly?: boolean;
 }
 
 // โดเมนยอดนิยมมาตรฐาน
@@ -155,6 +158,7 @@ export function SmartEmailInput({
   onBlur,
   helperText,
   showHelperText = true,
+  personalOnly = false,
 }: SmartEmailInputProps) {
   const { lang } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
@@ -188,6 +192,14 @@ export function SmartEmailInput({
     }
     return null;
   }, [hasAt, prefix, domainQuery]);
+
+  // แจ้งเตือนอีเมลองค์กร เมื่อพิมพ์โดเมนครบแล้ว (มีจุด) และไม่ใช่กรณีพิมพ์ผิดที่ระบบแนะนำให้แก้
+  const showOrgEmailWarning = useMemo(() => {
+    if (!personalOnly || disabled || !hasAt || !prefix || typoCorrection) return false;
+    const domain = getEmailDomain(value);
+    if (!/\.[a-z]{2,}$/.test(domain)) return false;
+    return !isPersonalEmail(value);
+  }, [personalOnly, disabled, hasAt, prefix, typoCorrection, value]);
 
   // รายการโดเมนแนะนำตามตัวอักษรที่พิมพ์หลัง @
   const filteredSuggestions = useMemo(() => {
@@ -266,9 +278,11 @@ export function SmartEmailInput({
             {label || defaultLabel}
             {required && <span className="text-rose-500 font-bold">*</span>}
           </span>
-          <span className="text-[10px] text-slate-400 font-normal">
-            {lang === 'th' ? 'รองรับทุกโดเมน (Gmail, Hotmail, Outlook ฯลฯ)' : 'Supports all email providers'}
-          </span>
+          {personalOnly && (
+            <span className="text-[10px] text-slate-400 font-normal">
+              {lang === 'th' ? 'เฉพาะอีเมลส่วนตัว เช่น Gmail, Hotmail, Outlook' : 'Personal email only'}
+            </span>
+          )}
         </label>
       )}
 
@@ -341,6 +355,14 @@ export function SmartEmailInput({
           >
             {lang === 'th' ? 'แก้ไขเป็นอันนี้' : 'Apply'}
           </button>
+        </div>
+      )}
+
+      {/* คำเตือนอีเมลองค์กร */}
+      {showOrgEmailWarning && (
+        <div className="mt-1.5 p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-1.5 animate-fade-in font-medium">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+          <span>{personalEmailRequiredMessage(lang === 'th' ? 'th' : 'en')}</span>
         </div>
       )}
 

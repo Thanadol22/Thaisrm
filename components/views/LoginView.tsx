@@ -45,6 +45,7 @@ import { SponsorAuthModal, SponsorSessionData } from '@/components/SponsorAuthMo
 import { ProfileAndSponsorUpdateModal } from '@/components/ProfileAndSponsorUpdateModal';
 import { PositionSelect } from '@/components/PositionSelect';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
+import { isPersonalEmail, personalEmailRequiredMessage } from '@/lib/validators/emailPolicy';
 import { useLanguage } from '@/context/LanguageContext';
 import { parseGoogleName } from '@/lib/utils';
 
@@ -968,6 +969,14 @@ export function LoginView({
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(emailTrimmed)) {
         alert(lang === 'th' ? `รูปแบบอีเมลไม่ถูกต้อง ${personLabel}` : `Please enter a valid email address ${personLabel}`);
+        setActiveAttendeeIdx(i);
+        return;
+      }
+
+      // ห้ามใช้อีเมลองค์กร ยกเว้นอีเมลที่ดึงมาจากฐานข้อมูลสมาชิก
+      const emailFromMemberDb = att.memberCheckStatus === 'valid' && !!att.lockedFields?.includes('email');
+      if (!emailFromMemberDb && !isPersonalEmail(emailTrimmed)) {
+        alert(`${personalEmailRequiredMessage(lang === 'th' ? 'th' : 'en')} ${personLabel}`);
         setActiveAttendeeIdx(i);
         return;
       }
@@ -1912,6 +1921,7 @@ export function LoginView({
                             }
                             disabled={isMemberFieldLocked('email')}
                             required
+                            personalOnly
                           />
                         </div>
 
