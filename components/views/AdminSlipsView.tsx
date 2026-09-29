@@ -163,7 +163,13 @@ export const hasActualSlip = (s?: SlipRecord | null) =>
     !s.slipUrl.startsWith('TEMP_')
   );
 
-export const isRegisteredAsPayLater = (s?: SlipRecord | null) =>
+export const isPdfSlipUrl = (url?: string | null) => {
+  if (!url) return false;
+  if (url.startsWith('data:application/pdf')) return true;
+  return url.split('?')[0].toLowerCase().endsWith('.pdf');
+};
+
+export const isRegisteredAsPayLater =(s?: SlipRecord | null) =>
   Boolean(
     s?.isPayLater ||
     s?.slipUrl === 'PAY_LATER' ||
@@ -953,15 +959,25 @@ export function AdminSlipsView() {
                   title="คลิกเพื่อดูรูปสลิปขนาดใหญ่"
                 >
                   {slip.slipUrl && slip.slipUrl !== 'PAY_LATER' && slip.slipUrl !== 'pay_later_pending' && slip.slipUrl !== '/placeholder-slip.png' ? (
-                    <img
-                      src={slip.slipUrl}
-                      alt="Slip Thumbnail"
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLElement).style.display = 'none';
-                      }}
-                    />
-                  ) : slip.slipUrl === 'PAY_LATER' || slip.slipUrl === 'pay_later_pending' ? (
+                    isPdfSlipUrl(slip.slipUrl) ? (
+                      <div className="flex flex-col items-center justify-center w-full h-full bg-rose-50 text-rose-600">
+                        <FileText className="w-5 h-5" />
+                        <span className="text-[8px] font-black leading-tight mt-0.5">PDF</span>
+                      </div>
+                    ) : (
+                      <>
+                        <FileText className="w-5 h-5 text-slate-400 absolute" />
+                        <img
+                          src={slip.slipUrl}
+                          alt="Slip Thumbnail"
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200 relative bg-slate-100"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      </>
+                    )
+                  ) :slip.slipUrl === 'PAY_LATER' || slip.slipUrl === 'pay_later_pending' ? (
                     <div className="flex flex-col items-center justify-center p-1 text-center bg-amber-50 text-amber-700 w-full h-full">
                       <Clock className="w-4 h-4 text-amber-500 mb-0.5" />
                       <span className="text-[8px] font-bold leading-tight">ชำระภายหลัง</span>
@@ -1322,11 +1338,19 @@ export function AdminSlipsView() {
                 {/* Slip Viewport - Compact Display */}
                 {selectedSlip.slipUrl && selectedSlip.slipUrl !== 'PAY_LATER' && selectedSlip.slipUrl !== 'pay_later_pending' && selectedSlip.slipUrl !== '/placeholder-slip.png' ? (
                   <div className="bg-slate-950 rounded-2xl p-2.5 flex flex-col items-center justify-center border border-slate-800/80">
-                    <img
-                      src={selectedSlip.slipUrl}
-                      alt="Bank Slip"
-                      className="max-h-56 sm:max-h-64 w-auto object-contain rounded-lg shadow-md"
-                    />
+                    {isPdfSlipUrl(selectedSlip.slipUrl) ? (
+                      <iframe
+                        src={selectedSlip.slipUrl}
+                        title="Bank Slip PDF"
+                        className="w-full h-72 sm:h-80 rounded-lg bg-white"
+                      />
+                    ) : (
+                      <img
+                        src={selectedSlip.slipUrl}
+                        alt="Bank Slip"
+                        className="max-h-56 sm:max-h-64 w-auto object-contain rounded-lg shadow-md"
+                      />
+                    )}
                     <div className="mt-2 flex items-center gap-2">
                       <a
                         href={selectedSlip.slipUrl}
@@ -1335,7 +1359,11 @@ export function AdminSlipsView() {
                         className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold transition flex items-center gap-1 backdrop-blur-md cursor-pointer border border-white/15 active:scale-95"
                       >
                         <ExternalLink className="w-3 h-3 text-[#4ade80]" />
-                        <span>เปิดดูภาพขนาดเต็ม</span>
+                        <span>
+                          {isPdfSlipUrl(selectedSlip.slipUrl)
+                            ? (lang === 'th' ? 'เปิดไฟล์ PDF ในแท็บใหม่' : 'Open PDF in new tab')
+                            : (lang === 'th' ? 'เปิดดูภาพขนาดเต็ม' : 'Open full size')}
+                        </span>
                       </a>
                     </div>
                   </div>
