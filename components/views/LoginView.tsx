@@ -573,18 +573,53 @@ export function LoginView({
 
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch('/api/sponsors/portal/verify-member', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            memberNo: memNo,
-            meetingId: activeMeeting?.meeting_id,
-            // ── ยืนยันตัวตน sponsor (required) ──
-            sponsorId: sponsorSession?.sponsorId,
-            contactEmail: sponsorSession?.contactEmail,
-          }),
-        });
-        const data = await res.json();
+        let data: any;
+        if (sponsorSession?.sponsorId && sponsorSession?.contactEmail) {
+          const res = await fetch('/api/sponsors/portal/verify-member', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              memberNo: memNo,
+              meetingId: activeMeeting?.meeting_id,
+              // ── ยืนยันตัวตน sponsor (required) ──
+              sponsorId: sponsorSession.sponsorId,
+              contactEmail: sponsorSession.contactEmail,
+            }),
+          });
+          data = await res.json();
+        } else {
+          // ลงทะเบียนรายบุคคล (ไม่มี sponsor session) → ใช้ endpoint ตรวจสอบสมาชิกสาธารณะ
+          const res = await fetch(`/api/members/verify/${encodeURIComponent(memNo)}`);
+          const result = await res.json();
+          const m = result?.success ? result.data : null;
+          if (!m) {
+            data = { valid: false };
+          } else {
+            const status = (m.membership_status || '').toString();
+            const member = {
+              member_no: m.member_no,
+              fullNameTh: m.full_name_th || '',
+              fullNameEn: m.full_name_en || '',
+              email: m.email || '',
+              workplace: m.workplace || '',
+              position: m.position || m.job_category || '',
+              membership_status: status,
+            };
+            let alreadyRegistered = false;
+            if (activeMeeting?.meeting_id && m.member_no) {
+              const regRes = await fetch(
+                `/api/meetings/${encodeURIComponent(activeMeeting.meeting_id)}/check-registration?memberNo=${encodeURIComponent(m.member_no)}`
+              );
+              const regData = await regRes.json().catch(() => null);
+              alreadyRegistered = !!regData?.isRegistered;
+            }
+            data = alreadyRegistered
+              ? { valid: false, alreadyRegistered: true }
+              : !status || status.toLowerCase() === 'active'
+                ? { valid: true, member }
+                : { valid: false, member };
+          }
+        }
         if (data.valid && data.member) {
           setAttendees(prev => prev.map((att, idx) => {
             if (idx !== activeAttendeeIdx) return att;
@@ -680,7 +715,7 @@ export function LoginView({
     }, 450);
 
     return () => clearTimeout(timer);
-  }, [currentAttendee?.memberNo, activeAttendeeIdx, activeMeeting?.meeting_id]);
+  }, [currentAttendee?.memberNo, activeAttendeeIdx, activeMeeting?.meeting_id, sponsorSession?.sponsorId]);
 
   // Sponsor session auto-fills workplace
   useEffect(() => {
