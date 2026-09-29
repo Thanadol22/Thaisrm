@@ -53,8 +53,8 @@ const navItems: {
     },
     {
       id: 'sponsors',
-      labelTh: 'จัดการคูปอง & สิทธิ์ฟรี',
-      labelEn: 'Coupons & Free Quotas',
+      labelTh: 'จัดการข้อมูลบริษัทและคูปอง',
+      labelEn: 'Companies & Coupons',
       icon: Ticket,
       badgeKey: 'coupons',
     },
