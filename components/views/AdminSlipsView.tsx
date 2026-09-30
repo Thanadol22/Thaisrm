@@ -15,6 +15,9 @@ import {
   Building2,
   AlertCircle,
   RotateCw,
+  Pencil,
+  Monitor,
+  MapPin,
   UserCheck,
   UserX,
   ExternalLink,
@@ -1380,6 +1383,20 @@ export function AdminSlipsView() {
                       </span>
                     )}
 
+                    {/* Attendance Format Badge — รายบุคคลเท่านั้น (กลุ่มแสดงรายคนในหน้ารายละเอียด) */}
+                    {!slip.isMembershipRegistration && !slip.isGroupMembership && !slip.isGroupConference && !slip.ticketCode?.startsWith('GRP-') && !slip.ticketCode?.startsWith('MEMGRP') && (() => {
+                      const isOnline = (slip.attendanceType || slip.guestPayload?.attendanceType) === 'online';
+                      return (
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border flex items-center gap-1 shadow-2xs ${isOnline
+                          ? 'bg-violet-50 text-violet-800 border-violet-200'
+                          : 'bg-amber-50 text-amber-800 border-amber-200'
+                          }`}>
+                          {isOnline ? <Monitor className="w-3 h-3 text-violet-600" /> : <MapPin className="w-3 h-3 text-amber-600" />}
+                          <span>{isOnline ? (lang === 'th' ? 'ออนไลน์' : 'Online') : (lang === 'th' ? 'ออนไซต์' : 'Onsite')}</span>
+                        </span>
+                      );
+                    })()}
+
                     {/* Applied Coupon Badge (ข้อ 4) */}
                     {(slip.couponCode || slip.couponInfo?.code) && (
                       <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-800 px-2.5 py-0.5 rounded-md border border-emerald-300 flex items-center gap-1 shadow-2xs">
@@ -1564,18 +1581,14 @@ export function AdminSlipsView() {
                           e.stopPropagation();
                           openFormatEdit(slip, cardFormat);
                         }}
-                        className={`p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 border ${cardFormat === 'online'
+                        className={`p-2 rounded-xl text-xs font-bold transition flex items-center cursor-pointer shadow-2xs active:scale-95 border ${cardFormat === 'online'
                           ? 'bg-violet-50 hover:bg-violet-100 text-violet-800 border-violet-200'
                           : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
                           }`}
                         title={lang === 'th' ? 'แก้ไขรูปแบบการเข้าร่วม' : 'Edit attendance format'}
+                        aria-label={lang === 'th' ? 'แก้ไขรูปแบบการเข้าร่วม' : 'Edit attendance format'}
                       >
-                        <RotateCw className="w-4 h-4" />
-                        <span className="hidden sm:inline">
-                          {cardFormat === 'online'
-                            ? (lang === 'th' ? 'ออนไลน์' : 'Online')
-                            : (lang === 'th' ? 'ออนไซต์' : 'Onsite')}
-                        </span>
+                        <Pencil className="w-4 h-4" />
                       </button>
                     );
                   })()}
@@ -2131,7 +2144,7 @@ export function AdminSlipsView() {
                                                 {attFormat === 'online'
                                                   ? (lang === 'th' ? 'ออนไลน์' : 'Online')
                                                   : (lang === 'th' ? 'ออนไซต์' : 'Onsite')}
-                                                <RotateCw className="w-2.5 h-2.5" />
+                                                <Pencil className="w-2.5 h-2.5" />
                                               </button>
                                             );
                                           })()}
@@ -2359,7 +2372,7 @@ export function AdminSlipsView() {
                               onClick={() => openFormatEdit(selectedSlip, currentFormat)}
                               className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-bold text-[11px] transition cursor-pointer"
                             >
-                              <RotateCw className="w-3 h-3" />
+                              <Pencil className="w-3 h-3" />
                               {lang === 'th' ? 'แก้ไข' : 'Edit'}
                             </button>
                           )}
@@ -2910,7 +2923,7 @@ export function AdminSlipsView() {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 rounded-xl bg-sky-50 text-sky-600">
-                    <RotateCw className="w-5 h-5" />
+                    <Pencil className="w-5 h-5" />
                   </div>
                   <div>
                     <h3 className="text-base font-black text-slate-900">
