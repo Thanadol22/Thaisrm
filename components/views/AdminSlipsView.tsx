@@ -1832,6 +1832,45 @@ export function AdminSlipsView() {
                   </div>
                 )}
 
+                {/* Admin note on the slip (e.g. attendee list edited after approval) */}
+                {selectedSlip.groupPayload?.adminNote && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-amber-900 font-extrabold text-xs sm:text-sm">
+                      <FileText className="w-4 h-4 text-amber-600" />
+                      <span>{lang === 'th' ? 'บันทึกจากผู้ดูแลระบบ' : 'Admin Note'}</span>
+                    </div>
+                    <p className="text-xs text-amber-950 leading-relaxed whitespace-pre-line">
+                      {selectedSlip.groupPayload.adminNote}
+                    </p>
+                    {Array.isArray(selectedSlip.groupPayload.removedAttendees) &&
+                      selectedSlip.groupPayload.removedAttendees.length > 0 && (
+                        <details className="group">
+                          <summary className="cursor-pointer text-[11px] font-bold text-amber-800 hover:text-amber-950 select-none">
+                            {lang === 'th'
+                              ? `รายชื่อที่นำออก ${selectedSlip.groupPayload.removedAttendees.length} ท่าน`
+                              : `Removed attendees (${selectedSlip.groupPayload.removedAttendees.length})`}
+                          </summary>
+                          <ol className="mt-2 space-y-1 list-decimal pl-5 text-[11px] text-amber-950">
+                            {selectedSlip.groupPayload.removedAttendees.map((att: any, idx: number) => (
+                              <li key={idx}>
+                                <span className="font-bold">{att.nameTh || att.nameEn || '-'}</span>
+                                {att.memberNo ? (
+                                  <span className="text-amber-700">
+                                    {' '}
+                                    • {lang === 'th' ? 'สมาชิก' : 'Member'} {att.memberNo}
+                                  </span>
+                                ) : null}
+                                {typeof att.price === 'number' && (
+                                  <span className="text-amber-700"> • ฿{att.price.toLocaleString()}</span>
+                                )}
+                              </li>
+                            ))}
+                          </ol>
+                        </details>
+                      )}
+                  </div>
+                )}
+
                 {/* Membership Applicant Detailed Profile (If Membership Application) */}
                 {selectedSlip.isMembershipRegistration && selectedSlip.memberPayload ? (
                   <div className="bg-purple-50/70 border border-purple-200 rounded-2xl p-4 space-y-3">
