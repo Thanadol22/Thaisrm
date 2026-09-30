@@ -1555,6 +1555,31 @@ export function AdminSlipsView() {
                     </button>
                   )}
 
+                  {canEditFormat(slip) && !slip.isGroupConference && !slip.isMembershipRegistration && (() => {
+                    const cardFormat: 'onsite' | 'online' =
+                      (slip.attendanceType || slip.guestPayload?.attendanceType) === 'online' ? 'online' : 'onsite';
+                    return (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openFormatEdit(slip, cardFormat);
+                        }}
+                        className={`p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 border ${cardFormat === 'online'
+                          ? 'bg-violet-50 hover:bg-violet-100 text-violet-800 border-violet-200'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                          }`}
+                        title={lang === 'th' ? 'แก้ไขรูปแบบการเข้าร่วม' : 'Edit attendance format'}
+                      >
+                        <RotateCw className="w-4 h-4" />
+                        <span className="hidden sm:inline">
+                          {cardFormat === 'online'
+                            ? (lang === 'th' ? 'ออนไลน์' : 'Online')
+                            : (lang === 'th' ? 'ออนไซต์' : 'Onsite')}
+                        </span>
+                      </button>
+                    );
+                  })()}
+
                   {(slip.status === 'pending' || slip.status === 'approved') && (
                     <button
                       onClick={(e) => openAttachModal(slip, e)}
