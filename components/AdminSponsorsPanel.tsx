@@ -39,6 +39,7 @@ import {
   TrendingUp,
   UserCheck,
   FileCheck2,
+  KeyRound,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { CouponModal, CouponItem } from '@/components/CouponModal';
@@ -161,6 +162,13 @@ export default function AdminSponsorsPanel({
   const [sponsorToDelete, setSponsorToDelete] = useState<SponsorItem | null>(null);
   const [deletingSponsor, setDeletingSponsor] = useState(false);
 
+  // ─── Temporary Login Code (สำหรับบริษัทที่หาอีเมล OTP ไม่เจอ) ───
+  const [tempCodeSponsor, setTempCodeSponsor] = useState<SponsorItem | null>(null);
+  const [tempCodeResult, setTempCodeResult] = useState<{ code: string; email: string; expiresAt: string } | null>(null);
+  const [issuingTempCode, setIssuingTempCode] = useState(false);
+  const [tempCodeError, setTempCodeError] = useState('');
+  const [tempCodeCopied, setTempCodeCopied] = useState(false);
+
   // ─── Sponsor Coupon History Modal ───
   const [sponsorCouponHistoryOpen, setSponsorCouponHistoryOpen] = useState(false);
   const [selectedSponsorForCoupons, setSelectedSponsorForCoupons] = useState<{
@@ -196,6 +204,40 @@ export default function AdminSponsorsPanel({
       return 0;
     });
   }, [meetings]);
+
+  const handleOpenTempCode = (sponsor: SponsorItem) => {
+    setTempCodeSponsor(sponsor);
+    setTempCodeResult(null);
+    setTempCodeError('');
+    setTempCodeCopied(false);
+  };
+
+  const handleIssueTempCode = async () => {
+    if (!tempCodeSponsor) return;
+    setIssuingTempCode(true);
+    setTempCodeError('');
+    setTempCodeCopied(false);
+    try {
+      const res = await fetch(`/api/admin/sponsors/${tempCodeSponsor.id}/temp-code`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setTempCodeError(data.error || 'ไม่สามารถออกรหัสผ่านชั่วคราวได้');
+        return;
+      }
+      setTempCodeResult({ code: data.code, email: data.email, expiresAt: data.expiresAt });
+    } catch {
+      setTempCodeError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    } finally {
+      setIssuingTempCode(false);
+    }
+  };
+
+  const handleCopyTempCode = () => {
+    if (!tempCodeResult) return;
+    navigator.clipboard.writeText(tempCodeResult.code);
+    setTempCodeCopied(true);
+    setTimeout(() => setTempCodeCopied(false), 2000);
+  };
 
   // ─── Fetch Meetings List ───
   const fetchMeetings = useCallback(async () => {
@@ -1320,6 +1362,15 @@ export default function AdminSponsorsPanel({
                                 <History className="w-4 h-4 text-[#0026b3]" />
                               </button>
 
+                              {/* Temporary Login Code Button */}
+                              <button
+                                onClick={() => handleOpenTempCode(sp)}
+                                className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 transition-colors cursor-pointer shadow-2xs"
+                                title="ออกรหัสผ่านชั่วคราวสำหรับเข้าสู่ระบบ กรณีตัวแทนหาอีเมลไม่เจอ"
+                              >
+                                <KeyRound className="w-4 h-4 text-emerald-600" />
+                              </button>
+
                               {/* Edit Button */}
                               <button
                                 onClick={() => handleOpenEditSponsor(sp)}
@@ -1940,6 +1991,123 @@ export default function AdminSponsorsPanel({
                     {deletingSponsor ? 'กำลังลบ...' : 'ยืนยันลบข้อมูล'}
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* ======================================================= */}
+      {/* MODAL: ISSUE TEMPORARY LOGIN CODE */}
+      {/* ======================================================= */}
+      {mounted &&
+        tempCodeSponsor &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in">
+            <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full shadow-2xl overflow-hidden">
+              <div className="p-6 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm shrink-0">
+                      <KeyRound className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-slate-900">ออกรหัสผ่านชั่วคราว</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">{tempCodeSponsor.name}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTempCodeSponsor(null)}
+                    className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {!tempCodeResult ? (
+                  <>
+                    <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1.5">
+                      <p>
+                        ใช้กรณีตัวแทนบริษัทหาอีเมลรหัสผ่านชั่วคราวไม่เจอ ระบบจะสร้างรหัส 6 หลักให้ผู้ดูแลแจ้งตัวแทนทางโทรศัพท์หรือ LINE
+                      </p>
+                      <p>
+                        อีเมลที่ใช้เข้าสู่ระบบ: <span className="font-bold text-slate-900">{tempCodeSponsor.contact_email}</span>
+                      </p>
+                      <p className="text-amber-700">รหัสเดิมที่ยังไม่ได้ใช้ของอีเมลนี้จะถูกยกเลิก</p>
+                    </div>
+
+                    {tempCodeError && (
+                      <div className="p-3 rounded-2xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>{tempCodeError}</span>
+                      </div>
+                    )}
+
+                    <div className="pt-1 flex items-center justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setTempCodeSponsor(null)}
+                        disabled={issuingTempCode}
+                        className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer transition-colors"
+                      >
+                        ยกเลิก
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleIssueTempCode}
+                        disabled={issuingTempCode}
+                        className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        {issuingTempCode ? 'กำลังออกรหัส...' : 'ออกรหัสผ่านชั่วคราว'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-center space-y-2">
+                      <p className="text-xs text-emerald-700 font-semibold">รหัสผ่านชั่วคราว</p>
+                      <p className="text-4xl font-black tracking-[0.3em] text-emerald-800 font-mono">{tempCodeResult.code}</p>
+                      <button
+                        type="button"
+                        onClick={handleCopyTempCode}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-bold cursor-pointer transition-colors"
+                      >
+                        {tempCodeCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        {tempCodeCopied ? 'คัดลอกแล้ว' : 'คัดลอกรหัส'}
+                      </button>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1.5">
+                      <p>
+                        ให้ตัวแทนกรอกอีเมล <span className="font-bold text-slate-900">{tempCodeResult.email}</span> ที่หน้าเข้าสู่ระบบ แล้วใช้รหัสนี้แทนรหัสจากอีเมล
+                      </p>
+                      <p>
+                        ใช้ได้ 1 ครั้ง หมดอายุเวลา{' '}
+                        <span className="font-bold text-slate-900">
+                          {new Date(tempCodeResult.expiresAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.
+                        </span>
+                      </p>
+                      <p className="text-amber-700">หากตัวแทนกดขอรหัสทางอีเมลใหม่ รหัสนี้จะถูกยกเลิก</p>
+                    </div>
+                    <div className="pt-1 flex items-center justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={handleIssueTempCode}
+                        disabled={issuingTempCode}
+                        className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer transition-colors disabled:opacity-50"
+                      >
+                        {issuingTempCode ? 'กำลังออกรหัส...' : 'ออกรหัสใหม่'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTempCodeSponsor(null)}
+                        className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                      >
+                        เสร็จสิ้น
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>,
