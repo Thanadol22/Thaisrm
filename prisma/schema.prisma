@@ -106,6 +106,7 @@ model meetings {
   coupon_usages        coupon_usages[]
   sponsor_quotas       sponsor_quotas[]
   sponsor_group_members sponsor_group_members[]
+  online_meeting_links  online_meeting_links[]
 }
 
 model meeting_daily_checkins {
@@ -359,5 +360,23 @@ model sponsor_group_members {
   @@map("sponsor_group_members")
 }
 
+/// ลิงก์ประชุมออนไลน์เฉพาะบุคคล (1 ลิงก์ / คน / วัน) นำเข้าจากไฟล์
+model online_meeting_links {
+  id               BigInt    @id @default(autoincrement())
+  meeting_id       String    @db.VarChar(50)
+  link_date        DateTime  @db.Date
+  attendance_id    BigInt?
+  member_no        String?   @db.VarChar(20)
+  import_name      String    @db.VarChar(255)
+  import_email     String    @db.VarChar(255)
+  meeting_link     String    @db.VarChar(1000)
+  reminder_sent_at DateTime? @db.Timestamptz(6)
+  link_sent_at     DateTime? @db.Timestamptz(6)
+  created_at       DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
 
+  meeting          meetings  @relation(fields: [meeting_id], references: [meeting_id], onDelete: Cascade, onUpdate: NoAction)
 
+  @@unique([meeting_id, link_date, import_email], map: "uq_online_link_meeting_date_email")
+  @@index([meeting_id, link_date], map: "idx_online_link_meeting_date")
+}
