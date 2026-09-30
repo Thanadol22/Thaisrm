@@ -451,6 +451,17 @@ export function AdminSlipsView() {
   const [attachUploading, setAttachUploading] = useState(false);
   const [attachError, setAttachError] = useState('');
 
+  // Admin edit attendance format modal state (attendeeIndex = ผู้เข้าร่วมในสลิปกลุ่ม, null = รายบุคคล)
+  const [formatEditTarget, setFormatEditTarget] = useState<{
+    slip: SlipRecord;
+    attendeeIndex: number | null;
+    attendeeName: string;
+    current: 'onsite' | 'online';
+  } | null>(null);
+  const [formatEditValue, setFormatEditValue] = useState<'onsite' | 'online'>('onsite');
+  const [formatSaving, setFormatSaving] = useState(false);
+  const [formatError, setFormatError] = useState('');
+
   useEffect(() => {
     setMounted(true);
     fetchSlips();
@@ -564,6 +575,86 @@ export function AdminSlipsView() {
       setAttachError(err?.message || 'เกิดข้อผิดพลาดในการอัปโหลดสลิป');
     } finally {
       setAttachUploading(false);
+    }
+  };
+
+  const canEditFormat = (slip: SlipRecord) =>
+    (slip.status === 'pending' || slip.status === 'approved') &&
+    !slip.isGroupMembership &&
+    !slip.isFormatChange &&
+    !slip.isAddOn;
+
+  const openFormatEdit = (
+    slip: SlipRecord,
+    current: 'onsite' | 'online',
+    attendeeIndex: number | null = null,
+    attendeeName = ''
+  ) => {
+    setFormatEditTarget({ slip, attendeeIndex, attendeeName: attendeeName || slip.nameTh || '', current });
+    setFormatEditValue(current === 'online' ? 'onsite' : 'online');
+    setFormatError('');
+  };
+
+  const closeFormatEdit = () => {
+    if (formatSaving) return;
+    setFormatEditTarget(null);
+  };
+
+  const handleConfirmFormatEdit = async () => {
+    if (!formatEditTarget) return;
+    const { slip, attendeeIndex } = formatEditTarget;
+    try {
+      setFormatSaving(true);
+      setFormatError('');
+      const res = await fetch('/api/admin/slips/format', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slipId: slip.id, format: formatEditValue, attendeeIndex }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setFormatError(json.error || 'ไม่สามารถแก้ไขรูปแบบการเข้าร่วมได้');
+        return;
+      }
+      const format = json.data.format as 'onsite' | 'online';
+      const applyPatch = (s: SlipRecord): SlipRecord => {
+        if (s.id !== slip.id) return s;
+        if (attendeeIndex !== null && s.groupPayload?.attendees) {
+          return {
+            ...s,
+            groupPayload: {
+              ...s.groupPayload,
+              attendees: s.groupPayload.attendees.map((att: any, idx: number) =>
+                idx === attendeeIndex
+                  ? {
+                      ...att,
+                      attendanceType: format,
+                      ...(att.selectedFormat !== undefined ? { selectedFormat: format } : {}),
+                      ...(att.format !== undefined ? { format } : {}),
+                    }
+                  : att
+              ),
+            },
+          };
+        }
+        return {
+          ...s,
+          attendanceType: format,
+          guestPayload: s.guestPayload ? { ...s.guestPayload, attendanceType: format } : s.guestPayload,
+        };
+      };
+      setSlips((prev) => prev.map(applyPatch));
+      setSelectedSlip((prev) => (prev ? applyPatch(prev) : prev));
+      setFormatEditTarget(null);
+      showToast(
+        format === 'online'
+          ? '✓ เปลี่ยนเป็นเข้าร่วมแบบออนไลน์เรียบร้อยแล้ว'
+          : '✓ เปลี่ยนเป็นเข้าร่วม ณ สถานที่จัดงานเรียบร้อยแล้ว'
+      );
+    } catch (err: any) {
+      setFormatError(err?.message || 'เกิดข้อผิดพลาดในการแก้ไขรูปแบบการเข้าร่วม');
+    } finally {
+      setFormatSaving(false);
     }
   };
 
@@ -1953,11 +2044,31 @@ export function AdminSlipsView() {
                                           {(() => {
                                             let fmt = att.selectedFormat || att.attendanceType || att.format || att.selectedPackage;
                                             if (fmt === 'both') fmt = att.attendanceType || 'onsite';
-                                            if (!fmt) return null;
+                                            const editable = selectedSlip.isGroupConference && canEditFormat(selectedSlip);
+                                            if (!fmt && !editable) return null;
+                                            if (!editable) {
+                                              return (
+                                                <span className="text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs whitespace-nowrap">
+                                                  {fmt}
+                                                </span>
+                                              );
+                                            }
+                                            const attFormat: 'onsite' | 'online' = fmt === 'online' ? 'online' : 'onsite';
                                             return (
-                                              <span className="text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs whitespace-nowrap">
-                                                {fmt}
-                                              </span>
+                                              <button
+                                                type="button"
+                                                onClick={() => openFormatEdit(selectedSlip, attFormat, idx, attName)}
+                                                title={lang === 'th' ? 'แก้ไขรูปแบบการเข้าร่วม' : 'Edit attendance format'}
+                                                className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border shadow-2xs whitespace-nowrap transition cursor-pointer ${attFormat === 'online'
+                                                  ? 'bg-violet-50 text-violet-800 border-violet-200 hover:bg-violet-100'
+                                                  : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                                                  }`}
+                                              >
+                                                {attFormat === 'online'
+                                                  ? (lang === 'th' ? 'ออนไลน์' : 'Online')
+                                                  : (lang === 'th' ? 'ออนไซต์' : 'Onsite')}
+                                                <RotateCw className="w-2.5 h-2.5" />
+                                              </button>
                                             );
                                           })()}
                                         </div>
@@ -2163,20 +2274,35 @@ export function AdminSlipsView() {
                   )}
 
                   {/* รูปแบบการเข้าร่วม */}
-                  {(selectedSlip.attendanceType || selectedSlip.guestPayload?.attendanceType) && !selectedSlip.isGroupMembership && !selectedSlip.isGroupConference && !selectedSlip.ticketCode?.startsWith('GRP-') && !selectedSlip.ticketCode?.startsWith('MEMGRP') && (
-                    <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
-                      <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
-                        {lang === 'th' ? 'รูปแบบการเข้าร่วม' : 'Attendance Type'}
-                      </span>
-                      <span className="font-bold text-xs sm:text-sm text-slate-800 text-right">
-                        {(selectedSlip.attendanceType === 'onsite' || selectedSlip.guestPayload?.attendanceType === 'onsite')
-                          ? (lang === 'th' ? 'เข้าร่วม ณ สถานที่จัดงาน' : 'Onsite')
-                          : ((selectedSlip.attendanceType === 'online' || selectedSlip.guestPayload?.attendanceType === 'online')
+                  {(selectedSlip.attendanceType || selectedSlip.guestPayload?.attendanceType || (canEditFormat(selectedSlip) && !selectedSlip.isMembershipRegistration)) && !selectedSlip.isGroupMembership && !selectedSlip.isGroupConference && !selectedSlip.ticketCode?.startsWith('GRP-') && !selectedSlip.ticketCode?.startsWith('MEMGRP') && (() => {
+                    const rawFormat = selectedSlip.attendanceType || selectedSlip.guestPayload?.attendanceType;
+                    // ไม่มีข้อมูลถือว่าเป็นออนไซต์ ตามค่าเริ่มต้นของฟอร์มลงทะเบียน
+                    const currentFormat: 'onsite' | 'online' = rawFormat === 'online' ? 'online' : 'onsite';
+                    return (
+                      <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
+                        <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
+                          {lang === 'th' ? 'รูปแบบการเข้าร่วม' : 'Attendance Type'}
+                        </span>
+                        <span className="flex items-center justify-end gap-2 flex-wrap">
+                          <span className="font-bold text-xs sm:text-sm text-slate-800 text-right">
+                            {currentFormat === 'online'
                               ? (lang === 'th' ? 'เข้าร่วมแบบออนไลน์' : 'Online')
-                              : (selectedSlip.attendanceType || selectedSlip.guestPayload?.attendanceType))}
-                      </span>
-                    </div>
-                  )}
+                              : (lang === 'th' ? 'เข้าร่วม ณ สถานที่จัดงาน' : 'Onsite')}
+                          </span>
+                          {canEditFormat(selectedSlip) && (
+                            <button
+                              type="button"
+                              onClick={() => openFormatEdit(selectedSlip, currentFormat)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-bold text-[11px] transition cursor-pointer"
+                            >
+                              <RotateCw className="w-3 h-3" />
+                              {lang === 'th' ? 'แก้ไข' : 'Edit'}
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })()}
 
                   {/* สถานะผู้สมัคร */}
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
@@ -2702,6 +2828,110 @@ export function AdminSlipsView() {
                     <>
                       <Upload className="w-4 h-4" />
                       <span>{lang === 'th' ? 'ยืนยันแนบสลิป' : 'Attach Slip'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* Admin Edit Attendance Format Modal */}
+      {mounted &&
+        formatEditTarget &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+            <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-sky-50 text-sky-600">
+                    <RotateCw className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">
+                      {lang === 'th' ? 'แก้ไขรูปแบบการเข้าร่วม' : 'Edit Attendance Format'}
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      {formatEditTarget.attendeeName} · {formatEditTarget.slip.ticketCode || formatEditTarget.slip.id}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={closeFormatEdit}
+                  disabled={formatSaving}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 cursor-pointer disabled:opacity-50"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {(['onsite', 'online'] as const).map((opt) => {
+                  const active = formatEditValue === opt;
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setFormatEditValue(opt)}
+                      disabled={formatSaving}
+                      className={`p-3 rounded-2xl border-2 text-left transition cursor-pointer disabled:opacity-50 ${active
+                        ? 'border-sky-500 bg-sky-50 text-sky-900'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                        }`}
+                    >
+                      <span className="block text-sm font-black">
+                        {opt === 'online'
+                          ? (lang === 'th' ? 'ออนไลน์' : 'Online')
+                          : (lang === 'th' ? 'ออนไซต์' : 'Onsite')}
+                      </span>
+                      <span className="block text-[11px] text-slate-500 mt-0.5">
+                        {formatEditTarget.current === opt
+                          ? (lang === 'th' ? 'รูปแบบปัจจุบัน' : 'Current format')
+                          : opt === 'online'
+                            ? (lang === 'th' ? 'เข้าร่วมแบบออนไลน์' : 'Join online')
+                            : (lang === 'th' ? 'เข้าร่วม ณ สถานที่จัดงาน' : 'Join at the venue')}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <p className="text-[11px] text-slate-500">
+                {lang === 'th'
+                  ? 'แก้ไขโดยไม่คิดค่าธรรมเนียมและไม่เปลี่ยนสถานะการชำระเงิน หากส่งบัตรเข้างานไปแล้ว กรุณาส่งบัตรเข้างานใหม่ให้ผู้เข้าร่วม'
+                  : 'No fee is charged and the payment status is unchanged. If the ticket was already sent, please resend it.'}
+              </p>
+
+              {formatError && (
+                <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{formatError}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2.5 pt-1">
+                <button
+                  onClick={closeFormatEdit}
+                  disabled={formatSaving}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
+                >
+                  {lang === 'th' ? 'ยกเลิก' : 'Cancel'}
+                </button>
+                <button
+                  onClick={handleConfirmFormatEdit}
+                  disabled={formatSaving || formatEditValue === formatEditTarget.current}
+                  className="px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-black rounded-xl transition cursor-pointer shadow-md disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {formatSaving ? (
+                    <>
+                      <RotateCw className="w-4 h-4 animate-spin" />
+                      <span>{lang === 'th' ? 'กำลังบันทึก...' : 'Saving...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>{lang === 'th' ? 'ยืนยันการแก้ไข' : 'Save'}</span>
                     </>
                   )}
                 </button>

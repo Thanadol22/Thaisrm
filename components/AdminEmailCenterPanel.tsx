@@ -37,6 +37,7 @@ import { renderCustomBroadcastEmail } from '@/lib/emailTemplates/customTemplate'
 import { formatThaiDate, DailyProgramInfo, programSupportsFormat } from '@/lib/services/dailyCheckinService';
 
 import { statusLabelTh } from '@/lib/statusLabels';
+import { OnlineAttendeesPanel } from '@/components/admin/OnlineAttendeesPanel';
 interface MeetingOption {
   meeting_id: string;
   meeting_name: string;
@@ -48,7 +49,7 @@ interface AdminEmailCenterPanelProps {
   onShowToast?: (message: string) => void;
 }
 
-type EmailSubTab = 'tickets' | 'composer' | 'schedule' | 'smtp';
+type EmailSubTab = 'tickets' | 'online' | 'composer' | 'schedule' | 'smtp';
 
 export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProps) {
   const [activeSubTab, setActiveSubTab] = useState<EmailSubTab>('tickets');
@@ -701,6 +702,19 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
 
             <button
               type="button"
+              onClick={() => setActiveSubTab('online')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition cursor-pointer shrink-0 whitespace-nowrap ${
+                activeSubTab === 'online'
+                  ? 'bg-[#0026b3] text-white shadow-md shadow-blue-900/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <Video className="w-3.5 h-3.5" />
+              <span>ลิงก์ประชุมออนไลน์</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveSubTab('composer')}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition cursor-pointer shrink-0 whitespace-nowrap ${
                 activeSubTab === 'composer'
@@ -1262,6 +1276,16 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
             </div>
           </div>
         </div>
+      )}
+
+      {/* ─── TAB: ONLINE MEETING LINKS ─── */}
+      {activeSubTab === 'online' && (
+        <OnlineAttendeesPanel
+          meetings={meetings}
+          meetingId={selectedMeetingId}
+          onMeetingChange={setSelectedMeetingId}
+          notify={notify}
+        />
       )}
 
       {/* ─── TAB 2: CUSTOM EMAIL COMPOSER & BROADCAST ─── */}

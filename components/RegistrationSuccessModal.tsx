@@ -96,6 +96,10 @@ export function RegistrationSuccessModal({
               <Mail className="w-4 h-4 shrink-0 text-[#0026b3]" />
               <span>{t.successModal.emailSent}</span>
             </div>
+            <div className="flex items-center gap-2.5 text-emerald-800 font-semibold">
+              <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>{t.successModal.reviewNotice}</span>
+            </div>
             <div className="flex items-center gap-2.5 text-slate-600 font-medium">
               <QrCode className="w-4 h-4 shrink-0 text-emerald-600" />
               <span>{t.successModal.qrInstruction}</span>

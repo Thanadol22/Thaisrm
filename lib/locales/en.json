@@ -21,6 +21,7 @@
     "emailNotice": "Please check your inbox for registration details (QR Code will be sent before the event).",
     "emailSent": "Registration confirmation sent to email successfully",
     "qrInstruction": "The check-in QR Code will be sent to your email prior to the conference date",
+    "reviewNotice": "Your registration is pending admin review. The result will be sent to you by email.",
     "confirmButton": "OK",
     "proceedToPaymentButton": "Proceed to Payment"
   },
