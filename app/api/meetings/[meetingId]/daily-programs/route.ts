@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getMeetingProgramsAndDates, formatBangkokDate } from '@/lib/services/dailyCheckinService';
+import { getActivitySeatUsage } from '@/lib/services/activitySeatService';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,34 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'Meeting not found' }, { status: 404 });
     }
 
-    const programs = getMeetingProgramsAndDates(meeting);
+    const [seatUsage, registeredCount] = await Promise.all([
+      getActivitySeatUsage(meetingId, { meetingActivities: meeting.activities }),
+      prisma.meeting_attendances.count({
+        where: {
+          meeting_id: meetingId,
+          attendance_status: { in: ['Registered', 'Checked_In', 'Non-Member'] },
+        },
+      }),
+    ]);
+    const usageById = new Map(seatUsage.map((u) => [u.id, u]));
+
+    // แนบจำนวนที่นั่ง: เวิร์กช็อปใช้ที่นั่งรายกิจกรรม, การประชุมหลักใช้จำนวนผู้ลงทะเบียนเทียบกับที่นั่งของงาน
+    const meetingMaxSeats = Number(meeting.max_seats) || 0;
+    const programs = getMeetingProgramsAndDates(meeting).map((p) => {
+      const usage = p.activityId ? usageById.get(p.activityId) : undefined;
+      if (usage) {
+        return { ...p, maxSeats: usage.maxSeats, usedSeats: usage.used, remainingSeats: usage.remaining };
+      }
+      if (p.isMainProgram) {
+        return {
+          ...p,
+          maxSeats: meetingMaxSeats || undefined,
+          usedSeats: registeredCount,
+          remainingSeats: meetingMaxSeats > 0 ? Math.max(0, meetingMaxSeats - registeredCount) : undefined,
+        };
+      }
+      return p;
+    });
     const todayBangkok = formatBangkokDate();
 
     // Query daily stats for each date

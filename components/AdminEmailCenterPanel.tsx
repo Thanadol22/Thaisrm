@@ -34,7 +34,7 @@ import { ThaiDatePicker } from '@/components/ThaiDatePicker';
 import { renderAttendeeTicketEmail } from '@/lib/emailTemplates/attendeeQrTemplate';
 import { renderAttendeeOnlineEmail } from '@/lib/emailTemplates/attendeeOnlineTemplate';
 import { renderCustomBroadcastEmail } from '@/lib/emailTemplates/customTemplate';
-import { formatThaiDate, DailyProgramInfo } from '@/lib/services/dailyCheckinService';
+import { formatThaiDate, DailyProgramInfo, programSupportsFormat } from '@/lib/services/dailyCheckinService';
 
 import { statusLabelTh } from '@/lib/statusLabels';
 interface MeetingOption {
@@ -205,6 +205,18 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
     }
   };
 
+  // รูปแบบที่ส่งได้: ทุกรายการที่เลือกต้องรองรับรูปแบบนั้น (เช่น เวิร์กช็อป Onsite อย่างเดียว ส่งแบบ Online ไม่ได้)
+  const formatAvailability = React.useMemo(() => {
+    if (!isDailyPassMode || selectedPrograms.length === 0) {
+      return { onsite: true, online: true, anyOnline: true };
+    }
+    return {
+      onsite: selectedPrograms.every((p) => programSupportsFormat(p.format, 'onsite')),
+      online: selectedPrograms.every((p) => programSupportsFormat(p.format, 'online')),
+      anyOnline: selectedPrograms.some((p) => programSupportsFormat(p.format, 'online')),
+    };
+  }, [isDailyPassMode, selectedPrograms]);
+
   // Auto-sync format filter based on selected programs format
   useEffect(() => {
     if (isDailyPassMode && selectedPrograms.length > 0) {
@@ -264,6 +276,11 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
       } else {
         modeDesc = `แบบ QR รายวัน (${selectedPrograms.length} รายการ: ${selectedPrograms.map((p) => `${p.programName} [${formatThaiDate(p.date, true)}]`).join(', ')})`;
       }
+    }
+
+    if (formatFilter !== 'all' && !formatAvailability[formatFilter]) {
+      notify(`รายการที่เลือกไม่มีรูปแบบ${formatFilter === 'online' ? 'ออนไลน์' : ' Onsite'} กรุณาเลือกรูปแบบการเข้าร่วมใหม่`);
+      return;
     }
 
     const formatDesc = formatFilter === 'online'
@@ -902,7 +919,19 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
                                   {prog.format === 'online' ? '💻 Online' : prog.format === 'onsite' ? '🏢 Onsite' : '🌐 Onsite & Online'}
                                 </span>
                                 {prog.maxSeats ? (
-                                  <span className="text-slate-400">• {prog.maxSeats} ที่นั่ง</span>
+                                  <span
+                                    className={
+                                      typeof prog.remainingSeats === 'number' && prog.remainingSeats <= 0
+                                        ? 'text-rose-600'
+                                        : 'text-slate-400'
+                                    }
+                                  >
+                                    • {typeof prog.usedSeats === 'number' ? `${prog.usedSeats}/${prog.maxSeats}` : prog.maxSeats} ที่นั่ง
+                                    {typeof prog.remainingSeats === 'number' &&
+                                      (prog.remainingSeats > 0 ? ` (เหลือ ${prog.remainingSeats})` : ' (เต็ม)')}
+                                  </span>
+                                ) : typeof prog.usedSeats === 'number' ? (
+                                  <span className="text-slate-400">• ลงทะเบียน {prog.usedSeats} คน</span>
                                 ) : null}
                               </div>
 
@@ -965,25 +994,34 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
                   { id: 'all', label: '🌐 ทั้งหมด', desc: 'Onsite ได้ QR / Online ได้ลิงก์' },
                   { id: 'onsite', label: '🏢 เฉพาะ Onsite', desc: 'ส่งบัตร QR Code สแกนหน้างาน' },
                   { id: 'online', label: '💻 เฉพาะ Online', desc: 'ส่งลิงก์รับชม (ไม่มี QR Code)' },
-                ].map((fmt) => (
-                  <button
-                    key={fmt.id}
-                    type="button"
-                    onClick={() => setFormatFilter(fmt.id as any)}
-                    className={`p-3 rounded-xl text-left border transition cursor-pointer ${
-                      formatFilter === fmt.id
-                        ? 'bg-blue-50 border-[#0026b3] text-[#0026b3] ring-1 ring-[#0026b3]'
-                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <div className="text-xs font-black">{fmt.label}</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">{fmt.desc}</div>
-                  </button>
-                ))}
+                ].map((fmt) => {
+                  const isDisabled = fmt.id !== 'all' && !formatAvailability[fmt.id as 'onsite' | 'online'];
+                  return (
+                    <button
+                      key={fmt.id}
+                      type="button"
+                      disabled={isDisabled}
+                      onClick={() => setFormatFilter(fmt.id as any)}
+                      title={isDisabled ? 'รายการที่เลือกไม่ได้จัดในรูปแบบนี้' : undefined}
+                      className={`p-3 rounded-xl text-left border transition ${
+                        isDisabled
+                          ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
+                          : formatFilter === fmt.id
+                          ? 'bg-blue-50 border-[#0026b3] text-[#0026b3] ring-1 ring-[#0026b3] cursor-pointer'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer'
+                      }`}
+                    >
+                      <div className="text-xs font-black">{fmt.label}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        {isDisabled ? 'รายการที่เลือกไม่ได้จัดในรูปแบบนี้' : fmt.desc}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Online Meeting Configuration Details (Visible when Online or All is selected) */}
-              {(formatFilter === 'online' || formatFilter === 'all') && (
+              {(formatFilter === 'online' || formatFilter === 'all') && formatAvailability.anyOnline && (
                 <div className="mt-3 pt-3 border-t border-slate-200/80 space-y-3 bg-white p-3.5 rounded-xl border border-sky-100 shadow-2xs">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                     <span className="text-xs font-black text-sky-900 flex items-center gap-1.5">

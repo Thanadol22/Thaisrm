@@ -7,6 +7,7 @@ import {
   formatBangkokDate,
   formatThaiDate,
   getMeetingProgramsAndDates,
+  programSupportsFormat,
 } from '@/lib/services/dailyCheckinService';
 
 export const dynamic = 'force-dynamic';
@@ -92,6 +93,27 @@ export async function POST(req: NextRequest) {
         targetDate: formatBangkokDate(meeting.meeting_date),
         programName: undefined,
       });
+    }
+
+    // 2.1 ตรวจรูปแบบการเข้าร่วมให้ตรงกับที่รายการกำหนด (เช่น เวิร์กช็อป Onsite อย่างเดียวส่งแบบ Online ไม่ได้)
+    const meetingPrograms = isDailyMode ? getMeetingProgramsAndDates(meeting) : [];
+    const findProgramFormat = (prog: { targetDate: string; programName?: string }) => {
+      const sameDate = meetingPrograms.filter((p) => p.date === prog.targetDate);
+      const matched = sameDate.find((p) => p.programName === prog.programName) || (sameDate.length === 1 ? sameDate[0] : undefined);
+      return matched?.format;
+    };
+    if (isDailyMode && (formatFilter === 'onsite' || formatFilter === 'online')) {
+      const unsupported = programsToProcess.filter((p) => !programSupportsFormat(findProgramFormat(p), formatFilter));
+      if (unsupported.length > 0) {
+        const label = formatFilter === 'online' ? 'ออนไลน์' : 'Onsite';
+        return NextResponse.json(
+          {
+            success: false,
+            error: `รายการต่อไปนี้ไม่มีรูปแบบ${label}: ${unsupported.map((p) => p.programName || p.targetDate).join(', ')}`,
+          },
+          { status: 400 }
+        );
+      }
     }
 
     let totalRecipientsCount = 0;
@@ -203,6 +225,11 @@ export async function POST(req: NextRequest) {
       // Apply formatFilter (all | onsite | online)
       if (formatFilter && formatFilter !== 'all') {
         targetList = targetList.filter((t) => t.format === formatFilter);
+      }
+      // ไม่ส่งอีเมลรูปแบบที่รายการไม่ได้จัด
+      if (isDailyMode) {
+        const progFormat = findProgramFormat(prog);
+        targetList = targetList.filter((t) => programSupportsFormat(progFormat, t.format));
       }
 
       totalRecipientsCount += targetList.length;

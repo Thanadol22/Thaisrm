@@ -3,6 +3,7 @@ import { isAddOnPayload } from '@/lib/services/registrationAddOnService';
 
 export interface DailyProgramInfo {
   id?: string;
+  activityId?: string;
   date: string; // YYYY-MM-DD
   programName: string;
   isMainProgram: boolean;
@@ -10,8 +11,18 @@ export interface DailyProgramInfo {
   format?: string;
   time?: string;
   maxSeats?: number;
+  usedSeats?: number;
+  remainingSeats?: number;
   memberPrice?: number;
   nonMemberPrice?: number;
+}
+
+/** รูปแบบการเข้าร่วมที่รายการรองรับ ('both' / 'hybrid' / ไม่ระบุ = รองรับทั้งสองแบบ) */
+export function programSupportsFormat(programFormat: string | undefined, format: 'onsite' | 'online'): boolean {
+  const f = (programFormat || 'both').toLowerCase();
+  if (f === 'onsite') return format === 'onsite';
+  if (f === 'online') return format === 'online';
+  return true;
 }
 
 const THAI_MONTHS: Record<string, number> = {
@@ -147,6 +158,7 @@ export function getMeetingProgramsAndDates(meeting: {
           const actIso = `${yearStr}-${monthStr}-${String(dayNum).padStart(2, '0')}`;
           programs.push({
             id: act.id ? `${act.id}-${dayKey}` : undefined,
+            activityId: act.id ? String(act.id) : undefined,
             date: actIso,
             programName: act.name || act.title || (act.type === 'main' ? 'Main Program' : 'Workshop'),
             isMainProgram: act.type === 'main',
@@ -163,6 +175,7 @@ export function getMeetingProgramsAndDates(meeting: {
       if (actIso) {
         programs.push({
           id: act.id,
+          activityId: act.id ? String(act.id) : undefined,
           date: actIso,
           programName: act.name || act.title || (act.type === 'main' ? 'Main Program' : 'Workshop'),
           isMainProgram: act.type === 'main',
