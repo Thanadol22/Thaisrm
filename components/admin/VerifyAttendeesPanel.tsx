@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { AttendeeItem, MeetingItem } from './types';
 import { PaginationControls } from '@/components/PaginationControls';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
+import { PositionSelect, POSITION_CATEGORY_OPTIONS } from '@/components/PositionSelect';
 import {
   UserCheck,
   PlusCircle,
@@ -26,6 +27,9 @@ import {
 } from 'lucide-react';
 
 /* ─── 5. VERIFY ATTENDEES PANEL (Light Theme with Round Filter) ───────────── */
+
+// ประเภทสมาชิกเดียวกับที่ระบบใช้แสดงผลผู้เข้าร่วม (สามัญ / ตลอดชีพ / บุคคลทั่วไป)
+const WALK_IN_MEMBER_TYPES = ['บุคคลทั่วไป', 'สมาชิกสามัญ', 'สมาชิกตลอดชีพ'];
 
 export interface VerifyAttendeesPanelProps {
   attendees: AttendeeItem[];
@@ -103,11 +107,42 @@ export function VerifyAttendeesPanel({
     email: '',
     workplace: '',
     meetingId: meetings[0]?.id || '',
-    memberType: 'แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)',
-    ticketType: 'TSRM Congress Full Pass',
+    memberType: WALK_IN_MEMBER_TYPES[0],
+    position: '',
+    positionOther: '',
+    selectedPrograms: [] as string[],
     paymentStatus: 'paid' as 'paid' | 'pending',
     checkInNow: true,
   });
+
+  const walkInMeeting = meetings.find((m) => m.id === walkInData.meetingId) || meetings[0];
+  const walkInActivities = useMemo<any[]>(
+    () => (Array.isArray(walkInMeeting?.activities) ? walkInMeeting.activities.filter((a: any) => a && a.id) : []),
+    [walkInMeeting]
+  );
+  const walkInIsMember = walkInData.memberType !== 'บุคคลทั่วไป';
+  const getWalkInPrice = (act: any) => {
+    const mPrice = typeof act.memberPrice === 'number' ? act.memberPrice : 0;
+    const nonMPrice = typeof act.nonMemberPrice === 'number' ? act.nonMemberPrice : mPrice;
+    return walkInIsMember ? mPrice : nonMPrice;
+  };
+  const walkInSelectedActs = walkInActivities.filter((a) => walkInData.selectedPrograms.includes(String(a.id)));
+  const walkInTotal = walkInSelectedActs.reduce((sum, a) => sum + getWalkInPrice(a), 0);
+
+  // เปลี่ยนรอบการประชุม: เลือกหลักสูตรหลักของรอบนั้นไว้ให้ก่อน
+  const walkInMainId = walkInActivities.find((a) => a.type === 'main' || a.id === 'main')?.id;
+  useEffect(() => {
+    setWalkInData((prev) => ({ ...prev, selectedPrograms: walkInMainId ? [String(walkInMainId)] : [] }));
+  }, [walkInMeeting?.id, walkInMainId]);
+
+  const toggleWalkInProgram = (id: string) => {
+    setWalkInData((prev) => ({
+      ...prev,
+      selectedPrograms: prev.selectedPrograms.includes(id)
+        ? prev.selectedPrograms.filter((p) => p !== id)
+        : [...prev.selectedPrograms, id],
+    }));
+  };
 
   const handleCreateWalkIn = (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,8 +150,25 @@ export function VerifyAttendeesPanel({
       alert('กรุณากรอกชื่อและเบอร์โทรศัพท์');
       return;
     }
+    if (!walkInData.position) {
+      alert('กรุณาเลือกตำแหน่ง');
+      return;
+    }
+    const isOtherPosition = walkInData.position === '0 อื่นๆ';
+    if (isOtherPosition && !walkInData.positionOther.trim()) {
+      alert('กรุณาระบุตำแหน่งอื่นๆ');
+      return;
+    }
+    if (walkInActivities.length > 0 && walkInSelectedActs.length === 0) {
+      alert('กรุณาเลือกโปรแกรมที่ต้องการเข้าร่วมอย่างน้อย 1 รายการ');
+      return;
+    }
 
-    const meeting = meetings.find((m) => m.id === walkInData.meetingId) || meetings[0];
+    const meeting = walkInMeeting;
+    const programs = walkInSelectedActs.map((a) => ({ id: String(a.id), name: String(a.name || a.id) }));
+    const position = isOtherPosition
+      ? walkInData.positionOther.trim()
+      : POSITION_CATEGORY_OPTIONS.find((o) => o.value === walkInData.position)?.labelTh || walkInData.position;
     const newAttendee: AttendeeItem = {
       id: `ATT-${Date.now()}`,
       code: Math.floor(100100 + Math.random() * 9000).toString(),
@@ -127,7 +179,10 @@ export function VerifyAttendeesPanel({
       phone: walkInData.phone,
       workplace: walkInData.workplace || 'โรงพยาบาล/คลินิก',
       memberType: walkInData.memberType,
-      ticketType: walkInData.ticketType,
+      ticketType: programs.map((p) => p.name).join(', ') || walkInData.memberType,
+      position,
+      programs,
+      amount: walkInTotal,
       ticketCode: `TSRM-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       meetingId: meeting?.id || '',
       meetingTitle: meeting?.titleTh || 'การประชุมวิชาการประจำปี TSRM Congress 2026',
@@ -139,19 +194,21 @@ export function VerifyAttendeesPanel({
 
     onAddAttendee?.(newAttendee);
     setIsAddModalOpen(false);
-    setWalkInData({
+    setWalkInData((prev) => ({
+      ...prev,
       nameTh: '',
       nameEn: '',
       id4Digits: '',
       phone: '',
       email: '',
       workplace: '',
-      meetingId: meetings[0]?.id || '',
-      memberType: 'แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)',
-      ticketType: 'TSRM Congress Full Pass',
+      memberType: WALK_IN_MEMBER_TYPES[0],
+      position: '',
+      positionOther: '',
+      selectedPrograms: walkInMainId ? [String(walkInMainId)] : [],
       paymentStatus: 'paid',
       checkInNow: true,
-    });
+    }));
   };
 
   const handleSaveStatusChange = async (e: React.FormEvent) => {
@@ -1218,34 +1275,117 @@ export function VerifyAttendeesPanel({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">ประเภทสมาชิก</label>
-                    <select
-                      value={walkInData.memberType}
-                      onChange={(e) => setWalkInData({ ...walkInData, memberType: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 font-medium focus:bg-white focus:outline-none focus:border-[#0026b3]"
-                    >
-                      <option value="แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)">แพทย์เวชศาสตร์การเจริญพันธุ์ (RM)</option>
-                      <option value="สูตินรีแพทย์ทั่วไป (OB-GYN)">สูตินรีแพทย์ทั่วไป (OB-GYN)</option>
-                      <option value="นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อน">นักวิทยาศาสตร์เพาะเลี้ยงตัวอ่อน</option>
-                      <option value="พยาบาลและบุคลากรทางการแพทย์">พยาบาลและบุคลากรทางการแพทย์</option>
-                      <option value="สมาชิกทั่วไป">สมาชิกทั่วไป</option>
-                    </select>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">ประเภทสมาชิก</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {WALK_IN_MEMBER_TYPES.map((type) => {
+                      const isActive = walkInData.memberType === type;
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setWalkInData({ ...walkInData, memberType: type })}
+                          className={`px-2 py-2 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                            isActive
+                              ? 'bg-blue-50 border-[#0026b3] text-[#0026b3] ring-1 ring-[#0026b3]/30'
+                              : 'bg-slate-50 border-slate-300 text-slate-600 hover:border-slate-400'
+                          }`}
+                        >
+                          {type}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">ประเภทบัตร</label>
-                    <select
-                      value={walkInData.ticketType}
-                      onChange={(e) => setWalkInData({ ...walkInData, ticketType: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 font-medium focus:bg-white focus:outline-none focus:border-[#0026b3]"
-                    >
-                      <option value="TSRM Congress Full Pass">TSRM Congress Full Pass (3,500 บาท)</option>
-                      <option value="Special Workshop: Hands-on Embryo">Special Workshop (5,000 บาท)</option>
-                      <option value="Single Day Pass: Day 1">Single Day Pass: Day 1 (2,000 บาท)</option>
-                      <option value="Single Day Pass: Day 2">Single Day Pass: Day 2 (2,000 บาท)</option>
-                    </select>
+                </div>
+
+                <PositionSelect
+                  value={walkInData.position}
+                  onChange={(val) => setWalkInData({ ...walkInData, position: val })}
+                  label="ตำแหน่ง"
+                  required
+                  showOtherInput={false}
+                />
+                {walkInData.position === '0 อื่นๆ' && (
+                  <input
+                    type="text"
+                    value={walkInData.positionOther}
+                    onChange={(e) => setWalkInData({ ...walkInData, positionOther: e.target.value })}
+                    placeholder="โปรดระบุตำแหน่งอื่นๆ..."
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:bg-white focus:outline-none focus:border-[#0026b3]"
+                  />
+                )}
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-slate-700">
+                      โปรแกรมที่เข้าร่วม {walkInActivities.length > 0 && <span className="text-rose-500">*</span>}
+                    </label>
+                    {walkInActivities.length > 0 && (
+                      <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                        เลือกแล้ว {walkInSelectedActs.length} รายการ
+                      </span>
+                    )}
                   </div>
+
+                  {walkInActivities.length === 0 ? (
+                    <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
+                      รอบการประชุมนี้ยังไม่มีรายการโปรแกรม
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2">
+                      {walkInActivities.map((act) => {
+                        const id = String(act.id);
+                        const isSelected = walkInData.selectedPrograms.includes(id);
+                        const price = getWalkInPrice(act);
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => toggleWalkInProgram(id)}
+                            className={`p-3 rounded-xl border text-left transition flex items-center justify-between gap-3 cursor-pointer ${
+                              isSelected
+                                ? 'bg-blue-50/90 border-[#0026b3] ring-1 ring-[#0026b3]/30'
+                                : 'bg-slate-50/80 border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                <span
+                                  className={`text-[10px] font-black px-2 py-0.5 rounded shrink-0 ${
+                                    isSelected
+                                      ? act.type === 'main'
+                                        ? 'bg-[#0026b3] text-white'
+                                        : 'bg-indigo-600 text-white'
+                                      : 'bg-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  {act.type === 'main' ? 'หลักสูตรหลัก' : 'เวิร์กช็อป'}
+                                </span>
+                                {act.date && <span className="text-[11px] text-slate-500 truncate">{act.date}</span>}
+                              </div>
+                              <p className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">{act.name || id}</p>
+                            </div>
+                            <div className="flex items-center gap-2.5 shrink-0">
+                              <span className="text-xs font-extrabold text-slate-700">
+                                {price > 0 ? `${price.toLocaleString()} บาท` : 'ฟรี'}
+                              </span>
+                              <div
+                                className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                                  isSelected ? 'bg-[#0026b3] text-white' : 'border border-slate-300 bg-white'
+                                }`}
+                              >
+                                {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                      <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 border border-slate-200">
+                        <span className="text-xs font-bold text-slate-600">ยอดชำระรวม</span>
+                        <span className="text-sm font-extrabold text-[#0026b3]">{walkInTotal.toLocaleString()} บาท</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">

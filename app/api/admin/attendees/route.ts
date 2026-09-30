@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 import { isAddOnPayload } from '@/lib/services/registrationAddOnService';
-import { assertSeatsForReactivatedSlip, SeatUnavailableError } from '@/lib/services/activitySeatService';
+import {
+  assertSeatsForReactivatedSlip,
+  countSlipSeatClaims,
+  lockAndAssertSeats,
+  SeatUnavailableError,
+} from '@/lib/services/activitySeatService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -514,6 +519,8 @@ export async function POST(request: NextRequest) {
       paymentStatus = 'paid',
       checkInNow = true,
       amount = 3500,
+      programs = [],
+      position,
     } = body;
 
     if (!meetingId || !nameTh || !phone) {
@@ -523,43 +530,64 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Create meeting_attendances record
-    const attendance = await (prisma as any).meeting_attendances.create({
-      data: {
-        meeting_id: meetingId,
-        attendee_name: nameTh,
-        attendee_email: email || `${phone}@walkin.tsrm.org`,
-        attendee_phone: phone,
-        workplace: workplace || 'โรงพยาบาล/คลินิก',
-        attendance_status: checkInNow ? 'Attended' : 'Registered',
-        checkin_time: checkInNow ? new Date() : null,
-      },
-    });
+    const activities = (Array.isArray(programs) ? programs : [])
+      .map((p: any) => ({ id: String(p?.id ?? ''), name: String(p?.name ?? '') }))
+      .filter((p: AttendeeProgram) => p.id || p.name);
+    const selectedActivities =
+      activities.length > 0 || position ? { activities, position: position || null, memberType, ticketType } : null;
+    const parsedAmount = Number(amount);
+    const slipAmount = Number.isFinite(parsedAmount) && parsedAmount >= 0 ? parsedAmount : 3500;
+    const createSlip = paymentStatus === 'paid' && Boolean((prisma as any).payment_slips);
 
-    const ticketCode = `TSRM-WALKIN-${attendance.attendance_id}`;
+    const { attendance, ticketCode } = await prisma.$transaction(async (tx: any) => {
+      // ตรวจที่นั่งเวิร์กช็อปที่จำกัดจำนวน (นับเฉพาะรายการที่มีสลิป)
+      if (createSlip && selectedActivities) {
+        const meeting = await tx.meetings.findUnique({ where: { meeting_id: meetingId }, select: { activities: true } });
+        const requested = countSlipSeatClaims({ selected_activities: selectedActivities }, meeting?.activities);
+        await lockAndAssertSeats(tx, meetingId, requested, { meetingActivities: meeting?.activities });
+      }
 
-    // 2. Create payment slip record if paid
-    if (paymentStatus === 'paid' && (prisma as any).payment_slips) {
-      await (prisma as any).payment_slips.create({
+      // 1. Create meeting_attendances record
+      const created = await tx.meeting_attendances.create({
         data: {
           meeting_id: meetingId,
-          guest_name: nameTh,
-          guest_email: email || `${phone}@walkin.tsrm.org`,
-          guest_phone: phone,
-          guest_workplace: workplace || 'โรงพยาบาล/คลินิก',
-          is_member: false,
-          ticket_code: ticketCode,
-          amount: Number(amount) || 3500,
-          bank: 'เงินสด / Walk-in Counter',
-          transfer_date: new Date().toLocaleDateString('th-TH'),
-          transfer_time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-          slip_url: '/walkin-receipt.png',
-          status: 'approved',
-          reviewed_by: 'Admin Walk-in',
-          reviewed_at: new Date(),
+          attendee_name: nameTh,
+          attendee_email: email || `${phone}@walkin.tsrm.org`,
+          attendee_phone: phone,
+          workplace: workplace || 'โรงพยาบาล/คลินิก',
+          attendance_status: checkInNow ? 'Attended' : 'Registered',
+          checkin_time: checkInNow ? new Date() : null,
         },
       });
-    }
+
+      const code = `TSRM-WALKIN-${created.attendance_id}`;
+
+      // 2. Create payment slip record if paid
+      if (createSlip) {
+        await tx.payment_slips.create({
+          data: {
+            meeting_id: meetingId,
+            guest_name: nameTh,
+            guest_email: email || `${phone}@walkin.tsrm.org`,
+            guest_phone: phone,
+            guest_workplace: workplace || 'โรงพยาบาล/คลินิก',
+            is_member: false,
+            ticket_code: code,
+            amount: slipAmount,
+            selected_activities: selectedActivities ?? undefined,
+            bank: 'เงินสด / Walk-in Counter',
+            transfer_date: new Date().toLocaleDateString('th-TH'),
+            transfer_time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+            slip_url: '/walkin-receipt.png',
+            status: 'approved',
+            reviewed_by: 'Admin Walk-in',
+            reviewed_at: new Date(),
+          },
+        });
+      }
+
+      return { attendance: created, ticketCode: code };
+    });
 
     return NextResponse.json({
       success: true,
@@ -570,6 +598,12 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
+    if (error instanceof SeatUnavailableError) {
+      return NextResponse.json(
+        { success: false, error: error.message, code: 'SEATS_UNAVAILABLE' },
+        { status: 409 }
+      );
+    }
     console.error('Error creating walk-in attendee:', error);
     return NextResponse.json(
       { success: false, error: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' },

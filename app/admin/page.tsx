@@ -482,6 +482,9 @@ export default function AdminPage() {
           workplace: newAttendee.workplace,
           memberType: newAttendee.memberType,
           ticketType: newAttendee.ticketType,
+          position: newAttendee.position,
+          programs: newAttendee.programs || [],
+          amount: newAttendee.amount,
           paymentStatus: newAttendee.paymentStatus,
           checkInNow: newAttendee.checkInStatus === 'checked_in',
         }),
@@ -493,9 +496,13 @@ export default function AdminPage() {
         fetchSlips();
         setGlobalToastMessage(`บันทึกผู้เข้าร่วม "${newAttendee.nameTh}" ลงฐานข้อมูลเรียบร้อยแล้ว!`);
         setTimeout(() => setGlobalToastMessage(null), 4000);
+      } else {
+        setAttendees((prev) => prev.filter((a) => a.id !== newAttendee.id));
+        alert(json.error || 'ไม่สามารถบันทึกผู้เข้าร่วมได้');
       }
     } catch (err) {
       console.error('Failed to save walk-in attendee to DB:', err);
+      setAttendees((prev) => prev.filter((a) => a.id !== newAttendee.id));
     }
   };
 

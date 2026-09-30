@@ -111,4 +111,6 @@ export interface AttendeeItem {
   rejectionReason?: string | null;
   programs?: Array<{ id: string; name: string }>;
   attendanceType?: 'onsite' | 'online';
+  amount?: number;
+  position?: string;
 }
