@@ -34,6 +34,7 @@ import {
   UserCheck,
   Lock,
   X,
+  Receipt,
 } from 'lucide-react';
 import { TsrmLogo } from '@/components/TsrmLogo';
 import { GoogleIcon } from '@/components/GoogleIcon';
@@ -118,6 +119,24 @@ const addOnIdentityKey = (att?: { memberNo?: string; email?: string }) =>
 
 const lockedFieldsFrom = (values: Partial<Record<MemberLockableField, string>>): MemberLockableField[] =>
   (Object.keys(values) as MemberLockableField[]).filter((k) => !!values[k]?.toString().trim());
+
+// Receipt request email: prefilled template the registrant completes in their mail app / Gmail
+const RECEIPT_EMAIL = 'tsrmcongress@gmail.com';
+const RECEIPT_EMAIL_SUBJECT = 'ขอใบเสร็จรับเงิน';
+const RECEIPT_EMAIL_BODY = [
+  'เรียน เจ้าหน้าที่สมาคมฯ',
+  '',
+  'ข้าพเจ้าต้องการขอใบเสร็จรับเงินในรูปแบบการพิมพ์ โดยมีรายละเอียดดังนี้',
+  '',
+  'ชื่อผู้ลงทะเบียน: ',
+  'รหัสสมาชิก (ถ้ามี): ',
+  'ชื่อ/บริษัทที่ต้องการให้ออกใบเสร็จ: ',
+  'ที่อยู่สำหรับออกใบเสร็จ: ',
+  'เลขประจำตัวผู้เสียภาษี: ',
+  'เบอร์โทรศัพท์: ',
+  '',
+  'ขอบคุณค่ะ/ครับ',
+].join('\r\n');
 
 interface LoginViewProps {
   onNavigateToSignup: () => void;
@@ -763,18 +782,22 @@ export function LoginView({
             };
           }));
         } else if (data.member?.membership_status && data.member.membership_status.toLowerCase() !== 'active') {
+          // สมาชิกหมดอายุ: ลงทะเบียนต่อได้โดยไม่ต้องต่ออายุ (คิดอัตราบุคคลทั่วไป) จึงดึงข้อมูลเดิมมาให้ แต่ไม่ล็อกช่อง
           setAttendees(prev => prev.map((att, idx) => {
             if (idx !== activeAttendeeIdx) return att;
             return {
               ...att,
-              nameTh: '',
-              nameEn: '',
-              email: '',
-              position: '',
+              nameTh: data.member.fullNameTh || '',
+              nameEn: data.member.fullNameEn || '',
+              email: data.member.email || '',
+              position: data.member.position || '',
               positionOther: '',
-              workplace: '',
+              workplace: data.member.workplace || '',
               memberCheckStatus: 'expired',
-              memberCheckMessage: lang === 'th' ? '⚠️ สถานะสมาชิกภาพหมดอายุ' : '⚠️ Membership expired',
+              memberCheckMessage: lang === 'th'
+                ? '⚠️ สถานะสมาชิกภาพหมดอายุ ลงทะเบียนต่อได้ในอัตราบุคคลทั่วไป หรือต่ออายุสมาชิกเพื่อรับราคาสมาชิก'
+                : '⚠️ Membership expired. You can continue at the non-member rate, or renew your membership to get member pricing.',
+              lockedFields: [],
               verifiedMember: null,
             };
           }));
@@ -1002,14 +1025,6 @@ export function LoginView({
       const att = attendeesToSubmit[i];
       const personLabel = regMode === 'group' ? (lang === 'th' ? `(ผู้ลงทะเบียนคนที่ ${i + 1})` : `(Attendee #${i + 1})`) : '';
 
-      if (regMode === 'group') {
-        if (!att.memberNo || !att.memberNo.trim()) {
-          alert(lang === 'th' ? `กรุณาระบุรหัสสมาชิก TSRM สำหรับ ${personLabel}` : `Please enter TSRM Member No. for ${personLabel}`);
-          setActiveAttendeeIdx(i);
-          return;
-        }
-      }
-
       // ป้องกันการส่งเลขสมาชิกที่ไม่มีอยู่จริง (ทั้งรายบุคคลและกลุ่ม)
       if (att.memberNo && att.memberNo.trim()) {
         if (att.memberCheckStatus === 'checking' || !att.memberCheckStatus || att.memberCheckStatus === 'idle') {
@@ -1107,7 +1122,8 @@ export function LoginView({
 
     try {
       // ── 1.1 Check Coupon in input box: auto-apply if entered but user forgot to click "ใช้คูปอง" ──
-      const rawCoupon = couponCodeInput.trim().toUpperCase();
+      // คูปองใช้ได้เฉพาะการลงทะเบียนแบบกลุ่มสำหรับบริษัท
+      const rawCoupon = regMode === 'group' ? couponCodeInput.trim().toUpperCase() : '';
       let effectiveCoupon = couponState;
 
       if (rawCoupon) {
@@ -1308,15 +1324,6 @@ export function LoginView({
         }
 
         if (addOnForSubmit) {
-          if (effectiveCoupon) {
-            alert(
-              lang === 'th'
-                ? 'ไม่สามารถใช้คูปองกับการลงทะเบียนกิจกรรมเพิ่มเติมได้ กรุณาลบรหัสคูปองออกก่อนดำเนินการต่อ'
-                : 'Coupons cannot be used when adding activities to an existing registration. Please remove the coupon code.'
-            );
-            return;
-          }
-
           const registeredIds = new Set(addOnForSubmit.registeredActivityIds);
           const remaining = single.selectedActivities.filter((a: any) => !registeredIds.has(String(a.id)));
           const registeredNames = addOnForSubmit.registeredActivities.map(a => a.name).filter(Boolean).join(', ');
@@ -1401,6 +1408,33 @@ export function LoginView({
         }
         localStorage.setItem('conference_registration', JSON.stringify(singlePayload));
       } else {
+        // สมาชิกหมดอายุ: แนะนำให้ต่ออายุ แต่ลงทะเบียนต่อในอัตราบุคคลทั่วไปได้
+        // ผู้ที่ไม่ใช่สมาชิก (รวมสมาชิกหมดอายุ) ลงทะเบียนได้ แต่ไม่ได้รับสิทธิ์คูปองบริษัท
+        const namesOf = (list: any[]) => list.map((a) => a.nameTh || a.nameEn).filter(Boolean).join(', ');
+        const expiredMembers = processedAttendees.filter((a) => a.isExpiredMember && !a.isAddOn);
+        const nonMembers = effectiveCoupon ? processedAttendees.filter((a) => !a.isMember && !a.isAddOn) : [];
+        const notices: string[] = [];
+        if (expiredMembers.length > 0) {
+          notices.push(
+            lang === 'th'
+              ? `สมาชิกสถานะหมดอายุ ${expiredMembers.length} ท่าน: ${namesOf(expiredMembers)}\nระบบจะคิดค่าลงทะเบียนในอัตราบุคคลทั่วไป หากต้องการราคาสมาชิก แนะนำให้ต่ออายุสมาชิกก่อนลงทะเบียน`
+              : `${expiredMembers.length} attendee(s) with expired membership: ${namesOf(expiredMembers)}\nThey will be charged the non-member rate. Renew the membership first to get member pricing.`
+          );
+        }
+        if (nonMembers.length > 0) {
+          notices.push(
+            lang === 'th'
+              ? `ผู้ลงทะเบียนที่ไม่ใช่สมาชิกสถานะปกติ ${nonMembers.length} ท่าน: ${namesOf(nonMembers)}\nจะไม่ได้รับสิทธิ์คูปองบริษัท และชำระในอัตราบุคคลทั่วไป`
+              : `${nonMembers.length} attendee(s) without active membership: ${namesOf(nonMembers)}\nThey are not eligible for the company coupon and will pay the non-member rate.`
+          );
+        }
+        if (notices.length > 0) {
+          const proceed = confirm(
+            `${notices.join('\n\n')}\n\n${lang === 'th' ? 'ต้องการดำเนินการต่อหรือไม่' : 'Continue?'}`
+          );
+          if (!proceed) return;
+        }
+
         // Corporate / Group Registration Payload
         const groupPayload = {
           category: 'conference',
@@ -1772,7 +1806,7 @@ export function LoginView({
                   )}
 
                   {/* Corporate Coupon Card - Only shown for Corporate / Group Registration */}
-                  {(regMode === 'group' || sponsorSession) && (
+                  {regMode === 'group' && (
                     <div className="bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-blue-50/80 border border-blue-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-2 animate-fade-in">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -1828,6 +1862,12 @@ export function LoginView({
                           )}
                         </button>
                       </div>
+
+                      <p className="text-[10.5px] sm:text-[11px] text-slate-600 leading-relaxed">
+                        {lang === 'th'
+                          ? 'คูปองบริษัทใช้ได้เฉพาะผู้ลงทะเบียนที่เป็นสมาชิกสถานะปกติ ผู้ที่ไม่ใช่สมาชิกลงทะเบียนได้ แต่ชำระในอัตราบุคคลทั่วไป'
+                          : 'Company coupons apply to active members only. Non-members can register but pay the non-member rate.'}
+                      </p>
 
                       {couponError && (
                         <div className="text-[11px] font-semibold text-rose-600 bg-rose-50 border border-rose-200/80 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 animate-fade-in">
@@ -1948,11 +1988,8 @@ export function LoginView({
                             <label className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
                               <Hash className="w-4 h-4 text-[#0026b3]" />
                               <span>
-                                {lang === 'th'
-                                  ? `รหัสสมาชิก TSRM ${regMode === 'group' ? '(จำเป็นสำหรับกลุ่ม)' : ''}`
-                                  : `TSRM Member No. ${regMode === 'group' ? '(Required for Group)' : ''}`}
+                                {lang === 'th' ? 'รหัสสมาชิก TSRM' : 'TSRM Member No.'}
                               </span>
-                              {regMode === 'group' && <span className="text-rose-500 font-bold ml-0.5">*</span>}
                             </label>
                             <span className="text-[10px] sm:text-[11px] text-blue-700 font-extrabold bg-blue-100/90 border border-blue-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
                               <Sparkles className="w-3 h-3 text-blue-600" />
@@ -2482,6 +2519,49 @@ export function LoginView({
         </div>
       </div>
 
+      {/* Receipt Request Footer */}
+      {!isAdminMode && (
+      <footer className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-3.5 xs:px-5 sm:px-8 lg:px-12 pt-5 sm:pt-7 pb-5 sm:pb-7 rounded-t-[24px] sm:rounded-t-[36px] shadow-xl relative overflow-hidden mt-2">
+        <div className="absolute -top-12 -left-12 w-48 h-48 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute bottom-0 -right-12 w-40 h-40 bg-[#4ade80]/15 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="max-w-5xl xl:max-w-6xl mx-auto relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0">
+              <Receipt className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-[#4ade80]" />
+            </div>
+            <div className="min-w-0 space-y-1">
+              <p className="text-sm sm:text-base font-extrabold text-white leading-tight">
+                {lang === 'th' ? 'หากต้องการใบเสร็จรับเงิน' : 'Need an official receipt?'}
+              </p>
+              <p className="text-xs sm:text-sm text-blue-100/90 leading-relaxed">
+                {lang === 'th'
+                  ? 'ขอเป็นรูปแบบการพิมพ์ ให้ออกใบเสร็จในนามใคร ที่อยู่ เลขประจำตัวผู้เสียภาษี เบอร์โทรศัพท์ กรุณาแจ้งที่'
+                  : 'For a printed receipt, please send the name to issue it to, address, tax ID and phone number to'}
+              </p>
+            </div>
+          </div>
+
+          <a
+            href={`mailto:${RECEIPT_EMAIL}?subject=${encodeURIComponent(RECEIPT_EMAIL_SUBJECT)}&body=${encodeURIComponent(RECEIPT_EMAIL_BODY)}`}
+            onClick={(e) => {
+              // Desktop browsers often have no mail client configured, so open Gmail compose instead
+              const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+              if (isMobile) return;
+              e.preventDefault();
+              const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${RECEIPT_EMAIL}&su=${encodeURIComponent(RECEIPT_EMAIL_SUBJECT)}&body=${encodeURIComponent(RECEIPT_EMAIL_BODY)}`;
+              window.open(gmailUrl, '_blank', 'noopener,noreferrer');
+            }}
+            title={lang === 'th' ? 'ส่งอีเมลขอใบเสร็จรับเงิน' : 'Email us to request a receipt'}
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md rounded-xl text-xs sm:text-sm font-bold transition border border-white/20 active:scale-95 shadow-2xs group min-h-[38px] shrink-0"
+          >
+            <Mail className="w-4 h-4 text-blue-200 group-hover:scale-110 transition-transform shrink-0" />
+            <span className="font-semibold break-all">tsrmcongress@gmail.com</span>
+          </a>
+        </div>
+      </footer>
+      )}
+
       {/* Participant Search Modal */}
       <ParticipantSearchModal
         isOpen={isSearchOpen}
@@ -2497,8 +2577,7 @@ export function LoginView({
         memberName={expiredMemberInfo?.memberName}
         memberNo={expiredMemberInfo?.memberNo}
         expireDate={expiredMemberInfo?.expireDate}
-        statusText={expiredMemberInfo?.statusText}
-      />
+        statusText={expiredMemberInfo?.statusText}      />
 
       {/* Change Attendance Format Modal */}
       <ChangeFormatModal

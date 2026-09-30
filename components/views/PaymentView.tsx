@@ -49,6 +49,17 @@ export interface GroupAttendeeActivity {
   isDiscounted?: boolean;
 }
 
+/** ประเภทผู้ลงทะเบียนแบบกลุ่ม สำหรับสรุปยอดในหน้าชำระเงิน */
+export type GroupAttendeeCategory = 'couponMember' | 'member' | 'expired' | 'nonMember' | 'addOn';
+
+const GROUP_CATEGORY_ORDER: GroupAttendeeCategory[] = ['couponMember', 'member', 'expired', 'nonMember', 'addOn'];
+
+const groupCategoryOf = (att: GroupAttendeeSummary): GroupAttendeeCategory =>
+  att.category ||
+  (!att.isMember
+    ? (att.isExpiredMember ? 'expired' : 'nonMember')
+    : ((att.discountTotal || 0) > 0 ? 'couponMember' : 'member'));
+
 export interface GroupAttendeeSummary {
   name: string;
   email?: string;
@@ -60,6 +71,8 @@ export interface GroupAttendeeSummary {
   discountTotal?: number;
   discountAppliedNotice?: string;
   isMember?: boolean;
+  isExpiredMember?: boolean;
+  category?: GroupAttendeeCategory;
   attendanceType?: string;
   details?: string;
   activities?: GroupAttendeeActivity[];
@@ -188,6 +201,63 @@ export function PaymentView({
           rateBadgeEn: isMember ? 'Member Rate' : 'Standard Rate',
         }))
       : [];
+
+  // แบบกลุ่มสำหรับบริษัท: สรุปยอดจริงแยกตามประเภทผู้ลงทะเบียน
+  const groupCategoryLabel = (key: GroupAttendeeCategory): { title: string; note: string } => {
+    const th = lang === 'th';
+    switch (key) {
+      case 'couponMember':
+        return {
+          title: th ? 'สมาชิกที่ได้รับสิทธิ์คูปอง' : 'Members with coupon',
+          note: th ? 'ราคาสมาชิก หักส่วนลดตามเงื่อนไขคูปอง' : 'Member rate less coupon discount',
+        };
+      case 'member':
+        return couponCode
+          ? {
+              title: th ? 'สมาชิกที่ไม่ได้รับส่วนลด' : 'Members without discount',
+              note: th ? 'ราคาสมาชิก เนื่องจากสิทธิ์คูปองถูกใช้ครบแล้ว' : 'Member rate, coupon allowance used up',
+            }
+          : {
+              title: th ? 'สมาชิก' : 'Members',
+              note: th ? 'ราคาสมาชิก' : 'Member rate',
+            };
+      case 'expired':
+        return {
+          title: th ? 'สมาชิกหมดอายุ' : 'Expired members',
+          note: th ? 'ราคาบุคคลทั่วไป ไม่ได้รับสิทธิ์คูปอง' : 'Non-member rate, no coupon',
+        };
+      case 'nonMember':
+        return {
+          title: th ? 'บุคคลทั่วไป' : 'Non-members',
+          note: th ? 'ราคาบุคคลทั่วไป ไม่ได้รับสิทธิ์คูปอง' : 'Non-member rate, no coupon',
+        };
+      case 'addOn':
+        return {
+          title: th ? 'ลงทะเบียนกิจกรรมเพิ่มเติม' : 'Activity add-ons',
+          note: th ? 'คิดเฉพาะกิจกรรมที่เพิ่ม ไม่ใช้สิทธิ์คูปอง' : 'Added activities only, no coupon',
+        };
+    }
+  };
+
+  const groupBreakdown = isGroup
+    ? GROUP_CATEGORY_ORDER.map((key) => {
+        const list = groupAttendees.filter((a) => groupCategoryOf(a) === key);
+        const discount = list.reduce((sum, a) => sum + (a.discountTotal || 0), 0);
+        const net = list.reduce((sum, a) => sum + (a.price || 0), 0);
+        const original = list.reduce((sum, a) => sum + (a.originalTotal ?? (a.price || 0) + (a.discountTotal || 0)), 0);
+        return { key, count: list.length, original, discount, net };
+      }).filter((row) => row.count > 0)
+    : [];
+  const groupTotals = groupBreakdown.reduce(
+    (acc, row) => ({
+      count: acc.count + row.count,
+      original: acc.original + row.original,
+      discount: acc.discount + row.discount,
+      net: acc.net + row.net,
+    }),
+    { count: 0, original: 0, discount: 0, net: 0 }
+  );
+  const baht = (n: number) => `${n.toLocaleString()} ${lang === 'th' ? 'บาท' : 'THB'}`;
 
   return (
     <div className="flex-1 flex flex-col justify-between animate-fade-in min-h-[640px]">
@@ -372,9 +442,17 @@ export function PaymentView({
                             )}
                             {isRegistration && att.isMember !== undefined && (
                               <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
-                                att.isMember ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-700'
+                                att.isMember
+                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                  : att.isExpiredMember
+                                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                    : 'bg-slate-100 text-slate-700'
                               }`}>
-                                {att.isMember ? (lang === 'th' ? 'สมาชิก' : 'Member') : (lang === 'th' ? 'บุคคลทั่วไป' : 'Non-Member')}
+                                {att.isMember
+                                  ? (lang === 'th' ? 'สมาชิก' : 'Member')
+                                  : att.isExpiredMember
+                                    ? (lang === 'th' ? 'สมาชิกหมดอายุ' : 'Expired Member')
+                                    : (lang === 'th' ? 'บุคคลทั่วไป' : 'Non-Member')}
                               </span>
                             )}
                             {isRegistration && att.attendanceType && (
@@ -441,14 +519,82 @@ export function PaymentView({
 
                       {/* Attendee Discount Allocation Banner */}
                       {att.discountAppliedNotice && (
-                        <div className="ml-7 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1 text-[10px] font-bold text-emerald-800 flex items-center gap-1.5">
-                          <Sparkles className="w-3 h-3 text-emerald-600 shrink-0" />
-                          <span>{att.discountAppliedNotice}</span>
-                        </div>
+                        (att.discountTotal || 0) > 0 ? (
+                          <div className="ml-7 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1 text-[10px] font-bold text-emerald-800 flex items-center gap-1.5">
+                            <Sparkles className="w-3 h-3 text-emerald-600 shrink-0" />
+                            <span>{att.discountAppliedNotice}</span>
+                          </div>
+                        ) : (
+                          <div className="ml-7 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1 text-[10px] font-bold text-amber-800 flex items-center gap-1.5">
+                            <Info className="w-3 h-3 text-amber-600 shrink-0" />
+                            <span>{att.discountAppliedNotice}</span>
+                          </div>
+                        )
                       )}
                     </div>
                   ))}
                 </div>
+
+                {/* สรุปยอดจริงแยกตามประเภทผู้ลงทะเบียน */}
+                {isRegistration && groupBreakdown.length > 0 && (
+                  <div className="border border-slate-200/80 rounded-2xl overflow-hidden bg-white">
+                    <div className="px-3.5 sm:px-4 py-2.5 bg-slate-50 border-b border-slate-200/80">
+                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        {lang === 'th' ? 'สรุปยอดตามประเภทผู้ลงทะเบียน' : 'Summary by Attendee Type'}
+                      </span>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {groupBreakdown.map((row) => {
+                        const label = groupCategoryLabel(row.key);
+                        return (
+                          <div key={row.key} className="px-3.5 sm:px-4 py-2.5 flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-xs sm:text-sm font-bold text-slate-900">
+                                {label.title}{' '}
+                                <span className="text-slate-500 font-semibold">
+                                  {lang === 'th' ? `${row.count} ท่าน` : `× ${row.count}`}
+                                </span>
+                              </p>
+                              <p className="text-[10.5px] sm:text-[11px] text-slate-500">{label.note}</p>
+                            </div>
+                            <div className="text-right shrink-0 text-[11px] sm:text-xs leading-relaxed">
+                              {row.discount > 0 && (
+                                <>
+                                  <div className="text-slate-500">
+                                    {lang === 'th' ? 'ราคาเต็ม ' : 'Full '}{baht(row.original)}
+                                  </div>
+                                  <div className="text-emerald-700 font-semibold">
+                                    {lang === 'th' ? 'ส่วนลด -' : 'Discount -'}{baht(row.discount)}
+                                  </div>
+                                </>
+                              )}
+                              <div className="font-black text-[#0026b3] text-xs sm:text-sm">{baht(row.net)}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="px-3.5 sm:px-4 py-3 bg-blue-50/50 border-t border-slate-200/80 space-y-1 text-xs sm:text-sm">
+                      <div className="flex justify-between text-slate-600">
+                        <span>{lang === 'th' ? `ราคาเต็มรวม ${groupTotals.count} ท่าน` : `Full price, ${groupTotals.count} attendees`}</span>
+                        <span className="font-semibold">{baht(groupTotals.original)}</span>
+                      </div>
+                      {groupTotals.discount > 0 && (
+                        <div className="flex justify-between text-emerald-700 font-semibold">
+                          <span>
+                            {lang === 'th' ? 'ส่วนลดจากคูปองบริษัท' : 'Company coupon discount'}
+                            {couponCode ? ` ${couponCode}` : ''}
+                          </span>
+                          <span>-{baht(groupTotals.discount)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-black text-[#0026b3] pt-1 border-t border-slate-200/80">
+                        <span>{lang === 'th' ? 'ยอดชำระจริง' : 'Amount due'}</span>
+                        <span>{baht(groupTotals.net)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : isRegistration ? (
               <>
@@ -626,7 +772,7 @@ export function PaymentView({
                     {couponCode ? ` (${couponCode})` : ''}
                   </span>
                 )}
-                {isRegistration && (
+                {isRegistration && !isGroup && (
                   <span className="text-[11px] text-slate-500 font-medium">
                     {lang === 'th' ? `คำนวณตามรูปแบบ: ${attendanceType === 'online' ? 'Online' : 'Onsite'}` : `Calculated for: ${attendanceType === 'online' ? 'Online' : 'Onsite'}`}
                   </span>

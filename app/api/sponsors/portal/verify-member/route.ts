@@ -101,9 +101,16 @@ export async function POST(req: NextRequest) {
         success: false,
         valid: false,
         message: `สมาชิกหมายเลข ${member.member_no} สถานะปัจจุบันคือ "${member.membership_status}" ไม่สามารถใช้สิทธิ์ได้ (ต้องเป็นสถานะ Active)`,
+        // ส่งข้อมูลเดิมกลับไปให้ฟอร์ม เพื่อให้ลงทะเบียนต่อในอัตราบุคคลทั่วไปได้โดยไม่ต้องต่ออายุ
         member: {
           member_no: member.member_no,
+          fullNameTh: member.fullNameTh || '',
+          fullNameEn: member.fullNameEn || '',
+          email: member.email || '',
+          workplace: member.workplace || '',
+          position: member.position || member.job_category || '',
           membership_status: member.membership_status,
+          expire_date: member.expire_date,
         },
       });
     }

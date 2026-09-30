@@ -171,6 +171,30 @@ export async function POST(
         }
       }
 
+      // คูปองบริษัทใช้ได้เฉพาะสมาชิกสถานะปกติ: ผู้ที่ไม่ใช่สมาชิกลงทะเบียนได้ แต่ห้ามได้รับส่วนลด
+      for (let i = 0; i < attendees.length; i++) {
+        const att = attendees[i];
+        if (att.isAddOn || Number(att.discountTotal || att.discountAmount || 0) <= 0) continue;
+        const rawNo = att.memberNo ? String(att.memberNo).trim() : '';
+        const discountedMember = rawNo
+          ? await prisma.member.findFirst({
+              where: { OR: [{ member_no: rawNo }, { member_no: rawNo.padStart(4, '0') }] },
+              select: { membership_status: true },
+            })
+          : null;
+        const status = (discountedMember?.membership_status || '').toLowerCase().trim();
+        if (!discountedMember || (status !== '' && status !== 'active')) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `ผู้ลงทะเบียนลำดับที่ ${i + 1} ${att.nameTh || att.nameEn || ''}: คูปองบริษัทใช้ได้เฉพาะสมาชิกสถานะปกติเท่านั้น`.replace(/\s+:/, ':'),
+              code: 'COUPON_MEMBERS_ONLY',
+            },
+            { status: 400 }
+          );
+        }
+      }
+
       // นับเป็นการใช้สิทธิ์คูปองเฉพาะผู้ที่ได้รับส่วนลดจริง และลงโปรแกรมที่คูปองครอบคลุม
       // (เช่น คูปองฟรีการประชุมหลัก แต่ลงเฉพาะเวิร์กช็อป จะไม่ตัดโควต้า)
       const couponCoveredAttendees = groupCoupon
@@ -743,6 +767,14 @@ export async function POST(
       addOnOriginalSlip = eligibility.originalSlip;
     }
     const isAddOn = Boolean(addOnOriginalSlip);
+
+    // ลงทะเบียนรายบุคคลไม่มีระบบคูปอง (คูปองใช้ได้เฉพาะการลงทะเบียนแบบกลุ่มสำหรับบริษัท)
+    if (couponCode && String(couponCode).trim()) {
+      return NextResponse.json(
+        { success: false, error: 'คูปองใช้ได้เฉพาะการลงทะเบียนแบบกลุ่มสำหรับบริษัทเท่านั้น', code: 'COUPON_GROUP_ONLY' },
+        { status: 400 }
+      );
+    }
 
     // 1. Check & Validate Coupon if supplied
     let couponRecord: any = null;

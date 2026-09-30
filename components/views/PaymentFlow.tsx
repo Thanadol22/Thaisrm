@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { PaymentView } from '@/components/views/PaymentView';
+import { PaymentView, type GroupAttendeeCategory } from '@/components/views/PaymentView';
 import { SlipUploadModal } from '@/components/SlipUploadModal';
 import { RegistrationSuccessModal } from '@/components/RegistrationSuccessModal';
 import { ToastNotification } from '@/components/ToastNotification';
@@ -293,6 +293,19 @@ export function PaymentFlow({
           discountNotice = lang === 'th'
             ? `➕ ลงทะเบียนเพิ่มเติม${att.addOnOriginalTicketCode ? ` สำหรับรายการ ${att.addOnOriginalTicketCode}` : ''} คิดเฉพาะกิจกรรมที่เพิ่ม`
             : `➕ Add-on${att.addOnOriginalTicketCode ? ` for ${att.addOnOriginalTicketCode}` : ''}: added activities only`;
+        } else if (!isMem) {
+          // ผู้ที่ไม่ใช่สมาชิก/สมาชิกหมดอายุ: คิดอัตราบุคคลทั่วไป ไม่ได้รับสิทธิ์คูปอง และไม่ตัดโควต้าของบริษัท
+          const couponTh = couponData ? ' ไม่ได้รับสิทธิ์คูปองบริษัท' : '';
+          const couponEn = couponData ? ', not eligible for the company coupon' : '';
+          if (att.isExpiredMember) {
+            discountNotice = lang === 'th'
+              ? `⚠️ สมาชิกหมดอายุ คิดอัตราบุคคลทั่วไป${couponTh}`
+              : `⚠️ Expired membership: non-member rate${couponEn}`;
+          } else if (couponData) {
+            discountNotice = lang === 'th'
+              ? `⚠️ ไม่ใช่สมาชิก คิดอัตราบุคคลทั่วไป${couponTh}`
+              : `⚠️ Non-member rate${couponEn}`;
+          }
         } else if (remainingFreeSeats > 0) {
           // Free sponsor coupon covers ONLY the Main Program
           let attDisc = 0;
@@ -318,8 +331,8 @@ export function PaymentFlow({
           const hasNonMain = itemizedActs.some(a => a.type !== 'main' && a.id !== 'main');
           discountNotice = lang === 'th'
             ? (hasNonMain
-                ? '✅ ได้รับสิทธิ์ฟรีค่าลงทะเบียนหลัก (Main Program) จากคูปองสปอนเซอร์ (ชำระเฉพาะเวิร์กช็อปเพิ่มเติม)'
-                : '✅ ได้รับสิทธิ์เข้าร่วมฟรีเฉพาะการประชุมหลัก (Main Program) จากคูปองสปอนเซอร์')
+                ? '✅ ได้รับสิทธิ์ฟรีค่าลงทะเบียนการประชุมหลักจากคูปองบริษัท ชำระเฉพาะเวิร์กช็อปเพิ่มเติม'
+                : '✅ ได้รับสิทธิ์เข้าร่วมการประชุมหลักฟรีจากคูปองบริษัท')
             : (hasNonMain
                 ? '✅ Free Main Program Pass Granted (Workshops billed separately)'
                 : '✅ Free Main Program Pass Granted');
@@ -363,11 +376,17 @@ export function PaymentFlow({
           });
         } else if (couponData && (couponData.discountType?.toLowerCase() === 'free' || couponData.isFullFree)) {
           discountNotice = lang === 'th'
-            ? '⚠️ เกินโควตาสิทธิ์ฟรีของคูปอง (คิดค่าธรรมเนียมตามปกติ)'
-            : '⚠️ Exceeded Free Pass Quota (Standard Rate)';
+            ? '⚠️ เกินโควตาสิทธิ์ฟรีของคูปอง คิดราคาสมาชิกตามปกติ'
+            : '⚠️ Exceeded free pass quota: member rate';
         }
 
         const attendeeNetPrice = Math.max(0, attendeeOriginalTotal - attendeeDiscount);
+        // ประเภทสำหรับสรุปยอดในหน้าชำระเงิน
+        const category: GroupAttendeeCategory = att.isAddOn
+          ? 'addOn'
+          : !isMem
+            ? (att.isExpiredMember ? 'expired' : 'nonMember')
+            : (attendeeDiscount > 0 ? 'couponMember' : 'member');
 
         return {
           name: att.nameTh || att.nameEn || 'ผู้ลงทะเบียน',
@@ -380,6 +399,8 @@ export function PaymentFlow({
           discountTotal: attendeeDiscount,
           discountAppliedNotice: discountNotice,
           isMember: isMem,
+          isExpiredMember: Boolean(att.isExpiredMember),
+          category,
           attendanceType: attType,
           activities: itemizedActs,
           details: `${attType === 'online' ? '💻 Online' : '🏢 Onsite'}${itemizedActs.length > 1 ? ` (${itemizedActs.length} รายการ)` : ''}`,
@@ -479,60 +500,9 @@ export function PaymentFlow({
 
     const originalAmount = calculatedItems.reduce((sum, item) => sum + item.originalPrice, 0);
 
-    // Coupon Calculation: Free coupon waives ONLY the Main Program
-    let discountAmount = 0;
-    let isCouponSponsored = false;
-
-    if (regData.couponData) {
-      const isFree = regData.couponData.isFullFree || regData.couponData.discountType?.toLowerCase() === 'free';
-      if (isFree) {
-        // Free coupon waives ONLY the Main Program
-        let freeMainDiscount = 0;
-        calculatedItems = calculatedItems.map(item => {
-          if (item.type === 'main' || item.id === 'main') {
-            freeMainDiscount += item.originalPrice;
-            return {
-              ...item,
-              discount: item.originalPrice,
-              netPrice: 0,
-              price: 0,
-            };
-          }
-          return item;
-        });
-        discountAmount = freeMainDiscount;
-        isCouponSponsored = (originalAmount - discountAmount) === 0 && originalAmount > 0;
-      } else if (regData.couponData.discountType?.toLowerCase() === 'fixed') {
-        const pool = Math.min(originalAmount, regData.couponData.discountValue || 0);
-        discountAmount = pool;
-        let poolLeft = pool;
-        calculatedItems = calculatedItems.map(item => {
-          if (poolLeft <= 0) return item;
-          const disc = Math.min(item.originalPrice, poolLeft);
-          poolLeft -= disc;
-          return {
-            ...item,
-            discount: disc,
-            netPrice: item.originalPrice - disc,
-            price: item.originalPrice - disc,
-          };
-        });
-        isCouponSponsored = discountAmount >= originalAmount && originalAmount > 0;
-      } else if (regData.couponData.discountType?.toLowerCase() === 'percent') {
-        const pct = Math.min(100, Math.max(0, regData.couponData.discountValue || 0));
-        discountAmount = Math.round((originalAmount * pct) / 100);
-        calculatedItems = calculatedItems.map(item => {
-          const disc = Math.round((item.originalPrice * pct) / 100);
-          return {
-            ...item,
-            discount: disc,
-            netPrice: Math.max(0, item.originalPrice - disc),
-            price: Math.max(0, item.originalPrice - disc),
-          };
-        });
-        isCouponSponsored = (pct === 100 || discountAmount >= originalAmount) && originalAmount > 0;
-      }
-    }
+    // ลงทะเบียนรายบุคคลไม่มีระบบคูปอง (คูปองใช้ได้เฉพาะการลงทะเบียนแบบกลุ่มสำหรับบริษัท)
+    const discountAmount = 0;
+    const isCouponSponsored = false;
 
     const totalAmount = Math.max(0, originalAmount - discountAmount);
 
@@ -744,7 +714,6 @@ export function PaymentFlow({
               guestPosition: !isMember ? (regData?.position || null) : undefined,
               amount: calculationResult.totalAmount,
               originalAmount: calculationResult.originalAmount,
-              couponCode: regData?.couponData?.code || undefined,
               bank: isPayLater
                 ? 'ชำระเงินภายหลัง (Pay Later)'
                 : (isFreeOrSponsored ? `สิทธิ์สปอนเซอร์: ${regData?.couponData?.companyName || 'Corporate Pass'}` : systemSettings.bank_name),
