@@ -242,8 +242,11 @@ export function PaymentFlow({
           }
         }
 
-        const hasOnsiteOnly = rawAttendeeActivities.some((a: any) => (a.format || (a.type === 'workshop' ? 'onsite' : 'both')) === 'onsite');
-        const isOnlineEligible = !hasOnsiteOnly && isMem;
+        const fmtOf = (a: any) => a.format || (a.type === 'workshop' ? 'onsite' : 'both');
+        const hasOnsiteOnly = rawAttendeeActivities.some((a: any) => fmtOf(a) === 'onsite');
+        // main ที่เรียนออนไลน์ได้ + workshop onsite → main เป็น online ได้ ส่วน workshop คง onsite
+        const hasOnlineCapableMain = rawAttendeeActivities.some((a: any) => (a.type === 'main' || a.id === 'main') && fmtOf(a) !== 'onsite');
+        const isOnlineEligible = (!hasOnsiteOnly || hasOnlineCapableMain) && isMem;
         const attType: 'onsite' | 'online' = (att.attendanceType === 'online' && isOnlineEligible) ? 'online' : 'onsite';
 
         // Calculate each activity's base price
@@ -442,10 +445,13 @@ export function PaymentFlow({
     const activitiesToCalculate = allActivities.filter(a => selectedIds.includes(a.id));
 
     // Enforce attendance rule:
-    // 1. If any selected activity is strictly 'onsite' -> force 'onsite'
-    // 2. Online rate is only eligible if no onsite-only activity is selected and user is active member
-    const hasOnsiteOnly = activitiesToCalculate.some(a => (a.format || (a.type === 'workshop' ? 'onsite' : 'both')) === 'onsite');
-    const isOnlineEligible = !hasOnsiteOnly && isMemberUser;
+    // 1. If any selected activity is strictly 'onsite' and no online-capable main is selected -> force 'onsite'
+    // 2. Main + onsite workshop -> main may be online, workshops stay onsite
+    // 3. Online rate is only eligible for active members
+    const fmtOf = (a: any) => a.format || (a.type === 'workshop' ? 'onsite' : 'both');
+    const hasOnsiteOnly = activitiesToCalculate.some(a => fmtOf(a) === 'onsite');
+    const hasOnlineCapableMain = activitiesToCalculate.some(a => (a.type === 'main' || a.id === 'main') && fmtOf(a) !== 'onsite');
+    const isOnlineEligible = (!hasOnsiteOnly || hasOnlineCapableMain) && isMemberUser;
     const attendType: 'onsite' | 'online' = (regData.attendanceType === 'online' && isOnlineEligible) ? 'online' : 'onsite';
 
     // Calculate each item

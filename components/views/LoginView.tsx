@@ -899,10 +899,14 @@ export function LoginView({
     }
 
     const selectedActs = effectiveActivities.filter(a => nextProgs.includes(a.id));
-    const hasOnsiteOnly = selectedActs.some(a => (a.format || (a.type === 'workshop' ? 'onsite' : 'both')) === 'onsite');
+    const fmtOf = (a: MeetingActivity) => a.format || (a.type === 'workshop' ? 'onsite' : 'both');
+    const hasOnsiteOnly = selectedActs.some(a => fmtOf(a) === 'onsite');
     const hasOnlineOnly = selectedActs.some(a => a.format === 'online');
+    // ลง main ที่เรียนออนไลน์ได้ พร้อม workshop onsite → main เลือกออนไลน์ได้ ส่วน workshop ยังเป็น onsite
+    const hasOnlineCapableMain = selectedActs.some(a => a.type === 'main' && fmtOf(a) !== 'onsite');
+    const onlineBlocked = hasOnsiteOnly && !hasOnlineCapableMain;
     let nextAttendType = currentAttendee.attendanceType;
-    if (hasOnsiteOnly) {
+    if (onlineBlocked) {
       nextAttendType = 'onsite';
     } else if (hasOnlineOnly) {
       nextAttendType = 'online';
@@ -2342,10 +2346,14 @@ export function LoginView({
                       {/* Attendance Format: Onsite vs Online */}
                       {(() => {
                         const selectedActs = effectiveActivities.filter(a => currentAttendee.selectedPrograms.includes(a.id));
-                        const onsiteOnlyActs = selectedActs.filter(a => (a.format || (a.type === 'workshop' ? 'onsite' : 'both')) === 'onsite');
+                        const fmtOf = (a: MeetingActivity) => a.format || (a.type === 'workshop' ? 'onsite' : 'both');
+                        const onsiteOnlyActs = selectedActs.filter(a => fmtOf(a) === 'onsite');
                         const onlineOnlyActs = selectedActs.filter(a => a.format === 'online');
-                        const hasOnsiteOnly = onsiteOnlyActs.length > 0;
                         const hasOnlineOnly = onlineOnlyActs.length > 0;
+                        // ลง main พร้อม workshop onsite → เลือกออนไลน์ได้ (main = online, workshop = onsite)
+                        const hasOnlineCapableMain = selectedActs.some(a => a.type === 'main' && fmtOf(a) !== 'onsite');
+                        const hasOnsiteOnly = onsiteOnlyActs.length > 0 && !hasOnlineCapableMain;
+                        const showMixedNotice = onsiteOnlyActs.length > 0 && hasOnlineCapableMain && currentAttendee.attendanceType === 'online';
 
                         return (
                           <div className="space-y-1.5 pt-1">
@@ -2398,6 +2406,17 @@ export function LoginView({
                                   {lang === 'th'
                                     ? `หลักสูตร "${onsiteOnlyActs.map(a => a.name).join(', ')}" บังคับเข้าร่วม ณ สถานที่จัดงานจริง`
                                     : `Course "${onsiteOnlyActs.map(a => a.name).join(', ')}" requires Onsite attendance.`}
+                                </span>
+                              </div>
+                            )}
+
+                            {showMixedNotice && (
+                              <div className="flex items-start gap-1.5 p-2.5 rounded-xl bg-blue-50/90 border border-blue-200/70 text-blue-800 text-xs leading-relaxed">
+                                <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                                <span>
+                                  {lang === 'th'
+                                    ? `หลักสูตรหลักเข้าร่วมออนไลน์ ส่วนหลักสูตร "${onsiteOnlyActs.map(a => a.name).join(', ')}" ต้องเข้าร่วม ณ สถานที่จัดงานจริง`
+                                    : `Main program will be attended online. Course "${onsiteOnlyActs.map(a => a.name).join(', ')}" must be attended onsite.`}
                                 </span>
                               </div>
                             )}
