@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import prisma from '@/lib/prisma';
 import { createOtpSessionToken } from '@/lib/security/otpSessionAuth';
 import { statusLabelTh } from '@/lib/statusLabels';
+import { resolveAttendeeActivities } from '@/lib/services/sponsorCouponService';
 
 export async function POST(req: NextRequest) {
   try {
@@ -234,7 +235,7 @@ export async function POST(req: NextRequest) {
         },
         include: {
           meetings: {
-            select: { meeting_id: true, meeting_name: true },
+            select: { meeting_id: true, meeting_name: true, activities: true },
           },
         },
         orderBy: { created_at: 'desc' },
@@ -424,7 +425,51 @@ export async function POST(req: NextRequest) {
       });
     });
 
-    const rawGroupMembers = Array.from(aggregatedMembersMap.values());
+    // รายการหลักสูตรและรูปแบบการเข้าร่วมของแต่ละคน จากข้อมูลการลงทะเบียนประชุมแบบกลุ่ม
+    // เพื่อให้บริษัทตรวจสอบได้เองว่าแต่ละคนลงหลักสูตรใด แบบออนไซต์หรือออนไลน์
+    type ProgramEntry = { name: string; type: string; format: 'onsite' | 'online' };
+    const programLookup = new Map<string, ProgramEntry[]>();
+    sponsorSlipsRaw.forEach((s: any) => {
+      const payload = (s.selected_activities as any) || {};
+      if (payload.type === 'membership_group_registration' || !Array.isArray(payload.attendees)) return;
+      const meetingActs = Array.isArray(s.meetings?.activities) ? (s.meetings.activities as any[]) : [];
+
+      payload.attendees.forEach((att: any) => {
+        if (!att || typeof att !== 'object') return;
+        const attFormat = (att.selectedFormat || att.attendanceType || att.format) === 'online' ? 'online' : 'onsite';
+        let acts = resolveAttendeeActivities(att, meetingActs);
+        if (acts.length === 0) acts = meetingActs.filter((a: any) => a?.type === 'main').slice(0, 1);
+        const programs: ProgramEntry[] = acts.map((a: any) => {
+          // หลักสูตรที่กำหนดรูปแบบตายตัว (เช่น workshop ออนไซต์) คงตามนั้น ที่เหลือตามรูปแบบที่ผู้เข้าร่วมเลือก
+          const fixed = a?.format || (a?.type === 'workshop' ? 'onsite' : 'both');
+          return {
+            name: String(a?.name || 'Main Program'),
+            type: String(a?.type || 'main'),
+            format: fixed === 'onsite' || fixed === 'online' ? fixed : attFormat,
+          };
+        });
+
+        const memberNo = String(att.memberNo || att.member_no || '').trim();
+        const email = String(att.email || '').trim().toLowerCase();
+        for (const key of [memberNo && `${s.meeting_id}|m:${memberNo}`, email && `${s.meeting_id}|e:${email}`]) {
+          if (key && !programLookup.has(key)) programLookup.set(key, programs);
+        }
+      });
+    });
+
+    const rawGroupMembers = Array.from(aggregatedMembersMap.values()).map((m: any) => {
+      const memberNo = m.member_no && m.member_no !== '-' ? m.member_no : '';
+      const email = m.attendee_email && m.attendee_email !== '-' ? String(m.attendee_email).toLowerCase() : '';
+      const programs =
+        (memberNo && programLookup.get(`${m.meeting_id}|m:${memberNo}`)) ||
+        (email && programLookup.get(`${m.meeting_id}|e:${email}`)) ||
+        [];
+      return {
+        ...m,
+        programs,
+        isMembershipOnly: programs.length === 0 && String(m.ticket_code || '').startsWith('MEMGRP'),
+      };
+    });
 
     // Calculate totals and overall financial status
     const pendingPaymentReviewSlips = sponsorSlips.filter((s) => s.itemStatus === 'pending_payment_review');
