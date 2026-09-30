@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 import { isValidEmail, isValidLink, normalizeEmail } from '@/lib/onlineLinkMatching';
+import { getReminderLog } from '@/lib/services/onlineReminderLog';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,7 +50,8 @@ export async function GET(req: NextRequest) {
       },
       orderBy: [{ link_date: 'asc' }, { id: 'asc' }],
     });
-    return NextResponse.json({ success: true, data: rows.map(serialize) });
+    const reminderLog = date && DATE_RE.test(date) ? await getReminderLog(meetingId, date) : {};
+    return NextResponse.json({ success: true, data: rows.map(serialize), reminderLog });
   } catch (error: any) {
     console.error('GET /api/admin/online-links error:', error);
     return NextResponse.json({ success: false, error: 'ไม่สามารถดึงข้อมูลลิงก์ประชุมได้' }, { status: 500 });

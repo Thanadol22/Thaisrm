@@ -32,7 +32,6 @@ import { EmailPreviewModal } from '@/components/EmailPreviewModal';
 import { PaginationControls } from '@/components/PaginationControls';
 import { ThaiDatePicker } from '@/components/ThaiDatePicker';
 import { renderAttendeeTicketEmail } from '@/lib/emailTemplates/attendeeQrTemplate';
-import { renderAttendeeOnlineEmail } from '@/lib/emailTemplates/attendeeOnlineTemplate';
 import { renderCustomBroadcastEmail } from '@/lib/emailTemplates/customTemplate';
 import { formatThaiDate, DailyProgramInfo, programSupportsFormat } from '@/lib/services/dailyCheckinService';
 
@@ -59,11 +58,6 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
   // --- Sub-Tab 1: Ticket Dispatch State ---
   const [selectedMeetingId, setSelectedMeetingId] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('Registered');
-  const [formatFilter, setFormatFilter] = useState<'all' | 'onsite' | 'online'>('all');
-  const [zoomUrl, setZoomUrl] = useState<string>('');
-  const [meetingIdCredentials, setMeetingIdCredentials] = useState<string>('');
-  const [passcode, setPasscode] = useState<string>('');
-  const [onlineInstructions, setOnlineInstructions] = useState<string>('');
   const [extraNote, setExtraNote] = useState<string>('');
   const [isDailyPassMode, setIsDailyPassMode] = useState<boolean>(true);
   const [selectedDailyDate, setSelectedDailyDate] = useState<string>('');
@@ -206,32 +200,11 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
     }
   };
 
-  // รูปแบบที่ส่งได้: ทุกรายการที่เลือกต้องรองรับรูปแบบนั้น (เช่น เวิร์กช็อป Onsite อย่างเดียว ส่งแบบ Online ไม่ได้)
-  const formatAvailability = React.useMemo(() => {
-    if (!isDailyPassMode || selectedPrograms.length === 0) {
-      return { onsite: true, online: true, anyOnline: true };
-    }
-    return {
-      onsite: selectedPrograms.every((p) => programSupportsFormat(p.format, 'onsite')),
-      online: selectedPrograms.every((p) => programSupportsFormat(p.format, 'online')),
-      anyOnline: selectedPrograms.some((p) => programSupportsFormat(p.format, 'online')),
-    };
-  }, [isDailyPassMode, selectedPrograms]);
-
-  // Auto-sync format filter based on selected programs format
-  useEffect(() => {
-    if (isDailyPassMode && selectedPrograms.length > 0) {
-      const allOnsite = selectedPrograms.every((p) => p.format === 'onsite');
-      const allOnline = selectedPrograms.every((p) => p.format === 'online');
-      if (allOnsite) {
-        setFormatFilter('onsite');
-      } else if (allOnline) {
-        setFormatFilter('online');
-      } else {
-        setFormatFilter('all');
-      }
-    }
-  }, [selectedDailyProgramKeys, isDailyPassMode, sortedDailyPrograms]);
+  // แท็บนี้ส่งบัตร QR สำหรับผู้เข้าร่วมแบบออนไซต์เท่านั้น (ผู้เข้าร่วมออนไลน์ส่งลิงก์จากแท็บลิงก์ประชุมออนไลน์)
+  const onsiteAvailable = React.useMemo(
+    () => !isDailyPassMode || selectedPrograms.length === 0 || selectedPrograms.every((p) => programSupportsFormat(p.format, 'onsite')),
+    [isDailyPassMode, selectedPrograms]
+  );
 
   // 2. Fetch scheduled queue when opening schedule tab
   const fetchScheduledQueue = async () => {
@@ -279,14 +252,12 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
       }
     }
 
-    if (formatFilter !== 'all' && !formatAvailability[formatFilter]) {
-      notify(`รายการที่เลือกไม่มีรูปแบบ${formatFilter === 'online' ? 'ออนไลน์' : ' Onsite'} กรุณาเลือกรูปแบบการเข้าร่วมใหม่`);
+    if (!onsiteAvailable) {
+      notify('รายการที่เลือกไม่ได้จัดแบบออนไซต์ ผู้เข้าร่วมออนไลน์ให้ส่งลิงก์จากแท็บลิงก์ประชุมออนไลน์');
       return;
     }
 
-    const formatDesc = formatFilter === 'online'
-      ? ' (เฉพาะผู้ลงทะเบียนออนไลน์)'
-      : (formatFilter === 'onsite' ? ' (เฉพาะผู้ลงทะเบียน Onsite)' : ' (ทุกรูปแบบการเข้าร่วม)');
+    const formatDesc = ' (เฉพาะผู้ลงทะเบียนแบบออนไซต์)';
 
     const confirmMsg = `ยืนยันการส่งอีเมล ${modeDesc}${formatDesc} สำหรับงาน "${meeting?.meeting_name || selectedMeetingId}" (กลุ่ม: ${statusFilter === 'all' ? 'ทั้งหมด' : statusLabelTh(statusFilter)})?`;
     if (!window.confirm(confirmMsg)) return;
@@ -301,7 +272,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
         body: JSON.stringify({
           meetingId: selectedMeetingId,
           statusFilter,
-          formatFilter,
+          formatFilter: 'onsite',
           extraNote,
           isDailyMode: isDailyPassMode,
           targetPrograms: isDailyPassMode ? selectedPrograms.map((p) => ({
@@ -310,10 +281,6 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
           })) : undefined,
           targetDate: selectedPrograms[0]?.date || selectedDailyDate,
           programName: selectedPrograms[0]?.programName,
-          zoomUrl: zoomUrl.trim() || undefined,
-          meetingIdCredentials: meetingIdCredentials.trim() || undefined,
-          passcode: passcode.trim() || undefined,
-          onlineInstructions: onlineInstructions.trim() || undefined,
         }),
       });
 
@@ -371,8 +338,8 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
     }
   };
 
-  // 2. Preview Ticket Email (Supports both Onsite QR and Online Access Pass)
-  const handlePreviewTicket = (previewType?: 'onsite' | 'online') => {
+  // 2. Preview Ticket Email (Onsite QR)
+  const handlePreviewTicket = () => {
     const meeting = meetings.find((m) => m.meeting_id === selectedMeetingId);
     const activeProg = selectedPrograms[0];
     const targetDateToUse = activeProg?.date || selectedDailyDate;
@@ -380,41 +347,20 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
       ? `ประจำวันที่ ${formatThaiDate(targetDateToUse, true) || targetDateToUse} (${activeProg?.programName || 'Main Program'})`
       : (meeting?.meeting_date ? new Date(meeting.meeting_date).toLocaleDateString('th-TH') : '21 - 22 ตุลาคม 2569');
 
-    const effectiveType = previewType || (formatFilter === 'online' ? 'online' : 'onsite');
+    const sampleHtml = renderAttendeeTicketEmail({
+      recipientName: 'นายแพทย์สมชาย ตัวอย่างแพทย์ Onsite',
+      meetingName: meeting?.meeting_name || 'การประชุมวิชาการประจำปี TSRM 2026',
+      meetingDate: dateDisplay,
+      location: meeting?.location || 'โรงแรมสยาม เคมปินสกี้ กรุงเทพฯ',
+      ticketCode: isDailyPassMode ? `TSRM-DAY-${selectedMeetingId.substring(0, 6) || '2026'}-0012` : 'TSRM-2026-8899',
+      memberNo: '0123',
+      attendanceStatus: 'ยืนยันสิทธิ์เรียบร้อย',
+      qrCodeUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=TSRM-PASS:TSRM-DAY-SAMPLE-PASS',
+      extraNote: extraNote || (isDailyPassMode ? `บัตรสำหรับเข้าร่วม: ${activeProg?.programName || 'Main Program'} • QR Code นี้ใช้ได้เฉพาะวันนี้ 1 ครั้งเท่านั้น` : 'กรุณาแสดง QR Code นี้แก่เจ้าหน้าที่ ณ จุดลงทะเบียนหน้างาน'),
+    });
 
-    if (effectiveType === 'online') {
-      const sampleHtml = renderAttendeeOnlineEmail({
-        recipientName: 'แพทย์หญิงสมหญิง ตัวอย่างแพทย์ออนไลน์',
-        meetingName: meeting?.meeting_name || 'การประชุมวิชาการประจำปี TSRM 2026',
-        meetingDate: dateDisplay,
-        ticketCode: 'TSRM-2026-ONL-0088',
-        memberNo: '0123',
-        attendanceStatus: 'ยืนยันสิทธิ์เรียบร้อย',
-        zoomUrl: zoomUrl.trim() || 'https://zoom.us/j/1234567890?pwd=samplepassword',
-        meetingIdCredentials: meetingIdCredentials.trim() || '123 456 7890',
-        passcode: passcode.trim() || 'TSRM2026',
-        onlineInstructions: onlineInstructions.trim() || undefined,
-        extraNote: extraNote || 'ลิงก์การประชุมนี้เป็นสิทธิ์เฉพาะตัวสำหรับผู้ลงทะเบียน โปรดอย่านำไปเผยแพร่ต่อสาธารณะ',
-      });
-
-      setPreviewSubject(`[ตัวอย่าง - สำหรับผู้เข้าชม Online] ยืนยันสิทธิ์เข้าร่วมประชุมออนไลน์ ${meeting?.meeting_name || 'TSRM 2026'}`);
-      setPreviewHtml(sampleHtml);
-    } else {
-      const sampleHtml = renderAttendeeTicketEmail({
-        recipientName: 'นายแพทย์สมชาย ตัวอย่างแพทย์ Onsite',
-        meetingName: meeting?.meeting_name || 'การประชุมวิชาการประจำปี TSRM 2026',
-        meetingDate: dateDisplay,
-        location: meeting?.location || 'โรงแรมสยาม เคมปินสกี้ กรุงเทพฯ',
-        ticketCode: isDailyPassMode ? `TSRM-DAY-${selectedMeetingId.substring(0, 6) || '2026'}-0012` : 'TSRM-2026-8899',
-        memberNo: '0123',
-        attendanceStatus: 'ยืนยันสิทธิ์เรียบร้อย',
-        qrCodeUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=TSRM-PASS:TSRM-DAY-SAMPLE-PASS',
-        extraNote: extraNote || (isDailyPassMode ? `บัตรสำหรับเข้าร่วม: ${activeProg?.programName || 'Main Program'} • QR Code นี้ใช้ได้เฉพาะวันนี้ 1 ครั้งเท่านั้น` : 'กรุณาแสดง QR Code นี้แก่เจ้าหน้าที่ ณ จุดลงทะเบียนหน้างาน'),
-      });
-
-      setPreviewSubject(`[ตัวอย่าง - สำหรับผู้เข้าชม Onsite] บัตรเข้างาน ${meeting?.meeting_name || 'TSRM 2026'}${isDailyPassMode ? ` (${activeProg?.programName || 'Daily Pass'}${selectedPrograms.length > 1 ? ` - 1 จาก ${selectedPrograms.length} รายการที่เลือก` : ''})` : ''}`);
-      setPreviewHtml(sampleHtml);
-    }
+    setPreviewSubject(`[ตัวอย่าง - สำหรับผู้เข้าชม Onsite] บัตรเข้างาน ${meeting?.meeting_name || 'TSRM 2026'}${isDailyPassMode ? ` (${activeProg?.programName || 'Daily Pass'}${selectedPrograms.length > 1 ? ` - 1 จาก ${selectedPrograms.length} รายการที่เลือก` : ''})` : ''}`);
+    setPreviewHtml(sampleHtml);
 
     setIsPreviewOpen(true);
   };
@@ -776,21 +722,12 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
               <div className="flex items-center gap-1.5 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => handlePreviewTicket('onsite')}
+                  onClick={() => handlePreviewTicket()}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs"
                   title="ดูตัวอย่างอีเมลสำหรับผู้เข้าร่วม Onsite (มี QR Code)"
                 >
                   <Eye className="w-3.5 h-3.5 text-blue-600" />
                   <span>ตัวอย่าง Onsite</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handlePreviewTicket('online')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-800 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs border border-sky-200"
-                  title="ดูตัวอย่างอีเมลสำหรับผู้เข้าร่วม Online (มีลิงก์ประชุม ไม่มี QR Code)"
-                >
-                  <Eye className="w-3.5 h-3.5 text-sky-600" />
-                  <span>ตัวอย่าง Online</span>
                 </button>
               </div>
             </div>
@@ -987,114 +924,22 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
               )}
             </div>
 
-            {/* 2. Format Filter (Onsite vs Online) */}
-            <div className="space-y-2 p-4 rounded-2xl bg-slate-50/80 border border-slate-200">
-              <label className="text-xs font-bold text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                <span className="flex items-center gap-1.5">
-                  <Globe className="w-3.5 h-3.5 text-[#0026b3]" />
-                  <span>รูปแบบการเข้าร่วม:</span>
-                </span>
-                <span className="text-[11px] text-slate-500 font-medium">
-                  {formatFilter === 'online'
-                    ? '🔵 ส่งเฉพาะผู้ลงทะเบียนออนไลน์ (ซิงค์อัตโนมัติ)'
-                    : (formatFilter === 'onsite'
-                    ? '🟢 ส่งเฉพาะผู้ลงทะเบียน Onsite (ซิงค์อัตโนมัติ)'
-                    : '✨ ส่งตามรูปแบบที่ลงทะเบียนจริงอัตโนมัติ')}
-                </span>
-              </label>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {[
-                  { id: 'all', label: '🌐 ทั้งหมด', desc: 'Onsite ได้ QR / Online ได้ลิงก์' },
-                  { id: 'onsite', label: '🏢 เฉพาะ Onsite', desc: 'ส่งบัตร QR Code สแกนหน้างาน' },
-                  { id: 'online', label: '💻 เฉพาะ Online', desc: 'ส่งลิงก์รับชม (ไม่มี QR Code)' },
-                ].map((fmt) => {
-                  const isDisabled = fmt.id !== 'all' && !formatAvailability[fmt.id as 'onsite' | 'online'];
-                  return (
-                    <button
-                      key={fmt.id}
-                      type="button"
-                      disabled={isDisabled}
-                      onClick={() => setFormatFilter(fmt.id as any)}
-                      title={isDisabled ? 'รายการที่เลือกไม่ได้จัดในรูปแบบนี้' : undefined}
-                      className={`p-3 rounded-xl text-left border transition ${
-                        isDisabled
-                          ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
-                          : formatFilter === fmt.id
-                          ? 'bg-blue-50 border-[#0026b3] text-[#0026b3] ring-1 ring-[#0026b3] cursor-pointer'
-                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer'
-                      }`}
-                    >
-                      <div className="text-xs font-black">{fmt.label}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">
-                        {isDisabled ? 'รายการที่เลือกไม่ได้จัดในรูปแบบนี้' : fmt.desc}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Online Meeting Configuration Details (Visible when Online or All is selected) */}
-              {(formatFilter === 'online' || formatFilter === 'all') && formatAvailability.anyOnline && (
-                <div className="mt-3 pt-3 border-t border-slate-200/80 space-y-3 bg-white p-3.5 rounded-xl border border-sky-100 shadow-2xs">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                    <span className="text-xs font-black text-sky-900 flex items-center gap-1.5">
-                      <Video className="w-3.5 h-3.5 text-sky-600" />
-                      <span>ข้อมูลห้องประชุมออนไลน์:</span>
-                    </span>
-                    <span className="text-[10px] text-sky-600 font-bold bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200 w-fit">
-                      สำหรับผู้เข้าร่วม Online
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600">ลิงก์เข้าร่วมห้องประชุม:</label>
-                      <input
-                        type="url"
-                        value={zoomUrl}
-                        onChange={(e) => setZoomUrl(e.target.value)}
-                        placeholder="https://zoom.us/j/1234567890?pwd=..."
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-[#0026b3]"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-600">Meeting ID / เลขห้อง:</label>
-                        <input
-                          type="text"
-                          value={meetingIdCredentials}
-                          onChange={(e) => setMeetingIdCredentials(e.target.value)}
-                          placeholder="เช่น 123 456 7890"
-                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-[#0026b3]"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-600">Passcode / รหัสผ่าน:</label>
-                        <input
-                          type="text"
-                          value={passcode}
-                          onChange={(e) => setPasscode(e.target.value)}
-                          placeholder="เช่น TSRM2026"
-                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-[#0026b3]"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600">คำแนะนำการเข้าร่วมออนไลน์เพิ่มเติม (ไม่บังคับ):</label>
-                      <input
-                        type="text"
-                        value={onlineInstructions}
-                        onChange={(e) => setOnlineInstructions(e.target.value)}
-                        placeholder="เช่น กรุณาตั้งชื่อในระบบ Zoom ให้ตรงกับชื่อที่ลงทะเบียน..."
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-[#0026b3]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
+            {/* 2. ส่งเฉพาะผู้เข้าร่วมแบบออนไซต์ */}
+            <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3.5 rounded-2xl border text-xs ${onsiteAvailable ? 'bg-slate-50/80 border-slate-200 text-slate-600' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+              <span className="flex items-center gap-1.5 font-bold">
+                <Globe className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
+                {onsiteAvailable
+                  ? 'ส่งบัตร QR Code เฉพาะผู้ลงทะเบียนแบบออนไซต์'
+                  : 'รายการที่เลือกไม่ได้จัดแบบออนไซต์ จึงไม่มีบัตร QR Code ให้ส่ง'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setActiveSubTab('online')}
+                className="flex items-center gap-1 font-black text-[#0026b3] hover:underline cursor-pointer w-fit"
+              >
+                <Video className="w-3.5 h-3.5" />
+                ผู้เข้าร่วมออนไลน์ส่งลิงก์ที่แท็บลิงก์ประชุมออนไลน์
+              </button>
             </div>
 
             {/* 3. Status Filter */}

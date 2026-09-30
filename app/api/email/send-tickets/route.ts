@@ -44,7 +44,6 @@ export async function POST(req: NextRequest) {
     const {
       meetingId,
       statusFilter = 'Registered', // 'Registered' | 'all' | 'Checked_In' | 'Non-Member'
-      formatFilter = 'all', // 'all' | 'onsite' | 'online'
       customRecipientList, // Optional array of { name, email, ticketCode, memberNo, status, format }
       extraNote,
       isDailyMode = false,
@@ -56,6 +55,8 @@ export async function POST(req: NextRequest) {
       passcode,
       onlineInstructions,
     } = body;
+    // ส่งบัตร QR เฉพาะผู้เข้าร่วมออนไซต์ ผู้เข้าร่วมออนไลน์รับลิงก์เฉพาะบุคคลจาก /api/admin/online-links/send
+    const formatFilter = 'onsite' as 'all' | 'onsite' | 'online';
 
     if (!meetingId && (!customRecipientList || customRecipientList.length === 0)) {
       return NextResponse.json({ success: false, error: 'Meeting ID is required' }, { status: 400 });

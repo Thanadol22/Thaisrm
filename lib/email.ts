@@ -1,6 +1,12 @@
 import nodemailer from 'nodemailer';
 import QRCode from 'qrcode';
 import {
+  renderOnlineReminderEmail,
+  renderOnlineLinkEmail,
+  OnlineMeetingEmailOptions,
+  OnlineLinkEmailOptions,
+} from './emailTemplates/onlineMeetingTemplates';
+import {
   renderMembershipApprovedEmail,
   renderMeetingApprovedEmail,
   renderCompanyGroupMembershipApprovedEmail,
@@ -598,6 +604,34 @@ export async function sendAttendeeOnlineEmail(params: SendAttendeeOnlineParams):
     to: params.to,
     subject: `ยืนยันสิทธิ์เข้าร่วมประชุมออนไลน์ ${params.meetingName} - คุณ ${params.recipientName}`,
     html,
+    customConfig: params.customConfig,
+  });
+}
+
+/**
+ * อีเมลเตือนผู้เข้าร่วมออนไลน์ก่อนวันงาน 1 วัน (ยังไม่มีลิงก์)
+ */
+export async function sendOnlineReminderEmail(
+  params: OnlineMeetingEmailOptions & { to: string; customConfig?: SmtpConfig }
+): Promise<EmailSendResult> {
+  return dispatchEmail({
+    to: params.to,
+    subject: `แจ้งเตือนการประชุมออนไลน์พรุ่งนี้ ${params.meetingName}`,
+    html: renderOnlineReminderEmail(params),
+    customConfig: params.customConfig,
+  });
+}
+
+/**
+ * อีเมลส่งลิงก์เข้าห้องประชุมเฉพาะบุคคลในวันงาน
+ */
+export async function sendOnlineLinkEmail(
+  params: OnlineLinkEmailOptions & { to: string; customConfig?: SmtpConfig }
+): Promise<EmailSendResult> {
+  return dispatchEmail({
+    to: params.to,
+    subject: `ลิงก์เข้าห้องประชุมออนไลน์ ${params.meetingName} - คุณ ${params.recipientName}`,
+    html: renderOnlineLinkEmail(params),
     customConfig: params.customConfig,
   });
 }
