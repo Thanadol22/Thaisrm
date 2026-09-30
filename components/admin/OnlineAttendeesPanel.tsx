@@ -150,6 +150,13 @@ export function OnlineAttendeesPanel({ meetings, meetingId, onMeetingChange, not
         notify(attJson.error || 'ไม่สามารถดึงรายชื่อผู้ลงทะเบียนได้');
         return;
       }
+      const meetingPrograms: DailyProgramInfo[] =
+        progJson.success && Array.isArray(progJson.data?.programs) ? progJson.data.programs : [];
+      // แสดงเฉพาะรายการที่เข้าร่วมแบบออนไลน์ได้ (เวิร์กช็อปที่จัดแบบออนไซต์อย่างเดียวยังคงเป็นออนไซต์)
+      const isOnlineProgram = (ap: { id: string; name: string }) => {
+        const defs = meetingPrograms.filter((dp) => programMatches(ap, dp));
+        return defs.length === 0 || defs.some((dp) => programSupportsFormat(dp.format, 'online'));
+      };
       setAttendees(
         (attJson.data || [])
           .filter((a: any) => a.attendanceType === 'online' && a.paymentStatus === 'paid')
@@ -159,10 +166,12 @@ export function OnlineAttendeesPanel({ meetings, meetingId, onMeetingChange, not
             nameTh: a.nameTh || '',
             nameEn: a.nameEn || '',
             email: a.email || '',
-            programs: (a.programs || []).map((p: any) => ({ id: String(p.id || ''), name: String(p.name || p.id || '') })),
+            programs: (a.programs || [])
+              .map((p: any) => ({ id: String(p.id || ''), name: String(p.name || p.id || '') }))
+              .filter(isOnlineProgram),
           }))
       );
-      setPrograms(progJson.success && Array.isArray(progJson.data?.programs) ? progJson.data.programs : []);
+      setPrograms(meetingPrograms);
       setPage(1);
     } catch (err: any) {
       notify(`เกิดข้อผิดพลาด: ${err?.message}`);
