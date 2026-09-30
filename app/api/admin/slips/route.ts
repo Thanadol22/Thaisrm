@@ -22,6 +22,50 @@ import {
   slipActivityList,
 } from '@/lib/services/registrationAddOnService';
 
+const MAIN_PROGRAM_PRICE = 4000;
+
+function attendeeHasMainProgram(att: any): boolean {
+  const acts = [
+    ...(Array.isArray(att?.selectedActivities) ? att.selectedActivities : []),
+    ...(Array.isArray(att?.activities) ? att.activities : []),
+  ];
+  // ไม่มีข้อมูลกิจกรรม = ลงเฉพาะการประชุมหลัก
+  if (acts.length === 0 && !att?.programNameTh && !att?.programNameEn) return true;
+  const isMainName = (name: unknown) => {
+    const n = String(name || '').toLowerCase();
+    return n.includes('การประชุมหลัก') || n.includes('main');
+  };
+  return (
+    acts.some((a: any) =>
+      typeof a === 'object' && a !== null
+        ? a.type === 'main' || a.id === 'main' || isMainName(a.name)
+        : a === 'main' || isMainName(a)
+    ) ||
+    isMainName(att?.programNameTh) ||
+    isMainName(att?.programNameEn)
+  );
+}
+
+/**
+ * ส่วนลดคูปองของผู้ลงทะเบียนในกลุ่ม: ใช้ค่าที่บันทึกไว้ตอนลงทะเบียน (รวมถึง 0)
+ * ประมาณค่าเฉพาะรายการเก่าที่ไม่มีข้อมูลส่วนลด โดยคูปองครอบคลุมเฉพาะการประชุมหลักของสมาชิก
+ */
+function estimateAttendeeCouponDiscount(att: any, couponRecord: any): number {
+  if (!att || att.isAddOn) return 0;
+  const stored = att.discountTotal ?? att.discountAmount;
+  if (stored !== undefined && stored !== null && stored !== '') return Number(stored) || 0;
+
+  const isMember = Boolean(att.isMember || att.memberNo) && !att.isExpiredMember;
+  if (!isMember) return 0;
+  const type = String(couponRecord?.discount_type || 'free').toLowerCase();
+  if (type === 'fixed') return Number(couponRecord?.discount_value) || 0;
+  if (type === 'percent') {
+    const attPrice = Number(att.subtotal || att.price || 0);
+    return Math.round(attPrice * ((Number(couponRecord?.discount_value) || 0) / 100));
+  }
+  return attendeeHasMainProgram(att) ? MAIN_PROGRAM_PRICE : 0;
+}
+
 // GET: Fetch all payment slips for Admin Review
 export async function GET(request: NextRequest) {
   const session = getAdminSessionFromRequest(request);
@@ -310,28 +354,7 @@ export async function GET(request: NextRequest) {
           if (matchedCu?.discount_applied && Number(matchedCu.discount_applied) > 0) {
             return sum + Number(matchedCu.discount_applied);
           }
-          if (att.discountTotal && Number(att.discountTotal) > 0) {
-            return sum + Number(att.discountTotal);
-          }
-          if (att.discountAmount && Number(att.discountAmount) > 0) {
-            return sum + Number(att.discountAmount);
-          }
-          const attActs = att.selectedActivities || [];
-          const hasMain = attActs.some((a: any) =>
-            a.name?.toLowerCase().includes('main') ||
-            a.name?.includes('Main Program') ||
-            a.name?.includes('การประชุมหลัก')
-          ) || att.programNameTh?.includes('Main') || att.programNameEn?.includes('Main') || true;
-
-          if (couponRecord?.discount_type === 'free' || couponInfo?.discountType === 'free' || couponCode) {
-            return sum + (hasMain ? 4000 : 0);
-          } else if (couponRecord?.discount_type === 'fixed') {
-            return sum + (Number(couponRecord.discount_value) || 0);
-          } else if (couponRecord?.discount_type === 'percent') {
-            const attPrice = Number(att.subtotal || att.price || 0);
-            return sum + (attPrice * ((Number(couponRecord.discount_value) || 0) / 100));
-          }
-          return sum;
+          return sum + (couponCode ? estimateAttendeeCouponDiscount(att, couponRecord) : 0);
         }, 0);
       }
 
@@ -358,7 +381,7 @@ export async function GET(request: NextRequest) {
 
       // 5. If individual registration with free coupon
       let singleFreeDiscount = 0;
-      if (!Array.isArray(attendees) || attendees.length <= 1) {
+      if (!Array.isArray(attendees) || attendees.length === 0) {
         if (couponRecord?.discount_type === 'free' || couponInfo?.discountType === 'free' || Boolean(couponCode)) {
           singleFreeDiscount = 4000;
         }
@@ -391,16 +414,10 @@ export async function GET(request: NextRequest) {
             const attInGroup = attendees.find(
               (a: any) => (a.memberNo && a.memberNo === sgm.member_no) || (a.email && a.email.toLowerCase() === sgm.attendee_email?.toLowerCase())
             );
-            const acts = attInGroup?.selectedActivities || [];
-            const hasMain = acts.some((a: any) =>
-              a.name?.toLowerCase().includes('main') ||
-              a.name?.includes('Main Program') ||
-              a.name?.includes('การประชุมหลัก')
-            ) || attInGroup?.programNameTh?.includes('Main') || true;
-
             const discount = Number(sgm.discount_amount) > 0
               ? Number(sgm.discount_amount)
-              : (couponRecord?.discount_type === 'free' && hasMain ? 4000 : (Number(couponRecord?.discount_value) || 4000));
+              : (attInGroup ? estimateAttendeeCouponDiscount(attInGroup, couponRecord) : 0);
+            if (discount <= 0) return;
 
             couponUsagesList.push({
               id: sgm.id ? sgm.id.toString() : `sgm-${sgm.member_no}`,
@@ -416,15 +433,8 @@ export async function GET(request: NextRequest) {
           });
         } else if (Array.isArray(attendees) && attendees.length > 0) {
           attendees.forEach((att: any, idx: number) => {
-            if (att.isAddOn) return; // ผู้ที่ลงเพิ่มไม่ได้ใช้สิทธิ์คูปอง
-            const acts = att.selectedActivities || [];
-            const hasMain = acts.some((a: any) =>
-              a.name?.toLowerCase().includes('main') ||
-              a.name?.includes('Main Program') ||
-              a.name?.includes('การประชุมหลัก')
-            ) || att.programNameTh?.includes('Main') || true;
-
-            const discount = couponRecord?.discount_type === 'free' && hasMain ? 4000 : (Number(couponRecord?.discount_value) || 4000);
+            const discount = estimateAttendeeCouponDiscount(att, couponRecord);
+            if (discount <= 0) return; // ผู้ที่ลงเพิ่ม บุคคลทั่วไป หรือไม่ได้ลงการประชุมหลัก ไม่ได้ใช้สิทธิ์คูปอง
             couponUsagesList.push({
               id: `att-${idx}`,
               couponCode: couponCode,
@@ -441,24 +451,13 @@ export async function GET(request: NextRequest) {
       } else if (Array.isArray(attendees) && attendees.length > couponUsagesList.length && (couponRecord || couponCode)) {
         // Supplement any missing group attendees to couponUsagesList
         attendees.forEach((att: any, idx: number) => {
-          if (att.isAddOn) return; // ผู้ที่ลงเพิ่มไม่ได้ใช้สิทธิ์คูปอง
           const alreadyInList = couponUsagesList.some(
             (cu: any) => (att.memberNo && cu.memberNo === att.memberNo) ||
               (att.email && cu.attendeeEmail?.toLowerCase() === att.email.toLowerCase()) ||
               (att.nameTh && cu.attendeeName === att.nameTh)
           );
-          if (!alreadyInList) {
-            const acts = att.selectedActivities || [];
-            const hasMain = acts.some((a: any) =>
-              a.name?.toLowerCase().includes('main') ||
-              a.name?.includes('Main Program') ||
-              a.name?.includes('การประชุมหลัก')
-            ) || att.programNameTh?.includes('Main') || true;
-
-            const discount = Number(att.discountTotal || att.discountAmount || 0) > 0
-              ? Number(att.discountTotal || att.discountAmount)
-              : ((couponRecord?.discount_type === 'free' || couponInfo?.discountType === 'free') && hasMain ? 4000 : (Number(couponRecord?.discount_value) || 4000));
-
+          const discount = alreadyInList ? 0 : estimateAttendeeCouponDiscount(att, couponRecord);
+          if (discount > 0) {
             couponUsagesList.push({
               id: `att-supp-${idx}`,
               couponCode: couponCode,
