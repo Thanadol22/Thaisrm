@@ -1802,7 +1802,7 @@ export function ProfileAndSponsorUpdateModal({
                               <p className="text-red-600 text-[11px] mt-0.5">เหตุผล: {s.rejection_reason}</p>
                             )}
                           </div>
-                          {s.slip_url && s.slip_url !== 'PAY_LATER' && s.slip_url !== 'pay_later_pending' && s.slip_url !== '/placeholder-slip.png' && s.slip_url !== 'GROUP_REGISTRATION' && s.slip_url !== 'GROUP_MEMBERSHIP' && (
+                          {s.slip_url && s.slip_url !== 'PAY_LATER' && s.slip_url !== 'pay_later_pending' && s.slip_url !== '/placeholder-slip.png' && s.slip_url !== 'GROUP_REGISTRATION' && s.slip_url !== 'GROUP_MEMBERSHIP' && !s.slip_url.startsWith('TEMP_') && (
                             <a
                               href={s.slip_url}
                               target="_blank"

@@ -12,6 +12,7 @@ import { createMember } from '@/lib/services/memberService';
 import { getSystemSettings } from '@/lib/services/settingsService';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 import { createReceiptForApprovedSlip } from '@/lib/services/receiptService';
+import { getAdminAttachedSlipUrl } from '@/lib/adminAttachedSlip';
 import {
   ADD_ON_MERGED_STATUS,
   AddOnMergeError,
@@ -865,7 +866,8 @@ export async function GET(request: NextRequest) {
           transferTime: s.transfer_time || '',
           transferDate: s.transfer_date || '',
           refNo: s.ref_no || s.slip_id,
-          slipUrl: s.slip_url,
+          slipUrl: getAdminAttachedSlipUrl(s.slip_url) || s.slip_url,
+          adminAttachedSlip: Boolean(getAdminAttachedSlipUrl(s.slip_url)),
           status: s.status as 'pending' | 'approved' | 'rejected',
           notes: s.rejection_reason || undefined,
           resubmitToken: s.resubmit_token,
@@ -1193,7 +1195,8 @@ export async function GET(request: NextRequest) {
           transferTime: s.transfer_time || '',
           transferDate: s.transfer_date || '',
           refNo: s.ref_no || s.slip_id,
-          slipUrl: s.slip_url,
+          slipUrl: getAdminAttachedSlipUrl(s.slip_url) || s.slip_url,
+          adminAttachedSlip: Boolean(getAdminAttachedSlipUrl(s.slip_url)),
           status: s.status as 'pending' | 'approved' | 'rejected',
           notes: s.rejection_reason || undefined,
           resubmitToken: s.resubmit_token,
@@ -1507,6 +1510,16 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'รายการนี้ถูกรวมเข้ากับรายการลงทะเบียนเดิมแล้ว ไม่สามารถเปลี่ยนสถานะได้' },
         { status: 400 }
       );
+    }
+
+    // สลิปที่แอดมินแนบไว้ล่วงหน้า: อนุมัติแล้วจึงนับเป็นสลิปจริง (ชำระเงินเรียบร้อย)
+    const adminAttachedSlipUrl = action === 'approve' ? getAdminAttachedSlipUrl(slip.slip_url) : null;
+    if (adminAttachedSlipUrl) {
+      await prisma.payment_slips.update({
+        where: { slip_id: slipId },
+        data: { slip_url: adminAttachedSlipUrl },
+      });
+      slip.slip_url = adminAttachedSlipUrl;
     }
 
     // ลงทะเบียนเพิ่มเติม: อนุมัติแล้วรวมกิจกรรมและยอดเงินเข้ารายการเดิม

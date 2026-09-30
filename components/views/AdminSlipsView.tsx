@@ -26,8 +26,10 @@ import {
   FileText,
   ChevronDown,
   ChevronUp,
+  Upload,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { uploadImageToStorage } from '@/lib/blobUpload';
 import { PaginationControls } from '@/components/PaginationControls';
 import { MemberDetailModal } from '@/components/MemberDetailModal';
 
@@ -218,10 +220,13 @@ export interface SlipRecord {
   isPayLater?: boolean;
   isPendingPaymentReview?: boolean;
   hasActualSlip?: boolean;
+  /** แอดมินแนบสลิปไว้แล้ว รออนุมัติการชำระเงิน (slipUrl คือสลิปที่แนบ แต่ยังไม่นับเป็นชำระแล้ว) */
+  adminAttachedSlip?: boolean;
 }
 
 export const hasActualSlip = (s?: SlipRecord | null) =>
   Boolean(
+    !s?.adminAttachedSlip &&
     s?.slipUrl &&
     s.slipUrl !== 'PAY_LATER' &&
     s.slipUrl !== 'pay_later_pending' &&
@@ -230,6 +235,10 @@ export const hasActualSlip = (s?: SlipRecord | null) =>
     s.slipUrl !== 'GROUP_MEMBERSHIP' &&
     !s.slipUrl.startsWith('TEMP_')
   );
+
+/** รอตรวจสอบ หรืออนุมัติสิทธิ์แล้วแต่มีสลิปที่แอดมินแนบไว้รออนุมัติการชำระเงิน */
+export const canApproveSlip = (s: SlipRecord) =>
+  s.status === 'pending' || (s.status === 'approved' && Boolean(s.adminAttachedSlip));
 
 export const isPdfSlipUrl = (url?: string | null) => {
   if (!url) return false;
@@ -278,6 +287,18 @@ export function getSlipLifecycleStage(s: SlipRecord): SlipLifecycleStage {
 }
 
 export function renderSlipStatusBadge(s: SlipRecord, lang: 'th' | 'en' = 'th') {
+  if (!s.adminAttachedSlip || s.status === 'rejected') return renderLifecycleBadge(s, lang);
+  return (
+    <>
+      {renderLifecycleBadge(s, lang)}
+      <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-sky-100 text-sky-900 border border-sky-300 shadow-2xs">
+        {lang === 'th' ? '📎 แนบสลิปแล้ว - รออนุมัติการชำระเงิน' : '📎 Slip Attached - Awaiting Payment Approval'}
+      </span>
+    </>
+  );
+}
+
+function renderLifecycleBadge(s: SlipRecord, lang: 'th' | 'en') {
   const stage = getSlipLifecycleStage(s);
 
   switch (stage) {
@@ -421,6 +442,15 @@ export function AdminSlipsView() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingSlipId, setProcessingSlipId] = useState<string | null>(null);
 
+  // Admin attach slip modal state
+  const [attachingSlip, setAttachingSlip] = useState<SlipRecord | null>(null);
+  const [attachFile, setAttachFile] = useState<File | null>(null);
+  const [attachPreviewUrl, setAttachPreviewUrl] = useState<string | null>(null);
+  const [attachTransferDate, setAttachTransferDate] = useState('');
+  const [attachTransferTime, setAttachTransferTime] = useState('');
+  const [attachUploading, setAttachUploading] = useState(false);
+  const [attachError, setAttachError] = useState('');
+
   useEffect(() => {
     setMounted(true);
     fetchSlips();
@@ -457,6 +487,84 @@ export function AdminSlipsView() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const openAttachModal = (slip: SlipRecord, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setAttachingSlip(slip);
+    setAttachFile(null);
+    setAttachPreviewUrl(null);
+    setAttachTransferDate('');
+    setAttachTransferTime('');
+    setAttachError('');
+  };
+
+  const closeAttachModal = () => {
+    if (attachUploading) return;
+    if (attachPreviewUrl) URL.revokeObjectURL(attachPreviewUrl);
+    setAttachingSlip(null);
+    setAttachFile(null);
+    setAttachPreviewUrl(null);
+  };
+
+  const handleAttachFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // ล้างค่าเพื่อให้เลือกไฟล์เดิมซ้ำได้หลังเปลี่ยนใจ
+    e.target.value = '';
+    if (!file) return;
+    if (attachPreviewUrl) URL.revokeObjectURL(attachPreviewUrl);
+    setAttachFile(file);
+    setAttachPreviewUrl(URL.createObjectURL(file));
+    setAttachError('');
+  };
+
+  const handleConfirmAttach = async () => {
+    if (!attachingSlip) return;
+    if (!attachFile) {
+      setAttachError('กรุณาเลือกไฟล์สลิป');
+      return;
+    }
+    try {
+      setAttachUploading(true);
+      setAttachError('');
+      const uploaded = await uploadImageToStorage(attachFile, 'slips');
+      const res = await fetch('/api/admin/slips/attach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slipId: attachingSlip.id,
+          slipUrl: uploaded.url,
+          transferDate: attachTransferDate,
+          transferTime: attachTransferTime,
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setAttachError(json.error || 'ไม่สามารถแนบสลิปได้');
+        return;
+      }
+      const patch = {
+        slipUrl: json.data.slipUrl,
+        adminAttachedSlip: Boolean(json.data.awaitingApproval),
+        transferDate: json.data.transferDate,
+        transferTime: json.data.transferTime,
+      };
+      setSlips((prev) => prev.map((s) => (s.id === attachingSlip.id ? { ...s, ...patch } : s)));
+      setSelectedSlip((prev) => (prev && prev.id === attachingSlip.id ? { ...prev, ...patch } : prev));
+      if (attachPreviewUrl) URL.revokeObjectURL(attachPreviewUrl);
+      setAttachingSlip(null);
+      setAttachFile(null);
+      setAttachPreviewUrl(null);
+      showToast(
+        json.data.awaitingApproval
+          ? '✓ แนบสลิปเรียบร้อยแล้ว สถานะจะเปลี่ยนเป็นชำระเงินเรียบร้อยเมื่อกดอนุมัติ'
+          : '✓ เปลี่ยนรูปสลิปเรียบร้อยแล้ว'
+      );
+    } catch (err: any) {
+      setAttachError(err?.message || 'เกิดข้อผิดพลาดในการอัปโหลดสลิป');
+    } finally {
+      setAttachUploading(false);
+    }
   };
 
   const handleApprove = async (id: string, e?: React.MouseEvent) => {
@@ -519,6 +627,7 @@ export function AdminSlipsView() {
               ? {
                 ...s,
                 status: 'approved',
+                adminAttachedSlip: false,
                 notes: undefined,
                 memberNo: approvedMemberNo || s.memberNo,
                 isMember: Boolean(approvedMemberNo || s.isMember),
@@ -532,6 +641,7 @@ export function AdminSlipsView() {
               ? {
                 ...prev,
                 status: 'approved',
+                adminAttachedSlip: false,
                 notes: undefined,
                 memberNo: approvedMemberNo || prev.memberNo,
                 isMember: Boolean(approvedMemberNo || prev.isMember),
@@ -1354,7 +1464,19 @@ export function AdminSlipsView() {
                     </button>
                   )}
 
-                  {slip.status === 'pending' && (
+                  {(slip.status === 'pending' || slip.status === 'approved') && (
+                    <button
+                      onClick={(e) => openAttachModal(slip, e)}
+                      disabled={isProcessing}
+                      className="p-2 sm:px-3 sm:py-2 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+                      title={lang === 'th' ? 'แนบสลิปแทนผู้ลงทะเบียน' : 'Attach slip on behalf of registrant'}
+                    >
+                      <Upload className="w-4 h-4 text-sky-600" />
+                      <span className="hidden sm:inline">{slip.adminAttachedSlip || hasActualSlip(slip) ? (lang === 'th' ? 'เปลี่ยนสลิป' : 'Replace Slip') : (lang === 'th' ? 'แนบสลิป' : 'Attach Slip')}</span>
+                    </button>
+                  )}
+
+                  {canApproveSlip(slip) && (
                     <>
                       <button
                         onClick={(e) => handleApprove(slip.id, e)}
@@ -1363,7 +1485,11 @@ export function AdminSlipsView() {
                             ? 'bg-emerald-300 opacity-90 cursor-wait'
                             : 'bg-[#4ade80] hover:bg-[#3ec424]'
                           }`}
-                        title={lang === 'th' ? 'อนุมัติ' : 'Approve'}
+                        title={
+                          slip.adminAttachedSlip
+                            ? (lang === 'th' ? 'อนุมัติการชำระเงิน' : 'Approve Payment')
+                            : (lang === 'th' ? 'อนุมัติ' : 'Approve')
+                        }
                       >
                         {processingSlipId === slip.id ? (
                           <>
@@ -1373,19 +1499,25 @@ export function AdminSlipsView() {
                         ) : (
                           <>
                             <Check className="w-4 h-4 stroke-[3]" />
-                            <span>{lang === 'th' ? 'อนุมัติ' : 'Approve'}</span>
+                            <span>
+                              {slip.adminAttachedSlip
+                                ? (lang === 'th' ? 'อนุมัติการชำระเงิน' : 'Approve Payment')
+                                : (lang === 'th' ? 'อนุมัติ' : 'Approve')}
+                            </span>
                           </>
                         )}
                       </button>
 
-                      <button
-                        onClick={(e) => openRejectModal(slip.id, e)}
-                        disabled={isProcessing}
-                        className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer active:scale-95"
-                        title={lang === 'th' ? 'ปฏิเสธ' : 'Reject'}
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      {slip.status === 'pending' && (
+                        <button
+                          onClick={(e) => openRejectModal(slip.id, e)}
+                          disabled={isProcessing}
+                          className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer active:scale-95"
+                          title={lang === 'th' ? 'ปฏิเสธ' : 'Reject'}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
@@ -2357,17 +2489,31 @@ export function AdminSlipsView() {
                   <span className="hidden sm:inline">{lang === 'th' ? 'ปิดหน้าต่าง' : 'Close'}</span>
                 </button>
 
-                {selectedSlip.status === 'pending' && (
+                {(selectedSlip.status === 'pending' || selectedSlip.status === 'approved') && (
+                  <button
+                    onClick={() => openAttachModal(selectedSlip)}
+                    disabled={isProcessing}
+                    className="ml-auto px-3 sm:px-4 py-2 sm:py-2.5 bg-sky-100 hover:bg-sky-200 text-sky-800 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                    title={lang === 'th' ? 'แนบสลิปแทนผู้ลงทะเบียน' : 'Attach slip on behalf of registrant'}
+                  >
+                    <Upload className="w-4 h-4 text-sky-600 shrink-0" />
+                    <span className="hidden sm:inline">{selectedSlip.adminAttachedSlip || hasActualSlip(selectedSlip) ? (lang === 'th' ? 'เปลี่ยนสลิป' : 'Replace Slip') : (lang === 'th' ? 'แนบสลิป' : 'Attach Slip')}</span>
+                  </button>
+                )}
+
+                {canApproveSlip(selectedSlip) && (
                   <div className="flex items-center gap-1.5 sm:gap-2">
-                    <button
-                      onClick={() => openRejectModal(selectedSlip.id)}
-                      disabled={isProcessing}
-                      className="px-3 sm:px-4 py-2 sm:py-2.5 bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap active:scale-95"
-                      title={lang === 'th' ? 'ปฏิเสธสลิป' : 'Reject Slip'}
-                    >
-                      <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                      <span className="hidden sm:inline">{lang === 'th' ? 'ปฏิเสธสลิป' : 'Reject'}</span>
-                    </button>
+                    {selectedSlip.status === 'pending' && (
+                      <button
+                        onClick={() => openRejectModal(selectedSlip.id)}
+                        disabled={isProcessing}
+                        className="px-3 sm:px-4 py-2 sm:py-2.5 bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                        title={lang === 'th' ? 'ปฏิเสธสลิป' : 'Reject Slip'}
+                      >
+                        <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span className="hidden sm:inline">{lang === 'th' ? 'ปฏิเสธสลิป' : 'Reject'}</span>
+                      </button>
+                    )}
 
                     <button
                       onClick={() => handleApprove(selectedSlip.id)}
@@ -2377,7 +2523,7 @@ export function AdminSlipsView() {
                           : 'bg-[#4ade80] hover:bg-[#3ec424]'
                         }`}
                       title={
-                        hasActualSlip(selectedSlip)
+                        (hasActualSlip(selectedSlip) || selectedSlip.adminAttachedSlip)
                           ? (lang === 'th' ? 'อนุมัติการชำระเงิน' : 'Approve Payment')
                           : isRegisteredAsPayLater(selectedSlip)
                             ? (lang === 'th' ? 'อนุมัติสิทธิ์การเข้าร่วม' : 'Approve Access')
@@ -2393,7 +2539,7 @@ export function AdminSlipsView() {
                         <>
                           <CheckCircle2 className="w-4 h-4 text-[#061d08] shrink-0" />
                           <span className="hidden sm:inline">
-                            {hasActualSlip(selectedSlip)
+                            {(hasActualSlip(selectedSlip) || selectedSlip.adminAttachedSlip)
                               ? (lang === 'th' ? 'อนุมัติการชำระเงิน' : 'Approve Payment')
                               : isRegisteredAsPayLater(selectedSlip)
                                 ? (lang === 'th' ? 'อนุมัติสิทธิ์การเข้าร่วม' : 'Approve Access')
@@ -2404,6 +2550,161 @@ export function AdminSlipsView() {
                     </button>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* Admin Attach Slip Modal */}
+      {mounted &&
+        attachingSlip &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+            <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-sky-50 text-sky-600">
+                    <Upload className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">
+                      {attachingSlip.adminAttachedSlip || hasActualSlip(attachingSlip)
+                        ? (lang === 'th' ? 'เปลี่ยนสลิปการโอนเงิน' : 'Replace Transfer Slip')
+                        : (lang === 'th' ? 'แนบสลิปการโอนเงิน' : 'Attach Transfer Slip')}
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      {attachingSlip.companyName || attachingSlip.nameTh} · {attachingSlip.ticketCode || attachingSlip.id}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={closeAttachModal}
+                  disabled={attachUploading}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 cursor-pointer disabled:opacity-50"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
+                <span>{lang === 'th' ? 'ยอดที่ต้องชำระ' : 'Amount due'}</span>
+                <span className="font-black text-slate-900 text-sm">฿{Number(attachingSlip.amount || 0).toLocaleString()}</span>
+              </div>
+
+              {(attachingSlip.adminAttachedSlip || hasActualSlip(attachingSlip)) && (
+                <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center justify-between gap-3">
+                  <span>{lang === 'th' ? 'สลิปปัจจุบันจะถูกแทนที่ด้วยไฟล์ใหม่' : 'The current slip will be replaced'}</span>
+                  <a
+                    href={attachingSlip.slipUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-amber-900 underline inline-flex items-center gap-1 shrink-0"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    {lang === 'th' ? 'ดูสลิปปัจจุบัน' : 'View current'}
+                  </a>
+                </div>
+              )}
+
+              <label
+                htmlFor="admin-attach-slip-input"
+                className="block border-2 border-dashed border-slate-300 hover:border-sky-400 rounded-2xl p-4 text-center cursor-pointer transition bg-slate-50/50"
+              >
+                {attachFile && attachPreviewUrl ? (
+                  attachFile.type === 'application/pdf' ? (
+                    <div className="flex flex-col items-center gap-1 text-rose-600 py-4">
+                      <FileText className="w-8 h-8" />
+                      <span className="text-xs font-bold break-all">{attachFile.name}</span>
+                    </div>
+                  ) : (
+                    <img src={attachPreviewUrl} alt="Slip preview" className="max-h-64 mx-auto rounded-xl object-contain" />
+                  )
+                ) : null}
+                {attachFile && attachPreviewUrl ? (
+                  <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-sky-700">
+                    <RotateCw className="w-3.5 h-3.5" />
+                    {lang === 'th' ? 'เลือกผิดรูป? คลิกเพื่อเลือกไฟล์ใหม่' : 'Wrong file? Click to choose another'}
+                  </span>
+                ) : (
+                  <div className="flex flex-col items-center gap-1.5 text-slate-500 py-6">
+                    <Upload className="w-7 h-7 text-slate-400" />
+                    <span className="text-xs font-bold">
+                      {lang === 'th' ? 'คลิกเพื่อเลือกรูปสลิปหรือไฟล์ PDF' : 'Click to choose a slip image or PDF'}
+                    </span>
+                  </div>
+                )}
+              </label>
+              <input
+                id="admin-attach-slip-input"
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={handleAttachFileChange}
+                disabled={attachUploading}
+                className="hidden"
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="space-y-1">
+                  <span className="text-[11px] font-bold text-slate-600">{lang === 'th' ? 'วันที่โอน' : 'Transfer date'}</span>
+                  <input
+                    type="date"
+                    value={attachTransferDate}
+                    onChange={(e) => setAttachTransferDate(e.target.value)}
+                    disabled={attachUploading}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-sky-200"
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[11px] font-bold text-slate-600">{lang === 'th' ? 'เวลาที่โอน' : 'Transfer time'}</span>
+                  <input
+                    type="time"
+                    value={attachTransferTime}
+                    onChange={(e) => setAttachTransferTime(e.target.value)}
+                    disabled={attachUploading}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-sky-200"
+                  />
+                </label>
+              </div>
+
+              <p className="text-[11px] text-slate-500">
+                {lang === 'th'
+                  ? 'สถานะรายการจะคงเดิม เมื่อกดอนุมัติ ระบบจะปรับเป็นชำระเงินเรียบร้อย ออกใบเสร็จ และส่งอีเมลยืนยัน'
+                  : 'The status stays the same. Approving marks it as paid, issues the receipt and sends confirmation.'}
+              </p>
+
+              {attachError && (
+                <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{attachError}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2.5 pt-1">
+                <button
+                  onClick={closeAttachModal}
+                  disabled={attachUploading}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
+                >
+                  {lang === 'th' ? 'ยกเลิก' : 'Cancel'}
+                </button>
+                <button
+                  onClick={handleConfirmAttach}
+                  disabled={attachUploading || !attachFile}
+                  className="px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-black rounded-xl transition cursor-pointer shadow-md disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {attachUploading ? (
+                    <>
+                      <RotateCw className="w-4 h-4 animate-spin" />
+                      <span>{lang === 'th' ? 'กำลังอัปโหลด...' : 'Uploading...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      <span>{lang === 'th' ? 'ยืนยันแนบสลิป' : 'Attach Slip'}</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>,
