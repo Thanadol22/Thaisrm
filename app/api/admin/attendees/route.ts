@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 import { isAddOnPayload } from '@/lib/services/registrationAddOnService';
+import { assertSeatsForReactivatedSlip, SeatUnavailableError } from '@/lib/services/activitySeatService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -616,7 +617,38 @@ export async function PATCH(request: NextRequest) {
     // Handle Payment Status Update Action
     if (paymentStatus || action === 'update_payment_status') {
       const targetPaymentStatus = paymentStatus as 'paid' | 'pending' | 'rejected';
-      
+
+      // Find corresponding payment slip
+      const slipWhereOr: any[] = [];
+      if (existing.member_no) slipWhereOr.push({ member_no: existing.member_no });
+      if (existing.attendee_email) slipWhereOr.push({ guest_email: existing.attendee_email });
+      if (existing.attendee_phone) slipWhereOr.push({ guest_phone: existing.attendee_phone });
+
+      const slip = slipWhereOr.length > 0 && (prisma as any).payment_slips
+        ? await (prisma as any).payment_slips.findFirst({
+            where: {
+              meeting_id: existing.meeting_id,
+              OR: slipWhereOr,
+            },
+            orderBy: { created_at: 'desc' },
+          })
+        : null;
+
+      // รายการที่ถูกปฏิเสธคืนที่นั่งไปแล้ว: เปลี่ยนกลับได้เฉพาะเมื่อเวิร์กช็อปยังมีที่นั่งเหลือ
+      if (slip?.status === 'rejected' && targetPaymentStatus !== 'rejected') {
+        try {
+          await assertSeatsForReactivatedSlip(slip);
+        } catch (seatErr) {
+          if (seatErr instanceof SeatUnavailableError) {
+            return NextResponse.json(
+              { success: false, error: seatErr.message, code: 'SEATS_UNAVAILABLE' },
+              { status: 409 }
+            );
+          }
+          throw seatErr;
+        }
+      }
+
       let nextAttendanceStatus = existing.attendance_status;
       if (targetPaymentStatus === 'paid') {
         nextAttendanceStatus = existing.checkin_time ? 'Attended' : 'Registered';
@@ -633,33 +665,18 @@ export async function PATCH(request: NextRequest) {
         },
       });
 
-      // Update or find corresponding payment slip
-      const slipWhereOr: any[] = [];
-      if (existing.member_no) slipWhereOr.push({ member_no: existing.member_no });
-      if (existing.attendee_email) slipWhereOr.push({ guest_email: existing.attendee_email });
-      if (existing.attendee_phone) slipWhereOr.push({ guest_phone: existing.attendee_phone });
-
-      if (slipWhereOr.length > 0 && (prisma as any).payment_slips) {
-        const slip = await (prisma as any).payment_slips.findFirst({
-          where: {
-            meeting_id: existing.meeting_id,
-            OR: slipWhereOr,
+      // Update corresponding payment slip
+      if (slip) {
+        const slipStatus = targetPaymentStatus === 'paid' ? 'approved' : targetPaymentStatus;
+        await (prisma as any).payment_slips.update({
+          where: { slip_id: slip.slip_id },
+          data: {
+            status: slipStatus,
+            rejection_reason: targetPaymentStatus === 'rejected' ? (rejectionReason || 'ผู้ดูแลระบบปฏิเสธการชำระเงิน') : null,
+            reviewed_by: session.username || 'Admin',
+            reviewed_at: new Date(),
           },
-          orderBy: { created_at: 'desc' },
         });
-
-        if (slip) {
-          const slipStatus = targetPaymentStatus === 'paid' ? 'approved' : targetPaymentStatus;
-          await (prisma as any).payment_slips.update({
-            where: { slip_id: slip.slip_id },
-            data: {
-              status: slipStatus,
-              rejection_reason: targetPaymentStatus === 'rejected' ? (rejectionReason || 'ผู้ดูแลระบบปฏิเสธการชำระเงิน') : null,
-              reviewed_by: session.username || 'Admin',
-              reviewed_at: new Date(),
-            },
-          });
-        }
       }
 
       return NextResponse.json({

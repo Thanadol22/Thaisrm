@@ -14,6 +14,11 @@ import {
   mergeGroupAddOnAttendees,
   slipActivityList,
 } from '@/lib/services/registrationAddOnService';
+import {
+  countSlipSeatClaims,
+  lockAndAssertSeats,
+  SeatUnavailableError,
+} from '@/lib/services/activitySeatService';
 
 export async function POST(
   request: NextRequest,
@@ -250,9 +255,17 @@ export async function POST(
         ? attendees.find((a: any) => a.memberNo && !a.isAddOn)?.memberNo?.trim() || null
         : null;
 
+      const requestedSeats = countSlipSeatClaims(
+        { ticket_code: 'GRP', selected_activities: groupPayload },
+        meeting.activities
+      );
+
       // ห่อทุก DB write ด้วย Transaction เพื่อความ Atomic
       let slip: any;
       await prisma.$transaction(async (tx) => {
+        // ตัดที่นั่งเวิร์กช็อปตั้งแต่ส่งรายการ (ยังไม่ต้องรออนุมัติ)
+        await lockAndAssertSeats(tx, meetingId, requestedSeats, { meetingActivities: meeting.activities });
+
         let effectiveCompanyEmail = groupContact?.coordinatorEmail?.trim() || (groupPayload as any)?.companyEmail?.trim() || (groupPayload as any)?.sponsorSession?.contactEmail?.trim() || null;
         if (!effectiveCompanyEmail && effectiveSponsorId) {
           const spRec = await tx.sponsors.findUnique({
@@ -892,10 +905,12 @@ export async function POST(
       };
     }
 
-    // 2. Record payment slip in payment_slips table
+    // 2. Record payment slip in payment_slips table (ตัดที่นั่งเวิร์กช็อปพร้อมกันใน Transaction)
+    const requestedSeats = countSlipSeatClaims({ selected_activities: effectiveSelectedActivities }, meeting.activities);
     let slip: any = null;
-    if ((prisma as any).payment_slips) {
-      slip = await (prisma as any).payment_slips.create({
+    await prisma.$transaction(async (tx) => {
+      await lockAndAssertSeats(tx, meetingId, requestedSeats, { meetingActivities: meeting.activities });
+      slip = await tx.payment_slips.create({
         data: {
           slip_id: slipId,
           meeting_id: meetingId,
@@ -913,28 +928,12 @@ export async function POST(
           ref_no: refNo || (couponRecord ? `COUPON:${couponRecord.code}` : null),
           slip_url: effectiveSlipUrl,
           status: registrationStatus,
-          selected_activities: effectiveSelectedActivities,
+          selected_activities: effectiveSelectedActivities as any,
           reviewed_by: registrationStatus === 'approved' ? (couponRecord ? `SYSTEM:COUPON(${couponRecord.code})` : 'SYSTEM:AUTO_FREE') : null,
           reviewed_at: registrationStatus === 'approved' ? new Date() : null,
         },
       });
-    } else {
-      const actJson = effectiveSelectedActivities ? JSON.stringify(effectiveSelectedActivities) : null;
-      await prisma.$executeRaw`
-        INSERT INTO payment_slips (
-          slip_id, meeting_id, member_no, guest_name, guest_email, guest_phone, guest_workplace,
-          is_member, ticket_code, amount, bank, transfer_date, transfer_time, ref_no, slip_url,
-          status, selected_activities, reviewed_by, reviewed_at, created_at, updated_at
-        ) VALUES (
-          ${slipId}, ${meetingId}, ${validMemberNo}, ${!isMember ? guestName : null}, ${!isMember ? guestEmail : null},
-          ${!isMember ? (guestPhone || null) : null}, ${!isMember ? (guestWorkplace || null) : null},
-          ${!!isMember}, ${ticketCode}, ${numericAmount}, ${bank || (couponRecord ? `สิทธิ์คูปอง: ${couponRecord.company_name}` : null)}, ${transferDate || null},
-          ${transferTime || null}, ${refNo || (couponRecord ? `COUPON:${couponRecord.code}` : null)}, ${effectiveSlipUrl}, 
-          ${registrationStatus}, ${actJson}::jsonb, ${registrationStatus === 'approved' ? 'SYSTEM:AUTO' : null}, ${registrationStatus === 'approved' ? new Date() : null}, NOW(), NOW()
-        )
-      `;
-      slip = { slip_id: slipId };
-    }
+    });
 
     // กิจกรรมเพิ่มเติมที่ไม่มีค่าใช้จ่าย: รวมเข้ารายการเดิมทันที ไม่ต้องรอเจ้าหน้าที่
     if (isAddOn) {
@@ -1101,6 +1100,12 @@ export async function POST(
       },
     });
   } catch (error: any) {
+    if (error instanceof SeatUnavailableError) {
+      return NextResponse.json(
+        { success: false, error: error.message, code: 'SEATS_UNAVAILABLE', shortages: error.shortages },
+        { status: 409 }
+      );
+    }
     console.error('Error during meeting registration:', error?.stack || error);
     return NextResponse.json(
       { success: false, error: 'เกิดข้อผิดพลาดในการลงทะเบียน กรุณาลองใหม่อีกครั้ง' },

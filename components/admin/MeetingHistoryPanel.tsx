@@ -243,6 +243,16 @@ export function MeetingHistoryPanel({
                               <span className="text-[10px] font-extrabold px-1 rounded bg-white/70">
                                 {isOnline ? 'Online' : isBoth ? 'Hybrid' : 'Onsite'}
                               </span>
+                              {typeof act.usedSeats === 'number' && Number(act.maxSeats) > 0 && (
+                                <span
+                                  className={`text-[10px] font-extrabold px-1 rounded ${
+                                    act.usedSeats >= act.maxSeats ? 'bg-rose-100 text-rose-700' : 'bg-white/70'
+                                  }`}
+                                  title="ที่นั่งที่ใช้แล้ว รวมรายการที่รอตรวจสอบ"
+                                >
+                                  {act.usedSeats}/{act.maxSeats} ที่นั่ง
+                                </span>
+                              )}
                             </span>
                           );
                         })}

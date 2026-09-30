@@ -22,6 +22,7 @@ import {
   parseSlipPayload,
   slipActivityList,
 } from '@/lib/services/registrationAddOnService';
+import { assertSeatsForReactivatedSlip, SeatUnavailableError } from '@/lib/services/activitySeatService';
 
 const MAIN_PROGRAM_PRICE = 4000;
 
@@ -1510,6 +1511,21 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'รายการนี้ถูกรวมเข้ากับรายการลงทะเบียนเดิมแล้ว ไม่สามารถเปลี่ยนสถานะได้' },
         { status: 400 }
       );
+    }
+
+    // รายการที่ถูกปฏิเสธคืนที่นั่งไปแล้ว: ก่อนกลับมาเป็นรอตรวจสอบ/อนุมัติ ต้องตรวจว่ายังมีที่นั่งเหลือ
+    if (slip.status === 'rejected' && (action === 'approve' || action === 'reset')) {
+      try {
+        await assertSeatsForReactivatedSlip(slip);
+      } catch (seatErr) {
+        if (seatErr instanceof SeatUnavailableError) {
+          return NextResponse.json(
+            { success: false, error: seatErr.message, code: 'SEATS_UNAVAILABLE' },
+            { status: 409 }
+          );
+        }
+        throw seatErr;
+      }
     }
 
     // สลิปที่แอดมินแนบไว้ล่วงหน้า: อนุมัติแล้วจึงนับเป็นสลิปจริง (ชำระเงินเรียบร้อย)

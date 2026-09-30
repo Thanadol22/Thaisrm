@@ -5,6 +5,14 @@ import {
   CreateMeetingInput,
 } from '@/lib/services/meetingService';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
+import prisma from '@/lib/prisma';
+import {
+  getActivitySeatUsage,
+  seatLimitedActivities,
+  SEAT_COUNTED_STATUSES,
+  summarizeSeatUsage,
+  withSeatUsage,
+} from '@/lib/services/activitySeatService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -44,8 +52,11 @@ export async function GET(req: NextRequest) {
     if (action === 'latest' || action === 'active') {
       const { getLatestActiveMeeting } = await import('@/lib/services/meetingService');
       const meeting = await getLatestActiveMeeting();
+      const data = meeting
+        ? withSeatUsage(meeting, await getActivitySeatUsage(meeting.meeting_id, { meetingActivities: meeting.activities }))
+        : meeting;
       return NextResponse.json(
-        { success: true, data: meeting },
+        { success: true, data },
         {
           headers: {
             'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
@@ -72,9 +83,25 @@ export async function GET(req: NextRequest) {
       order,
     });
 
+    // ที่นั่งที่ใช้ไปของแต่ละเวิร์กช็อป (นับรายการที่รอตรวจสอบและอนุมัติแล้ว)
+    const limitedMeetingIds = result.data
+      .filter((m: any) => seatLimitedActivities(m.activities).length > 0)
+      .map((m: any) => m.meeting_id);
+    const seatSlips = limitedMeetingIds.length > 0
+      ? await prisma.payment_slips.findMany({
+          where: { meeting_id: { in: limitedMeetingIds }, status: { in: SEAT_COUNTED_STATUSES } },
+          select: { slip_id: true, meeting_id: true, ticket_code: true, selected_activities: true },
+        })
+      : [];
+    const data = result.data.map((m: any) =>
+      limitedMeetingIds.includes(m.meeting_id)
+        ? withSeatUsage(m, summarizeSeatUsage(seatSlips.filter((s) => s.meeting_id === m.meeting_id), m.activities))
+        : m
+    );
+
     return NextResponse.json({
       success: true,
-      data: result.data,
+      data,
       pagination: result.pagination,
     }, { status: 200 });
   } catch (err: unknown) {

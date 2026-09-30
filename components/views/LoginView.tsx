@@ -58,6 +58,9 @@ export interface MeetingActivity {
   selectedDays?: string[];
   format?: 'onsite' | 'online' | 'both';
   maxSeats?: number;
+  /** ที่นั่งคงเหลือจากระบบ (มีเฉพาะกิจกรรมที่จำกัดที่นั่ง) */
+  remainingSeats?: number;
+  usedSeats?: number;
   memberPrice?: number;
   nonMemberPrice?: number;
 }
@@ -872,6 +875,16 @@ export function LoginView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminSponsorSession?.sponsorId, activeMeeting?.meeting_id]);
 
+  // ที่นั่งคงเหลือสำหรับผู้ลงทะเบียนที่กำลังแก้ไข (หักผู้ลงทะเบียนคนอื่นในฟอร์มกลุ่มที่เลือกกิจกรรมเดียวกันแล้ว)
+  // null = ไม่จำกัดที่นั่ง
+  const seatsLeftForCurrent = (act: MeetingActivity): number | null => {
+    if (typeof act.remainingSeats !== 'number') return null;
+    const takenByOthers = attendees.filter(
+      (att, idx) => idx !== activeAttendeeIdx && att.selectedPrograms.includes(act.id)
+    ).length;
+    return Math.max(0, act.remainingSeats - takenByOthers);
+  };
+
   const toggleProgramForCurrentAttendee = (key: string) => {
     if (currentAddOn?.registeredActivityIds.includes(key)) return; // ลงทะเบียนไว้แล้ว
     const currentProgs = currentAttendee?.selectedPrograms || [];
@@ -880,6 +893,8 @@ export function LoginView({
       if (currentProgs.length === 1) return; // keep at least 1
       nextProgs = currentProgs.filter(k => k !== key);
     } else {
+      const act = effectiveActivities.find(a => a.id === key);
+      if (act && seatsLeftForCurrent(act) === 0) return; // ที่นั่งเต็มแล้ว
       nextProgs = [...currentProgs, key];
     }
 
@@ -2245,15 +2260,21 @@ export function LoginView({
                               );
                             }
 
+                            const seatsLeft = seatsLeftForCurrent(act);
+                            const isFull = !isSelected && seatsLeft === 0;
+
                             return (
                               <button
                                 key={act.id}
                                 type="button"
+                                disabled={isFull}
                                 onClick={() => toggleProgramForCurrentAttendee(act.id)}
-                                className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 active:scale-[0.99] relative overflow-hidden ${
-                                  isSelected
-                                    ? 'bg-blue-50/90 border-[#0026b3] text-slate-900 shadow-2xs ring-1.5 ring-[#0026b3]/30 font-bold'
-                                    : 'bg-slate-50/80 border-slate-200 hover:border-slate-300 text-slate-700 font-medium'
+                                className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border text-left transition-all flex items-center justify-between gap-3 relative overflow-hidden ${
+                                  isFull
+                                    ? 'bg-slate-100/80 border-slate-200 text-slate-400 cursor-not-allowed opacity-70'
+                                    : isSelected
+                                      ? 'bg-blue-50/90 border-[#0026b3] text-slate-900 shadow-2xs ring-1.5 ring-[#0026b3]/30 font-bold cursor-pointer active:scale-[0.99]'
+                                      : 'bg-slate-50/80 border-slate-200 hover:border-slate-300 text-slate-700 font-medium cursor-pointer active:scale-[0.99]'
                                 }`}
                               >
                                 <div className="flex-1 min-w-0">
@@ -2287,8 +2308,22 @@ export function LoginView({
                                         <span className="truncate">{act.date}</span>
                                       </span>
                                     )}
+
+                                    {seatsLeft !== null && (
+                                      <span className={`text-[9px] sm:text-[10px] font-extrabold px-2 py-0.5 rounded shrink-0 border ${
+                                        isFull
+                                          ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                          : seatsLeft <= 10
+                                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                            : 'bg-slate-50 text-slate-600 border-slate-200'
+                                      }`}>
+                                        {isFull
+                                          ? (lang === 'th' ? 'ที่นั่งเต็มแล้ว' : 'Fully booked')
+                                          : (lang === 'th' ? `เหลือ ${seatsLeft} ที่นั่ง` : `${seatsLeft} seats left`)}
+                                      </span>
+                                    )}
                                   </div>
-                                  <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-snug" title={act.name}>
+                                  <h4 className={`text-xs sm:text-sm font-extrabold leading-snug ${isFull ? 'text-slate-500' : 'text-slate-900'}`} title={act.name}>
                                     {act.name}
                                   </h4>
                                 </div>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { assertSeatsForReactivatedSlip, SeatUnavailableError } from '@/lib/services/activitySeatService';
 
 // GET: Retrieve slip & rejection details by token with full registration details
 export async function GET(request: NextRequest) {
@@ -610,6 +611,21 @@ export async function POST(request: NextRequest) {
     const groupAttendeesCount = customGroupPayload?.attendees?.length || customGroupPayload?.applicants?.length || 0;
     const groupCoordEmail = customGroupPayload?.groupContact?.coordinatorEmail || cleanEmail;
     const groupCoordPhone = customGroupPayload?.groupContact?.coordinatorPhone || cleanPhone;
+
+    // รายการที่ถูกปฏิเสธคืนที่นั่งไปแล้ว: ส่งใหม่ได้เฉพาะเมื่อเวิร์กช็อปยังมีที่นั่งเหลือ
+    if (slip.status === 'rejected') {
+      try {
+        await assertSeatsForReactivatedSlip({ ...slip, selected_activities: updatedActivities });
+      } catch (seatErr) {
+        if (seatErr instanceof SeatUnavailableError) {
+          return NextResponse.json(
+            { success: false, error: seatErr.message, code: 'SEATS_UNAVAILABLE' },
+            { status: 409 }
+          );
+        }
+        throw seatErr;
+      }
+    }
 
     // Update payment_slips record in place (ไม่สร้าง record ใหม่!)
     await (prisma as any).payment_slips.update({
