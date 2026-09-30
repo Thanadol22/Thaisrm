@@ -87,6 +87,53 @@ export function getAttendeeActivities(att: any): { name: string; price?: number 
   return [];
 }
 
+const MAIN_PROGRAM_PRICE = 4000;
+
+function attendeeHasMainProgram(att: any): boolean {
+  const raw = [
+    ...(Array.isArray(att?.selectedActivityObjects) ? att.selectedActivityObjects : []),
+    ...(Array.isArray(att?.selectedActivities) ? att.selectedActivities : []),
+    ...(Array.isArray(att?.activities) ? att.activities : []),
+  ];
+  // ไม่มีข้อมูลกิจกรรม = ลงเฉพาะการประชุมหลัก
+  if (raw.length === 0 && !att?.programNameTh && !att?.selectedPackage) return true;
+  const isMainName = (name: unknown) => {
+    const n = String(name || '').toLowerCase();
+    return n.includes('การประชุมหลัก') || n.includes('main');
+  };
+  return (
+    raw.some((a: any) =>
+      typeof a === 'object' && a !== null
+        ? a.type === 'main' || a.id === 'main' || isMainName(a.name || a.title)
+        : a === 'main' || isMainName(a)
+    ) ||
+    isMainName(att?.programNameTh) ||
+    isMainName(att?.selectedPackage)
+  );
+}
+
+/**
+ * ส่วนลดคูปองของผู้ลงทะเบียนในกลุ่ม: ใช้ค่าที่บันทึกไว้ตอนลงทะเบียน (รวมถึง 0)
+ * ประมาณค่าเฉพาะรายการเก่าที่ไม่มีข้อมูลส่วนลด และคูปองครอบคลุมเฉพาะการประชุมหลักของสมาชิก
+ */
+export function getGroupAttendeeDiscount(att: any, slip: Pick<SlipRecord, 'couponCode' | 'couponInfo' | 'couponUsages'>): number {
+  if (!att || att.isAddOn) return 0;
+
+  const usage = slip.couponUsages?.find(
+    (cu) => (att.memberNo && cu.memberNo === att.memberNo) ||
+      (att.email && cu.attendeeEmail?.toLowerCase() === String(att.email).toLowerCase()) ||
+      (att.nameTh && cu.attendeeName === att.nameTh)
+  );
+  if (usage?.discountApplied && Number(usage.discountApplied) > 0) return Number(usage.discountApplied);
+
+  const stored = att.discountTotal ?? att.discountAmount;
+  if (stored !== undefined && stored !== null && stored !== '') return Number(stored) || 0;
+
+  const hasCoupon = Boolean(slip.couponCode || slip.couponInfo?.code);
+  const isMember = Boolean(att.isMember || att.memberNo);
+  return hasCoupon && isMember && attendeeHasMainProgram(att) ? MAIN_PROGRAM_PRICE : 0;
+}
+
 export interface SlipRecord {
   id: string;
   dbId?: string;
@@ -1140,9 +1187,7 @@ export function AdminSlipsView() {
                           const effDisc = (() => {
                             const attendees = slip.groupPayload?.attendees;
                             if (Array.isArray(attendees) && attendees.length > 0) {
-                              const sumAtt = attendees.reduce((sum: number, att: any) => {
-                                return sum + (Number(att.discountTotal) || Number(att.discountAmount) || 4000);
-                              }, 0);
+                              const sumAtt = attendees.reduce((sum: number, att: any) => sum + getGroupAttendeeDiscount(att, slip), 0);
                               return Math.max(slip.discountTotal || 0, sumAtt, Number(slip.groupPayload?.discountAmount) || 0);
                             }
                             return slip.discountTotal || 0;
@@ -1729,31 +1774,12 @@ export function AdminSlipsView() {
                                 const isAttMember = Boolean(att.isMember || att.memberNo);
                                 const attActivities = getAttendeeActivities(att);
 
-                                // Check coupon discount for this attendee (ข้อ 3 & 4)
-                                const attUsage = selectedSlip.couponUsages?.find(
-                                  (cu) => (att.memberNo && cu.memberNo === att.memberNo) ||
-                                    (att.email && cu.attendeeEmail?.toLowerCase() === att.email.toLowerCase()) ||
-                                    (att.nameTh && cu.attendeeName === att.nameTh)
-                                );
-
-                                const isCouponActive = Boolean(selectedSlip.couponCode || selectedSlip.couponInfo?.code);
-                                const isFreeCoupon = selectedSlip.couponInfo?.discountType === 'free';
-                                const hasMainProgram = attActivities.some(a =>
-                                  a.name.toLowerCase().includes('main') ||
-                                  a.name.includes('การประชุมหลัก') ||
-                                  a.name.includes('Main Program')
-                                ) || true;
-
-                                // ผู้ที่ลงทะเบียนเพิ่มเติมไม่ได้ใช้สิทธิ์คูปองของบริษัท
+                                // ส่วนลดคูปองของผู้ลงทะเบียนรายนี้ (ผู้ลงเพิ่มเติมไม่ได้ใช้สิทธิ์คูปองของบริษัท)
                                 const isAddOnAttendee = Boolean(att.isAddOn);
-                                const attDiscount = isAddOnAttendee
-                                  ? 0
-                                  : (attUsage?.discountApplied && Number(attUsage.discountApplied) > 0)
-                                    ? Number(attUsage.discountApplied)
-                                    : (Number(att.discountTotal) || Number(att.discountAmount) || ((isFreeCoupon || isCouponActive) && hasMainProgram ? 4000 : 0));
+                                const attDiscount = getGroupAttendeeDiscount(att, selectedSlip);
 
-                                const hasDiscount = !isAddOnAttendee && (attDiscount > 0 || ((isFreeCoupon || isCouponActive) && hasMainProgram) || Boolean(att.discountAppliedNotice));
-                                const originalPrice = Number(att.originalTotal || att.subtotal || (hasDiscount ? ((Number(att.price) || 0) + attDiscount) : (Number(att.price) || (hasMainProgram ? 4000 : 0))));
+                                const hasDiscount = attDiscount > 0;
+                                const originalPrice = Number(att.originalTotal || att.subtotal || ((Number(att.price) || 0) + attDiscount));
                                 const netPrice = hasDiscount && originalPrice > 0 ? Math.max(0, originalPrice - attDiscount) : (att.price !== undefined ? Number(att.price) : (Number(att.subtotal) || 0));
 
                                 return (
@@ -1886,9 +1912,9 @@ export function AdminSlipsView() {
                                               const isMainProgram = act.name.toLowerCase().includes('main') ||
                                                 act.name.includes('การประชุมหลัก') ||
                                                 act.name.includes('Main Program');
-                                              const isActDiscounted = hasDiscount && isMainProgram && (isFreeCoupon || isCouponActive || attDiscount >= (act.price || 4000));
-                                              const rawActPrice = Number(act.price) || (isMainProgram ? 4000 : 0);
-                                              const discountedActPrice = isActDiscounted ? Math.max(0, rawActPrice - (attDiscount > 0 ? Math.min(attDiscount, rawActPrice) : 4000)) : rawActPrice;
+                                              const isActDiscounted = hasDiscount && isMainProgram;
+                                              const rawActPrice = Number(act.price) || (isMainProgram ? MAIN_PROGRAM_PRICE : 0);
+                                              const discountedActPrice = isActDiscounted ? Math.max(0, rawActPrice - Math.min(attDiscount, rawActPrice)) : rawActPrice;
 
                                               return (
                                                 <span
@@ -2159,35 +2185,29 @@ export function AdminSlipsView() {
                   )}
 
                   {/* ส่วนลดที่ได้รับ (ข้อ 3) */}
-                  {((selectedSlip.discountTotal && selectedSlip.discountTotal > 0) || selectedSlip.couponInfo?.discountType === 'free' || Boolean(selectedSlip.couponCode)) && (
-                    <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
-                      <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
-                        {lang === 'th' ? 'ส่วนลดที่ได้รับ' : 'Discount Applied'}
-                      </span>
-                      <span className="font-black font-mono text-sm sm:text-base text-emerald-700 text-right">
-                        -฿{(() => {
-                          const attendees = selectedSlip.groupPayload?.attendees;
-                          if (Array.isArray(attendees) && attendees.length > 0) {
-                            const sumAttDiscount = attendees.reduce((sum: number, att: any) => {
-                              const attUsage = selectedSlip.couponUsages?.find(
-                                (cu) => (att.memberNo && cu.memberNo === att.memberNo) ||
-                                  (att.email && cu.attendeeEmail?.toLowerCase() === att.email.toLowerCase()) ||
-                                  (att.nameTh && cu.attendeeName === att.nameTh)
-                              );
-                              const isCouponActive = Boolean(selectedSlip.couponCode || selectedSlip.couponInfo?.code);
-                              const isFreeCoupon = selectedSlip.couponInfo?.discountType === 'free';
-                              const attDisc = (attUsage?.discountApplied && Number(attUsage.discountApplied) > 0)
-                                ? Number(attUsage.discountApplied)
-                                : (Number(att.discountTotal) || Number(att.discountAmount) || ((isFreeCoupon || isCouponActive) ? 4000 : 0));
-                              return sum + attDisc;
-                            }, 0);
-                            return Math.max(selectedSlip.discountTotal || 0, sumAttDiscount, Number(selectedSlip.groupPayload?.discountAmount) || 0).toLocaleString();
-                          }
-                          return (selectedSlip.discountTotal || 4000).toLocaleString();
-                        })()} THB
-                      </span>
-                    </div>
-                  )}
+                  {(() => {
+                    const attendees = selectedSlip.groupPayload?.attendees;
+                    const effDiscount = Array.isArray(attendees) && attendees.length > 0
+                      ? Math.max(
+                          selectedSlip.discountTotal || 0,
+                          attendees.reduce((sum: number, att: any) => sum + getGroupAttendeeDiscount(att, selectedSlip), 0),
+                          Number(selectedSlip.groupPayload?.discountAmount) || 0
+                        )
+                      : (selectedSlip.discountTotal && selectedSlip.discountTotal > 0)
+                        ? selectedSlip.discountTotal
+                        : (selectedSlip.couponInfo?.discountType === 'free' || selectedSlip.couponCode ? MAIN_PROGRAM_PRICE : 0);
+                    if (effDiscount <= 0) return null;
+                    return (
+                      <div className="flex items-center justify-between py-1.5 border-b border-slate-200/80 gap-3">
+                        <span className="text-slate-500 font-bold text-xs sm:text-sm shrink-0">
+                          {lang === 'th' ? 'ส่วนลดที่ได้รับ' : 'Discount Applied'}
+                        </span>
+                        <span className="font-black font-mono text-sm sm:text-base text-emerald-700 text-right">
+                          -฿{effDiscount.toLocaleString()} THB
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Registered Courses & Activities Section */}
@@ -2244,19 +2264,7 @@ export function AdminSlipsView() {
                                 const attendees = selectedSlip.groupPayload?.attendees;
                                 const effGroupDiscount = (() => {
                                   if (Array.isArray(attendees) && attendees.length > 0) {
-                                    const sumAttDiscount = attendees.reduce((sum: number, att: any) => {
-                                      const attUsage = selectedSlip.couponUsages?.find(
-                                        (cu) => (att.memberNo && cu.memberNo === att.memberNo) ||
-                                          (att.email && cu.attendeeEmail?.toLowerCase() === att.email.toLowerCase()) ||
-                                          (att.nameTh && cu.attendeeName === att.nameTh)
-                                      );
-                                      const isCouponActive = Boolean(selectedSlip.couponCode || selectedSlip.couponInfo?.code);
-                                      const isFreeCoupon = selectedSlip.couponInfo?.discountType === 'free';
-                                      const attDisc = (attUsage?.discountApplied && Number(attUsage.discountApplied) > 0)
-                                        ? Number(attUsage.discountApplied)
-                                        : (Number(att.discountTotal) || Number(att.discountAmount) || ((isFreeCoupon || isCouponActive) ? 4000 : 0));
-                                      return sum + attDisc;
-                                    }, 0);
+                                    const sumAttDiscount = attendees.reduce((sum: number, att: any) => sum + getGroupAttendeeDiscount(att, selectedSlip), 0);
                                     return Math.max(selectedSlip.discountTotal || 0, sumAttDiscount, Number(selectedSlip.groupPayload?.discountAmount) || 0);
                                   }
                                   return (selectedSlip.discountTotal && selectedSlip.discountTotal > 0)
