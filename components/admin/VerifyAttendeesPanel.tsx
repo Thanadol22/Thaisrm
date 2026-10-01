@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AdminPageHeader, HeaderButton } from './AdminPageHeader';
 import { Btn, IconBtn, EmptyState, ContextBar, StatGrid, StatCard, Toolbar, ToolbarGroup, SearchInput, Segmented, FilterSelect } from './ui';
 import { createPortal } from 'react-dom';
@@ -8,6 +8,7 @@ import { AttendeeItem, MeetingItem } from './types';
 import { PaginationControls } from '@/components/PaginationControls';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
 import { PositionSelect, POSITION_CATEGORY_OPTIONS } from '@/components/PositionSelect';
+import { uploadImageToStorage } from '@/lib/blobUpload';
 import {
   UserCheck,
   PlusCircle,
@@ -28,6 +29,9 @@ import {
   Check,
   Users,
   TrendingUp,
+  Upload,
+  ImageIcon,
+  Trash2,
 } from 'lucide-react';
 
 /* ─── 5. VERIFY ATTENDEES PANEL (Light Theme with Round Filter) ───────────── */
@@ -101,7 +105,7 @@ export function VerifyAttendeesPanel({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(5);
 
-  // Walk-in modal state
+  // Registration modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [walkInData, setWalkInData] = useState({
     memberNo: '',
@@ -117,9 +121,16 @@ export function VerifyAttendeesPanel({
     position: '',
     positionOther: '',
     selectedPrograms: [] as string[],
-    paymentStatus: 'paid' as 'paid' | 'pending',
-    checkInNow: true,
+    paymentStatus: 'pending' as 'paid' | 'pending',
+    checkInNow: false,
   });
+
+  // Slip upload state
+  const [slipFile, setSlipFile] = useState<File | null>(null);
+  const [slipPreview, setSlipPreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const slipInputRef = useRef<HTMLInputElement>(null);
 
   const walkInMeeting = meetings.find((m) => m.id === walkInData.meetingId) || meetings[0];
 
@@ -212,7 +223,7 @@ export function VerifyAttendeesPanel({
   const getWalkInPrice = (act: any) => {
     const isMainAct = act?.type === 'main' || act?.id === 'main';
     if (isMainAct) {
-      // ลงทะเบียนหน้างานเป็นแบบออนไซต์
+      // ลงทะเบียนแบบออนไซต์
       const tier = walkInData.isFellow && walkInFellowTier ? walkInFellowTier : walkInTiers.participant;
       if (tier) return Number(walkInIsMember ? tier.onsiteMember : tier.onsiteNonMember) || 0;
     }
@@ -238,8 +249,35 @@ export function VerifyAttendeesPanel({
     }));
   };
 
-  const handleCreateWalkIn = (e: React.FormEvent) => {
+  const handleSlipFileChange = (file: File | null) => {
+    if (!file) {
+      setSlipFile(null);
+      setSlipPreview(null);
+      return;
+    }
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+    if (!isImage && !isPdf) {
+      alert('รองรับเฉพาะไฟล์รูปภาพ (JPG, PNG, WEBP) หรือ PDF เท่านั้น');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('ไฟล์ต้องมีขนาดไม่เกิน 10 MB');
+      return;
+    }
+    setSlipFile(file);
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setSlipPreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setSlipPreview(null);
+    }
+  };
+
+  const handleCreateWalkIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (walkInData.memberNo.trim() && !linkedMember) {
       alert('กรุณากดค้นหาเลขสมาชิกก่อน หรือลบเลขสมาชิกออกหากไม่ใช่สมาชิก');
       return;
@@ -266,6 +304,25 @@ export function VerifyAttendeesPanel({
       return;
     }
 
+    setIsSubmitting(true);
+
+    // Upload slip file if provided
+    let uploadedSlipUrl = '';
+    if (slipFile) {
+      try {
+        setIsUploading(true);
+        const result = await uploadImageToStorage(slipFile, 'slips');
+        uploadedSlipUrl = result.url;
+      } catch (err: any) {
+        alert(`อัพโหลดสลิปไม่สำเร็จ: ${err?.message || 'เกิดข้อผิดพลาด'}`);
+        setIsUploading(false);
+        setIsSubmitting(false);
+        return;
+      } finally {
+        setIsUploading(false);
+      }
+    }
+
     const meeting = walkInMeeting;
     const programs = walkInSelectedActs.map((a) => ({ id: String(a.id), name: String(a.name || a.id) }));
     const position = isOtherPosition
@@ -290,15 +347,19 @@ export function VerifyAttendeesPanel({
       ticketCode: `TSRM-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       meetingId: meeting?.id || '',
       meetingTitle: meeting?.titleTh || 'การประชุมวิชาการประจำปี TSRM Congress 2026',
-      registeredDate: '10 ก.ย. 2569',
+      registeredDate: new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }),
       paymentStatus: walkInData.paymentStatus,
       checkInStatus: walkInData.checkInNow ? 'checked_in' : 'not_checked_in',
-      checkInTime: walkInData.checkInNow ? '10:30 น.' : undefined,
+      checkInTime: walkInData.checkInNow ? new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.' : undefined,
+      slipUrl: uploadedSlipUrl || undefined,
     };
 
     onAddAttendee?.(newAttendee);
     setIsAddModalOpen(false);
     unlinkWalkInMember();
+    setSlipFile(null);
+    setSlipPreview(null);
+    setIsSubmitting(false);
     setWalkInData((prev) => ({
       ...prev,
       memberNo: '',
@@ -313,8 +374,8 @@ export function VerifyAttendeesPanel({
       position: '',
       positionOther: '',
       selectedPrograms: walkInMainId ? [String(walkInMainId)] : [],
-      paymentStatus: 'paid',
-      checkInNow: true,
+      paymentStatus: 'pending',
+      checkInNow: false,
     }));
   };
 
@@ -486,7 +547,7 @@ export function VerifyAttendeesPanel({
         actions={
           <>
             <HeaderButton variant="primary" icon={PlusCircle} onClick={() => setIsAddModalOpen(true)}>
-              ลงทะเบียน Walk-in
+              ลงทะเบียนผู้เข้าร่วม
             </HeaderButton>
             <HeaderButton icon={FileSpreadsheet} onClick={handleExportCSV}>
               Export รายชื่อ ({filteredAttendees.length})
@@ -1142,7 +1203,7 @@ export function VerifyAttendeesPanel({
           document.body
         )}
 
-      {/* Walk-in Registration Modal */}
+      {/* Registration Modal */}
       {isAddModalOpen &&
         typeof document !== 'undefined' &&
         createPortal(
@@ -1153,10 +1214,10 @@ export function VerifyAttendeesPanel({
                   <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-[#0026b3]">
                     <PlusCircle className="w-5 h-5" />
                   </div>
-                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900">ลงทะเบียนผู้เข้าร่วมหน้างาน</h3>
+                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900">ลงทะเบียนผู้เข้าร่วม</h3>
                 </div>
                 <button
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={() => { setIsAddModalOpen(false); setSlipFile(null); setSlipPreview(null); }}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
@@ -1465,6 +1526,78 @@ export function VerifyAttendeesPanel({
                   )}
                 </div>
 
+                {/* อัพโหลดสลิปการชำระเงิน */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-700">สลิปหลักฐานการชำระเงิน</label>
+                  <div
+                    className={`relative rounded-xl border-2 border-dashed transition p-4 ${
+                      slipFile
+                        ? 'border-emerald-300 bg-emerald-50/40'
+                        : 'border-slate-300 bg-slate-50/60 hover:border-[#0026b3]/40 hover:bg-blue-50/30'
+                    }`}
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) handleSlipFileChange(file);
+                    }}
+                  >
+                    {slipFile ? (
+                      <div className="flex items-center gap-3">
+                        {slipPreview ? (
+                          <img
+                            src={slipPreview}
+                            alt="ตัวอย่างสลิป"
+                            className="w-16 h-16 object-cover rounded-lg border border-slate-200 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                            <ImageIcon className="w-6 h-6 text-slate-400" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-slate-800 truncate">{slipFile.name}</p>
+                          <p className="text-[11px] text-slate-500">
+                            {(slipFile.size / 1024).toFixed(0)} KB
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setSlipFile(null); setSlipPreview(null); if (slipInputRef.current) slipInputRef.current.value = ''; }}
+                          className="p-1.5 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer shrink-0"
+                          title="ลบสลิป"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => slipInputRef.current?.click()}
+                        className="w-full flex flex-col items-center gap-1.5 cursor-pointer text-center"
+                      >
+                        <Upload className="w-7 h-7 text-slate-400" />
+                        <span className="text-xs font-bold text-slate-600">คลิกเพื่อเลือกไฟล์ หรือลากไฟล์มาวางที่นี่</span>
+                        <span className="text-[11px] text-slate-400">รองรับ JPG, PNG, WEBP, PDF ขนาดไม่เกิน 10 MB</span>
+                      </button>
+                    )}
+                    <input
+                      ref={slipInputRef}
+                      type="file"
+                      accept="image/*,.pdf"
+                      className="hidden"
+                      onChange={(e) => handleSlipFileChange(e.target.files?.[0] || null)}
+                    />
+                  </div>
+                  {isUploading && (
+                    <div className="flex items-center gap-2 text-xs text-[#0026b3] font-bold">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>กำลังอัพโหลดสลิป...</span>
+                    </div>
+                  )}
+                </div>
+
                 <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -1503,17 +1636,27 @@ export function VerifyAttendeesPanel({
                 <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setIsAddModalOpen(false)}
+                    onClick={() => { setIsAddModalOpen(false); setSlipFile(null); setSlipPreview(null); }}
                     className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm cursor-pointer"
                   >
                     ยกเลิก
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-[#0026b3] hover:bg-[#001f94] text-white font-bold text-xs sm:text-sm shadow-md shadow-[#0026b3]/20 transition cursor-pointer flex items-center gap-1.5"
+                    disabled={isSubmitting || isUploading}
+                    className="px-5 py-2.5 rounded-xl bg-[#0026b3] hover:bg-[#001f94] text-white font-bold text-xs sm:text-sm shadow-md shadow-[#0026b3]/20 transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Check className="w-4 h-4 text-[#4ade80]" />
-                    <span>บันทึกผู้เข้าร่วม</span>
+                    {isSubmitting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>กำลังบันทึก...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 text-[#4ade80]" />
+                        <span>บันทึกการลงทะเบียน</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </form>

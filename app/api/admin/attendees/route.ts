@@ -498,7 +498,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/admin/attendees
- * บันทึกผู้เข้าร่วมประชุมแบบ Walk-in ลงฐานข้อมูลจริง
+ * บันทึกผู้เข้าร่วมประชุมลงฐานข้อมูลจริง (ลงทะเบียนโดยแอดมิน)
  */
 export async function POST(request: NextRequest) {
   const session = getAdminSessionFromRequest(request);
@@ -516,13 +516,14 @@ export async function POST(request: NextRequest) {
       workplace,
       memberType,
       ticketType,
-      paymentStatus = 'paid',
-      checkInNow = true,
+      paymentStatus = 'pending',
+      checkInNow = false,
       amount = 3500,
       programs = [],
       position,
       memberNo,
       isFellow = false,
+      slipUrl,
     } = body;
 
     if (!meetingId || !nameTh || !phone) {
@@ -572,11 +573,17 @@ export async function POST(request: NextRequest) {
         : null;
     const parsedAmount = Number(amount);
     const slipAmount = Number.isFinite(parsedAmount) && parsedAmount >= 0 ? parsedAmount : 3500;
-    const createSlip = paymentStatus === 'paid' && Boolean((prisma as any).payment_slips);
+
+    // สร้างสลิปเสมอ (ทั้งสถานะ paid และ pending) เพื่อให้การลงทะเบียนบันทึกรูปแบบเดียวกับระบบอื่นๆ
+    const canCreateSlip = Boolean((prisma as any).payment_slips);
+
+    const hasUploadedSlip = Boolean(slipUrl && String(slipUrl).trim());
+    // กำหนด status ของสลิปตามสถานะการชำระเงินจริง
+    const slipStatus = paymentStatus === 'paid' ? 'approved' : 'pending';
 
     const { attendance, ticketCode } = await prisma.$transaction(async (tx: any) => {
       // ตรวจที่นั่งเวิร์กช็อปที่จำกัดจำนวน (นับเฉพาะรายการที่มีสลิป)
-      if (createSlip && selectedActivities) {
+      if (canCreateSlip && selectedActivities) {
         const meeting = await tx.meetings.findUnique({ where: { meeting_id: meetingId }, select: { activities: true } });
         const requested = countSlipSeatClaims({ selected_activities: selectedActivities }, meeting?.activities);
         await lockAndAssertSeats(tx, meetingId, requested, { meetingActivities: meeting?.activities });
@@ -588,7 +595,7 @@ export async function POST(request: NextRequest) {
           meeting_id: meetingId,
           member_no: linkedMember?.member_no ?? null,
           attendee_name: nameTh,
-          attendee_email: email || `${phone}@walkin.tsrm.org`,
+          attendee_email: email || `${phone}@register.tsrm.org`,
           attendee_phone: phone,
           workplace: workplace || 'โรงพยาบาล/คลินิก',
           attendance_status: checkInNow ? 'Attended' : 'Registered',
@@ -596,29 +603,29 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      const code = `TSRM-WALKIN-${created.attendance_id}`;
+      const code = `TSRM-REG-${created.attendance_id}`;
 
-      // 2. Create payment slip record if paid
-      if (createSlip) {
+      // 2. Create payment slip record (ทั้ง paid และ pending)
+      if (canCreateSlip) {
         await tx.payment_slips.create({
           data: {
             meeting_id: meetingId,
             member_no: linkedMember?.member_no ?? null,
             guest_name: nameTh,
-            guest_email: email || `${phone}@walkin.tsrm.org`,
+            guest_email: email || `${phone}@register.tsrm.org`,
             guest_phone: phone,
             guest_workplace: workplace || 'โรงพยาบาล/คลินิก',
             is_member: isActiveMember,
             ticket_code: code,
             amount: slipAmount,
             selected_activities: selectedActivities ?? undefined,
-            bank: 'เงินสด / Walk-in Counter',
+            bank: hasUploadedSlip ? 'โอนเงิน' : 'ลงทะเบียนโดยแอดมิน',
             transfer_date: new Date().toLocaleDateString('th-TH'),
             transfer_time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-            slip_url: '/walkin-receipt.png',
-            status: 'approved',
-            reviewed_by: 'Admin Walk-in',
-            reviewed_at: new Date(),
+            slip_url: hasUploadedSlip ? String(slipUrl).trim() : '/admin-registered.png',
+            status: slipStatus,
+            reviewed_by: paymentStatus === 'paid' ? `Admin: ${session.username || 'admin'}` : null,
+            reviewed_at: paymentStatus === 'paid' ? new Date() : null,
           },
         });
       }
@@ -631,7 +638,7 @@ export async function POST(request: NextRequest) {
       data: {
         id: attendance.attendance_id.toString(),
         ticketCode,
-        message: 'บันทึกผู้เข้าร่วม Walk-in สำเร็จ',
+        message: 'บันทึกการลงทะเบียนสำเร็จ',
       },
     });
   } catch (error: any) {
@@ -641,7 +648,7 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
-    console.error('Error creating walk-in attendee:', error);
+    console.error('Error creating attendee registration:', error);
     return NextResponse.json(
       { success: false, error: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' },
       { status: 500 }

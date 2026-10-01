@@ -127,6 +127,7 @@ export interface AttendeeItem {
   checkInStatus: 'checked_in' | 'not_checked_in';
   checkInTime?: string;
   slipId?: string | null;
+  slipUrl?: string;
   rejectionReason?: string | null;
   programs?: Array<{ id: string; name: string }>;
   attendanceType?: 'onsite' | 'online';

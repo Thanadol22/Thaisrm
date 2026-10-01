@@ -493,6 +493,7 @@ export default function AdminPage() {
           amount: newAttendee.amount,
           paymentStatus: newAttendee.paymentStatus,
           checkInNow: newAttendee.checkInStatus === 'checked_in',
+          slipUrl: newAttendee.slipUrl || undefined,
         }),
       });
       const json = await res.json();
@@ -500,14 +501,14 @@ export default function AdminPage() {
         fetchAttendees();
         fetchMeetings();
         fetchSlips();
-        setGlobalToastMessage(`บันทึกผู้เข้าร่วม "${newAttendee.nameTh}" ลงฐานข้อมูลเรียบร้อยแล้ว!`);
+        setGlobalToastMessage(`บันทึกการลงทะเบียน "${newAttendee.nameTh}" ลงฐานข้อมูลเรียบร้อยแล้ว!`);
         setTimeout(() => setGlobalToastMessage(null), 4000);
       } else {
         setAttendees((prev) => prev.filter((a) => a.id !== newAttendee.id));
-        alert(json.error || 'ไม่สามารถบันทึกผู้เข้าร่วมได้');
+        alert(json.error || 'ไม่สามารถบันทึกการลงทะเบียนได้');
       }
     } catch (err) {
-      console.error('Failed to save walk-in attendee to DB:', err);
+      console.error('Failed to save attendee registration to DB:', err);
       setAttendees((prev) => prev.filter((a) => a.id !== newAttendee.id));
     }
   };
