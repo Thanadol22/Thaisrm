@@ -223,6 +223,9 @@ export interface SlipRecord {
     finalAmount?: number;
   }>;
   discountTotal?: number;
+  /** บันทึกแยกสำหรับผู้ดูแลระบบ (เช่น รายการ fellow) ยอดรวมอยู่ในบิล includedInTicketCode แล้ว */
+  isAdminLedger?: boolean;
+  includedInTicketCode?: string | null;
   isPayLater?: boolean;
   isPendingPaymentReview?: boolean;
   hasActualSlip?: boolean;
@@ -253,6 +256,7 @@ export const isPdfSlipUrl = (url?: string | null) => {
 };
 
 export const isRegisteredAsPayLater =(s?: SlipRecord | null) =>
+  !s?.isAdminLedger &&
   Boolean(
     s?.isPayLater ||
     s?.slipUrl === 'PAY_LATER' ||
@@ -293,6 +297,15 @@ export function getSlipLifecycleStage(s: SlipRecord): SlipLifecycleStage {
 }
 
 export function renderSlipStatusBadge(s: SlipRecord, lang: 'th' | 'en' = 'th') {
+  if (s.isAdminLedger && s.status !== 'rejected') {
+    return (
+      <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-lime-100 text-lime-900 border border-lime-300 shadow-2xs">
+        {lang === 'th'
+          ? `บันทึกแยกสำหรับแอดมิน${s.includedInTicketCode ? ` ยอดรวมในบิล ${s.includedInTicketCode}` : ''}`
+          : `Admin record${s.includedInTicketCode ? `, billed in ${s.includedInTicketCode}` : ''}`}
+      </span>
+    );
+  }
   if (!s.adminAttachedSlip || s.status === 'rejected') return renderLifecycleBadge(s, lang);
   return (
     <>

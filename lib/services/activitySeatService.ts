@@ -72,6 +72,8 @@ function isNonSeatPayload(payload: any): boolean {
     payload &&
       !Array.isArray(payload) &&
       (payload.isFormatChange ||
+        // บันทึกแยกสำหรับผู้ดูแลระบบ (เช่น รายการ fellow) ที่รวมอยู่ในบิลอื่นแล้ว ไม่นับที่นั่งซ้ำ
+        payload.adminOnly ||
         payload.type === 'membership_registration' ||
         payload.type === 'membership_group_registration')
   );

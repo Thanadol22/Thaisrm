@@ -322,6 +322,7 @@ export default function AdminPage() {
           slipUrl: s.slipUrl,
           status: s.status,
           rejectionReason: s.notes,
+          isAdminLedger: Boolean(s.isAdminLedger),
           selectedActivities: s.selectedActivities || [],
         }));
         setSlips(mapped);

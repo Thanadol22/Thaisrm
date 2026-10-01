@@ -78,7 +78,10 @@ export function DashboardOverviewPanel({
   }, [slips, activeMeetingId]);
 
   const pendingSlips = useMemo(() => displayedSlips.filter((s) => s.status === 'pending'), [displayedSlips]);
-  const approvedSlips = useMemo(() => displayedSlips.filter((s) => s.status === 'approved'), [displayedSlips]);
+  const approvedSlips = useMemo(
+    () => displayedSlips.filter((s) => s.status === 'approved' && !s.isAdminLedger),
+    [displayedSlips]
+  );
   const totalRevenue = useMemo(() => approvedSlips.reduce((sum, s) => sum + s.amount, 0), [approvedSlips]);
   const totalRegistered = displayedAttendees.length;
   const checkedInAttendees = useMemo(

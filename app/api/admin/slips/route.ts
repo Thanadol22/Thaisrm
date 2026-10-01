@@ -878,8 +878,11 @@ export async function GET(request: NextRequest) {
           couponInfo: couponInfo || null,
           couponUsages: couponUsagesList,
           discountTotal: discountTotal || 0,
+          // บันทึกแยกสำหรับผู้ดูแลระบบ (ยอดรวมอยู่ในบิลอื่นแล้ว): ไม่นับรายได้/ยอดค้างชำระซ้ำ
+          isAdminLedger: Boolean(parseSlipPayload(s.selected_activities)?.adminOnly),
+          includedInTicketCode: parseSlipPayload(s.selected_activities)?.includedInTicketCode || null,
           // ── สถานะย่อยสำหรับ Pay Later flow ──
-          isPayLater: Boolean(
+          isPayLater: !parseSlipPayload(s.selected_activities)?.adminOnly && Boolean(
             s.slip_url === 'PAY_LATER' ||
             s.slip_url === 'pay_later_pending' ||
             (typeof s.bank === 'string' && (s.bank.includes('ชำระเงินภายหลัง') || s.bank.toLowerCase().includes('pay later')))
@@ -1207,8 +1210,11 @@ export async function GET(request: NextRequest) {
           couponInfo: couponInfo || null,
           couponUsages: couponUsagesList,
           discountTotal: discountTotal || 0,
+          // บันทึกแยกสำหรับผู้ดูแลระบบ (ยอดรวมอยู่ในบิลอื่นแล้ว): ไม่นับรายได้/ยอดค้างชำระซ้ำ
+          isAdminLedger: Boolean(parseSlipPayload(s.selected_activities)?.adminOnly),
+          includedInTicketCode: parseSlipPayload(s.selected_activities)?.includedInTicketCode || null,
           // ── สถานะย่อยสำหรับ Pay Later flow ──
-          isPayLater: Boolean(
+          isPayLater: !parseSlipPayload(s.selected_activities)?.adminOnly && Boolean(
             s.slip_url === 'PAY_LATER' ||
             s.slip_url === 'pay_later_pending' ||
             (typeof s.bank === 'string' && (s.bank.includes('ชำระเงินภายหลัง') || s.bank.toLowerCase().includes('pay later')))

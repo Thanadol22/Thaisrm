@@ -36,7 +36,9 @@ export interface RevenueReportProps {
   initialMeetingId?: string;
 }
 
-export function RevenueReportPanel({ meetings, slips, attendees = [], initialMeetingId }: RevenueReportProps) {
+export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], initialMeetingId }: RevenueReportProps) {
+  // บันทึกแยกสำหรับผู้ดูแลระบบ (ยอดรวมอยู่ในบิลอื่นแล้ว) ไม่นับรายได้ซ้ำ
+  const slips = useMemo(() => allSlips.filter((s) => !s.isAdminLedger), [allSlips]);
   const [selectedMeetingId, setSelectedMeetingId] = useState<string>(initialMeetingId || 'all');
 
   useEffect(() => {

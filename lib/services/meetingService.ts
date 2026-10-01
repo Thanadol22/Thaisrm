@@ -319,11 +319,24 @@ export async function getMeetings(params: GetMeetingsParams = {}) {
             _sum: { amount: true },
           })
         );
+        // บันทึกแยกสำหรับผู้ดูแลระบบ (ยอดรวมอยู่ในบิลอื่นแล้ว) ไม่นับรายได้ซ้ำ: หักออกจากยอดรวม
+        // (ใช้ NOT กับ JSON path ไม่ได้ เพราะรายการที่ไม่มีคีย์นี้จะถูกตัดออกทั้งหมด)
+        tasks.push(
+          p.payment_slips.groupBy({
+            by: ['meeting_id'],
+            where: {
+              meeting_id: { in: meetingIds },
+              status: 'approved',
+              selected_activities: { path: ['adminOnly'], equals: true },
+            },
+            _sum: { amount: true },
+          })
+        );
       } else {
-        tasks.push(Promise.resolve([]));
+        tasks.push(Promise.resolve([]), Promise.resolve([]));
       }
 
-      const [attendancesStats, revenueStats] = await Promise.all(tasks);
+      const [attendancesStats, revenueStats, adminLedgerStats] = await Promise.all(tasks);
 
       if (Array.isArray(attendancesStats)) {
         attendancesStats.forEach((st: any) => {
@@ -334,6 +347,12 @@ export async function getMeetings(params: GetMeetingsParams = {}) {
       if (Array.isArray(revenueStats)) {
         revenueStats.forEach((rev: any) => {
           revenueMap.set(rev.meeting_id, rev._sum?.amount || 0);
+        });
+      }
+      if (Array.isArray(adminLedgerStats)) {
+        adminLedgerStats.forEach((rev: any) => {
+          const total = revenueMap.get(rev.meeting_id) || 0;
+          revenueMap.set(rev.meeting_id, Math.max(0, total - (rev._sum?.amount || 0)));
         });
       }
     } catch (aggErr) {
