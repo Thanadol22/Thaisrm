@@ -296,7 +296,7 @@ export default function SponsorRegistrationsSheet({ sponsors = [] }: { sponsors?
                       </td>
                       <td className={`${td} text-slate-600`}>{r.email || '-'}</td>
                       <td className={`${td} text-slate-600 tabular-nums`}>{r.phone || '-'}</td>
-                      <td className={`${td} max-w-[260px] truncate`} title={r.isFellow ? `${r.programs} - ราคา fellow` : r.programs}>
+                      <td className={`${td} min-w-[220px] max-w-[320px] whitespace-normal`} title={r.isFellow ? `${r.programs} - ราคา fellow` : r.programs}>
                         {r.isFellow && (
                           <span className="mr-1.5 inline-block px-1.5 py-px rounded bg-lime-50 text-lime-800 border border-lime-200 text-[10px] font-bold align-middle">
                             ราคา fellow
