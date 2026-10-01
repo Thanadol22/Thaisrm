@@ -2,6 +2,11 @@ import nodemailer from 'nodemailer';
 import QRCode from 'qrcode';
 import { writeEmailLog, serializeAttachments, getEmailLog, markEmailLogResent } from './services/emailLog';
 import {
+  renderSponsorHistoryEmail,
+  sponsorHistoryEmailSubject,
+  SponsorHistoryEmailOptions,
+} from './emailTemplates/sponsorRegistrationHistoryTemplate';
+import {
   renderOnlineReminderEmail,
   renderOnlineLinkEmail,
   OnlineMeetingEmailOptions,
@@ -743,6 +748,21 @@ export async function sendCustomBroadcastEmail(params: SendCustomBroadcastParams
     to: params.to,
     subject,
     html,
+    customConfig: params.customConfig,
+  });
+}
+
+/**
+ * ส่งสรุปประวัติการลงทะเบียน / แจ้งยอดค้างชำระ ให้ผู้ติดต่อของบริษัท
+ */
+export async function sendSponsorHistoryEmail(
+  params: SponsorHistoryEmailOptions & { to: string; subjectPrefix?: string; customConfig?: SmtpConfig }
+): Promise<EmailSendResult> {
+  const subject = `${params.subjectPrefix || ''}${sponsorHistoryEmailSubject(params.kind, params.companyName)}`;
+  return dispatchEmail({
+    to: params.to,
+    subject,
+    html: renderSponsorHistoryEmail(params),
     customConfig: params.customConfig,
   });
 }
