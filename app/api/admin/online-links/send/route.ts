@@ -7,7 +7,7 @@ import { isValidEmail } from '@/lib/onlineLinkMatching';
 import { markRemindersSent } from '@/lib/services/onlineReminderLog';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // ฝั่งหน้าจอแบ่งส่งทีละชุด เพื่อไม่ให้คำขอเดียวใช้เวลานานเกินไป

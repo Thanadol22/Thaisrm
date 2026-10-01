@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import QRCode from 'qrcode';
+import { writeEmailLog, serializeAttachments, getEmailLog, markEmailLogResent } from './services/emailLog';
 import {
   renderOnlineReminderEmail,
   renderOnlineLinkEmail,
@@ -213,6 +214,27 @@ export function htmlToPlainText(html: string): string {
     .trim();
 }
 
+// ข้อผิดพลาดชั่วคราว (การเชื่อมต่อหลุด/หมดเวลา/เซิร์ฟเวอร์ขอให้ลองใหม่) — ส่งซ้ำได้โดยเปิดการเชื่อมต่อใหม่
+function isTransientSmtpError(error: any): boolean {
+  const code = String(error?.code || '');
+  if (['ECONNECTION', 'ETIMEDOUT', 'ESOCKET', 'ECONNRESET', 'EPIPE', 'EDNS'].includes(code)) return true;
+  const responseCode = Number(error?.responseCode);
+  if (responseCode >= 400 && responseCode < 500) return true;
+  return /timeout|closed|reset|socket/i.test(String(error?.message || ''));
+}
+
+function resetCachedTransporter() {
+  try {
+    globalForMail.cachedTransporter?.close();
+  } catch {
+    // ignore
+  }
+  globalForMail.cachedTransporter = null;
+  globalForMail.cachedTransporterKey = undefined;
+}
+
+const MAX_SEND_ATTEMPTS = 3;
+
 /**
  * Core Generic Mail Dispatcher
  */
@@ -231,16 +253,15 @@ async function dispatchEmail({
   attachments?: any[];
   customConfig?: SmtpConfig;
 }): Promise<EmailSendResult> {
-  const transporter = getMailTransporter(customConfig);
   const from = customConfig?.from || getDefaultFromAddress();
 
-  if (!transporter) {
-    console.log('📧 [EMAIL FALLBACK / TEST MODE] Outgoing Email:', {
+  if (!getMailTransporter(customConfig)) {
+    console.warn('📧 [EMAIL FALLBACK / TEST MODE] SMTP not configured — email NOT sent:', {
       to,
       subject,
       timestamp: new Date().toISOString(),
-      previewSnippet: html.substring(0, 150) + '...',
     });
+    await writeEmailLog({ to, subject, status: 'fallback', error: 'ยังไม่ได้ตั้งค่า SMTP', attempts: 0, at: new Date().toISOString() });
 
     return {
       success: true,
@@ -249,37 +270,92 @@ async function dispatchEmail({
     };
   }
 
-  try {
-    const replyTo = process.env.SMTP_REPLY_TO || process.env.SMTP_USER || 'tsrm.support2026@gmail.com';
-    const plainTextContent = text || htmlToPlainText(html) || subject;
+  const replyTo = process.env.SMTP_REPLY_TO || process.env.SMTP_USER || 'tsrm.support2026@gmail.com';
+  const plainTextContent = text || htmlToPlainText(html) || subject;
+  let lastError: any = null;
+  let attempts = 0;
 
-    const info = await transporter.sendMail({
-      from,
-      to,
-      replyTo,
-      subject,
-      html,
-      text: plainTextContent,
-      attachments,
-      headers: {
-        'X-Mailer': 'TSRM Notification System',
-        'X-Auto-Response-Suppress': 'OOF, AutoReply',
-      },
-    });
+  for (attempts = 1; attempts <= MAX_SEND_ATTEMPTS; attempts++) {
+    const transporter = getMailTransporter(customConfig);
+    if (!transporter) break;
+    try {
+      const info = await transporter.sendMail({
+        from,
+        to,
+        replyTo,
+        subject,
+        html,
+        text: plainTextContent,
+        attachments,
+        headers: {
+          'X-Mailer': 'TSRM Notification System',
+          'X-Auto-Response-Suppress': 'OOF, AutoReply',
+        },
+      });
+      if (customConfig) transporter.close();
 
-    console.log('📧 [EMAIL DELIVERED] Successfully sent to:', to, 'ID:', info.messageId);
-    return {
-      success: true,
-      messageId: info.messageId,
-      fallback: false,
-    };
-  } catch (error: any) {
-    console.error('❌ [EMAIL SEND ERROR] Failed to send email to:', to, error);
-    return {
-      success: false,
-      error: error?.message || 'SMTP Transmission failed',
-    };
+      console.log('📧 [EMAIL DELIVERED] Successfully sent to:', to, 'ID:', info.messageId, attempts > 1 ? `(attempt ${attempts})` : '');
+      await writeEmailLog({ to, subject, status: 'sent', messageId: info.messageId, attempts, at: new Date().toISOString() });
+      return {
+        success: true,
+        messageId: info.messageId,
+        fallback: false,
+      };
+    } catch (error: any) {
+      lastError = error;
+      if (customConfig) transporter.close();
+      console.error(`❌ [EMAIL SEND ERROR] Failed to send email to: ${to} (attempt ${attempts}/${MAX_SEND_ATTEMPTS})`, error?.code, error?.responseCode, error?.message);
+      if (!isTransientSmtpError(error) || attempts >= MAX_SEND_ATTEMPTS) break;
+      // การเชื่อมต่อใน pool อาจค้างจากการที่ serverless ถูกพักไว้ — ทิ้งแล้วเปิดใหม่ก่อนลองอีกครั้ง
+      if (!customConfig) resetCachedTransporter();
+      await new Promise((r) => setTimeout(r, 1000 * attempts));
+    }
   }
+
+  const errorMessage = lastError?.message || 'SMTP Transmission failed';
+  await writeEmailLog({
+    to,
+    subject,
+    status: 'failed',
+    error: errorMessage,
+    attempts: Math.min(attempts, MAX_SEND_ATTEMPTS),
+    at: new Date().toISOString(),
+    payload: { html, text: plainTextContent, attachments: serializeAttachments(attachments) },
+  });
+  return {
+    success: false,
+    error: errorMessage,
+  };
+}
+
+/**
+ * ส่งอีเมลที่เคยส่งไม่สำเร็จซ้ำจากเนื้อหาที่บันทึกไว้
+ */
+export async function resendLoggedEmail(logId: string): Promise<EmailSendResult> {
+  const entry = await getEmailLog(logId);
+  if (!entry) return { success: false, error: 'ไม่พบประวัติอีเมลนี้' };
+  if (entry.resentAt) return { success: false, error: 'อีเมลนี้ส่งซ้ำสำเร็จไปแล้ว' };
+  if (!entry.payload?.html) return { success: false, error: 'ไม่มีเนื้อหาอีเมลสำหรับส่งซ้ำ' };
+
+  const result = await dispatchEmail({
+    to: entry.to,
+    subject: entry.subject,
+    html: entry.payload.html,
+    text: entry.payload.text,
+    attachments: entry.payload.attachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+      encoding: 'base64',
+      cid: a.cid,
+      contentType: a.contentType,
+      contentDisposition: a.cid ? 'inline' : undefined,
+    })),
+  });
+
+  if (result.success && !result.fallback) {
+    await markEmailLogResent(logId, null);
+  }
+  return result;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

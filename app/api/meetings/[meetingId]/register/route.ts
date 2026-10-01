@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isPersonalEmail, personalEmailRequiredMessage } from '@/lib/validators/emailPolicy';
 import { sendRegistrationApprovedEmail, sendAttendeeSponsoredRegistrationEmail } from '@/lib/email';
@@ -28,6 +28,9 @@ import {
   priceSpecialFormAttendees,
   SpecialFormPricingError,
 } from '@/lib/services/specialFormService';
+
+// ส่งอีเมล (รวมงานใน after()) ทีละฉบับ — ให้เวลาพอสำหรับกลุ่มใหญ่
+export const maxDuration = 300;
 
 export async function POST(
   request: NextRequest,
@@ -606,7 +609,7 @@ export async function POST(
 
         const coordinatorEmail = groupContact?.coordinatorEmail || (groupPayload as any).companyEmail;
         if (coordinatorEmail) {
-          sendRegistrationApprovedEmail({
+          after(() => sendRegistrationApprovedEmail({
             to: coordinatorEmail,
             recipientName: companyName || groupContact?.coordinatorName || 'ตัวแทนบริษัท',
             meetingName: meeting.meeting_name || 'งานประชุมวิชาการ TSRM 2026',
@@ -615,7 +618,7 @@ export async function POST(
             amountPaid: numericAmount,
             isMember: Boolean(hasMemberAttendees),
             selectedActivities: groupPayload,
-          }).catch((mailErr) => console.error('Failed to send free group registration confirmation email:', mailErr));
+          }).catch((mailErr) => console.error('Failed to send free group registration confirmation email:', mailErr)));
         }
 
         // Send sponsored registration notification to EACH attendee
@@ -669,7 +672,7 @@ export async function POST(
                 }];
               }
 
-              sendAttendeeSponsoredRegistrationEmail({
+              after(() => sendAttendeeSponsoredRegistrationEmail({
                 to: attEmail,
                 recipientName: attName || 'ผู้เข้าร่วมประชุม',
                 recipientEmail: attEmail,
@@ -683,7 +686,7 @@ export async function POST(
                 format: att.attendanceType || undefined,
               }).catch((attMailErr) =>
                 console.error(`Failed to send free sponsored registration email to attendee ${attEmail}:`, attMailErr)
-              );
+              ));
             } else {
               console.warn(`⚠️ [Free Group Reg] Skipping attendee email: No email found for attendee "${attName || attMemberNo}"`);
             }
@@ -1201,7 +1204,7 @@ export async function POST(
         }
       }
 
-      sendRegistrationApprovedEmail({
+      after(() => sendRegistrationApprovedEmail({
         to: effectiveAttendeeEmail,
         recipientName: effectiveAttendeeName || 'ผู้ลงทะเบียน',
         nameEn: body.guestNameEn || body.nameEn || (effectiveSelectedActivities as any)?.nameEn || undefined,
@@ -1221,7 +1224,7 @@ export async function POST(
         amountPaid: numericAmount,
         isMember: Boolean(isMember),
         selectedActivities: effectiveSelectedActivities,
-      }).catch((mailErr) => console.error('Failed to send free individual registration confirmation email:', mailErr));
+      }).catch((mailErr) => console.error('Failed to send free individual registration confirmation email:', mailErr)));
     }
 
     return NextResponse.json({

@@ -122,7 +122,7 @@ export async function syncApprovedSlipsToReceipts(): Promise<void> {
         ORDER BY s.created_at ASC
       `),
       prisma.$queryRawUnsafe<any[]>(`SELECT * FROM meetings`),
-      prisma.$queryRawUnsafe<any[]>(`SELECT key, value FROM system_settings`),
+      prisma.$queryRawUnsafe<any[]>(`SELECT key, value FROM system_settings WHERE key NOT LIKE 'email_log:%'`),
     ]);
 
     if (!Array.isArray(approvedSlips) || approvedSlips.length === 0) {

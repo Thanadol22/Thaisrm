@@ -11,6 +11,8 @@ import {
 } from '@/lib/services/dailyCheckinService';
 
 export const dynamic = 'force-dynamic';
+// ส่งอีเมลทีละฉบับต่อกัน — ให้เวลาพอสำหรับรายชื่อยาว
+export const maxDuration = 300;
 
 function parseAttendeeFormat(selectedActivities: any, refNo?: string | null): 'onsite' | 'online' {
   if (refNo && refNo.includes('->online')) return 'online';

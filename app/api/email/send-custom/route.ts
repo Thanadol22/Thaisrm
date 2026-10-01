@@ -4,6 +4,8 @@ import { sendCustomBroadcastEmail } from '@/lib/email';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 
 export const dynamic = 'force-dynamic';
+// ส่งอีเมลทีละฉบับต่อกัน — ให้เวลาพอสำหรับรายชื่อยาว
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   const session = getAdminSessionFromRequest(req);

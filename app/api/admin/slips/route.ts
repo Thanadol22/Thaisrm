@@ -24,6 +24,9 @@ import {
 } from '@/lib/services/registrationAddOnService';
 import { assertSeatsForReactivatedSlip, SeatUnavailableError } from '@/lib/services/activitySeatService';
 
+// ส่งอีเมล (รวมงานใน after()) ทีละฉบับ — ให้เวลาพอสำหรับกลุ่มใหญ่
+export const maxDuration = 300;
+
 const MAIN_PROGRAM_PRICE = 4000;
 
 function attendeeHasMainProgram(att: any): boolean {

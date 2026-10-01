@@ -4,6 +4,9 @@ import { isCouponApplicableToActivities, retireUsedSponsorCoupon } from '@/lib/s
 import crypto from 'crypto';
 import { sendAttendeeTicketEmail, sendAttendeeSponsoredRegistrationEmail, sendRegistrationApprovedEmail } from '@/lib/email';
 
+// ส่งอีเมล (รวมงานใน after()) ทีละฉบับ — ให้เวลาพอสำหรับกลุ่มใหญ่
+export const maxDuration = 300;
+
 interface MemberEntry {
   memberNo: string;
   fullName: string;

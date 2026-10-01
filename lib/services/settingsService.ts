@@ -103,7 +103,7 @@ export async function getSystemSettings(forceFresh = false): Promise<SystemSetti
 
   try {
     const rows = await prisma.$queryRawUnsafe<SettingRow[]>(
-      'SELECT key, value FROM system_settings'
+      "SELECT key, value FROM system_settings WHERE key NOT LIKE 'email_log:%'"
     );
 
     if (Array.isArray(rows)) {

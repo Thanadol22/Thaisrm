@@ -28,6 +28,7 @@ import {
   Laptop,
   Video,
   ExternalLink,
+  History,
 } from 'lucide-react';
 import { EmailPreviewModal } from '@/components/EmailPreviewModal';
 import { PaginationControls } from '@/components/PaginationControls';
@@ -38,6 +39,7 @@ import { formatThaiDate, DailyProgramInfo, programSupportsFormat } from '@/lib/s
 
 import { statusLabelTh } from '@/lib/statusLabels';
 import { OnlineAttendeesPanel } from '@/components/admin/OnlineAttendeesPanel';
+import { EmailLogPanel } from '@/components/admin/EmailLogPanel';
 interface MeetingOption {
   meeting_id: string;
   meeting_name: string;
@@ -49,7 +51,7 @@ interface AdminEmailCenterPanelProps {
   onShowToast?: (message: string) => void;
 }
 
-type EmailSubTab = 'tickets' | 'online' | 'composer' | 'schedule' | 'smtp';
+type EmailSubTab = 'tickets' | 'online' | 'composer' | 'schedule' | 'logs' | 'smtp';
 
 export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProps) {
   const [activeSubTab, setActiveSubTab] = useState<EmailSubTab>('tickets');
@@ -632,6 +634,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
               icon: Clock,
               count: scheduledTasks.filter((t) => t.status === 'pending').length || undefined,
             },
+            { id: 'logs', label: 'ประวัติการส่ง', icon: History },
             { id: 'smtp', label: 'สถานะ SMTP', icon: Server },
           ]}
         />
@@ -1050,6 +1053,8 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
           notify={notify}
         />
       )}
+
+      {activeSubTab === 'logs' && <EmailLogPanel notify={notify} />}
 
       {/* ─── TAB 2: CUSTOM EMAIL COMPOSER & BROADCAST ─── */}
       {activeSubTab === 'composer' && (
