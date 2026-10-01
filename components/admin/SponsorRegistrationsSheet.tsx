@@ -27,6 +27,7 @@ interface RegistrationRow {
   programs: string;
   format: string;
   isAddOn: boolean;
+  isFellow: boolean;
   discount: number;
   netPrice: number;
   attendanceStatus: string | null;
@@ -152,7 +153,7 @@ export default function SponsorRegistrationsSheet() {
       r.name,
       r.email,
       r.phone,
-      r.programs,
+      r.isFellow ? `${r.programs} - ราคา fellow` : r.programs,
       r.format,
       r.discount,
       r.netPrice,
@@ -278,7 +279,14 @@ export default function SponsorRegistrationsSheet() {
                       </td>
                       <td className={`${td} text-slate-600`}>{r.email || '-'}</td>
                       <td className={`${td} text-slate-600 tabular-nums`}>{r.phone || '-'}</td>
-                      <td className={`${td} max-w-[260px] truncate`} title={r.programs}>{r.programs || '-'}</td>
+                      <td className={`${td} max-w-[260px] truncate`} title={r.isFellow ? `${r.programs} - ราคา fellow` : r.programs}>
+                        {r.isFellow && (
+                          <span className="mr-1.5 inline-block px-1.5 py-px rounded bg-lime-50 text-lime-800 border border-lime-200 text-[10px] font-bold align-middle">
+                            ราคา fellow
+                          </span>
+                        )}
+                        {r.programs || '-'}
+                      </td>
                       <td className={td}>{r.format || '-'}</td>
                       <td className={`${td} text-right tabular-nums text-slate-600`}>{r.discount ? fmtMoney(r.discount) : '-'}</td>
                       <td className={`${td} text-right tabular-nums font-semibold`}>{fmtMoney(r.netPrice)}</td>
