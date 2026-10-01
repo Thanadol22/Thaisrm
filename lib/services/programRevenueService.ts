@@ -6,7 +6,7 @@ import { groupPeople } from '@/lib/services/sponsorRegistrationService';
 // แจกยอดเงินของทุกบิล (รวมบิลกลุ่มบริษัท) ลงหลักสูตรตามที่ผู้เข้าร่วมแต่ละคนเลือก โดยยอดรวมทุกแถวเท่ากับยอดสลิปจริงเสมอ
 // รายการที่ไม่ใช่หลักสูตร (ค่าสมัครสมาชิก ค่าเปลี่ยนรูปแบบ รายการลงบิลย้อนหลัง) แยกเป็นแถวต่างหาก
 
-export type ProgramRevenueKind = 'main' | 'workshop' | 'membership' | 'format_change' | 'backdated' | 'unassigned';
+export type ProgramRevenueKind = 'main' | 'workshop' | 'membership' | 'format_change' | 'backdated' | 'adjustment' | 'unassigned';
 
 export interface ProgramRevenueRow {
   key: string;
@@ -41,6 +41,7 @@ const EXTRA_ROWS: Record<Exclude<ProgramRevenueKind, 'main' | 'workshop'>, strin
   membership: 'ค่าสมัครสมาชิก',
   format_change: 'ค่าธรรมเนียมเปลี่ยนรูปแบบการเข้าร่วม',
   backdated: 'รายการลงบิลย้อนหลัง',
+  adjustment: 'ส่วนต่างยอดบิล',
   unassigned: 'ไม่ระบุหลักสูตร',
 };
 
@@ -74,7 +75,15 @@ interface Line {
   key: string;
   weight: number;
   person: string;
+  /** ยอดสุทธิจริงของรายการ (หลังหักส่วนลด) ที่บันทึกไว้ในบิล */
+  exact?: number;
 }
+
+const priceOrNull = (v: unknown): number | null => {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+};
 
 /** แบ่งยอดบิลตามสัดส่วนน้ำหนัก ปัดเศษให้ผลรวมเท่ายอดบิลพอดี */
 function splitAmount(amount: number, lines: Line[]): number[] {
@@ -130,7 +139,7 @@ export function aggregateMeetingSlips(m: MeetingRow, slips: SlipRow[]): MeetingP
 
   /** น้ำหนักไว้แบ่งยอด: ราคาที่บันทึกในรายการก่อน ไม่มีจึงใช้ราคาตั้งของหลักสูตร */
   const weightOf = (item: any, act: any, isMember: boolean, online: boolean) => {
-    const own = Number(item?.price);
+    const own = Number(item?.originalPrice ?? item?.price);
     if (own > 0) return own;
     if (act?.type === 'main') {
       const p = tiers.participant || {};
@@ -140,14 +149,28 @@ export function aggregateMeetingSlips(m: MeetingRow, slips: SlipRow[]): MeetingP
     return Number(isMember ? act?.memberPrice : act?.nonMemberPrice) || Number(act?.memberPrice) || 1;
   };
 
-  /** รายการหลักสูตรของผู้เข้าร่วม 1 คน (ไม่เลือกอะไรเลย = ลงเฉพาะการประชุมหลัก) */
-  const personLines = (items: any[], person: string, isMember: boolean, online: boolean): Line[] => {
+  /**
+   * รายการหลักสูตรของผู้เข้าร่วม 1 คน (ไม่เลือกอะไรเลย = ลงเฉพาะการประชุมหลัก)
+   * personNet = ยอดสุทธิของคนนี้ที่บันทึกในบิล: ใช้ราคาสุทธิรายรายการ (netPrice) เป็นยอดจริง
+   * หากผลรวมรายรายการไม่ตรงกับยอดสุทธิของคน (เช่น แอดมินแก้ยอดภายหลัง) จึงแบ่งยอดของคนนั้นตามสัดส่วน
+   */
+  const personLines = (items: any[], person: string, isMember: boolean, online: boolean, personNet: number | null = null): Line[] => {
     const list = items.length > 0 ? items : mainAct ? [mainAct] : [];
-    if (list.length === 0) return [{ key: 'unassigned', weight: 1, person }];
-    return list.map((item) => {
+    if (list.length === 0) return [{ key: 'unassigned', weight: 1, person, ...(personNet !== null ? { exact: personNet } : {}) }];
+    const lines: Line[] = list.map((item) => {
       const act = findAct(item);
       return { key: act ? `act:${act.id}` : 'unassigned', weight: weightOf(item, act, isMember, online), person };
     });
+    const nets = items.length > 0 ? list.map((item) => priceOrNull(item?.netPrice)) : list.map(() => null);
+    const allNets = nets.every((n): n is number => n !== null);
+    const netSum = allNets ? nets.reduce((s, n) => s + n, 0) : 0;
+    if (allNets && (personNet === null || personNet === netSum)) {
+      lines.forEach((l, i) => (l.exact = nets[i]));
+    } else if (personNet !== null) {
+      const parts = splitAmount(personNet, allNets && netSum > 0 ? lines.map((l, i) => ({ ...l, weight: nets[i] })) : lines);
+      lines.forEach((l, i) => (l.exact = parts[i]));
+    }
+    return lines;
   };
 
   let approvedTotal = 0;
@@ -197,8 +220,8 @@ export function aggregateMeetingSlips(m: MeetingRow, slips: SlipRow[]): MeetingP
         const person = `${s.slip_id}:${i}`;
         const isMember = Boolean(att?.isMember || att?.memberNo);
         const online = (att?.selectedFormat || att?.attendanceType || att?.format) === 'online';
-        lines.push(...personLines(resolveAttendeeActivities(att, acts), person, isMember, online));
-        attendeeBackdatedCharges(att).forEach((c) => lines.push({ key: 'backdated', weight: c.amount, person }));
+        lines.push(...personLines(resolveAttendeeActivities(att, acts), person, isMember, online, priceOrNull(att?.price ?? att?.netPrice)));
+        attendeeBackdatedCharges(att).forEach((c) => lines.push({ key: 'backdated', weight: c.amount, person, exact: c.amount }));
       });
     } else {
       const items: any[] = Array.isArray(payload)
@@ -215,29 +238,45 @@ export function aggregateMeetingSlips(m: MeetingRow, slips: SlipRow[]): MeetingP
     if (amount === 0 && lines.length === 0) continue;
     if (lines.length === 0) lines = [{ key: 'unassigned', weight: 1, person: s.slip_id }];
 
-    splitAmount(amount, lines).forEach((part, i) => {
+    // ทุกรายการมียอดสุทธิจริง: ใช้ยอดนั้นตรงๆ ส่วนที่ไม่ตรงกับยอดบิลแยกเป็นแถวส่วนต่าง
+    // ไม่เช่นนั้นจึงแบ่งยอดบิลตามสัดส่วนราคา
+    let parts: number[];
+    if (lines.every((l) => l.exact !== undefined)) {
+      parts = lines.map((l) => l.exact!);
+      const diff = amount - parts.reduce((s, p) => s + p, 0);
+      if (diff !== 0) {
+        lines.push({ key: 'adjustment', weight: 0, person: s.slip_id });
+        parts.push(diff);
+      }
+    } else {
+      parts = splitAmount(amount, lines);
+    }
+
+    parts.forEach((part, i) => {
       const line = lines[i];
       const row =
         line.key.startsWith('act:')
           ? rows.get(line.key)!
           : rowFor(line.key, EXTRA_ROWS[line.key as keyof typeof EXTRA_ROWS], line.key as ProgramRevenueKind);
+      // แถวส่วนต่างยอดบิลไม่ใช่ผู้ลงทะเบียน ไม่นับจำนวนคน
+      const countsPerson = line.key !== 'adjustment';
       if (approved) {
         row.approvedRevenue += part;
-        row.approvedSet.add(line.person);
+        if (countsPerson) row.approvedSet.add(line.person);
         if (payLater) row.payLaterApprovedRevenue += part;
       } else {
         row.pendingRevenue += part;
-        row.pendingSet.add(line.person);
+        if (countsPerson) row.pendingSet.add(line.person);
         if (payLater) row.payLaterPendingRevenue += part;
       }
-      if (payLater) row.payLaterSet.add(line.person);
+      if (payLater && countsPerson) row.payLaterSet.add(line.person);
     });
   }
 
   return {
     meetingId: m.meeting_id,
     rows: [...rows.values()]
-      .filter((r) => r.kind === 'main' || r.kind === 'workshop' || r.approvedRevenue > 0 || r.pendingRevenue > 0)
+      .filter((r) => r.kind === 'main' || r.kind === 'workshop' || r.approvedRevenue !== 0 || r.pendingRevenue !== 0)
       .map(({ approvedSet, pendingSet, payLaterSet, ...r }) => ({
         ...r,
         approvedPeople: approvedSet.size,

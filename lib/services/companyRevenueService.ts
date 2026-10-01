@@ -120,7 +120,7 @@ export async function getCompanyRevenue(): Promise<CompanyRevenue[]> {
       if (!m) continue;
       const agg = aggregateMeetingSlips(m, c.slips.get(meetingId) || []);
       const items: CompanyRevenueItem[] = agg.rows
-        .filter((r) => r.approvedRevenue + r.pendingRevenue > 0 || r.approvedPeople + r.pendingPeople > 0)
+        .filter((r) => r.approvedRevenue + r.pendingRevenue !== 0 || r.approvedPeople + r.pendingPeople > 0)
         .map((r) => {
           const payLater = r.payLaterApprovedRevenue + r.payLaterPendingRevenue;
           const received = r.approvedRevenue - r.payLaterApprovedRevenue;

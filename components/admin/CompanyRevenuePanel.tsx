@@ -32,6 +32,7 @@ const KIND_LABEL: Record<CompanyRevenueItem['kind'], string> = {
   membership: 'สมาชิก',
   format_change: 'ค่าธรรมเนียม',
   backdated: 'ลงบิลย้อนหลัง',
+  adjustment: 'ส่วนต่าง',
   unassigned: 'ไม่ระบุ',
   quota: 'โควต้า',
 };
@@ -42,6 +43,7 @@ const KIND_TONE: Record<CompanyRevenueItem['kind'], string> = {
   membership: 'bg-violet-100 text-violet-800',
   format_change: 'bg-slate-100 text-slate-600',
   backdated: 'bg-slate-100 text-slate-600',
+  adjustment: 'bg-amber-100 text-amber-800',
   unassigned: 'bg-slate-100 text-slate-600',
   quota: 'bg-sky-100 text-sky-800',
 };
