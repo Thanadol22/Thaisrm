@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 import { normalizeSpecialFormInput, serializeSpecialForm, specialFormInclude } from '@/lib/services/specialFormAdmin';
-import { buildSpecialFormMeeting, parseSpecialFormItems } from '@/lib/services/specialFormService';
+import { buildSpecialFormMeeting, resolveSpecialFormItems } from '@/lib/services/specialFormService';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
   return NextResponse.json({
     success: true,
     data: await serializeSpecialForm(form),
-    meeting: buildSpecialFormMeeting(meeting, parseSpecialFormItems(form.items)),
+    meeting: buildSpecialFormMeeting(meeting, resolveSpecialFormItems(form, meeting)),
     companies: sponsors,
   });
 }

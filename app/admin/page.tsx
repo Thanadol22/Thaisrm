@@ -479,6 +479,8 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           meetingId: newAttendee.meetingId,
+          memberNo: newAttendee.memberNo || undefined,
+          isFellow: Boolean(newAttendee.isFellow),
           nameTh: newAttendee.nameTh,
           nameEn: newAttendee.nameEn,
           phone: newAttendee.phone,

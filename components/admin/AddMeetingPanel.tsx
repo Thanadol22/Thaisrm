@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { AdminPageHeader, HeaderButton } from './AdminPageHeader';
+import { Btn, FormActionBar } from './ui';
 import { createPortal } from 'react-dom';
 import { MeetingPricingTiers, DEFAULT_PRICING_TIERS, MeetingItem } from './types';
 import { AdminTab } from '@/components/AdminNavbar';
@@ -182,6 +184,12 @@ export function AddMeetingPanel({ onMeetingCreated, onNavigateTab }: AddMeetingP
   const [activities, setActivities] = useState<ActivityItem[]>([createEmptyActivity('main')]);
 
   const [pricing, setPricing] = useState<MeetingPricingTiers>(DEFAULT_PRICING_TIERS);
+  const fellowPricing = pricing.fellow || { onsiteMember: 0, onsiteNonMember: 0, onlineMember: 0 };
+  const updateFellow = (field: 'onsiteMember' | 'onsiteNonMember' | 'onlineMember', value: number) =>
+    setPricing((prev) => ({
+      ...prev,
+      fellow: { ...(prev.fellow || { onsiteMember: 0, onsiteNonMember: 0, onlineMember: 0 }), [field]: value },
+    }));
 
   const [isSaved, setIsSaved] = useState(false);
   const [lastCreatedId, setLastCreatedId] = useState<string>('');
@@ -346,6 +354,11 @@ export function AddMeetingPanel({ onMeetingCreated, onNavigateTab }: AddMeetingP
         onsiteNonMember: 0,
         onlineMember: 0,
       },
+      fellow: {
+        onsiteMember: 0,
+        onsiteNonMember: 0,
+        onlineMember: 0,
+      },
       changeFee: {
         label: '',
         conditionDate: '',
@@ -481,7 +494,7 @@ export function AddMeetingPanel({ onMeetingCreated, onNavigateTab }: AddMeetingP
   const workshopCount = activities.filter((a) => a.type === 'workshop').length;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-12">
+    <div className="space-y-6 animate-fade-in pb-12">
       {/* Toast Notification */}
       <ToastNotification message={toastMessage} />
 
@@ -604,28 +617,15 @@ export function AddMeetingPanel({ onMeetingCreated, onNavigateTab }: AddMeetingP
           document.body
         )}
 
-      {/* Header & Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[#0026b3] text-xs font-bold mb-2">
-            <PlusCircle className="w-4 h-4 text-[#0026b3]" />
-            <span>สร้างกำหนดการประชุมและงานอบรมใหม่</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">เพิ่มการประชุม / งานประชุมวิชาการ</h1>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            ระบุข้อมูลการประชุม กำหนดการ สถานที่ หลักสูตร Main Program / Workshop พร้อมอัตราค่าลงทะเบียน
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleResetForm}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold border border-slate-200 transition cursor-pointer self-start sm:self-auto"
-        >
-          <RotateCcw className="w-4 h-4 text-slate-500" />
-          <span>ล้างฟอร์ม / เริ่มใหม่</span>
-        </button>
-      </div>
+      <AdminPageHeader
+        tab="add-meeting"
+        description="ระบุข้อมูลการประชุม กำหนดการ สถานที่ หลักสูตร Main Program / Workshop พร้อมอัตราค่าลงทะเบียน"
+        actions={
+          <HeaderButton icon={RotateCcw} onClick={handleResetForm}>
+            ล้างฟอร์มและเริ่มใหม่
+          </HeaderButton>
+        }
+      />
 
       {isSaved && (
         <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-emerald-900 shadow-sm animate-scale-up">
@@ -666,18 +666,21 @@ export function AddMeetingPanel({ onMeetingCreated, onNavigateTab }: AddMeetingP
       )}
 
       {/* ─── MAIN INPUT FORM ─── */}
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-8 space-y-7 shadow-xs"
-      >
+      <form onSubmit={handleSubmit} className="space-y-6">
         {/* ─── SECTION 1: ข้อมูลและกำหนดการประชุม ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-            <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              <Layers className="w-4 h-4 text-[#0026b3]" />
-              1. ข้อมูลและกำหนดการประชุม
-            </h3>
-            <span className="text-xs text-slate-500">* ข้อมูลจำเป็น</span>
+        <section className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-[#0026b3] text-white text-sm font-black flex items-center justify-center shrink-0">1</span>
+              <div className="min-w-0">
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-[#0026b3]" />
+                  ข้อมูลและกำหนดการประชุม
+                </h3>
+              <p className="text-xs text-slate-500 mt-0.5">รหัส ชื่อการประชุม วันเวลา รูปแบบการจัดงาน สถานที่ และรหัสเจ้าหน้าที่</p>
+              </div>
+            </div>
+            <span className="text-xs text-slate-500 shrink-0"><span className="text-rose-500">*</span> ข้อมูลจำเป็น</span>
           </div>
 
           {/* รหัสการประชุม และ ชื่อการประชุม */}
@@ -924,19 +927,20 @@ export function AddMeetingPanel({ onMeetingCreated, onNavigateTab }: AddMeetingP
               </button>
             </div>
           </div>
-        </div>
+        </section>
 
         {/* ─── SECTION 2: หลักสูตร / กิจกรรมที่จะเปิด (Programs & Workshops) ─── */}
-        <div className="space-y-3.5 pt-4 border-t border-slate-100">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
-            <div>
-              <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                <Award className="w-4 h-4 text-[#0026b3]" />
-                2. หลักสูตร / กิจกรรมที่จะเปิด
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                เลือกวันที่จัดกิจกรรม (เลือกได้มากกว่า 1 วัน) และระบุจำนวนที่นั่งสำหรับ Workshop
-              </p>
+        <section className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-slate-100 pb-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-[#0026b3] text-white text-sm font-black flex items-center justify-center shrink-0">2</span>
+              <div className="min-w-0">
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <Award className="w-4 h-4 text-[#0026b3]" />
+                  หลักสูตรและกิจกรรมที่จะเปิด
+                </h3>
+              <p className="text-xs text-slate-500 mt-0.5">เลือกวันที่จัดกิจกรรม เลือกได้มากกว่า 1 วัน และระบุจำนวนที่นั่งสำหรับ Workshop</p>
+              </div>
             </div>
             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 self-start sm:self-auto">
               {mainCount > 0 && (
@@ -961,6 +965,7 @@ export function AddMeetingPanel({ onMeetingCreated, onNavigateTab }: AddMeetingP
           <div className="space-y-3">
             {activities.map((activity, index) => {
               const isMain = activity.type === 'main';
+              const showMainPricing = isMain && activities.findIndex((a) => a.type === 'main') === index;
               const borderColor = isMain
                 ? 'border-indigo-200 hover:border-indigo-300'
                 : 'border-violet-200 hover:border-violet-300';
@@ -1085,6 +1090,7 @@ export function AddMeetingPanel({ onMeetingCreated, onNavigateTab }: AddMeetingP
 
                     {/* Date day pills & Workshop seats */}
                     {isMain ? (
+                      <>
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
                           <label className="text-xs font-bold text-slate-700">
@@ -1136,6 +1142,216 @@ export function AddMeetingPanel({ onMeetingCreated, onNavigateTab }: AddMeetingP
                           </div>
                         )}
                       </div>
+                        {/* อัตราค่าลงทะเบียน Main Program (ใช้ทั้งการประชุม) */}
+                        {showMainPricing && (
+                          <div className="space-y-2 pt-3 border-t border-indigo-100">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <div className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                                  <Coins className="w-3.5 h-3.5 text-indigo-600" />
+                                  อัตราค่าลงทะเบียน Main Program
+                                </div>
+                                <p className="text-[11px] text-slate-500">
+                                  กรอกราคาเป็นบาท ราคา Fellow ใช้กับฟอร์ม fellow อัตโนมัติ
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                                <button
+                                  type="button"
+                                  onClick={handleLoadDefaultPricing}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#0026b3] text-xs font-bold border border-blue-200 transition cursor-pointer"
+                                  title="โหลดค่าเริ่มต้นมาตรฐาน"
+                                >
+                                  <Sparkles className="w-3.5 h-3.5" />
+                                  <span>ใส่ค่ามาตรฐานอัตโนมัติ</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleClearPricing}
+                                  className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-700 text-xs font-medium border border-slate-200 transition cursor-pointer"
+                                >
+                                  ล้างราคา
+                                </button>
+                              </div>
+                            </div>
+                      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
+                        <table className="w-full min-w-[540px] text-left border-collapse text-xs sm:text-sm">
+                          <thead>
+                            {/* Top Group Header */}
+                            <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-bold">
+                              <th className="py-2.5 px-3 w-[32%] min-w-[140px] text-slate-800">ประเภทผู้เข้าร่วม</th>
+                              <th
+                                colSpan={2}
+                                className="py-2 px-3 text-center border-l border-slate-200 bg-emerald-50/70 text-emerald-900"
+                              >
+                                Onsite (เข้าร่วม ณ สถานที่)
+                              </th>
+                              <th className="py-2 px-3 text-center border-l border-slate-200 bg-blue-50/70 text-[#0026b3]">
+                                Online (ออนไลน์)
+                              </th>
+                            </tr>
+                            {/* Sub Header */}
+                            <tr className="bg-slate-50 border-b border-slate-200 text-[11px] sm:text-xs text-slate-600 font-bold">
+                              <th className="py-2 px-3">กลุ่มราคา</th>
+                              <th className="py-2 px-3 text-center border-l border-slate-200 w-[22%]">
+                                Member<span className="text-rose-500">*</span>
+                              </th>
+                              <th className="py-2 px-3 text-center border-l border-slate-200 w-[22%]">Non-member</th>
+                              <th className="py-2 px-3 text-center border-l border-slate-200 w-[24%] text-[#0026b3]">
+                                Member<span className="text-rose-500">*</span>
+                              </th>
+                            </tr>
+                          </thead>
+
+                          <tbody className="divide-y divide-slate-200">
+                            {/* Row 1: Participant */}
+                            <tr className="hover:bg-slate-50/50 transition">
+                              <td className="py-2.5 px-3 font-extrabold text-slate-900">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                                  <span>Participant</span>
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-normal pl-3">ผู้เข้าร่วมทั่วไป / แพทย์</div>
+                              </td>
+                              {/* Onsite Member */}
+                              <td className="py-2 px-2.5 border-l border-slate-200">
+                                <div className="relative">
+                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                                    ฿
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={100}
+                                    value={pricing.participant.onsiteMember}
+                                    onChange={(e) =>
+                                      setPricing({
+                                        ...pricing,
+                                        participant: {
+                                          ...pricing.participant,
+                                          onsiteMember: parseInt(e.target.value) || 0,
+                                        },
+                                      })
+                                    }
+                                    className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                                  />
+                                </div>
+                              </td>
+                              {/* Onsite Non-member */}
+                              <td className="py-2 px-2.5 border-l border-slate-200">
+                                <div className="relative">
+                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                                    ฿
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={100}
+                                    value={pricing.participant.onsiteNonMember}
+                                    onChange={(e) =>
+                                      setPricing({
+                                        ...pricing,
+                                        participant: {
+                                          ...pricing.participant,
+                                          onsiteNonMember: parseInt(e.target.value) || 0,
+                                        },
+                                      })
+                                    }
+                                    className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                                  />
+                                </div>
+                              </td>
+                              {/* Online Member */}
+                              <td className="py-2 px-2.5 border-l border-slate-200 bg-blue-50/20">
+                                <div className="relative">
+                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                                    ฿
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={100}
+                                    value={pricing.participant.onlineMember}
+                                    onChange={(e) =>
+                                      setPricing({
+                                        ...pricing,
+                                        participant: {
+                                          ...pricing.participant,
+                                          onlineMember: parseInt(e.target.value) || 0,
+                                        },
+                                      })
+                                    }
+                                    className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-[#0026b3] focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+
+                            {/* Row 1.5: Fellow (ผูกกับฟอร์ม fellow อัตโนมัติ) */}
+                            <tr className="hover:bg-slate-50/50 transition bg-violet-50/30">
+                              <td className="py-2.5 px-3 font-extrabold text-slate-900">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-violet-600"></span>
+                                  <span>Fellow</span>
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 border border-violet-200">
+                                    Main Program
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-normal pl-3">ใช้กับฟอร์ม fellow อัตโนมัติ เว้น 0 = ไม่ผูกราคา</div>
+                              </td>
+                              <td className="py-2 px-2.5 border-l border-slate-200">
+                                <div className="relative">
+                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                                    ฿
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={100}
+                                    value={fellowPricing.onsiteMember}
+                                    onChange={(e) => updateFellow('onsiteMember', parseInt(e.target.value) || 0)}
+                                    className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                                  />
+                                </div>
+                              </td>
+                              <td className="py-2 px-2.5 border-l border-slate-200">
+                                <div className="relative">
+                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                                    ฿
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={100}
+                                    value={fellowPricing.onsiteNonMember}
+                                    onChange={(e) => updateFellow('onsiteNonMember', parseInt(e.target.value) || 0)}
+                                    className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                                  />
+                                </div>
+                              </td>
+                              <td className="py-2 px-2.5 border-l border-slate-200 bg-blue-50/20">
+                                <div className="relative">
+                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                                    ฿
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={100}
+                                    value={fellowPricing.onlineMember}
+                                    onChange={(e) => updateFellow('onlineMember', parseInt(e.target.value) || 0)}
+                                    className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-[#0026b3] focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+
+                          </tbody>
+                        </table>
+                      </div>
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <>
                         <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-start">
@@ -1318,261 +1534,21 @@ export function AddMeetingPanel({ onMeetingCreated, onNavigateTab }: AddMeetingP
               <span>+ เพิ่ม Workshop</span>
             </button>
           </div>
-        </div>
+        </section>
 
-        {/* ─── SECTION 3: ระบุเงินและกำหนดอัตราค่าลงทะเบียน (Interactive Pricing Matrix Table) ─── */}
-        <div className="space-y-3.5 pt-4 border-t border-slate-100">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-            <div>
-              <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                <Coins className="w-4 h-4 text-[#0026b3]" />
-                3. กำหนดอัตราค่าลงทะเบียน
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                กรอกตัวเลขราคา (บาท) ลงในตารางได้โดยตรง ระบบจะนำไปคำนวณและแสดงผลในหน้าลงทะเบียน
-              </p>
+        {/* ─── SECTION 3: เงื่อนไขการเปลี่ยนรูปแบบและราคาเวิร์กช็อป ─── */}
+        <section className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="border-b border-slate-100 pb-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-[#0026b3] text-white text-sm font-black flex items-center justify-center shrink-0">3</span>
+              <div className="min-w-0">
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <Coins className="w-4 h-4 text-[#0026b3]" />
+                  ค่าธรรมเนียมและเงื่อนไข
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">ค่าธรรมเนียมการเปลี่ยนรูปแบบการเข้าร่วม และสรุปราคาเวิร์กช็อป</p>
+              </div>
             </div>
-
-            <div className="flex items-center gap-1.5 self-start sm:self-auto">
-              <button
-                type="button"
-                onClick={handleLoadDefaultPricing}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#0026b3] text-xs font-bold border border-blue-200 transition cursor-pointer"
-                title="โหลดค่าเริ่มต้นมาตรฐาน"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>ใส่ค่ามาตรฐานอัตโนมัติ</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleClearPricing}
-                className="px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-700 text-xs font-medium border border-slate-200 transition cursor-pointer"
-              >
-                ล้างตาราง
-              </button>
-            </div>
-          </div>
-
-          {/* Compact Directly Editable Matrix Table */}
-          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
-            <table className="w-full min-w-[540px] text-left border-collapse text-xs sm:text-sm">
-              <thead>
-                {/* Top Group Header */}
-                <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-bold">
-                  <th className="py-2.5 px-3 w-[32%] min-w-[140px] text-slate-800">ประเภทผู้เข้าร่วม</th>
-                  <th
-                    colSpan={2}
-                    className="py-2 px-3 text-center border-l border-slate-200 bg-emerald-50/70 text-emerald-900"
-                  >
-                    Onsite (เข้าร่วม ณ สถานที่)
-                  </th>
-                  <th className="py-2 px-3 text-center border-l border-slate-200 bg-blue-50/70 text-[#0026b3]">
-                    Online (ออนไลน์)
-                  </th>
-                </tr>
-                {/* Sub Header */}
-                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] sm:text-xs text-slate-600 font-bold">
-                  <th className="py-2 px-3">หมวดหมู่ / รายการ</th>
-                  <th className="py-2 px-3 text-center border-l border-slate-200 w-[22%]">
-                    Member<span className="text-rose-500">*</span>
-                  </th>
-                  <th className="py-2 px-3 text-center border-l border-slate-200 w-[22%]">Non-member</th>
-                  <th className="py-2 px-3 text-center border-l border-slate-200 w-[24%] text-[#0026b3]">
-                    Member<span className="text-rose-500">*</span>
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-slate-200">
-                {/* Row 1: Participant */}
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="py-2.5 px-3 font-extrabold text-slate-900">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                      <span>Participant</span>
-                    </div>
-                    <div className="text-[10px] text-slate-400 font-normal pl-3">ผู้เข้าร่วมทั่วไป / แพทย์</div>
-                  </td>
-                  {/* Onsite Member */}
-                  <td className="py-2 px-2.5 border-l border-slate-200">
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                        ฿
-                      </span>
-                      <input
-                        type="number"
-                        min={0}
-                        step={100}
-                        value={pricing.participant.onsiteMember}
-                        onChange={(e) =>
-                          setPricing({
-                            ...pricing,
-                            participant: {
-                              ...pricing.participant,
-                              onsiteMember: parseInt(e.target.value) || 0,
-                            },
-                          })
-                        }
-                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
-                      />
-                    </div>
-                  </td>
-                  {/* Onsite Non-member */}
-                  <td className="py-2 px-2.5 border-l border-slate-200">
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                        ฿
-                      </span>
-                      <input
-                        type="number"
-                        min={0}
-                        step={100}
-                        value={pricing.participant.onsiteNonMember}
-                        onChange={(e) =>
-                          setPricing({
-                            ...pricing,
-                            participant: {
-                              ...pricing.participant,
-                              onsiteNonMember: parseInt(e.target.value) || 0,
-                            },
-                          })
-                        }
-                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
-                      />
-                    </div>
-                  </td>
-                  {/* Online Member */}
-                  <td className="py-2 px-2.5 border-l border-slate-200 bg-blue-50/20">
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                        ฿
-                      </span>
-                      <input
-                        type="number"
-                        min={0}
-                        step={100}
-                        value={pricing.participant.onlineMember}
-                        onChange={(e) =>
-                          setPricing({
-                            ...pricing,
-                            participant: {
-                              ...pricing.participant,
-                              onlineMember: parseInt(e.target.value) || 0,
-                            },
-                          })
-                        }
-                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-[#0026b3] focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
-                      />
-                    </div>
-                  </td>
-                </tr>
-
-                {/* Row 2: Format Change Fee */}
-                <tr className="hover:bg-slate-50/50 transition bg-amber-50/30">
-                  <td className="py-2 px-3 font-extrabold text-slate-900">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                      <span className="text-xs">แจ้งเปลี่ยนรูปแบบ (Online ↔ Onsite)</span>
-                    </div>
-                    <div className="flex items-center gap-1 mt-1 pl-3">
-                      <input
-                        type="text"
-                        value={pricing.changeFee.conditionDate}
-                        onChange={(e) => {
-                          const cDate = e.target.value;
-                          setPricing({
-                            ...pricing,
-                            changeFee: {
-                              ...pricing.changeFee,
-                              conditionDate: cDate,
-                            },
-                          });
-                        }}
-                        placeholder="After 10 Oct 2026"
-                        className="bg-white border border-amber-300 rounded px-1.5 py-0.5 text-[10px] font-bold text-rose-600 focus:outline-none focus:ring-1 focus:ring-rose-400 w-32"
-                      />
-                    </div>
-                  </td>
-                  {/* Onsite Member */}
-                  <td className="py-2 px-2.5 border-l border-slate-200">
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                        ฿
-                      </span>
-                      <input
-                        type="number"
-                        min={0}
-                        step={100}
-                        value={pricing.changeFee.onsiteMember}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          setPricing({
-                            ...pricing,
-                            changeFee: {
-                              ...pricing.changeFee,
-                              onsiteMember: val,
-                              onsiteNonMember: val,
-                              onlineMember: val,
-                            },
-                          });
-                        }}
-                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
-                      />
-                    </div>
-                  </td>
-                  {/* Onsite Non-member */}
-                  <td className="py-2 px-2.5 border-l border-slate-200">
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                        ฿
-                      </span>
-                      <input
-                        type="number"
-                        min={0}
-                        step={100}
-                        value={pricing.changeFee.onsiteNonMember}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          setPricing({
-                            ...pricing,
-                            changeFee: {
-                              ...pricing.changeFee,
-                              onsiteNonMember: val,
-                            },
-                          });
-                        }}
-                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
-                      />
-                    </div>
-                  </td>
-                  {/* Online Member */}
-                  <td className="py-2 px-2.5 border-l border-slate-200 bg-blue-50/20">
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                        ฿
-                      </span>
-                      <input
-                        type="number"
-                        min={0}
-                        step={100}
-                        value={pricing.changeFee.onlineMember}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          setPricing({
-                            ...pricing,
-                            changeFee: {
-                              ...pricing.changeFee,
-                              onlineMember: val,
-                            },
-                          });
-                        }}
-                        className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg pl-6 pr-2 py-1.5 text-xs sm:text-sm font-bold text-[#0026b3] focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] text-right"
-                      />
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
           </div>
 
           {/* Format Change Policy Detail Card */}
@@ -1806,18 +1782,24 @@ export function AddMeetingPanel({ onMeetingCreated, onNavigateTab }: AddMeetingP
               />
             </div>
             <span className="text-slate-400">
-              💡 กดปุ่ม &quot;ใส่ค่ามาตรฐานอัตโนมัติ&quot; เพื่อเติมข้อมูลตามโครงสร้างมาตรฐานได้ทันที
+              💡 ปุ่ม &quot;ใส่ค่ามาตรฐานอัตโนมัติ&quot; อยู่ในการ์ด Main Program ในหัวข้อที่ 2
             </span>
           </div>
-        </div>
+        </section>
 
         {/* ─── SECTION 4: หมายเหตุ / รายละเอียดเพิ่มเติม ─── */}
-        <div className="space-y-3 pt-4 border-t border-slate-100">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-            <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              <ClipboardList className="w-4 h-4 text-[#0026b3]" />
-              4. หมายเหตุ / รายละเอียดเพิ่มเติม (ถ้ามี)
-            </h3>
+        <section className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="border-b border-slate-100 pb-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-[#0026b3] text-white text-sm font-black flex items-center justify-center shrink-0">4</span>
+              <div className="min-w-0">
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4 text-[#0026b3]" />
+                  หมายเหตุและรายละเอียดเพิ่มเติม
+                </h3>
+              <p className="text-xs text-slate-500 mt-0.5">ไม่บังคับ เช่น วิทยากรรับเชิญ หรือหมายเหตุสำหรับผู้ลงทะเบียน</p>
+              </div>
+            </div>
           </div>
           <textarea
             rows={3}
@@ -1826,37 +1808,21 @@ export function AddMeetingPanel({ onMeetingCreated, onNavigateTab }: AddMeetingP
             placeholder="ระบุรายละเอียดการประชุม วิทยากรรับเชิญ หรือหมายเหตุ..."
             className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition resize-none shadow-2xs"
           />
-        </div>
+        </section>
 
-        {/* Action Buttons */}
-        <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100">
-          <div className="text-xs text-slate-500 flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>ระบบจะบันทึกข้อมูลและอัตราค่าลงทะเบียน พร้อมเปิดช่องทางลงทะเบียนให้อัตโนมัติ</span>
-          </div>
-
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={handleResetForm}
-              className="flex-1 sm:flex-none px-4 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition cursor-pointer"
-            >
-              ยกเลิก
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 font-bold text-sm px-8 py-3 rounded-xl shadow-md transition active:scale-95 cursor-pointer ${
-                isSubmitting
-                  ? 'bg-slate-400 text-white shadow-slate-300/20 cursor-not-allowed'
-                  : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-[#0026b3]/20'
-              }`}
-            >
-              <Check className="w-4 h-4 text-[#4ade80]" />
-              <span>{isSubmitting ? 'กำลังบันทึก...' : 'บันทึกและเปิดรับลงทะเบียน'}</span>
-            </button>
-          </div>
-        </div>
+        <FormActionBar
+          note={
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ระบบจะบันทึกข้อมูลและอัตราค่าลงทะเบียน พร้อมเปิดรับลงทะเบียนอัตโนมัติ
+            </span>
+          }
+        >
+          <Btn onClick={handleResetForm}>ยกเลิก</Btn>
+          <Btn type="submit" variant="primary" icon={Check} loading={isSubmitting}>
+            {isSubmitting ? 'กำลังบันทึก...' : 'บันทึกและเปิดรับลงทะเบียน'}
+          </Btn>
+        </FormActionBar>
       </form>
     </div>
   );

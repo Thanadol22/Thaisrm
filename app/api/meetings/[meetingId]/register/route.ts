@@ -24,7 +24,7 @@ import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
 import {
   isSpecialFormOpen,
   isSponsorAllowedForForm,
-  parseSpecialFormItems,
+  resolveSpecialFormItems,
   priceSpecialFormAttendees,
   SpecialFormPricingError,
 } from '@/lib/services/specialFormService';
@@ -246,7 +246,7 @@ export async function POST(
           return NextResponse.json({ success: false, error: 'รหัสคูปองนี้ใช้กับฟอร์มนี้ไม่ได้' }, { status: 400 });
         }
 
-        const items = parseSpecialFormItems(form.items);
+        const items = resolveSpecialFormItems(form, meeting);
         let priced;
         try {
           priced = await priceSpecialFormAttendees({

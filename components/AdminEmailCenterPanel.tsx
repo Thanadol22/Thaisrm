@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { AdminPageHeader, HeaderTabs } from '@/components/admin/AdminPageHeader';
+import { Btn } from '@/components/admin/ui';
 import {
-  Mail,
   QrCode,
   Send,
   Calendar,
@@ -613,102 +614,34 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
   };
 
   return (
-    <div className="space-y-6 animate-fade-in select-none">
-      {/* ─── Top Brand Header ─── */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#0026b3] to-[#001768] flex items-center justify-center text-white shadow-lg shadow-blue-900/20 shrink-0">
-            <Mail className="w-6 h-6" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg sm:text-xl font-black text-slate-900 truncate">ระบบจัดการอีเมล</h1>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5 line-clamp-2 sm:line-clamp-1">
-              ศูนย์ควบคุมการส่งอีเมล E-Ticket, QR Code ตรวจสอบสถานะผู้เข้าร่วม, ร่างอีเมลอิสระ และตั้งเวลาส่งล่วงหน้า
-            </p>
-          </div>
-        </div>
-
-        {/* Quick Tabs Switcher */}
-        <div className="w-full xl:w-auto overflow-x-auto pb-1 xl:pb-0 scrollbar-none">
-          <div className="inline-flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 min-w-max">
-            <button
-              type="button"
-              onClick={() => setActiveSubTab('tickets')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition cursor-pointer shrink-0 whitespace-nowrap ${
-                activeSubTab === 'tickets'
-                  ? 'bg-[#0026b3] text-white shadow-md shadow-blue-900/20'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-              }`}
-            >
-              <QrCode className="w-3.5 h-3.5" />
-              <span>ส่ง QR Code ผู้เข้าร่วม</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveSubTab('online')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition cursor-pointer shrink-0 whitespace-nowrap ${
-                activeSubTab === 'online'
-                  ? 'bg-[#0026b3] text-white shadow-md shadow-blue-900/20'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-              }`}
-            >
-              <Video className="w-3.5 h-3.5" />
-              <span>ลิงก์ประชุมออนไลน์</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveSubTab('composer')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition cursor-pointer shrink-0 whitespace-nowrap ${
-                activeSubTab === 'composer'
-                  ? 'bg-[#0026b3] text-white shadow-md shadow-blue-900/20'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-              }`}
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>ร่างอีเมลแบบกำหนดเอง</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveSubTab('schedule')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition cursor-pointer shrink-0 whitespace-nowrap ${
-                activeSubTab === 'schedule'
-                  ? 'bg-[#0026b3] text-white shadow-md shadow-blue-900/20'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-              }`}
-            >
-              <Clock className="w-3.5 h-3.5" />
-              <span>ตั้งเวลาส่งล่วงหน้า</span>
-              {scheduledTasks.filter((t) => t.status === 'pending').length > 0 && (
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveSubTab('smtp')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition cursor-pointer shrink-0 whitespace-nowrap ${
-                activeSubTab === 'smtp'
-                  ? 'bg-[#0026b3] text-white shadow-md shadow-blue-900/20'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-              }`}
-            >
-              <Server className="w-3.5 h-3.5" />
-              <span>สถานะ SMTP</span>
-            </button>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-6 animate-fade-in pb-12 select-none">
+      <AdminPageHeader
+        tab="emails"
+        description="ศูนย์ควบคุมการส่งบัตรเข้างานและ QR Code ลิงก์ประชุมออนไลน์ ร่างอีเมลอิสระ และตั้งเวลาส่งล่วงหน้า"
+      >
+        <HeaderTabs
+          value={activeSubTab}
+          onChange={setActiveSubTab}
+          options={[
+            { id: 'tickets', label: 'ส่ง QR Code ผู้เข้าร่วม', icon: QrCode },
+            { id: 'online', label: 'ลิงก์ประชุมออนไลน์', icon: Video },
+            { id: 'composer', label: 'ร่างอีเมลแบบกำหนดเอง', icon: Send },
+            {
+              id: 'schedule',
+              label: 'ตั้งเวลาส่งล่วงหน้า',
+              icon: Clock,
+              count: scheduledTasks.filter((t) => t.status === 'pending').length || undefined,
+            },
+            { id: 'smtp', label: 'สถานะ SMTP', icon: Server },
+          ]}
+        />
+      </AdminPageHeader>
 
       {/* ─── TAB 1: SEND ATTENDEE QR CODE TICKETS ─── */}
       {activeSubTab === 'tickets' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column: Form Controls */}
-          <div className="lg:col-span-2 bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80 space-y-5">
+          <div className="lg:col-span-2 bg-white rounded-2xl p-5 sm:p-6 shadow-xs border border-slate-200/90 space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-blue-50 text-[#0026b3] shrink-0">
@@ -736,7 +669,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-[#0026b3]" />
-                <span>เลือกงานประชุมวิชาการ:</span>
+                <span>งานประชุมวิชาการ</span>
               </label>
               <select
                 value={selectedMeetingId}
@@ -1022,31 +955,16 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
                 <span>ระบบจะทยอยจัดส่งทีละคนเพื่อป้องกันการติด Spam filter</span>
               </div>
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={handleSendTickets}
-                  disabled={sendingTickets}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#0026b3] to-[#001768] text-white font-black text-xs hover:opacity-95 shadow-md shadow-blue-900/20 transition cursor-pointer disabled:opacity-50"
-                >
-                  {sendingTickets ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>กำลังส่งอีเมล...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4" />
-                      <span>ส่งอีเมล QR Code ทันที</span>
-                    </>
-                  )}
-                </button>
+                <Btn variant="primary" icon={Send} loading={sendingTickets} onClick={handleSendTickets} className="w-full sm:w-auto">
+                  {sendingTickets ? 'กำลังส่งอีเมล...' : 'ส่งอีเมล QR Code ทันที'}
+                </Btn>
               </div>
             </div>
           </div>
 
           {/* Right Column: Information & Scheduled shortcut */}
           <div className="space-y-6">
-            <div className="bg-gradient-to-br from-blue-900 to-indigo-950 text-white rounded-3xl p-5 sm:p-6 shadow-md relative overflow-hidden">
+            <div className="bg-gradient-to-br from-blue-900 to-indigo-950 text-white rounded-2xl p-5 sm:p-6 shadow-md relative overflow-hidden">
               <div className="absolute -right-6 -bottom-6 w-32 h-32 rounded-full bg-white/5 blur-xl pointer-events-none" />
               <div className="flex items-center gap-2 text-[#4ade80] text-xs font-extrabold uppercase tracking-wider mb-2">
                 <Clock className="w-4 h-4" />
@@ -1108,7 +1026,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
             </div>
 
             {/* Help Card */}
-            <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 space-y-3">
+            <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-xs border border-slate-200/90 space-y-3">
               <div className="flex items-center gap-2 text-xs font-black text-slate-800">
                 <HelpCircle className="w-4 h-4 text-[#0026b3]" />
                 <span>เกี่ยวกับระบบ QR Code</span>
@@ -1136,7 +1054,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
       {/* ─── TAB 2: CUSTOM EMAIL COMPOSER & BROADCAST ─── */}
       {activeSubTab === 'composer' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-5">
+          <div className="lg:col-span-2 bg-white rounded-2xl p-5 sm:p-6 shadow-xs border border-slate-200/90 space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-blue-50 text-[#0026b3]">
@@ -1275,44 +1193,24 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
                   value={testRecipient}
                   onChange={(e) => setTestRecipient(e.target.value)}
                   placeholder="อีเมลรับผลทดสอบ..."
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 flex-1 sm:w-44"
+                  className="h-10 bg-white border border-slate-300 rounded-xl px-3 text-xs text-slate-800 flex-1 sm:w-52 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3]"
                 />
-                <button
-                  type="button"
-                  onClick={handleSendTestCustom}
-                  disabled={sendingTest}
-                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer shrink-0"
-                >
+                <Btn icon={Eye} loading={sendingTest} onClick={handleSendTestCustom}>
                   {sendingTest ? 'กำลังส่ง...' : 'ทดสอบส่ง'}
-                </button>
+                </Btn>
               </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={handleSendCustomBroadcast}
-                  disabled={sendingCustom}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-[#0026b3] text-white font-black text-xs hover:bg-blue-900 transition cursor-pointer shadow-sm"
-                >
-                  {sendingCustom ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>กำลังส่ง...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-3.5 h-3.5" />
-                      <span>ส่งอีเมลทันที</span>
-                    </>
-                  )}
-                </button>
+                <Btn variant="primary" icon={Send} loading={sendingCustom} onClick={handleSendCustomBroadcast} className="w-full sm:w-auto">
+                  {sendingCustom ? 'กำลังส่ง...' : 'ส่งอีเมลทันที'}
+                </Btn>
               </div>
             </div>
           </div>
 
           {/* Right Column: Schedule & Info */}
           <div className="space-y-6">
-            <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white rounded-3xl p-5 sm:p-6 shadow-md space-y-3">
+            <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white rounded-2xl p-5 sm:p-6 shadow-md space-y-3">
               <div className="flex items-center gap-2 text-[#4ade80] text-xs font-extrabold uppercase tracking-wider">
                 <Clock className="w-4 h-4" />
                 <span>ตั้งเวลาบรอดแคสต์ล่วงหน้า</span>
@@ -1346,7 +1244,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
 
       {/* ─── TAB 3: SCHEDULED TASKS QUEUE ─── */}
       {activeSubTab === 'schedule' && (
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-5">
+        <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-xs border border-slate-200/90 space-y-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-amber-50 text-amber-600">
@@ -1468,7 +1366,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
 
       {/* ─── TAB 4: SMTP STATUS & TEST ─── */}
       {activeSubTab === 'smtp' && (
-        <div className="max-w-2xl mx-auto bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80 space-y-6">
+        <div className="max-w-2xl mx-auto bg-white rounded-2xl p-5 sm:p-6 shadow-xs border border-slate-200/90 space-y-6">
           <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
             <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <Server className="w-5 h-5" />

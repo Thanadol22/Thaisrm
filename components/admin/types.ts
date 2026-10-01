@@ -10,6 +10,12 @@ export interface MeetingPricingTiers {
     onsiteNonMember: number;
     onlineMember: number;
   };
+  /** ราคา fellow ของการประชุมหลัก ผูกกับฟอร์ม fellow อัตโนมัติ (0 ทั้งหมด = ไม่ผูก) */
+  fellow?: {
+    onsiteMember: number;
+    onsiteNonMember: number;
+    onlineMember: number;
+  };
   changeFee: {
     enabled?: boolean;
     label?: string;
@@ -26,6 +32,11 @@ export interface MeetingPricingTiers {
 export const DEFAULT_PRICING_TIERS: MeetingPricingTiers = {
   programName: '',
   participant: {
+    onsiteMember: 0,
+    onsiteNonMember: 0,
+    onlineMember: 0,
+  },
+  fellow: {
     onsiteMember: 0,
     onsiteNonMember: 0,
     onlineMember: 0,
@@ -96,6 +107,10 @@ export interface SlipItem {
 export interface AttendeeItem {
   id: string;
   code: string;
+  /** เลขสมาชิกที่ผูกไว้ (member_no) */
+  memberNo?: string;
+  /** ลงทะเบียนราคา fellow */
+  isFellow?: boolean;
   nameTh: string;
   nameEn: string;
   id4Digits: string;

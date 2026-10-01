@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { AdminPageHeader, HeaderButton, HeaderTabs } from '@/components/admin/AdminPageHeader';
+import { Btn, IconBtn, EmptyState, StatGrid, StatCard, Toolbar, ToolbarGroup, SearchInput, Segmented } from '@/components/admin/ui';
 import {
   Building2,
   Users,
   Ticket,
   Plus,
   PlusCircle,
-  Search,
   Filter,
   CheckCircle2,
   AlertCircle,
@@ -18,6 +19,8 @@ import {
   Mail,
   Calendar,
   Sparkles,
+  CalendarDays,
+  ChevronDown,
   ShieldCheck,
   ChevronRight,
   Eye,
@@ -655,7 +658,7 @@ export default function AdminSponsorsPanel({
   };
 
   return (
-    <div className="space-y-6 font-sans">
+    <div className="space-y-6 animate-fade-in pb-12">
       {/* Toast Notification (Rule 9 compliant) */}
       {mounted &&
         toastMessage &&
@@ -671,166 +674,108 @@ export default function AdminSponsorsPanel({
           document.body
         )}
 
-      {/* Top Header & Sub-Tab Switcher */}
-      <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#0026b3] to-[#001773] text-white flex items-center justify-center shadow-md shadow-blue-900/20">
-              <Ticket className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                  ระบบจัดการคูปอง & โควต้าสปอนเซอร์ (Coupons & Quotas)
-                </h2>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
-                  สิทธิ์ฟรี & โควต้า
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                โควต้าสิทธิ์ฟรีคือรหัสคูปองสำหรับนำไปกรอกลงทะเบียน โดยเชื่อมโยงกับบริษัทสปอนเซอร์และรอบการประชุม
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <button
+      <AdminPageHeader
+        tab="sponsors"
+        description="จัดการบริษัทสปอนเซอร์ รหัสคูปองและโควต้าสิทธิ์ฟรี ที่เชื่อมโยงกับบริษัทและรอบการประชุม"
+        actions={
+          <>
+            <HeaderButton
+              variant="primary"
+              icon={PlusCircle}
               onClick={() => {
                 setCouponToEdit(null);
                 setCouponPrefilledCompany('');
                 setCouponModalOpen(true);
               }}
-              className="px-4 py-2.5 rounded-xl bg-[#0026b3] hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-900/20 flex items-center gap-2 transition-all cursor-pointer"
             >
-              <PlusCircle className="w-4 h-4" />
-              <span>สร้างรหัสคูปองใหม่</span>
-            </button>
-            <button
+              สร้างรหัสคูปองใหม่
+            </HeaderButton>
+            <HeaderButton
+              icon={Building2}
               onClick={() => {
                 setAddSponsorError('');
                 setAddSponsorOpen(true);
               }}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Building2 className="w-4 h-4 text-slate-600" />
-              <span>เพิ่มบริษัท</span>
-            </button>
-            <button
-              onClick={() => setCompanyMemberOpen(true)}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <UserCheck className="w-4 h-4 text-slate-600" />
-              <span>เพิ่มสมาชิกบริษัท</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Sub-Tab Navigation Bar */}
-        <div className="flex items-center gap-2 pt-2 border-t border-slate-100 overflow-x-auto">
-          <button
-            onClick={() => setActiveSubTab('coupons')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
-              activeSubTab === 'coupons'
-                ? 'bg-[#0026b3] text-white shadow-sm shadow-blue-900/20'
-                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
-          >
-            <Ticket className="w-4 h-4" />
-            <span>🎟️ รายการรหัสคูปอง ({couponStats.total})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveSubTab('sponsors')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
-              activeSubTab === 'sponsors'
-                ? 'bg-[#0026b3] text-white shadow-sm shadow-blue-900/20'
-                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
-          >
-            <Building2 className="w-4 h-4" />
-            <span>🏢 บริษัทสปอนเซอร์ ({sponsorStats.total})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveSubTab('history')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
-              activeSubTab === 'history'
-                ? 'bg-[#0026b3] text-white shadow-sm shadow-blue-900/20'
-                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
-          >
-            <History className="w-4 h-4" />
-            <span>📋 ประวัติการใช้สิทธิ์ลงทะเบียน</span>
-          </button>
-        </div>
-      </div>
+              เพิ่มบริษัท
+            </HeaderButton>
+            <HeaderButton icon={UserCheck} onClick={() => setCompanyMemberOpen(true)}>
+              เพิ่มสมาชิกบริษัท
+            </HeaderButton>
+          </>
+        }
+      >
+        <HeaderTabs
+          value={activeSubTab}
+          onChange={setActiveSubTab}
+          options={[
+            { id: 'coupons', label: 'รายการรหัสคูปอง', icon: Ticket, count: couponStats.total },
+            { id: 'sponsors', label: 'บริษัทสปอนเซอร์', icon: Building2, count: sponsorStats.total },
+            { id: 'history', label: 'ประวัติการใช้สิทธิ์ลงทะเบียน', icon: History },
+          ]}
+        />
+      </AdminPageHeader>
 
       {/* ========================================================================= */}
       {/* 1. PRIMARY TAB: COUPONS & FREE QUOTAS LIST */}
       {/* ========================================================================= */}
       {activeSubTab === 'coupons' && (
         <div className="space-y-6">
-          {/* Coupon Statistics KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-5 rounded-2xl bg-white border border-slate-200/90 shadow-sm hover:shadow transition-shadow">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">คูปองทั้งหมด</span>
-                <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <Ticket className="w-4 h-4" />
-                </span>
-              </div>
-              <div className="text-3xl font-black text-slate-900 mt-2">{couponStats.total}</div>
-              <div className="text-[11px] text-emerald-600 font-semibold mt-2">เปิดใช้งานอยู่ {couponStats.active} รายการ</div>
-            </div>
+          <StatGrid>
+            <StatCard
+              label="คูปองทั้งหมด"
+              value={couponStats.total}
+              unit="รหัส"
+              hint={`เปิดใช้งานอยู่ ${couponStats.active} รหัส`}
+              icon={Ticket}
+              tone="blue"
+            />
+            <StatCard
+              label="สิทธิ์ที่ใช้ไปแล้ว"
+              value={couponStats.totalUses}
+              unit="สิทธิ์"
+              hint={`จากทั้งหมด ${couponStats.maxUses} สิทธิ์`}
+              icon={CheckCircle2}
+              tone="green"
+            />
+            <StatCard
+              label="สิทธิ์คงเหลือ"
+              value={Math.max(0, couponStats.maxUses - couponStats.totalUses)}
+              unit="สิทธิ์"
+              hint="พร้อมใช้ลงทะเบียน"
+              icon={Sparkles}
+              tone="violet"
+            />
+            <StatCard
+              label="บริษัทสปอนเซอร์"
+              value={sponsorStats.total}
+              unit="บริษัท"
+              hint="บริษัทในระบบทั้งหมด"
+              icon={Building2}
+              tone="slate"
+            />
+          </StatGrid>
 
-            <div className="p-5 rounded-2xl bg-white border border-emerald-200/90 shadow-sm hover:shadow transition-shadow">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">สิทธิ์ที่ใช้ไปแล้ว</span>
-                <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                  <CheckCircle2 className="w-4 h-4" />
-                </span>
-              </div>
-              <div className="text-3xl font-black text-emerald-900 mt-2">{couponStats.totalUses}</div>
-              <div className="text-[11px] text-slate-500 mt-2">จากทั้งหมด {couponStats.maxUses} สิทธิ์</div>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-white border border-purple-200/90 shadow-sm hover:shadow transition-shadow">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider">สิทธิ์คงเหลือ</span>
-                <span className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-                  <Sparkles className="w-4 h-4" />
-                </span>
-              </div>
-              <div className="text-3xl font-black text-purple-900 mt-2">
-                {Math.max(0, couponStats.maxUses - couponStats.totalUses)}
-              </div>
-              <div className="text-[11px] text-purple-700/80 mt-2">พร้อมสำหรับการลงทะเบียน</div>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-white border border-blue-200/90 shadow-sm hover:shadow transition-shadow">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">บริษัทที่ผูกคูปอง</span>
-                <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <Building2 className="w-4 h-4" />
-                </span>
-              </div>
-              <div className="text-3xl font-black text-blue-900 mt-2">{sponsorStats.total}</div>
-              <div className="text-[11px] text-blue-700 mt-2">บริษัทสปอนเซอร์ในระบบ</div>
-            </div>
-          </div>
-
-          {/* Filter Toolbar (Meeting Dropdown defaults to latest upcoming) */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-sm">
-            <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto flex-1">
-              {/* Meeting Dropdown Selector */}
-              <div className="relative w-full sm:w-72">
+          <Toolbar>
+            <SearchInput
+              value={couponSearchQuery}
+              onChange={(v) => {
+                setCouponSearchQuery(v);
+                setCouponPage(1);
+              }}
+              placeholder="ค้นหารหัสคูปอง หรือชื่อบริษัท..."
+            />
+            <ToolbarGroup>
+              <div className="relative w-full sm:w-80">
+                <CalendarDays className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <select
                   value={selectedCouponMeeting}
                   onChange={(e) => {
                     setSelectedCouponMeeting(e.target.value);
                     setCouponPage(1);
                   }}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                  aria-label="งานประชุม"
+                  className="w-full h-10 appearance-none pl-9 pr-9 rounded-xl bg-white border border-slate-200 text-xs sm:text-sm font-bold text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] cursor-pointer"
                 >
                   <option value="all">🌐 ทุกงานประชุม ({meetings.length})</option>
                   {sortedMeetings.map((m) => {
@@ -844,57 +789,52 @@ export default function AdminSponsorsPanel({
                     );
                   })}
                 </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
-
-              {/* Coupon Search */}
-              <div className="relative w-full sm:w-80">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={couponSearchQuery}
-                  onChange={(e) => {
-                    setCouponSearchQuery(e.target.value);
-                    setCouponPage(1);
-                  }}
-                  onKeyDown={(e) => e.key === 'Enter' && fetchCoupons()}
-                  placeholder="ค้นหารหัสคูปอง หรือชื่อบริษัท..."
-                  className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
+              <IconBtn
+                icon={RotateCw}
+                label="รีเฟรชข้อมูล"
+                tone="blue"
                 onClick={fetchCoupons}
-                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors cursor-pointer"
-                title="รีเฟรชข้อมูล"
-              >
-                <RotateCw className={`w-4 h-4 ${couponsLoading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-          </div>
+                className={`w-10 h-10 rounded-xl ${couponsLoading ? '[&_svg]:animate-spin' : ''}`}
+              />
+            </ToolbarGroup>
+          </Toolbar>
 
           {/* Coupons Table */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
             {couponsLoading ? (
               <div className="py-16 text-center text-xs text-slate-500 flex items-center justify-center gap-2.5">
                 <RotateCw className="w-5 h-5 animate-spin text-blue-600" />
                 <span>กำลังโหลดข้อมูลคูปอง...</span>
               </div>
             ) : coupons.length === 0 ? (
-              <div className="py-16 text-center text-xs text-slate-500">
-                <Ticket className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                <p className="font-semibold text-slate-700">ไม่พบคูปองตามรอบการประชุมที่เลือก</p>
-                <p className="text-slate-400 mt-0.5">กดปุ่ม "สร้างรหัสคูปองใหม่" เพื่อเพิ่มรหัสคูปองสำหรับบริษัทสปอนเซอร์</p>
-              </div>
+              <EmptyState
+                icon={Ticket}
+                title="ไม่พบคูปองตามรอบการประชุมที่เลือก"
+                description="สร้างรหัสคูปองใหม่เพื่อมอบสิทธิ์ให้บริษัทสปอนเซอร์"
+                action={
+                  <Btn
+                    variant="primary"
+                    icon={PlusCircle}
+                    onClick={() => {
+                      setCouponToEdit(null);
+                      setCouponPrefilledCompany('');
+                      setCouponModalOpen(true);
+                    }}
+                  >
+                    สร้างรหัสคูปองใหม่
+                  </Btn>
+                }
+              />
             ) : (
               <div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs text-slate-700 min-w-[980px]">
-                    <thead className="bg-slate-50/90 text-slate-600 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
+                    <thead className="bg-slate-50 text-slate-600 text-xs font-bold border-b border-slate-200">
                       <tr>
                         <th className="py-3.5 px-4 whitespace-nowrap min-w-[170px]">รหัสคูปอง</th>
-                        <th className="py-3.5 px-4 whitespace-nowrap min-w-[200px]">บริษัท / สปอนเซอร์</th>
+                        <th className="py-3.5 px-4 whitespace-nowrap min-w-[200px]">บริษัทสปอนเซอร์</th>
                         <th className="py-3.5 px-4 whitespace-nowrap min-w-[150px]">วัตถุประสงค์</th>
                         <th className="py-3.5 px-4 whitespace-nowrap min-w-[150px]">งานประชุม</th>
                         <th className="py-3.5 px-4 text-center whitespace-nowrap min-w-[110px]">ประเภทสิทธิ์</th>
@@ -1060,9 +1000,10 @@ export default function AdminSponsorsPanel({
                             {/* Actions */}
                             <td className="py-3.5 px-4 text-right whitespace-nowrap">
                               <div className="inline-flex items-center gap-1.5 justify-end">
-                                {/* History Button (Opens Coupon Generation History Modal) */}
-                                <button
-                                  type="button"
+                                <IconBtn
+                                  icon={History}
+                                  label="ดูประวัติรหัสคูปองของบริษัทนี้"
+                                  tone="blue"
                                   onClick={() => {
                                     const compCoupons = couponsByCompany.get((coupon.company_name || '').toLowerCase().trim()) || [coupon];
                                     setSelectedSponsorForCoupons({
@@ -1072,34 +1013,17 @@ export default function AdminSponsorsPanel({
                                     });
                                     setSponsorCouponHistoryOpen(true);
                                   }}
-                                  className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#0026b3] border border-blue-200/80 transition-colors cursor-pointer shadow-2xs"
-                                  title="ดูประวัติรหัสคูปองที่เคยสร้างของบริษัทนี้"
-                                >
-                                  <History className="w-4 h-4 text-[#0026b3]" />
-                                </button>
-
-                                {/* Edit Button */}
-                                <button
-                                  type="button"
+                                />
+                                <IconBtn
+                                  icon={Pencil}
+                                  label="แก้ไขคูปอง"
+                                  tone="amber"
                                   onClick={() => {
                                     setCouponToEdit(coupon);
                                     setCouponModalOpen(true);
                                   }}
-                                  className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200/80 transition-colors cursor-pointer shadow-2xs"
-                                  title="แก้ไขคูปอง"
-                                >
-                                  <Pencil className="w-4 h-4 text-amber-600" />
-                                </button>
-
-                                {/* Delete Button */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteCoupon(coupon.id, coupon.code)}
-                                  className="p-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200/80 transition-colors cursor-pointer shadow-2xs"
-                                  title="ลบคูปอง"
-                                >
-                                  <Trash2 className="w-4 h-4 text-red-600" />
-                                </button>
+                                />
+                                <IconBtn icon={Trash2} label="ลบคูปอง" tone="rose" onClick={() => handleDeleteCoupon(coupon.id, coupon.code)} />
                               </div>
                             </td>
                           </tr>
@@ -1132,125 +1056,89 @@ export default function AdminSponsorsPanel({
       {/* ========================================================================= */}
       {activeSubTab === 'sponsors' && (
         <div className="space-y-6">
-          {/* Sponsors KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-5 rounded-2xl bg-white border border-slate-200/90 shadow-sm hover:shadow transition-shadow">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">บริษัททั้งหมด</span>
-                <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <Building2 className="w-4 h-4" />
-                </span>
-              </div>
-              <div className="text-3xl font-black text-slate-900 mt-2">{sponsorStats.total}</div>
-              <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-2 font-medium">
-                <span className="text-purple-700 font-semibold">💎 {sponsorStats.platinum}</span>
-                <span className="text-slate-300">•</span>
-                <span className="text-amber-700 font-semibold">🥇 {sponsorStats.gold}</span>
-                <span className="text-slate-300">•</span>
-                <span className="text-slate-600 font-semibold">🥈 {sponsorStats.silver}</span>
-              </div>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-white border border-purple-200/90 shadow-sm hover:shadow transition-shadow">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1">
-                  <Crown className="w-3.5 h-3.5 text-purple-600" /> Platinum
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 text-[10px] font-bold">20 ที่นั่ง/งาน</span>
-              </div>
-              <div className="text-3xl font-black text-purple-900 mt-2">{sponsorStats.platinum}</div>
-              <div className="text-[11px] text-purple-700/80 mt-2 font-medium">สิทธิ์ Platinum (โควต้า 20 สิทธิ์)</div>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-white border border-amber-200/90 shadow-sm hover:shadow transition-shadow">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1">
-                  <Award className="w-3.5 h-3.5 text-amber-600" /> Gold
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 text-[10px] font-bold">8 ที่นั่ง/งาน</span>
-              </div>
-              <div className="text-3xl font-black text-amber-900 mt-2">{sponsorStats.gold}</div>
-              <div className="text-[11px] text-amber-700/80 mt-2 font-medium">สิทธิ์ Gold (โควต้า 8 สิทธิ์)</div>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-white border border-blue-200/90 shadow-sm hover:shadow transition-shadow">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1">
-                  <Ticket className="w-3.5 h-3.5 text-blue-600" /> โควต้าที่ใช้ / ทั้งหมด
-                </span>
-                <span className="text-[11px] font-bold text-blue-600">
-                  {sponsorStats.totalQuota > 0 ? `${Math.round((sponsorStats.totalUsed / sponsorStats.totalQuota) * 100)}%` : '0%'}
-                </span>
-              </div>
-              <div className="text-3xl font-black text-blue-900 mt-2">
-                {sponsorStats.totalUsed} <span className="text-sm font-semibold text-slate-400">/ {sponsorStats.totalQuota}</span>
-              </div>
-              <div className="text-[11px] text-slate-500 mt-2 font-medium">
-                คงเหลือ {Math.max(0, sponsorStats.totalQuota - sponsorStats.totalUsed)} สิทธิ์
-              </div>
-            </div>
-          </div>
-
-          {/* Search & Tier Filter Bar */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-sm">
-            <div className="flex items-center gap-2 w-full sm:w-auto flex-1 max-w-md">
-              <div className="relative w-full">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={sponsorSearch}
-                  onChange={(e) => setSponsorSearch(e.target.value)}
-                  placeholder="ค้นหาชื่อบริษัท, ผู้ประสานงาน, หรืออีเมล..."
-                  className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 transition-colors"
+          <StatGrid>
+            <StatCard
+              label="บริษัททั้งหมด"
+              value={sponsorStats.total}
+              unit="บริษัท"
+              icon={Building2}
+              tone="blue"
+              active={selectedTier === 'all'}
+              onClick={() => setSelectedTier('all')}
+            />
+            <StatCard
+              label="ระดับ Platinum"
+              value={sponsorStats.platinum}
+              unit="บริษัท"
+              hint="โควต้า 20 ที่นั่งต่องาน"
+              icon={Crown}
+              tone="violet"
+              active={selectedTier === 'Platinum'}
+              onClick={() => setSelectedTier(selectedTier === 'Platinum' ? 'all' : 'Platinum')}
+            />
+            <StatCard
+              label="ระดับ Gold"
+              value={sponsorStats.gold}
+              unit="บริษัท"
+              hint="โควต้า 8 ที่นั่งต่องาน"
+              icon={Award}
+              tone="amber"
+              active={selectedTier === 'Gold'}
+              onClick={() => setSelectedTier(selectedTier === 'Gold' ? 'all' : 'Gold')}
+            />
+            <StatCard
+              label="โควต้าที่ใช้ไป"
+              value={sponsorStats.totalUsed}
+              unit={`/ ${sponsorStats.totalQuota} สิทธิ์`}
+              hint={`คงเหลือ ${Math.max(0, sponsorStats.totalQuota - sponsorStats.totalUsed)} สิทธิ์`}
+              icon={Ticket}
+              tone="green"
+            >
+              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden mt-2.5">
+                <div
+                  className="h-full bg-emerald-500 rounded-full"
+                  style={{ width: `${sponsorStats.totalQuota > 0 ? Math.min(100, Math.round((sponsorStats.totalUsed / sponsorStats.totalQuota) * 100)) : 0}%` }}
                 />
               </div>
-            </div>
+            </StatCard>
+          </StatGrid>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto justify-start sm:justify-end">
-              {[
-                { id: 'all', label: `ทั้งหมด (${sponsorStats.total})` },
-                { id: 'Platinum', label: `💎 Platinum (${sponsorStats.platinum})` },
-                { id: 'Gold', label: `🥇 Gold (${sponsorStats.gold})` },
-                { id: 'Silver', label: `🥈 Silver (${sponsorStats.silver})` },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setSelectedTier(tab.id)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                    selectedTier === tab.id
-                      ? 'bg-[#0026b3] text-white shadow-sm shadow-blue-900/20'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-              <button
+          <Toolbar>
+            <SearchInput value={sponsorSearch} onChange={setSponsorSearch} placeholder="ค้นหาชื่อบริษัท, ผู้ประสานงาน, หรืออีเมล..." />
+            <ToolbarGroup>
+              <Segmented
+                value={selectedTier}
+                onChange={setSelectedTier}
+                options={[
+                  { id: 'all', label: 'ทั้งหมด', count: sponsorStats.total },
+                  { id: 'Platinum', label: 'Platinum', count: sponsorStats.platinum },
+                  { id: 'Gold', label: 'Gold', count: sponsorStats.gold },
+                  { id: 'Silver', label: 'Silver', count: sponsorStats.silver },
+                ]}
+              />
+              <IconBtn
+                icon={RotateCw}
+                label="รีเฟรชข้อมูล"
+                tone="blue"
                 onClick={fetchSponsors}
-                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors shrink-0 ml-1 cursor-pointer"
-                title="รีเฟรชข้อมูล"
-              >
-                <RotateCw className={`w-4 h-4 ${sponsorsLoading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-          </div>
+                className={`w-10 h-10 rounded-xl ${sponsorsLoading ? '[&_svg]:animate-spin' : ''}`}
+              />
+            </ToolbarGroup>
+          </Toolbar>
 
           {/* Sponsors Table */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
             {sponsorsLoading ? (
               <div className="py-16 text-center text-xs text-slate-500 flex items-center justify-center gap-2.5">
                 <RotateCw className="w-5 h-5 animate-spin text-blue-600" />
                 <span>กำลังโหลดรายชื่อบริษัทสปอนเซอร์...</span>
               </div>
             ) : filteredSponsors.length === 0 ? (
-              <div className="py-16 text-center text-xs text-slate-500">
-                <Building2 className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                <p className="font-semibold text-slate-700">ไม่พบข้อมูลบริษัทสปอนเซอร์ตามเงื่อนไขที่ค้นหา</p>
-              </div>
+              <EmptyState icon={Building2} title="ไม่พบบริษัทสปอนเซอร์ตามเงื่อนไขที่ค้นหา" description="ลองเปลี่ยนคำค้นหาหรือระดับสปอนเซอร์" />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs text-slate-700 min-w-[900px]">
-                  <thead className="bg-slate-50/90 text-slate-600 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
+                  <thead className="bg-slate-50 text-slate-600 text-xs font-bold border-b border-slate-200">
                     <tr>
                       <th className="py-3.5 px-4 whitespace-nowrap min-w-[130px]">ระดับ Tier</th>
                       <th className="py-3.5 px-4 whitespace-nowrap min-w-[180px]">ชื่อบริษัท</th>
@@ -1346,8 +1234,10 @@ export default function AdminSponsorsPanel({
 
                           <td className="py-3.5 px-4 text-right whitespace-nowrap">
                             <div className="inline-flex items-center gap-1.5 justify-end">
-                              {/* History Button (Opens Coupon Generation History Modal) */}
-                              <button
+                              <IconBtn
+                                icon={History}
+                                label="ดูประวัติรหัสคูปองทั้งหมดของบริษัทนี้"
+                                tone="blue"
                                 onClick={() => {
                                   setSelectedSponsorForCoupons({
                                     name: sp.name,
@@ -1356,41 +1246,23 @@ export default function AdminSponsorsPanel({
                                   });
                                   setSponsorCouponHistoryOpen(true);
                                 }}
-                                className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#0026b3] border border-blue-200/80 transition-colors cursor-pointer shadow-2xs"
-                                title="ดูประวัติรหัสคูปองที่เคยสร้างทั้งหมดของบริษัทนี้"
-                              >
-                                <History className="w-4 h-4 text-[#0026b3]" />
-                              </button>
-
-                              {/* Temporary Login Code Button */}
-                              <button
+                              />
+                              <IconBtn
+                                icon={KeyRound}
+                                label="ออกรหัสผ่านชั่วคราว กรณีตัวแทนหาอีเมลไม่เจอ"
+                                tone="green"
                                 onClick={() => handleOpenTempCode(sp)}
-                                className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 transition-colors cursor-pointer shadow-2xs"
-                                title="ออกรหัสผ่านชั่วคราวสำหรับเข้าสู่ระบบ กรณีตัวแทนหาอีเมลไม่เจอ"
-                              >
-                                <KeyRound className="w-4 h-4 text-emerald-600" />
-                              </button>
-
-                              {/* Edit Button */}
-                              <button
-                                onClick={() => handleOpenEditSponsor(sp)}
-                                className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200/80 transition-colors cursor-pointer shadow-2xs"
-                                title="แก้ไขข้อมูลบริษัทและโควต้า"
-                              >
-                                <Pencil className="w-4 h-4 text-amber-600" />
-                              </button>
-
-                              {/* Delete Button */}
-                              <button
+                              />
+                              <IconBtn icon={Pencil} label="แก้ไขข้อมูลบริษัทและโควต้า" tone="amber" onClick={() => handleOpenEditSponsor(sp)} />
+                              <IconBtn
+                                icon={Trash2}
+                                label="ลบข้อมูลบริษัทสปอนเซอร์"
+                                tone="rose"
                                 onClick={() => {
                                   setSponsorToDelete(sp);
                                   setDeleteSponsorOpen(true);
                                 }}
-                                className="p-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200/80 transition-colors cursor-pointer shadow-2xs"
-                                title="ลบข้อมูลบริษัทสปอนเซอร์"
-                              >
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                              </button>
+                              />
                             </div>
                           </td>
                         </tr>
@@ -1409,45 +1281,39 @@ export default function AdminSponsorsPanel({
       {/* ========================================================================= */}
       {activeSubTab === 'history' && (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-sm">
-            <div className="relative w-full sm:w-96">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={historySearch}
-                onChange={(e) => setHistorySearch(e.target.value)}
-                placeholder="ค้นหาชื่อสมาชิก, เลขสมาชิก, รหัสตั๋ว หรือชื่อบริษัท..."
-                className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-blue-500"
+          <Toolbar>
+            <SearchInput
+              value={historySearch}
+              onChange={setHistorySearch}
+              placeholder="ค้นหาชื่อสมาชิก, เลขสมาชิก, รหัสบัตร หรือชื่อบริษัท..."
+            />
+            <ToolbarGroup>
+              <span className="text-xs font-semibold text-slate-500">{filteredGlobalHistory.length} รายการ</span>
+              <IconBtn
+                icon={RotateCw}
+                label="รีเฟรชข้อมูล"
+                tone="blue"
+                onClick={fetchGlobalHistory}
+                className={`w-10 h-10 rounded-xl ${globalHistoryLoading ? '[&_svg]:animate-spin' : ''}`}
               />
-            </div>
+            </ToolbarGroup>
+          </Toolbar>
 
-            <button
-              onClick={fetchGlobalHistory}
-              className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors shrink-0 cursor-pointer"
-              title="รีเฟรชข้อมูล"
-            >
-              <RotateCw className={`w-4 h-4 ${globalHistoryLoading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-
-          <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
             {globalHistoryLoading ? (
               <div className="py-16 text-center text-xs text-slate-500 flex items-center justify-center gap-2.5">
                 <RotateCw className="w-5 h-5 animate-spin text-blue-600" />
                 <span>กำลังโหลดประวัติการใช้สิทธิ์และลงทะเบียน...</span>
               </div>
             ) : filteredGlobalHistory.length === 0 ? (
-              <div className="py-16 text-center text-xs text-slate-500">
-                <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                <p className="font-semibold text-slate-700">ไม่พบประวัติการใช้สิทธิ์ตามเงื่อนไขที่ค้นหา</p>
-              </div>
+              <EmptyState icon={Users} title="ไม่พบประวัติการใช้สิทธิ์ตามเงื่อนไขที่ค้นหา" />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs text-slate-700 min-w-[920px]">
-                  <thead className="bg-slate-50/90 text-slate-600 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
+                  <thead className="bg-slate-50 text-slate-600 text-xs font-bold border-b border-slate-200">
                     <tr>
                       <th className="py-3.5 px-4 whitespace-nowrap min-w-[110px]">เลขสมาชิก</th>
-                      <th className="py-3.5 px-4 whitespace-nowrap min-w-[180px]">ชื่อ-นามสกุล / อีเมล</th>
+                      <th className="py-3.5 px-4 whitespace-nowrap min-w-[180px]">ชื่อและอีเมล</th>
                       <th className="py-3.5 px-4 whitespace-nowrap min-w-[160px]">บริษัทสปอนเซอร์</th>
                       <th className="py-3.5 px-4 whitespace-nowrap min-w-[150px]">รหัสคูปอง</th>
                       <th className="py-3.5 px-4 whitespace-nowrap min-w-[150px]">งานประชุม</th>
@@ -1548,12 +1414,12 @@ export default function AdminSponsorsPanel({
                     <p className="font-semibold text-slate-700">ยังไม่มีประวัติสมาชิกที่บริษัทนี้เคยส่งลงทะเบียน</p>
                   </div>
                 ) : (
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
                     <table className="w-full text-left text-xs text-slate-700">
                       <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
                         <tr>
                           <th className="py-3 px-3.5">เลขสมาชิก</th>
-                          <th className="py-3 px-3.5">ชื่อ-นามสกุล / อีเมล</th>
+                          <th className="py-3 px-3.5">ชื่อและอีเมล</th>
                           <th className="py-3 px-3.5">งานประชุม</th>
                           <th className="py-3 px-3.5">รหัส Ticket</th>
                           <th className="py-3 px-3.5">วันที่ทำรายการ</th>

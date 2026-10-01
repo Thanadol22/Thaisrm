@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { AdminPageHeader, HeaderButton } from './AdminPageHeader';
+import { Btn, IconBtn, EmptyState, ContextBar, StatGrid, StatCard, Toolbar, ToolbarGroup, SearchInput, Segmented, FilterSelect } from './ui';
 import { createPortal } from 'react-dom';
 import { AttendeeItem, MeetingItem } from './types';
 import { PaginationControls } from '@/components/PaginationControls';
@@ -14,8 +16,8 @@ import {
   CalendarDays,
   ChevronDown,
   MapPin,
-  Search,
   X,
+  Search,
   CheckCircle2,
   XCircle,
   Clock,
@@ -24,6 +26,8 @@ import {
   Eye,
   RefreshCw,
   Check,
+  Users,
+  TrendingUp,
 } from 'lucide-react';
 
 /* ─── 5. VERIFY ATTENDEES PANEL (Light Theme with Round Filter) ───────────── */
@@ -100,6 +104,8 @@ export function VerifyAttendeesPanel({
   // Walk-in modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [walkInData, setWalkInData] = useState({
+    memberNo: '',
+    isFellow: false,
     nameTh: '',
     nameEn: '',
     id4Digits: '',
@@ -116,12 +122,100 @@ export function VerifyAttendeesPanel({
   });
 
   const walkInMeeting = meetings.find((m) => m.id === walkInData.meetingId) || meetings[0];
+
+  // ค้นหาสมาชิกจากเลขสมาชิกแล้วเติมข้อมูลอัตโนมัติ
+  const [linkedMember, setLinkedMember] = useState<{ memberNo: string; nameTh: string; status: string; isActive: boolean } | null>(null);
+  const [memberLookup, setMemberLookup] = useState<{ state: 'idle' | 'loading' | 'error'; message?: string }>({ state: 'idle' });
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
+
+  const checkWalkInRegistration = async (meetingId: string, memberNo: string) => {
+    if (!meetingId || !memberNo) return setAlreadyRegistered(false);
+    try {
+      const res = await fetch(
+        `/api/meetings/${encodeURIComponent(meetingId)}/check-registration?memberNo=${encodeURIComponent(memberNo)}`
+      );
+      const data = await res.json().catch(() => null);
+      setAlreadyRegistered(Boolean(data?.isRegistered));
+    } catch {
+      setAlreadyRegistered(false);
+    }
+  };
+
+  const unlinkWalkInMember = () => {
+    setLinkedMember(null);
+    setAlreadyRegistered(false);
+    setMemberLookup({ state: 'idle' });
+  };
+
+  const handleLookupWalkInMember = async () => {
+    const raw = walkInData.memberNo.trim();
+    if (!raw) return;
+    setMemberLookup({ state: 'loading' });
+    setAlreadyRegistered(false);
+    try {
+      const res = await fetch(`/api/members/verify/${encodeURIComponent(raw)}`);
+      const result = await res.json().catch(() => null);
+      const m = result?.success ? result.data : null;
+      if (!m) {
+        setLinkedMember(null);
+        setMemberLookup({ state: 'error', message: `ไม่พบเลขสมาชิก ${raw} ในระบบ` });
+        return;
+      }
+      const status = String(m.membership_status || '').trim();
+      const isActive = status === '' || status.toLowerCase() === 'active';
+      const memberNo = String(m.member_no || raw);
+      const jobText = String(m.job_category || m.position || '').trim();
+      const posOption = POSITION_CATEGORY_OPTIONS.find(
+        (o) =>
+          o.value === jobText ||
+          o.value.slice(2).toLowerCase() === jobText.toLowerCase() ||
+          o.labelTh === jobText
+      );
+      setWalkInData((prev) => ({
+        ...prev,
+        memberNo,
+        nameTh: m.full_name_th || prev.nameTh,
+        nameEn: m.full_name_en || prev.nameEn,
+        phone: String(m.mobile || prev.phone).replace(/\D/g, '').slice(0, 10),
+        id4Digits: m.id_last4 || prev.id4Digits,
+        email: m.email || prev.email,
+        workplace: m.workplace || prev.workplace,
+        // สมาชิกหมดอายุคิดราคาบุคคลทั่วไป
+        memberType: !isActive
+          ? 'บุคคลทั่วไป'
+          : String(m.membership_type || '').toLowerCase() === 'lifelong'
+            ? 'สมาชิกตลอดชีพ'
+            : 'สมาชิกสามัญ',
+        position: posOption ? posOption.value : jobText ? '0 อื่นๆ' : prev.position,
+        isFellow: posOption?.value === '2 Fellow RM' ? true : prev.isFellow,
+        positionOther: posOption ? '' : jobText || prev.positionOther,
+      }));
+      setLinkedMember({ memberNo, nameTh: m.full_name_th || '', status, isActive });
+      setMemberLookup({ state: 'idle' });
+      checkWalkInRegistration(walkInData.meetingId, memberNo);
+    } catch {
+      setMemberLookup({ state: 'error', message: 'ค้นหาสมาชิกไม่สำเร็จ กรุณาลองใหม่' });
+    }
+  };
   const walkInActivities = useMemo<any[]>(
     () => (Array.isArray(walkInMeeting?.activities) ? walkInMeeting.activities.filter((a: any) => a && a.id) : []),
     [walkInMeeting]
   );
   const walkInIsMember = walkInData.memberType !== 'บุคคลทั่วไป';
+  // ราคา fellow ของการประชุมหลัก (0 ทั้งหมด = ยังไม่ได้ตั้ง ใช้ราคาปกติ)
+  const walkInTiers = (walkInMeeting?.pricingTiers || {}) as any;
+  const walkInFellowTier =
+    walkInTiers.fellow &&
+    Number(walkInTiers.fellow.onsiteMember || 0) + Number(walkInTiers.fellow.onsiteNonMember || 0) + Number(walkInTiers.fellow.onlineMember || 0) > 0
+      ? walkInTiers.fellow
+      : null;
   const getWalkInPrice = (act: any) => {
+    const isMainAct = act?.type === 'main' || act?.id === 'main';
+    if (isMainAct) {
+      // ลงทะเบียนหน้างานเป็นแบบออนไซต์
+      const tier = walkInData.isFellow && walkInFellowTier ? walkInFellowTier : walkInTiers.participant;
+      if (tier) return Number(walkInIsMember ? tier.onsiteMember : tier.onsiteNonMember) || 0;
+    }
     const mPrice = typeof act.memberPrice === 'number' ? act.memberPrice : 0;
     const nonMPrice = typeof act.nonMemberPrice === 'number' ? act.nonMemberPrice : mPrice;
     return walkInIsMember ? mPrice : nonMPrice;
@@ -146,6 +240,14 @@ export function VerifyAttendeesPanel({
 
   const handleCreateWalkIn = (e: React.FormEvent) => {
     e.preventDefault();
+    if (walkInData.memberNo.trim() && !linkedMember) {
+      alert('กรุณากดค้นหาเลขสมาชิกก่อน หรือลบเลขสมาชิกออกหากไม่ใช่สมาชิก');
+      return;
+    }
+    if (linkedMember && alreadyRegistered) {
+      alert(`สมาชิกเลขที่ ${linkedMember.memberNo} ลงทะเบียนการประชุมรอบนี้แล้ว`);
+      return;
+    }
     if (!walkInData.nameTh || !walkInData.phone) {
       alert('กรุณากรอกชื่อและเบอร์โทรศัพท์');
       return;
@@ -171,7 +273,9 @@ export function VerifyAttendeesPanel({
       : POSITION_CATEGORY_OPTIONS.find((o) => o.value === walkInData.position)?.labelTh || walkInData.position;
     const newAttendee: AttendeeItem = {
       id: `ATT-${Date.now()}`,
-      code: Math.floor(100100 + Math.random() * 9000).toString(),
+      code: linkedMember?.memberNo || Math.floor(100100 + Math.random() * 9000).toString(),
+      memberNo: linkedMember?.memberNo,
+      isFellow: walkInData.isFellow,
       nameTh: walkInData.nameTh,
       nameEn: walkInData.nameEn || walkInData.nameTh,
       id4Digits: walkInData.id4Digits || walkInData.phone.slice(-4),
@@ -194,8 +298,11 @@ export function VerifyAttendeesPanel({
 
     onAddAttendee?.(newAttendee);
     setIsAddModalOpen(false);
+    unlinkWalkInMember();
     setWalkInData((prev) => ({
       ...prev,
+      memberNo: '',
+      isFellow: false,
       nameTh: '',
       nameEn: '',
       id4Digits: '',
@@ -372,289 +479,182 @@ export function VerifyAttendeesPanel({
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[#0026b3] text-xs font-bold mb-2">
-            <UserCheck className="w-4 h-4 text-[#0026b3]" />
-            <span>ระบบตรวจสอบรายชื่อและเช็คอินผู้เข้าร่วมประชุม</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">ตรวจสอบผู้เข้าร่วมประชุม</h1>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            ค้นหาข้อมูลสมาชิก ตรวจสอบการลงทะเบียน และบันทึกการเช็คอินแยกตามรอบการประชุม
-          </p>
-        </div>
+      <AdminPageHeader
+        tab="verify-attendees"
+        title="ตรวจสอบผู้เข้าร่วมประชุม"
+        description="ค้นหาข้อมูลสมาชิก ตรวจสอบการลงทะเบียน และบันทึกการเช็คอินแยกตามรอบการประชุม"
+        actions={
+          <>
+            <HeaderButton variant="primary" icon={PlusCircle} onClick={() => setIsAddModalOpen(true)}>
+              ลงทะเบียน Walk-in
+            </HeaderButton>
+            <HeaderButton icon={FileSpreadsheet} onClick={handleExportCSV}>
+              Export รายชื่อ ({filteredAttendees.length})
+            </HeaderButton>
+          </>
+        }
+      />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0026b3] hover:bg-[#001f94] text-white text-xs sm:text-sm font-bold shadow-xs transition active:scale-95 cursor-pointer"
-          >
-            <PlusCircle className="w-4 h-4 text-[#4ade80]" />
-            <span>+ ลงทะเบียน Walk-in</span>
-          </button>
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs sm:text-sm font-bold shadow-xs transition cursor-pointer"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span>Export รายชื่อ ({filteredAttendees.length})</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ─── Meeting Round Filter Selector (Dropdown Format) ─────────────── */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-2.5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <label className="flex items-center gap-2 text-xs sm:text-sm font-extrabold text-slate-700 uppercase tracking-wider">
-            <Filter className="w-4 h-4 text-[#0026b3]" />
-            <span>เลือกรอบการประชุม:</span>
-          </label>
-          <span className="text-xs text-slate-500 font-medium">
-            ผู้ลงทะเบียนในรอบที่เลือก: <strong className="text-[#0026b3] font-bold">{roundAttendees.length}</strong> คน
-            • เช็คอินแล้ว <strong className="text-emerald-700 font-bold">{checkedInInRound}</strong> คน
-          </span>
-        </div>
-
-        <div className="relative">
-          <select
-            value={activeMeetingId}
-            onChange={(e) => setSelectedMeetingId(e.target.value)}
-            className="w-full appearance-none bg-slate-50 border border-slate-300 text-slate-900 text-xs sm:text-sm font-bold rounded-xl pl-11 pr-10 py-3 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition cursor-pointer shadow-xs"
-          >
-            {meetings.map((m) => {
-              const isOngoing = m.status === 'ongoing';
-              const isUpcoming = m.status === 'upcoming';
-              const mAttendees = attendees.filter((a) => a.meetingId === m.id || a.meetingTitle === m.titleTh);
-              const mChecked = mAttendees.filter((a) => a.checkInStatus === 'checked_in').length;
-              return (
-                <option key={m.id} value={m.id}>
-                  {isOngoing ? '🟢 [รอบปัจจุบัน] ' : isUpcoming ? '🟡 [เร็วๆ นี้] ' : '📅 '}
-                  [{m.id}] {m.titleTh} ({m.date}) — เช็คอิน {mChecked}/{mAttendees.length || m.registered} คน
-                </option>
-              );
-            })}
-            <option value="all">🌐 รวมทุกรอบการประชุม — รวมทั้งหมด {attendees.length} คน</option>
-          </select>
-          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#0026b3]">
-            <CalendarDays className="w-5 h-5" />
-          </div>
-          <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
-      </div>
-
-      {/* ─── Selected Round Info & Key Stats ─────────────────────────────── */}
-      {currentMeeting ? (
-        <div className="bg-gradient-to-r from-blue-50/60 via-slate-50 to-white border border-blue-200/80 rounded-2xl p-5 shadow-xs space-y-4">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="space-y-1.5 min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-mono font-bold text-[#0026b3] bg-blue-100 px-2.5 py-0.5 rounded-md">
-                  {currentMeeting.id}
-                </span>
-                <span
-                  className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
-                    currentMeeting.status === 'ongoing'
-                      ? 'bg-[#4ade80]/15 text-emerald-800 border-[#4ade80]/40'
-                      : currentMeeting.status === 'upcoming'
-                        ? 'bg-amber-50 text-amber-700 border-amber-200'
-                        : 'bg-slate-100 text-slate-700 border-slate-200'
-                  }`}
-                >
-                  {currentMeeting.status === 'ongoing'
-                    ? '● กำลังดำเนินการ'
+      <ContextBar
+        icon={Filter}
+        label={
+          <>
+            <span>{currentMeeting ? currentMeeting.titleTh : 'รวมทุกรอบการประชุม'}</span>
+            {currentMeeting && (
+              <span
+                className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                  currentMeeting.status === 'ongoing'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     : currentMeeting.status === 'upcoming'
-                      ? 'รอเริ่มงาน'
-                      : 'เสร็จสิ้น'}
-                </span>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-blue-50 text-[#0026b3] border border-blue-200 uppercase">
-                  {currentMeeting.type}
-                </span>
-              </div>
-              <h2 className="text-base sm:text-lg font-extrabold text-slate-900">{currentMeeting.titleTh}</h2>
-              <div className="text-xs sm:text-sm text-slate-500 font-medium">{currentMeeting.titleEn}</div>
-              <div className="flex items-center gap-4 text-xs sm:text-sm text-slate-600 flex-wrap pt-1">
-                <span className="flex items-center gap-1.5">
-                  <CalendarDays className="w-4 h-4 text-[#0026b3]" /> {currentMeeting.date} ({currentMeeting.time})
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-[#0026b3]" /> {currentMeeting.location}
-                </span>
-              </div>
-            </div>
-
-            {/* Quick Metrics in Current Round */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3.5 rounded-xl border border-blue-200/60 shrink-0 text-center shadow-xs">
-              <div className="px-2">
-                <div className="text-[11px] text-slate-500 font-bold">ผู้ลงทะเบียน</div>
-                <div className="text-base sm:text-lg font-extrabold text-slate-900">
-                  {totalInRound} <span className="text-xs text-slate-400 font-normal">/ {currentMeeting.maxSeats}</span>
-                </div>
-              </div>
-              <div className="px-2 border-l border-slate-100">
-                <div className="text-[11px] text-slate-500 font-bold">เช็คอินแล้ว</div>
-                <div className="text-base sm:text-lg font-extrabold text-emerald-600">{checkedInInRound}</div>
-              </div>
-              <div className="px-2 border-l border-slate-100">
-                <div className="text-[11px] text-slate-500 font-bold">ยังไม่เช็คอิน</div>
-                <div className="text-base sm:text-lg font-extrabold text-amber-600">{notCheckedInInRound}</div>
-              </div>
-              <div className="px-2 border-l border-slate-100">
-                <div className="text-[11px] text-slate-500 font-bold">อัตราเช็คอิน</div>
-                <div className="text-base sm:text-lg font-extrabold text-[#0026b3]">{rateInRound}%</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Progress bar */}
-          <div className="space-y-1.5 pt-2 border-t border-slate-100">
-            <div className="flex justify-between text-xs text-slate-600 font-medium">
-              <span>ความคืบหน้าการเช็คอินเข้างานรอบนี้</span>
-              <span className="font-extrabold text-[#0026b3]">
-                {rateInRound}% ({checkedInInRound}/{totalInRound} คน)
-              </span>
-            </div>
-            <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-[#0026b3] to-[#4ade80] rounded-full transition-all duration-500"
-                style={{ width: `${rateInRound}%` }}
-              ></div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* Overall Progress & Quick Stats Card (When All Rounds selected) */
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-slate-700">อัตราการเช็คอินเข้างานรวมทุกรอบการประชุม</span>
-              <span className="text-sm font-extrabold text-[#0026b3]">
-                ({checkedInInRound}/{totalInRound} คน)
-              </span>
-            </div>
-            <span className="text-base font-extrabold text-emerald-700">{rateInRound}% สำเร็จ</span>
-          </div>
-          <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-[#0026b3] to-[#4ade80] rounded-full transition-all duration-700"
-              style={{ width: `${rateInRound}%` }}
-            ></div>
-          </div>
-
-          {/* 4 Summary Pills */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-center text-xs sm:text-sm">
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-              <div className="text-slate-500 font-medium text-xs">จำนวนรอบประชุม</div>
-              <div className="text-base font-extrabold text-slate-900 mt-0.5">{meetings.length} รอบ</div>
-            </div>
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-              <div className="text-slate-500 font-medium text-xs">ผู้ลงทะเบียนทั้งหมด</div>
-              <div className="text-base font-extrabold text-slate-900 mt-0.5">{totalInRound} คน</div>
-            </div>
-            <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3">
-              <div className="text-emerald-700 font-medium text-xs">เช็คอินเข้างานแล้ว</div>
-              <div className="text-base font-extrabold text-emerald-800 mt-0.5">{checkedInInRound} คน</div>
-            </div>
-            <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3">
-              <div className="text-amber-700 font-medium text-xs">ยังไม่เข้างาน</div>
-              <div className="text-base font-extrabold text-amber-800 mt-0.5">{notCheckedInInRound} คน</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─── Search & Secondary Filter Bar ───────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-        {/* Search Input */}
-        <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 flex-1 shadow-xs focus-within:ring-2 focus-within:ring-[#0026b3]/20 focus-within:border-[#0026b3]">
-          <Search className="w-4 h-4 text-slate-400 shrink-0" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหาชื่อ-นามสกุล, เลขสมาชิก, เลข 4 ตัวท้าย, สังกัด, รหัสตั๋ว..."
-            className="bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none w-full"
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className="text-slate-400 hover:text-slate-600 text-xs p-1">
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-
-        {/* Filter Badges & Dropdowns */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Check-In Status Tabs */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 overflow-x-auto">
-            {[
-              { id: 'all', label: `ทั้งหมด (${programAttendees.length})` },
-              { id: 'checked_in', label: `เช็คอินแล้ว (${checkedInInProgram})` },
-              { id: 'not_checked_in', label: `ยังไม่เข้าร่วม (${programAttendees.length - checkedInInProgram})` },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setFilterCheckIn(tab.id as any)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-                  filterCheckIn === tab.id
-                    ? 'bg-[#0026b3] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-slate-100 text-slate-600 border-slate-200'
                 }`}
               >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Program Dropdown */}
-          {meetingPrograms.length > 0 && (
-            <select
-              value={filterProgram}
-              onChange={(e) => setFilterProgram(e.target.value)}
-              className="bg-white border border-slate-300 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none shadow-xs cursor-pointer focus:border-[#0026b3] max-w-[260px]"
-            >
-              <option value="all">โปรแกรม: ทั้งหมด</option>
-              {meetingPrograms.map((prog) => (
-                <option key={prog.id} value={prog.id}>
-                  {prog.name} ({roundAttendees.filter((a) => attendeeHasProgram(a, prog)).length})
-                </option>
-              ))}
-            </select>
-          )}
-
-          {/* Attendance Type Dropdown */}
-          <select
-            value={filterAttendanceType}
-            onChange={(e) => setFilterAttendanceType(e.target.value as any)}
-            className="bg-white border border-slate-300 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none shadow-xs cursor-pointer focus:border-[#0026b3]"
-          >
-            <option value="all">รูปแบบการเข้าร่วม: ทั้งหมด</option>
-            <option value="onsite">ออนไซต์ ({programAttendees.length - onlineInProgram})</option>
-            <option value="online">ออนไลน์ ({onlineInProgram})</option>
-          </select>
-
-          {/* Payment Status Dropdown */}
-          <select
-            value={filterPayment}
-            onChange={(e) => setFilterPayment(e.target.value as any)}
-            className="bg-white border border-slate-300 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none shadow-xs cursor-pointer focus:border-[#0026b3]"
-          >
-            <option value="all">การชำระเงิน: ทั้งหมด</option>
-            <option value="paid">ชำระแล้ว ({paidInRound})</option>
-            <option value="pending">รอชำระ ({pendingInRound})</option>
-            <option value="rejected">สลิปถูกปฏิเสธ ({rejectedInRound})</option>
-          </select>
+                {currentMeeting.status === 'ongoing' ? 'กำลังดำเนินการ' : currentMeeting.status === 'upcoming' ? 'รอเริ่มงาน' : 'เสร็จสิ้น'}
+              </span>
+            )}
+          </>
+        }
+        description={
+          currentMeeting ? (
+            <span className="inline-flex items-center gap-3 flex-wrap">
+              <span className="inline-flex items-center gap-1">
+                <CalendarDays className="w-3.5 h-3.5 text-[#0026b3]" /> {currentMeeting.date} ({currentMeeting.time})
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-[#0026b3]" /> {currentMeeting.location}
+              </span>
+            </span>
+          ) : (
+            `${meetings.length} รอบการประชุม`
+          )
+        }
+      >
+        <div className="relative">
+              <select
+                value={activeMeetingId}
+                onChange={(e) => setSelectedMeetingId(e.target.value)}
+                className="w-full appearance-none bg-slate-50 border border-slate-300 text-slate-900 text-xs sm:text-sm font-bold rounded-xl pl-10 pr-10 py-2.5 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition cursor-pointer shadow-xs"
+              >
+                {meetings.map((m) => {
+                  const isOngoing = m.status === 'ongoing';
+                  const isUpcoming = m.status === 'upcoming';
+                  const mAttendees = attendees.filter((a) => a.meetingId === m.id || a.meetingTitle === m.titleTh);
+                  const mChecked = mAttendees.filter((a) => a.checkInStatus === 'checked_in').length;
+                  return (
+                    <option key={m.id} value={m.id}>
+                      {isOngoing ? '🟢 [รอบปัจจุบัน] ' : isUpcoming ? '🟡 [เร็วๆ นี้] ' : '📅 '}
+                      [{m.id}] {m.titleTh} ({m.date}) — เช็คอิน {mChecked}/{mAttendees.length || m.registered} คน
+                    </option>
+                  );
+                })}
+                <option value="all">🌐 รวมทุกรอบการประชุม — รวมทั้งหมด {attendees.length} คน</option>
+              </select>
+          <CalendarDays className="w-4 h-4 text-[#0026b3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
-      </div>
+      </ContextBar>
+
+      <StatGrid>
+        <StatCard
+          label="ผู้ลงทะเบียน"
+          value={totalInRound}
+          unit={currentMeeting ? `/ ${currentMeeting.maxSeats} ที่นั่ง` : 'คน'}
+          icon={Users}
+          tone="blue"
+        />
+        <StatCard
+          label="เช็คอินแล้ว"
+          value={checkedInInRound}
+          unit="คน"
+          icon={UserCheck}
+          tone="green"
+          active={filterCheckIn === 'checked_in'}
+          onClick={() => setFilterCheckIn(filterCheckIn === 'checked_in' ? 'all' : 'checked_in')}
+        />
+        <StatCard
+          label="ยังไม่เช็คอิน"
+          value={notCheckedInInRound}
+          unit="คน"
+          icon={Clock}
+          tone="amber"
+          active={filterCheckIn === 'not_checked_in'}
+          onClick={() => setFilterCheckIn(filterCheckIn === 'not_checked_in' ? 'all' : 'not_checked_in')}
+        />
+        <StatCard label="อัตราเช็คอิน" value={`${rateInRound}%`} icon={TrendingUp} tone="violet">
+          <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden mt-2.5">
+            <div
+              className="h-full bg-gradient-to-r from-[#0026b3] to-[#4ade80] rounded-full transition-all duration-500"
+              style={{ width: `${rateInRound}%` }}
+            />
+          </div>
+        </StatCard>
+      </StatGrid>
+
+      <Toolbar>
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="ค้นหาชื่อ, เลขสมาชิก, เลข 4 ตัวท้าย, สังกัด, รหัสตั๋ว..."
+        />
+        <ToolbarGroup>
+          <Segmented
+            value={filterCheckIn}
+            onChange={setFilterCheckIn}
+            options={[
+              { id: 'all', label: 'ทั้งหมด', count: programAttendees.length },
+              { id: 'checked_in', label: 'เช็คอินแล้ว', count: checkedInInProgram },
+              { id: 'not_checked_in', label: 'ยังไม่เข้าร่วม', count: programAttendees.length - checkedInInProgram },
+            ]}
+          />
+          {meetingPrograms.length > 0 && (
+            <FilterSelect
+              label="โปรแกรม"
+              value={filterProgram}
+              onChange={setFilterProgram}
+              className="max-w-[240px]"
+              options={[
+                { value: 'all', label: 'ทุกโปรแกรม' },
+                ...meetingPrograms.map((prog) => ({
+                  value: prog.id,
+                  label: `${prog.name} (${roundAttendees.filter((a) => attendeeHasProgram(a, prog)).length})`,
+                })),
+              ]}
+            />
+          )}
+          <FilterSelect
+            label="รูปแบบการเข้าร่วม"
+            value={filterAttendanceType}
+            onChange={(v) => setFilterAttendanceType(v as typeof filterAttendanceType)}
+            options={[
+              { value: 'all', label: 'ทุกรูปแบบ' },
+              { value: 'onsite', label: `ออนไซต์ (${programAttendees.length - onlineInProgram})` },
+              { value: 'online', label: `ออนไลน์ (${onlineInProgram})` },
+            ]}
+          />
+          <FilterSelect
+            label="การชำระเงิน"
+            value={filterPayment}
+            onChange={(v) => setFilterPayment(v as typeof filterPayment)}
+            options={[
+              { value: 'all', label: 'ทุกสถานะชำระเงิน' },
+              { value: 'paid', label: `ชำระแล้ว (${paidInRound})` },
+              { value: 'pending', label: `รอชำระ (${pendingInRound})` },
+              { value: 'rejected', label: `สลิปถูกปฏิเสธ (${rejectedInRound})` },
+            ]}
+          />
+        </ToolbarGroup>
+      </Toolbar>
 
       {/* ─── Attendees Table ─────────────────────────────────────────────── */}
       <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-xs bg-white">
         <table className="w-full min-w-[760px] text-left">
           <thead>
-            <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 text-xs font-bold uppercase tracking-wider">
+            <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 text-xs font-bold">
               <th className="px-5 py-3.5">รหัสสมาชิก</th>
-              <th className="px-5 py-3.5">ชื่อ-นามสกุล / สังกัด</th>
+              <th className="px-5 py-3.5">ชื่อและสังกัด</th>
               <th className="px-5 py-3.5">รอบการประชุม</th>
-              <th className="px-5 py-3.5">ประเภทสมาชิก / ตั๋ว</th>
+              <th className="px-5 py-3.5">ประเภทและบัตร</th>
               <th className="px-5 py-3.5">การชำระเงิน</th>
               <th className="px-5 py-3.5">สถานะเช็คอิน</th>
               <th className="px-5 py-3.5 text-right">การจัดการ</th>
@@ -663,10 +663,12 @@ export function VerifyAttendeesPanel({
           <tbody className="divide-y divide-slate-100 text-sm">
             {filteredAttendees.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-12 text-slate-500">
-                  <UserCheck className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <div className="font-bold text-slate-700">ไม่พบข้อมูลผู้เข้าร่วมตามเงื่อนไขที่เลือก</div>
-                  <p className="text-xs text-slate-400 mt-1">ลองเปลี่ยนคำค้นหาหรือเลือกตัวกรองรอบการประชุมใหม่</p>
+                <td colSpan={7}>
+                  <EmptyState
+                    icon={UserCheck}
+                    title="ไม่พบผู้เข้าร่วมตามเงื่อนไขที่เลือก"
+                    description="ลองเปลี่ยนคำค้นหา ตัวกรอง หรือรอบการประชุม"
+                  />
                 </td>
               </tr>
             ) : (
@@ -771,28 +773,22 @@ export function VerifyAttendeesPanel({
                       )}
                     </td>
                     <td className="px-5 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {a.paymentStatus === 'paid' && onPrintReceipt && (
-                          <button
-                            onClick={() => onPrintReceipt(a)}
-                            className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#0026b3] border border-blue-200 transition cursor-pointer"
-                            title="พิมพ์ใบเสร็จรับเงิน"
-                          >
-                            <Printer className="w-4 h-4" />
-                          </button>
-                        )}
-                        <button
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Btn
+                          size="sm"
+                          variant={a.checkInStatus === 'checked_in' ? 'secondary' : 'primary'}
+                          icon={a.checkInStatus === 'checked_in' ? XCircle : Check}
                           onClick={() => onToggleCheckIn(a.id)}
-                          className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
-                            a.checkInStatus === 'checked_in'
-                              ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
-                              : 'bg-[#0026b3] hover:bg-[#001f94] text-white shadow-xs'
-                          }`}
+                          className="min-w-[96px]"
                         >
                           {a.checkInStatus === 'checked_in' ? 'ยกเลิก' : 'เช็คอิน'}
-                        </button>
+                        </Btn>
+                        <IconBtn icon={Eye} label="ดูรายละเอียด" tone="blue" onClick={() => setSelectedAttendee(a)} />
                         {onUpdatePaymentStatus && (
-                          <button
+                          <IconBtn
+                            icon={Pencil}
+                            label="แก้ไขสถานะการชำระเงิน"
+                            tone="amber"
                             onClick={() => {
                               setEditingStatusAttendee(a);
                               setEditStatusValue(
@@ -804,19 +800,11 @@ export function VerifyAttendeesPanel({
                               );
                               setEditRejectionReason(a.rejectionReason || '');
                             }}
-                            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-[#0026b3] border border-slate-200 transition cursor-pointer"
-                            title="แก้ไขสถานะการชำระเงิน"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
+                          />
                         )}
-                        <button
-                          onClick={() => setSelectedAttendee(a)}
-                          className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 transition cursor-pointer"
-                          title="ดูรายละเอียด"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
+                        {a.paymentStatus === 'paid' && onPrintReceipt && (
+                          <IconBtn icon={Printer} label="พิมพ์ใบเสร็จรับเงิน" tone="green" onClick={() => onPrintReceipt(a)} />
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1180,7 +1168,10 @@ export function VerifyAttendeesPanel({
                   <label className="block text-xs font-bold text-slate-700 mb-1">รอบการประชุมที่ลงทะเบียน *</label>
                   <select
                     value={walkInData.meetingId}
-                    onChange={(e) => setWalkInData({ ...walkInData, meetingId: e.target.value })}
+                    onChange={(e) => {
+                      setWalkInData({ ...walkInData, meetingId: e.target.value });
+                      if (linkedMember) checkWalkInRegistration(e.target.value, linkedMember.memberNo);
+                    }}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 font-medium focus:bg-white focus:outline-none focus:border-[#0026b3]"
                     required
                   >
@@ -1192,12 +1183,77 @@ export function VerifyAttendeesPanel({
                   </select>
                 </div>
 
+                {/* เลขสมาชิก: ค้นหาแล้วเติมข้อมูลอัตโนมัติ */}
+                <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-3 space-y-2">
+                  <label className="block text-xs font-bold text-slate-700">
+                    เลขสมาชิก <span className="font-normal text-slate-500">ถ้าเป็นสมาชิก กรอกแล้วกดค้นหาเพื่อเติมข้อมูลอัตโนมัติ</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={walkInData.memberNo}
+                      disabled={!!linkedMember}
+                      onChange={(e) => {
+                        setWalkInData({ ...walkInData, memberNo: e.target.value.replace(/\s/g, '').slice(0, 20) });
+                        if (memberLookup.state === 'error') setMemberLookup({ state: 'idle' });
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleLookupWalkInMember();
+                        }
+                      }}
+                      placeholder="เช่น 0123"
+                      className="flex-1 min-w-0 bg-white border border-slate-300 rounded-xl px-3 py-2 font-mono font-bold text-slate-800 focus:outline-none focus:border-[#0026b3] disabled:bg-slate-100 disabled:text-slate-500"
+                    />
+                    {linkedMember ? (
+                      <Btn variant="secondary" icon={X} onClick={unlinkWalkInMember}>
+                        ยกเลิกการผูก
+                      </Btn>
+                    ) : (
+                      <Btn
+                        variant="primary"
+                        icon={Search}
+                        loading={memberLookup.state === 'loading'}
+                        disabled={!walkInData.memberNo.trim()}
+                        onClick={handleLookupWalkInMember}
+                      >
+                        ค้นหา
+                      </Btn>
+                    )}
+                  </div>
+                  {memberLookup.state === 'error' && (
+                    <p className="text-[11px] font-semibold text-rose-600">{memberLookup.message}</p>
+                  )}
+                  {linkedMember && (
+                    <div className="space-y-1">
+                      <p className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                        ผูกกับสมาชิกเลขที่ {linkedMember.memberNo} {linkedMember.nameTh} เติมข้อมูลจากฐานข้อมูลแล้ว
+                      </p>
+                      {!linkedMember.isActive && (
+                        <p className="text-[11px] font-semibold text-amber-700">
+                          สมาชิกภาพหมดอายุ คิดราคาบุคคลทั่วไป
+                        </p>
+                      )}
+                      {alreadyRegistered && (
+                        <p className="text-[11px] font-semibold text-rose-600">
+                          สมาชิกคนนี้ลงทะเบียนการประชุมรอบนี้แล้ว บันทึกซ้ำไม่ได้
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">ชื่อ-นามสกุล (ภาษาไทย) *</label>
                     <input
                       type="text"
                       required
+                      readOnly={!!linkedMember}
+                      title={linkedMember ? 'ชื่อตามข้อมูลสมาชิก ยกเลิกการผูกเพื่อแก้ไข' : undefined}
                       value={walkInData.nameTh}
                       onChange={(e) =>
                         setWalkInData({
@@ -1297,6 +1353,27 @@ export function VerifyAttendeesPanel({
                     })}
                   </div>
                 </div>
+
+                <label
+                  className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition ${
+                    walkInData.isFellow ? 'border-violet-400 bg-violet-50 ring-1 ring-violet-300' : 'border-slate-300 bg-slate-50 hover:border-slate-400'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={walkInData.isFellow}
+                    onChange={(e) => setWalkInData({ ...walkInData, isFellow: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 accent-violet-600 cursor-pointer"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-xs font-bold text-slate-800">ลงทะเบียนเป็น Fellow</span>
+                    <span className="block text-[11px] text-slate-500">
+                      {walkInFellowTier
+                        ? `ใช้ราคา Fellow ของการประชุมหลัก สมาชิก ${Number(walkInFellowTier.onsiteMember || 0).toLocaleString()} บาท บุคคลทั่วไป ${Number(walkInFellowTier.onsiteNonMember || 0).toLocaleString()} บาท`
+                        : 'การประชุมนี้ยังไม่ได้ตั้งราคา Fellow จะบันทึกว่าเป็น Fellow แต่คิดราคาปกติ'}
+                    </span>
+                  </span>
+                </label>
 
                 <PositionSelect
                   value={walkInData.position}

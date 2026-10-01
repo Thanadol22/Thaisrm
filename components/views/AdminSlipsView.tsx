@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { AdminPageHeader, HeaderButton, HeaderTabs } from '@/components/admin/AdminPageHeader';
+import { Btn, EmptyState, StatGrid, StatCard, Toolbar, ToolbarGroup, SearchInput } from '@/components/admin/ui';
 import { createPortal } from 'react-dom';
 import {
   Receipt,
-  Search,
   CheckCircle2,
   XCircle,
   Clock,
@@ -13,6 +14,7 @@ import {
   X,
   CreditCard,
   Building2,
+  Mail,
   AlertCircle,
   RotateCw,
   Pencil,
@@ -235,6 +237,16 @@ export interface SlipRecord {
   /** แอดมินแนบสลิปไว้แล้ว รออนุมัติการชำระเงิน (slipUrl คือสลิปที่แนบ แต่ยังไม่นับเป็นชำระแล้ว) */
   adminAttachedSlip?: boolean;
 }
+
+/** รายการราคา fellow: มาจากฟอร์ม fellow (ทั้งบิล) หรือแอดมินระบุรายคน/walk-in */
+export const isFellowSlip = (s?: SlipRecord | null, att?: any) =>
+  Boolean(
+    att?.isFellow ||
+      att?.priceTier === 'fellow' ||
+      s?.groupPayload?.isFellow ||
+      s?.groupPayload?.priceTier === 'fellow' ||
+      s?.guestPayload?.isFellow
+  );
 
 export const hasActualSlip = (s?: SlipRecord | null) =>
   Boolean(
@@ -1101,7 +1113,7 @@ export function AdminSlipsView() {
   }, [filteredSlips, currentPage, pageSize]);
 
   return (
-    <div className="flex-1 flex flex-col justify-start animate-fade-in p-3 sm:p-6 space-y-4 max-w-6xl mx-auto w-full">
+    <div className="space-y-6 animate-fade-in pb-12">
       {/* Toast Notification */}
       {mounted &&
         toastMessage &&
@@ -1113,329 +1125,129 @@ export function AdminSlipsView() {
           document.body
         )}
 
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white p-4 sm:p-6 rounded-3xl shadow-xl relative overflow-hidden">
-        <div className="absolute -top-12 -right-12 w-48 h-48 bg-[#4ade80]/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-white/10 backdrop-blur-md text-[#4ade80]">
-                <Receipt className="w-5 h-5" />
-              </div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-                {lang === 'th' ? 'ตรวจสอบการชำระเงิน' : 'Payment Verification & Review'}
-              </h1>
-            </div>
-            <p className="text-xs text-blue-100/90 font-normal">
-              {lang === 'th'
-                ? 'ตรวจสอบหลักฐานการชำระเงินค่าประชุม อนุมัติสิทธิ์เข้างาน หรือแจ้งส่งสลิปใหม่'
-                : 'Review payment slips, verify bank transaction details, and approve event access.'}
-            </p>
-          </div>
-
-          {/* Quick Summary Badges & Refresh */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={fetchSlips}
-              disabled={loading}
-              className="bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-3 py-1.5 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 border border-white/20 transition cursor-pointer active:scale-95"
-              title="รีเฟรชข้อมูล"
-            >
-              <RotateCw className={`w-3.5 h-3.5 text-blue-200 ${loading ? 'animate-spin' : ''}`} />
-              <span>{lang === 'th' ? 'รีเฟรช' : 'Refresh'}</span>
-            </button>
-            <span className="bg-white/15 text-white backdrop-blur-md px-3 py-1.5 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 border border-white/20">
-              <Receipt className="w-3.5 h-3.5 text-blue-200" />
-              <span>
-                {lang === 'th' ? 'ทั้งหมด' : 'Total'}: {totalCount}
-              </span>
+      <AdminPageHeader
+        tab="verify-slip"
+        title={lang === 'th' ? 'ตรวจสอบการชำระเงิน' : 'Payment Verification'}
+        description={
+          lang === 'th'
+            ? 'ตรวจสอบหลักฐานการชำระเงินค่าประชุม อนุมัติสิทธิ์เข้างาน หรือแจ้งส่งสลิปใหม่'
+            : 'Review payment slips, verify bank transaction details, and approve event access.'
+        }
+        actions={
+          <>
+            <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 text-amber-950 text-xs sm:text-sm font-black shadow-sm">
+              <Clock className="w-4 h-4" />
+              {lang === 'th' ? 'รอตรวจ' : 'Pending'} {allPendingCount}
             </span>
-            <span className="bg-amber-400 text-amber-950 px-3 py-1.5 rounded-2xl text-xs font-black flex items-center gap-1.5 shadow-sm">
-              <Clock className="w-3.5 h-3.5" />
-              <span>
-                {lang === 'th' ? 'รอตรวจ' : 'Pending'}: {allPendingCount}
-              </span>
-            </span>
-          </div>
-        </div>
-      </div>
+            <HeaderButton icon={RotateCw} onClick={fetchSlips} disabled={loading} title="รีเฟรชข้อมูล">
+              {lang === 'th' ? 'รีเฟรช' : 'Refresh'}
+            </HeaderButton>
+          </>
+        }
+      >
+        <HeaderTabs
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+          options={[
+            { id: 'all', label: lang === 'th' ? 'ทุกประเภท' : 'All Types', icon: Layers, count: totalCount },
+            { id: 'individual', label: lang === 'th' ? 'บุคคลทั่วไปและสมาชิก' : 'Individual & Member', icon: User, count: individualSlips.length },
+            { id: 'corporate', label: lang === 'th' ? 'กลุ่มบริษัททั้งหมด' : 'Corporate Group', icon: Building2, count: corporateSlips.length },
+            { id: 'corporate_pay_later', label: lang === 'th' ? 'กลุ่มรอชำระเงิน' : 'Corporate Pay Later', icon: CreditCard, count: corporatePayLaterSlips.length },
+          ]}
+        />
+      </AdminPageHeader>
 
-      {/* ─── Mode / Module Switcher: Individual vs Corporate Group vs Corporate Pay Later ─── */}
-      <div className="flex items-center p-1.5 bg-slate-100 rounded-2xl w-full border border-slate-200 shadow-2xs gap-1.5 overflow-x-auto">
-        <button
-          onClick={() => setCategoryFilter('all')}
-          className={`flex-1 min-w-[130px] flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${categoryFilter === 'all'
-              ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-        >
-          <Layers className="w-4 h-4 text-blue-600" />
-          <span>{lang === 'th' ? 'ทุกประเภท' : 'All Types'}</span>
-          <span
-            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${categoryFilter === 'all' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-600'
-              }`}
-          >
-            {totalCount}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setCategoryFilter('individual')}
-          className={`flex-1 min-w-[160px] flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${categoryFilter === 'individual'
-              ? 'bg-white text-slate-900 shadow-sm border border-purple-200 ring-1 ring-purple-400/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-        >
-          <User className="w-4 h-4 text-purple-600" />
-          <span>{lang === 'th' ? 'บุคคลทั่วไป / สมาชิกเดี่ยว' : 'Individual & Member'}</span>
-          <span
-            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${categoryFilter === 'individual' ? 'bg-purple-100 text-purple-800' : 'bg-slate-200 text-slate-600'
-              }`}
-          >
-            {individualSlips.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setCategoryFilter('corporate')}
-          className={`flex-1 min-w-[160px] flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${categoryFilter === 'corporate'
-              ? 'bg-white text-slate-900 shadow-sm border border-indigo-200 ring-1 ring-indigo-400/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-        >
-          <Building2 className="w-4 h-4 text-indigo-600" />
-          <span>{lang === 'th' ? 'องค์กร / กลุ่มบริษัททั้งหมด' : 'Corporate Group (All)'}</span>
-          <span
-            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${categoryFilter === 'corporate' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-600'
-              }`}
-          >
-            {corporateSlips.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setCategoryFilter('corporate_pay_later')}
-          className={`flex-1 min-w-[165px] flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${categoryFilter === 'corporate_pay_later'
-              ? 'bg-amber-500 text-amber-950 shadow-sm border border-amber-600 ring-2 ring-amber-400/40 font-black'
-              : 'text-amber-800 bg-amber-50/80 hover:bg-amber-100 border border-amber-200/70'
-            }`}
-        >
-          <CreditCard className="w-4 h-4 text-amber-900" />
-          <span>{lang === 'th' ? 'กลุ่มรอชำระเงิน' : 'Corporate Pay Later'}</span>
-          <span
-            className={`text-[10px] px-2 py-0.5 rounded-full font-black ${categoryFilter === 'corporate_pay_later' ? 'bg-amber-950 text-amber-100' : 'bg-amber-200 text-amber-900'
-              }`}
-          >
-            {corporatePayLaterSlips.length}
-          </span>
-        </button>
-      </div>
-
-      {/* Metrics Row (Scoped to selected Category) */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 sm:gap-3">
-        <div
+      {/* สรุปสถานะในหมวดที่เลือก กดเพื่อกรอง */}
+      <StatGrid cols={5}>
+        <StatCard
+          label={lang === 'th' ? 'ทั้งหมดในหมวดนี้' : 'All in category'}
+          value={categoryTotalCount}
+          icon={Layers}
+          tone="blue"
+          active={statusFilter === 'all'}
           onClick={() => setStatusFilter('all')}
-          className={`p-3.5 rounded-2xl border transition cursor-pointer ${statusFilter === 'all'
-              ? 'bg-blue-50/80 border-[#0026b3] shadow-sm'
-              : 'bg-white border-slate-200 hover:border-slate-300'
-            }`}
-        >
-          <p className="text-[11px] font-bold text-slate-500">{lang === 'th' ? 'ทั้งหมด (ในหมวดนี้)' : 'All (In Category)'}</p>
-          <p className="text-xl font-black text-slate-900 mt-0.5">{categoryTotalCount}</p>
-        </div>
-
-        <div
+        />
+        <StatCard
+          label={lang === 'th' ? 'รอตรวจสอบ' : 'Pending review'}
+          value={categoryPendingCount}
+          icon={Clock}
+          tone="amber"
+          active={statusFilter === 'pending'}
           onClick={() => setStatusFilter('pending')}
-          className={`p-3.5 rounded-2xl border transition cursor-pointer ${statusFilter === 'pending'
-              ? 'bg-amber-50 border-amber-400 shadow-sm'
-              : 'bg-white border-slate-200 hover:border-slate-300'
-            }`}
-        >
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-bold text-amber-800">{lang === 'th' ? 'รอตรวจสอบ' : 'Pending Review'}</p>
-            {categoryPendingCount > 0 && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />}
-          </div>
-          <p className="text-xl font-black text-amber-900 mt-0.5">{categoryPendingCount}</p>
-        </div>
-
-        <div
+        />
+        <StatCard
+          label={lang === 'th' ? 'รอชำระเงิน' : 'Pay later'}
+          value={categoryPayLaterCount}
+          icon={CreditCard}
+          tone="violet"
+          active={statusFilter === 'pay_later'}
           onClick={() => setStatusFilter('pay_later')}
-          className={`p-3.5 rounded-2xl border transition cursor-pointer ${statusFilter === 'pay_later'
-              ? 'bg-orange-50 border-orange-400 shadow-sm ring-1 ring-orange-400/30'
-              : 'bg-white border-slate-200 hover:border-slate-300'
-            }`}
-        >
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-bold text-orange-800">{lang === 'th' ? 'รอชำระเงิน' : 'Pay Later'}</p>
-            {categoryPayLaterCount > 0 && <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />}
-          </div>
-          <p className="text-xl font-black text-orange-900 mt-0.5">{categoryPayLaterCount}</p>
-        </div>
-
-        <div
+        />
+        <StatCard
+          label={lang === 'th' ? 'อนุมัติแล้ว' : 'Approved'}
+          value={categoryApprovedCount}
+          icon={CheckCircle2}
+          tone="green"
+          active={statusFilter === 'approved'}
           onClick={() => setStatusFilter('approved')}
-          className={`p-3.5 rounded-2xl border transition cursor-pointer ${statusFilter === 'approved'
-              ? 'bg-emerald-50 border-emerald-400 shadow-sm'
-              : 'bg-white border-slate-200 hover:border-slate-300'
-            }`}
-        >
-          <p className="text-[11px] font-bold text-emerald-800">{lang === 'th' ? 'อนุมัติแล้ว' : 'Approved'}</p>
-          <p className="text-xl font-black text-emerald-900 mt-0.5">{categoryApprovedCount}</p>
-        </div>
-
-        <div
+        />
+        <StatCard
+          label={lang === 'th' ? 'ปฏิเสธหรือรอแก้ไข' : 'Rejected'}
+          value={categoryRejectedCount}
+          icon={XCircle}
+          tone="rose"
+          active={statusFilter === 'rejected'}
           onClick={() => setStatusFilter('rejected')}
-          className={`p-3.5 rounded-2xl border transition cursor-pointer ${statusFilter === 'rejected'
-              ? 'bg-rose-50 border-rose-400 shadow-sm'
-              : 'bg-white border-slate-200 hover:border-slate-300'
-            }`}
-        >
-          <p className="text-[11px] font-bold text-rose-800">{lang === 'th' ? 'ปฏิเสธ / แก้ไข' : 'Rejected'}</p>
-          <p className="text-xl font-black text-rose-900 mt-0.5">{categoryRejectedCount}</p>
-        </div>
-      </div>
+        />
+      </StatGrid>
 
-      {/* Search & Filter Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center justify-between bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
-        <div className="relative flex-1 min-w-0">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={
-              lang === 'th'
-                ? 'ค้นหาตามชื่อ, เลขสมาชิก, เลขอ้างอิง, รหัสตั๋ว, สังกัด...'
-                : 'Search by name, member no, ref, ticket code, hospital...'
-            }
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-800 outline-none focus:border-[#0026b3] focus:bg-white transition"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        {/* Status Filter Buttons with scoped counts */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-          <button
-            onClick={() => setStatusFilter('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${statusFilter === 'all'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 bg-slate-100 hover:bg-slate-200'
-              }`}
-          >
-            <span>{lang === 'th' ? 'ทั้งหมด' : 'All'}</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
-                }`}
-            >
-              {categoryTotalCount}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('pending')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${statusFilter === 'pending'
-                ? 'bg-amber-500 text-amber-950 font-black shadow-xs'
-                : 'text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/60'
-              }`}
-          >
-            <span>{lang === 'th' ? 'รอตรวจ' : 'Pending'}</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${statusFilter === 'pending' ? 'bg-amber-950/20 text-amber-950' : 'bg-amber-200/80 text-amber-900'
-                }`}
-            >
-              {categoryPendingCount}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('pay_later')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${statusFilter === 'pay_later'
-                ? 'bg-orange-500 text-orange-950 font-black shadow-xs'
-                : 'text-orange-800 bg-orange-50 hover:bg-orange-100 border border-orange-200/60'
-              }`}
-          >
-            <span>{lang === 'th' ? 'รอชำระเงิน' : 'Pay Later'}</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${statusFilter === 'pay_later' ? 'bg-orange-950/20 text-orange-950' : 'bg-orange-200/80 text-orange-900'
-                }`}
-            >
-              {categoryPayLaterCount}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('approved')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${statusFilter === 'approved'
-                ? 'bg-emerald-600 text-white font-black shadow-xs'
-                : 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/60'
-              }`}
-          >
-            <span>{lang === 'th' ? 'อนุมัติแล้ว' : 'Approved'}</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${statusFilter === 'approved' ? 'bg-white/20 text-white' : 'bg-emerald-200/80 text-emerald-900'
-                }`}
-            >
-              {categoryApprovedCount}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('rejected')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${statusFilter === 'rejected'
-                ? 'bg-rose-600 text-white font-black shadow-xs'
-                : 'text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200/60'
-              }`}
-          >
-            <span>{lang === 'th' ? 'ปฏิเสธ' : 'Rejected'}</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${statusFilter === 'rejected' ? 'bg-white/20 text-white' : 'bg-rose-200/80 text-rose-900'
-                }`}
-            >
-              {categoryRejectedCount}
-            </span>
-          </button>
-
-          <button
+      <Toolbar>
+        <SearchInput
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder={
+            lang === 'th'
+              ? 'ค้นหาชื่อ, เลขสมาชิก, เลขอ้างอิง, รหัสบัตร, สังกัด...'
+              : 'Search by name, member no, ref, ticket code, hospital...'
+          }
+        />
+        <ToolbarGroup>
+          <span className="text-xs font-semibold text-slate-500">
+            {lang === 'th' ? `แสดง ${filteredSlips.length} รายการ` : `${filteredSlips.length} items`}
+          </span>
+          <Btn
+            variant="soft"
+            icon={Download}
+            loading={Boolean(bulkDownload)}
             onClick={() => downloadSlipsZip(filteredSlips)}
-            disabled={Boolean(bulkDownload) || filteredSlips.length === 0}
+            disabled={filteredSlips.length === 0}
             title={lang === 'th' ? 'ดาวน์โหลดรูปสลิปทุกรายการตามตัวกรองเป็นไฟล์ ZIP' : 'Download all slips in this list as ZIP'}
-            className="ml-auto px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer text-[#0026b3] bg-blue-50 hover:bg-blue-100 border border-blue-200/60 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {bulkDownload ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-            <span>
-              {bulkDownload
-                ? `${bulkDownload.done}/${bulkDownload.total}`
-                : (lang === 'th' ? 'ดาวน์โหลดสลิป' : 'Download slips')}
-            </span>
-          </button>
-        </div>
-      </div>
+            {bulkDownload
+              ? `${bulkDownload.done}/${bulkDownload.total}`
+              : lang === 'th'
+                ? 'ดาวน์โหลดสลิป'
+                : 'Download slips'}
+          </Btn>
+        </ToolbarGroup>
+      </Toolbar>
 
       {/* Slip Cards List */}
       <div className="space-y-3">
         {filteredSlips.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-3xl border border-dashed border-slate-300 space-y-2">
-            <Receipt className="w-10 h-10 text-slate-300 mx-auto" />
-            <p className="text-sm font-bold text-slate-700">
-              {lang === 'th' ? 'ไม่พบข้อมูลสลิปตามเงื่อนไข' : 'No slip records found'}
-            </p>
-            <p className="text-xs text-slate-400">
-              {lang === 'th' ? 'ลองเปลี่ยนคำค้นหาหรือตัวกรองสถานะ' : 'Try adjusting your search query or filter'}
-            </p>
+          <div className="bg-white rounded-2xl border border-dashed border-slate-300">
+            <EmptyState
+              icon={Receipt}
+              title={lang === 'th' ? 'ไม่พบข้อมูลสลิปตามเงื่อนไข' : 'No slip records found'}
+              description={lang === 'th' ? 'ลองเปลี่ยนคำค้นหาหรือตัวกรองสถานะ' : 'Try adjusting your search query or filter'}
+            />
           </div>
         ) : (
           paginatedSlips.map((slip) => (
             <div
               key={slip.id}
               onClick={() => setSelectedSlip(slip)}
-              className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs hover:shadow-md hover:border-slate-300 transition-all duration-200 cursor-pointer flex flex-col overflow-hidden"
+              className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md hover:border-slate-300 transition-all duration-200 cursor-pointer flex flex-col overflow-hidden"
             >
               <div className="p-4 sm:p-5 space-y-3">
               {/* Header: รูปสลิป / ชื่อและสถานะ / ยอดเงิน */}
@@ -1574,6 +1386,12 @@ export function AdminSlipsView() {
                         </span>
                       );
                     })()}
+
+                    {isFellowSlip(slip) && (
+                      <span className="text-[10px] font-black bg-violet-600 text-white px-2 py-0.5 rounded-md shadow-2xs">
+                        Fellow
+                      </span>
+                    )}
 
                     {/* Applied Coupon Badge (ข้อ 4) */}
                     {(slip.couponCode || slip.couponInfo?.code) && (
@@ -2346,208 +2164,182 @@ export function AdminSlipsView() {
                                     className={`bg-white border rounded-2xl p-3 sm:p-3.5 text-xs text-slate-800 shadow-2xs transition flex flex-col sm:flex-row items-start justify-between gap-3 ${hasDiscount ? 'border-emerald-200 hover:border-emerald-400 bg-emerald-50/20' : 'border-sky-100 hover:border-sky-300'
                                       }`}
                                   >
-                                    <div className="min-w-0 flex-1 w-full space-y-1.5">
-                                      {/* Row 1: Number + Thai Name + Member Badge + Mobile Action */}
-                                      <div className="flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2 font-bold text-slate-900 flex-wrap min-w-0">
-                                          <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${hasDiscount ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-[#0026b3]'
-                                            }`}>
+                                    <div className="min-w-0 flex-1 w-full space-y-2">
+                                      {/* แถว 1: ลำดับ ชื่อ และปุ่มจัดการ */}
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="flex items-start gap-2 min-w-0">
+                                          <span className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 ${hasDiscount ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-[#0026b3]'}`}>
                                             {idx + 1}
                                           </span>
-                                          <span className="text-sm font-extrabold text-slate-900 truncate">{attName}</span>
-
-                                          {isAddOnAttendee && (
-                                            <span
-                                              className="text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md shadow-2xs whitespace-nowrap"
-                                              title={Array.isArray(att.registeredActivities) ? `ลงทะเบียนไว้แล้ว: ${att.registeredActivities.map((r: any) => r.name).join(', ')}` : undefined}
-                                            >
-                                              {`➕ ลงเพิ่ม${att.addOnOriginalTicketCode ? ` · รายการเดิม ${att.addOnOriginalTicketCode}` : ''}`}
-                                            </span>
-                                          )}
-
-                                          {/* Member Badge Beside Thai Name */}
-                                          {isAttMember ? (
-                                            <span className="text-[10px] font-bold bg-blue-50 text-[#0026b3] border border-blue-200 px-2 py-0.5 rounded-md shadow-2xs whitespace-nowrap">
-                                              {att.memberNo ? `สมาชิก (#${att.memberNo})` : 'สมาชิกสมาคม'}
-                                            </span>
-                                          ) : (
-                                            <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-md shadow-2xs whitespace-nowrap">
-                                              บุคคลทั่วไป
-                                            </span>
-                                          )}
-
-                                          {(() => {
-                                            let fmt = att.selectedFormat || att.attendanceType || att.format || att.selectedPackage;
-                                            if (fmt === 'both') fmt = att.attendanceType || 'onsite';
-                                            const editable = selectedSlip.isGroupConference && canEditFormat(selectedSlip);
-                                            if (!fmt && !editable) return null;
-                                            if (!editable) {
-                                              return (
-                                                <span className="text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs whitespace-nowrap">
-                                                  {fmt}
-                                                </span>
-                                              );
-                                            }
-                                            const attFormat: 'onsite' | 'online' = fmt === 'online' ? 'online' : 'onsite';
-                                            return (
-                                              <button
-                                                type="button"
-                                                onClick={() => openFormatEdit(selectedSlip, attFormat, idx, attName)}
-                                                title={lang === 'th' ? 'แก้ไขรูปแบบการเข้าร่วม' : 'Edit attendance format'}
-                                                className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border shadow-2xs whitespace-nowrap transition cursor-pointer ${attFormat === 'online'
-                                                  ? 'bg-violet-50 text-violet-800 border-violet-200 hover:bg-violet-100'
-                                                  : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                                                  }`}
-                                              >
-                                                {attFormat === 'online'
-                                                  ? (lang === 'th' ? 'ออนไลน์' : 'Online')
-                                                  : (lang === 'th' ? 'ออนไซต์' : 'Onsite')}
-                                                <Pencil className="w-2.5 h-2.5" />
-                                              </button>
-                                            );
-                                          })()}
-                                        </div>
-
-                                        {/* Actions on Top Right: edit / remove (admin) + view all */}
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                        {canEditGroupAttendees(selectedSlip) && !isAddOnAttendee && (
-                                          <>
-                                            <button
-                                              type="button"
-                                              onClick={() => openAttendeeEditor(selectedSlip, 'update', idx, att)}
-                                              className="p-1.5 sm:p-2 rounded-xl bg-white hover:bg-sky-50 text-slate-500 hover:text-[#0026b3] border border-slate-200 hover:border-sky-300 shadow-2xs transition active:scale-95 cursor-pointer"
-                                              title={lang === 'th' ? 'แก้ไขข้อมูลผู้ลงทะเบียน' : 'Edit attendee'}
-                                            >
-                                              <Pencil className="w-3.5 h-3.5" />
-                                            </button>
-                                            {totalAttendees.length > 1 && (
-                                              <button
-                                                type="button"
-                                                onClick={() => openAttendeeEditor(selectedSlip, 'delete', idx, att)}
-                                                className="p-1.5 sm:p-2 rounded-xl bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-300 shadow-2xs transition active:scale-95 cursor-pointer"
-                                                title={lang === 'th' ? 'นำออกจากรายการ' : 'Remove attendee'}
-                                              >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                              </button>
-                                            )}
-                                          </>
-                                        )}
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            setViewingAttendee({
-                                              ...att,
-                                              mobile: att.mobile || att.phone || att.tel || '',
-                                              phone: att.phone || att.mobile || att.tel || '',
-                                              meetingName: selectedSlip.meetingName,
-                                              companyName: selectedSlip.companyName || selectedSlip.groupPayload.companyName,
-                                              ticketCode: selectedSlip.ticketCode,
-                                              submittedAt: selectedSlip.createdAt,
-                                              couponCode: selectedSlip.couponCode || selectedSlip.couponInfo?.code,
-                                              couponInfo: selectedSlip.couponInfo,
-                                              attDiscount,
-                                              hasDiscount,
-                                              originalPrice,
-                                              netPrice,
-                                            })
-                                          }
-                                          className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-bold text-[11px] sm:text-xs shadow-2xs transition active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
-                                          title="ดูรายละเอียดข้อมูลผู้ลงทะเบียน"
-                                        >
-                                          <Eye className="w-3.5 h-3.5 text-[#0026b3]" />
-                                          <span>{lang === 'th' ? 'ดูทั้งหมด' : 'View'}</span>
-                                        </button>
-                                        </div>
-                                      </div>
-
-                                      {/* Row 2: English Name Below Thai Name */}
-                                      {att.nameEn && att.nameTh && (
-                                        <div className="pl-6 sm:pl-7 -mt-1">
-                                          <span className="text-xs text-slate-500 font-medium">({att.nameEn})</span>
-                                        </div>
-                                      )}
-
-                                      {/* Row 3: Contact & Price (Responsive Row) */}
-                                      <div className="pl-6 sm:pl-7 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-slate-500 pt-0.5">
-                                        <div className="flex items-center gap-2 flex-wrap min-w-0">
-                                          <span className="text-sky-700 font-mono font-medium break-all">
-                                            {att.email || att.mobile || '-'}
-                                          </span>
-                                          {att.workplace && att.workplace !== selectedSlip.companyName && (
-                                            <span className="truncate max-w-[200px]">🏢 {att.workplace}</span>
-                                          )}
-                                          {att.dietaryPreference && (
-                                            <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 whitespace-nowrap">
-                                              🍽️ {att.dietaryPreference}
-                                            </span>
-                                          )}
-                                        </div>
-
-                                        {originalPrice > 0 ? (
-                                          <div className="flex items-center gap-1.5 font-mono text-xs shrink-0">
-                                            {hasDiscount && attDiscount > 0 ? (
-                                              <>
-                                                <span className="line-through text-slate-400 text-[11px]">
-                                                  ฿{originalPrice.toLocaleString()}
-                                                </span>
-                                                <span className="font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                                                  ฿{Number(netPrice).toLocaleString()}
-                                                </span>
-                                              </>
-                                            ) : (
-                                              <span className="font-bold text-slate-800">
-                                                ฿{originalPrice.toLocaleString()}
-                                              </span>
+                                          <div className="min-w-0">
+                                            <div className="text-sm font-extrabold text-slate-900 leading-snug break-words">{attName}</div>
+                                            {att.nameEn && att.nameTh && (
+                                              <div className="text-[11px] text-slate-500 font-medium leading-snug break-words">{att.nameEn}</div>
                                             )}
                                           </div>
-                                        ) : null}
+                                        </div>
+
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                          {canEditGroupAttendees(selectedSlip) && !isAddOnAttendee && (
+                                            <>
+                                              <button
+                                                type="button"
+                                                onClick={() => openAttendeeEditor(selectedSlip, 'update', idx, att)}
+                                                className="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-white hover:bg-sky-50 text-slate-500 hover:text-[#0026b3] border border-slate-200 hover:border-sky-300 transition cursor-pointer"
+                                                title={lang === 'th' ? 'แก้ไขข้อมูลผู้ลงทะเบียน' : 'Edit attendee'}
+                                              >
+                                                <Pencil className="w-3.5 h-3.5" />
+                                              </button>
+                                              {totalAttendees.length > 1 && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => openAttendeeEditor(selectedSlip, 'delete', idx, att)}
+                                                  className="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-300 transition cursor-pointer"
+                                                  title={lang === 'th' ? 'นำออกจากรายการ' : 'Remove attendee'}
+                                                >
+                                                  <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                              )}
+                                            </>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setViewingAttendee({
+                                                ...att,
+                                                mobile: att.mobile || att.phone || att.tel || '',
+                                                phone: att.phone || att.mobile || att.tel || '',
+                                                meetingName: selectedSlip.meetingName,
+                                                companyName: selectedSlip.companyName || selectedSlip.groupPayload.companyName,
+                                                ticketCode: selectedSlip.ticketCode,
+                                                submittedAt: selectedSlip.createdAt,
+                                                couponCode: selectedSlip.couponCode || selectedSlip.couponInfo?.code,
+                                                couponInfo: selectedSlip.couponInfo,
+                                                attDiscount,
+                                                hasDiscount,
+                                                originalPrice,
+                                                netPrice,
+                                              })
+                                            }
+                                            className="h-8 inline-flex items-center gap-1.5 px-2.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-bold text-[11px] transition cursor-pointer whitespace-nowrap"
+                                            title="ดูรายละเอียดข้อมูลผู้ลงทะเบียน"
+                                          >
+                                            <Eye className="w-3.5 h-3.5 text-[#0026b3]" />
+                                            <span>{lang === 'th' ? 'ดูทั้งหมด' : 'View'}</span>
+                                          </button>
+                                        </div>
                                       </div>
 
-                                      {/* Row 4: Individual Activities / Programs with Discounted Prices directly (ข้อ 3) */}
-                                      {attActivities.length > 0 && (
-                                        <div className="pl-6 sm:pl-7 pt-1.5 space-y-1">
-                                          <span className="text-[10px] text-slate-400 font-bold block">
-                                            {lang === 'th' ? 'หลักสูตร / กิจกรรมที่ลงทะเบียน:' : 'Registered Courses & Activities:'}
+                                      {/* แถว 2: ป้ายสถานะเรียงแถวเดียว */}
+                                      <div className="pl-8 flex flex-wrap items-center gap-1.5">
+                                        {isAttMember ? (
+                                          <span className="text-[10px] font-bold bg-blue-50 text-[#0026b3] border border-blue-200 px-2 py-0.5 rounded-md whitespace-nowrap">
+                                            {att.memberNo ? `สมาชิก #${att.memberNo}` : 'สมาชิกสมาคม'}
                                           </span>
-                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                        ) : (
+                                          <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-md whitespace-nowrap">
+                                            บุคคลทั่วไป
+                                          </span>
+                                        )}
+
+                                        {isFellowSlip(selectedSlip, att) && (
+                                          <span className="text-[10px] font-black bg-violet-600 text-white px-2 py-0.5 rounded-md whitespace-nowrap">
+                                            Fellow
+                                          </span>
+                                        )}
+
+                                        {(() => {
+                                          let fmt = att.selectedFormat || att.attendanceType || att.format || att.selectedPackage;
+                                          if (fmt === 'both') fmt = att.attendanceType || 'onsite';
+                                          const editable = selectedSlip.isGroupConference && canEditFormat(selectedSlip);
+                                          if (!fmt && !editable) return null;
+                                          const attFormat: 'onsite' | 'online' = fmt === 'online' ? 'online' : 'onsite';
+                                          const label = attFormat === 'online' ? (lang === 'th' ? 'ออนไลน์' : 'Online') : (lang === 'th' ? 'ออนไซต์' : 'Onsite');
+                                          const cls = `inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${attFormat === 'online' ? 'bg-violet-50 text-violet-800 border-violet-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`;
+                                          if (!editable) {
+                                            return (
+                                              <span className={cls}>
+                                                {attFormat === 'online' ? <Monitor className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+                                                {label}
+                                              </span>
+                                            );
+                                          }
+                                          return (
+                                            <button
+                                              type="button"
+                                              onClick={() => openFormatEdit(selectedSlip, attFormat, idx, attName)}
+                                              title={lang === 'th' ? 'แก้ไขรูปแบบการเข้าร่วม' : 'Edit attendance format'}
+                                              className={`${cls} cursor-pointer hover:brightness-95`}
+                                            >
+                                              {attFormat === 'online' ? <Monitor className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+                                              {label}
+                                              <Pencil className="w-2.5 h-2.5 opacity-60" />
+                                            </button>
+                                          );
+                                        })()}
+
+                                        {isAddOnAttendee && (
+                                          <span
+                                            className="text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md whitespace-nowrap"
+                                            title={Array.isArray(att.registeredActivities) ? `ลงทะเบียนไว้แล้ว: ${att.registeredActivities.map((r: any) => r.name).join(', ')}` : undefined}
+                                          >
+                                            {`ลงเพิ่ม${att.addOnOriginalTicketCode ? ` · รายการเดิม ${att.addOnOriginalTicketCode}` : ''}`}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {/* แถว 3: ข้อมูลติดต่อ */}
+                                      <div className="pl-8 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                                        <span className="inline-flex items-center gap-1 text-sky-700 font-mono font-medium break-all">
+                                          <Mail className="w-3 h-3 shrink-0 text-slate-400" />
+                                          {att.email || att.mobile || '-'}
+                                        </span>
+                                        {att.workplace && att.workplace !== selectedSlip.companyName && (
+                                          <span className="inline-flex items-center gap-1 min-w-0">
+                                            <Building2 className="w-3 h-3 shrink-0 text-slate-400" />
+                                            <span className="truncate max-w-[220px]">{att.workplace}</span>
+                                          </span>
+                                        )}
+                                        {att.dietaryPreference && (
+                                          <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 whitespace-nowrap">
+                                            {att.dietaryPreference}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {/* แถว 4: รายการที่ลงทะเบียน และยอดเงิน */}
+                                      {(attActivities.length > 0 || originalPrice > 0) && (
+                                        <div className="ml-8 pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+                                          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                                             {attActivities.map((act, actIdx) => {
                                               const isMainProgram = act.name.toLowerCase().includes('main') ||
                                                 act.name.includes('การประชุมหลัก') ||
                                                 act.name.includes('Main Program');
                                               const isActDiscounted = hasDiscount && isMainProgram;
-                                              const rawActPrice = Number(act.price) || (isMainProgram ? MAIN_PROGRAM_PRICE : 0);
-                                              const discountedActPrice = isActDiscounted ? Math.max(0, rawActPrice - Math.min(attDiscount, rawActPrice)) : rawActPrice;
-
                                               return (
                                                 <span
                                                   key={actIdx}
-                                                  className={`text-[10px] font-bold border px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-2xs ${isActDiscounted
-                                                      ? 'bg-emerald-50 text-emerald-950 border-emerald-300 ring-1 ring-emerald-400/20'
+                                                  className={`text-[10px] font-bold border px-2 py-1 rounded-lg inline-flex items-center gap-1.5 ${isActDiscounted
+                                                      ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
                                                       : 'bg-sky-50 text-[#0026b3] border-sky-200'
                                                     }`}
                                                 >
-                                                  <BookOpen className={`w-3 h-3 shrink-0 ${isActDiscounted ? 'text-emerald-600' : 'text-[#0026b3]'}`} />
-                                                  <span className="truncate max-w-[200px]">{act.name}</span>
-                                                  {isActDiscounted ? (
-                                                    <span className="font-mono font-extrabold flex items-center gap-1 shrink-0 whitespace-nowrap">
-                                                      {rawActPrice > 0 && (
-                                                        <span className="line-through text-slate-400 font-normal">
-                                                          ฿{rawActPrice.toLocaleString()}
-                                                        </span>
-                                                      )}
-                                                      <span className="text-emerald-700 font-black">
-                                                        {discountedActPrice === 0 ? '฿0' : `฿${discountedActPrice.toLocaleString()}`}
-                                                      </span>
-                                                    </span>
-                                                  ) : rawActPrice > 0 ? (
-                                                    <span className="font-mono text-sky-800 font-black shrink-0 whitespace-nowrap">
-                                                      (฿{rawActPrice.toLocaleString()})
-                                                    </span>
-                                                  ) : null}
+                                                  <BookOpen className="w-3 h-3 shrink-0" />
+                                                  <span className="truncate max-w-[220px]">{act.name}</span>
                                                 </span>
                                               );
                                             })}
                                           </div>
+                                          {originalPrice > 0 && (
+                                            <div className="flex items-baseline gap-1.5 font-mono shrink-0 sm:ml-auto">
+                                              {hasDiscount && attDiscount > 0 && (
+                                                <span className="line-through text-slate-400 text-[11px]">฿{originalPrice.toLocaleString()}</span>
+                                              )}
+                                              <span className={`text-sm font-black ${hasDiscount ? 'text-emerald-700' : 'text-slate-900'}`}>
+                                                ฿{Number(hasDiscount ? netPrice : originalPrice).toLocaleString()}
+                                              </span>
+                                            </div>
+                                          )}
                                         </div>
                                       )}
                                     </div>

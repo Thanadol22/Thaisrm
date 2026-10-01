@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
-import { buildSpecialFormMeeting, parseSpecialFormItems } from '@/lib/services/specialFormService';
+import { buildSpecialFormMeeting, resolveSpecialFormItems } from '@/lib/services/specialFormService';
 import { parseSlipPayload } from '@/lib/services/registrationAddOnService';
 import {
   countSlipSeatClaims,
@@ -93,9 +93,9 @@ async function withSpecialFormPricing<T extends { activities: unknown; pricing_t
 ): Promise<T> {
   const formId = payload && !Array.isArray(payload) ? payload.specialFormId : null;
   if (!meeting || !formId) return meeting;
-  const form = await prisma.special_forms.findUnique({ where: { id: String(formId) }, select: { items: true } });
+  const form = await prisma.special_forms.findUnique({ where: { id: String(formId) }, select: { items: true, form_type: true } });
   if (!form) return meeting;
-  return buildSpecialFormMeeting(meeting, parseSpecialFormItems(form.items)) as T;
+  return buildSpecialFormMeeting(meeting, resolveSpecialFormItems(form, meeting)) as T;
 }
 
 /** ราคาตั้งต้นของกิจกรรมตามสถานะสมาชิกและรูปแบบการเข้าร่วม (ตรงกับหน้าชำระเงิน) */

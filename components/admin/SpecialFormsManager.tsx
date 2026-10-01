@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Btn, EmptyState, SectionTitle } from './ui';
 import {
   Building2,
   Check,
@@ -63,18 +64,34 @@ const FORM_TYPE_OPTIONS = [
 
 const isMain = (a: any) => a?.type === 'main' || a?.id === 'main';
 
+/** ราคา fellow ที่ตั้งไว้ในการประชุม (ตรงกับ getMeetingFellowPrices ฝั่งเซิร์ฟเวอร์) */
+function meetingFellowPrices(meeting: MeetingItem | undefined) {
+  const f = (meeting?.pricingTiers as any)?.fellow;
+  if (!f || f.enabled === false) return null;
+  const prices = {
+    onsiteMember: Math.max(0, Number(f.onsiteMember) || 0),
+    onsiteNonMember: Math.max(0, Number(f.onsiteNonMember) || 0),
+    online: Math.max(0, Number(f.onlineMember) || 0),
+  };
+  return prices.onsiteMember + prices.onsiteNonMember + prices.online > 0 ? prices : null;
+}
+
 /** ราคาเริ่มต้นของรายการ: fellow ใช้ราคา fellow ที่ตั้งไว้ในการประชุม (ถ้ามี) ที่เหลือใช้ราคาปกติ */
 function defaultItem(act: any, meeting: MeetingItem | undefined, formType: string): FormItemInput {
   const tiers = (meeting?.pricingTiers || {}) as any;
   if (isMain(act)) {
-    const fellow = formType === 'fellow' ? tiers.fellow : null;
+    const f = formType === 'fellow' ? tiers.fellow : null;
+    const fellow =
+      f && Number(f.onsiteMember || 0) + Number(f.onsiteNonMember || 0) + Number(f.onlineMember ?? f.onlineMemberPrice ?? 0) > 0 ? f : null;
     const p = tiers.participant || {};
     return {
       activityId: String(act.id),
       label: act.name || 'Main Program',
       onsiteMember: Number(fellow?.onsiteMember ?? p.onsiteMember ?? 0),
       onsiteNonMember: Number(fellow?.onsiteNonMember ?? p.onsiteNonMember ?? 0),
-      online: Number(fellow ? (fellow.onlineMemberType === 'free' ? 0 : fellow.onlineMemberPrice ?? 0) : p.onlineMember ?? 0),
+      online: Number(
+        fellow ? fellow.onlineMember ?? (fellow.onlineMemberType === 'free' ? 0 : fellow.onlineMemberPrice ?? 0) : p.onlineMember ?? 0
+      ),
     };
   }
   return {
@@ -272,35 +289,30 @@ export function SpecialFormsManager({
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl border bg-lime-50 text-lime-700 border-lime-100">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
-              ฟอร์มเฉพาะราคาพิเศษ <span className="text-slate-400 font-bold">({forms?.length ?? 0})</span>
-            </h3>
-            <p className="text-xs text-slate-500">ตั้งรายการและราคาเอง เลือกบริษัทที่เข้าได้ แล้วส่งลิงก์ให้บริษัท</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#0026b3] hover:bg-[#001c8c] text-white text-sm font-bold cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          สร้างฟอร์มเฉพาะ
-        </button>
-      </div>
+      <SectionTitle
+        icon={Sparkles}
+        tone="green"
+        title="ฟอร์มเฉพาะราคาพิเศษ"
+        count={forms?.length ?? 0}
+        description="ตั้งรายการและราคาเอง เลือกบริษัทที่เข้าได้ แล้วส่งลิงก์ให้บริษัท"
+        actions={
+          <Btn variant="primary" icon={Plus} onClick={openCreate}>
+            สร้างฟอร์มเฉพาะ
+          </Btn>
+        }
+      />
 
       {forms === null ? (
         <div className="flex justify-center py-8">
           <Loader2 className="w-6 h-6 text-[#0026b3] animate-spin" />
         </div>
       ) : forms.length === 0 ? (
-        <div className="border border-dashed border-slate-300 rounded-2xl p-6 text-center text-sm text-slate-500 bg-white">
-          ยังไม่มีฟอร์มเฉพาะ กดสร้างฟอร์มเฉพาะเพื่อเริ่มต้น
+        <div className="border border-dashed border-slate-300 rounded-2xl bg-white">
+          <EmptyState
+            icon={Sparkles}
+            title="ยังไม่มีฟอร์มเฉพาะ"
+            description="สร้างฟอร์มที่ตั้งราคาเองสำหรับบริษัทที่เลือก แล้วส่งลิงก์ให้บริษัทลงทะเบียน"
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -480,6 +492,7 @@ function DraftModal({
   const [sponsorQuery, setSponsorQuery] = useState('');
   const meeting = meetings.find((m) => m.id === draft.meetingId);
   const acts: any[] = meeting?.activities || [];
+  const boundFellow = draft.formType === 'fellow' ? meetingFellowPrices(meeting) : null;
   const update = (patch: Partial<DraftForm>) => setDraft((d) => (d ? { ...d, ...patch } : d));
   const updateItem = (id: string, patch: Partial<FormItemInput & { enabled: boolean }>) =>
     setDraft((d) => (d ? { ...d, items: { ...d.items, [id]: { ...d.items[id], ...patch } } } : d));
@@ -568,6 +581,8 @@ function DraftModal({
                   const item = draft.items[id];
                   if (!item) return null;
                   const onlineCapable = isMain(act) && (act.format || 'both') !== 'onsite';
+                  const bound = isMain(act) ? boundFellow : null;
+                  const shown = bound ? { ...item, ...bound } : item;
                   return (
                     <div key={id} className={`rounded-xl border p-3 space-y-2 ${item.enabled ? 'border-[#0026b3]/40 bg-blue-50/30' : 'border-slate-200 bg-slate-50/50'}`}>
                       <label className="flex items-center gap-2 cursor-pointer">
@@ -586,24 +601,29 @@ function DraftModal({
                           </label>
                           <label className="space-y-1">
                             <span className="text-[11px] font-bold text-slate-500">สมาชิก ออนไซต์</span>
-                            <input type="number" min={0} className={priceCls} value={item.onsiteMember} onChange={(e) => updateItem(id, { onsiteMember: Number(e.target.value) })} />
+                            <input type="number" min={0} className={`${priceCls} disabled:bg-violet-50 disabled:text-violet-800`} value={shown.onsiteMember} disabled={!!bound} onChange={(e) => updateItem(id, { onsiteMember: Number(e.target.value) })} />
                           </label>
                           <label className="space-y-1">
                             <span className="text-[11px] font-bold text-slate-500">บุคคลทั่วไป ออนไซต์</span>
-                            <input type="number" min={0} className={priceCls} value={item.onsiteNonMember} onChange={(e) => updateItem(id, { onsiteNonMember: Number(e.target.value) })} />
+                            <input type="number" min={0} className={`${priceCls} disabled:bg-violet-50 disabled:text-violet-800`} value={shown.onsiteNonMember} disabled={!!bound} onChange={(e) => updateItem(id, { onsiteNonMember: Number(e.target.value) })} />
                           </label>
                           <label className="space-y-1">
                             <span className="text-[11px] font-bold text-slate-500">สมาชิก ออนไลน์</span>
                             <input
                               type="number"
                               min={0}
-                              disabled={!onlineCapable}
+                              disabled={!onlineCapable || !!bound}
                               className={`${priceCls} disabled:bg-slate-100 disabled:text-slate-400`}
-                              value={onlineCapable ? item.online : 0}
+                              value={onlineCapable ? shown.online : 0}
                               onChange={(e) => updateItem(id, { online: Number(e.target.value) })}
                             />
                           </label>
                         </div>
+                      )}
+                      {item.enabled && bound && (
+                        <p className="text-[11px] font-semibold text-violet-700">
+                          ราคาการประชุมหลักผูกกับราคา Fellow ของการประชุมนี้ แก้ราคาได้ที่หน้าแก้ไขการประชุม
+                        </p>
                       )}
                     </div>
                   );

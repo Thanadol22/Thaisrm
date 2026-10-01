@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { AdminPageHeader, HeaderButton } from './AdminPageHeader';
+import { Btn, StatGrid, StatCard, Toolbar, ToolbarGroup, SearchInput, Segmented, FilterSelect } from './ui';
 import { MeetingItem, SlipItem, AttendeeItem } from './types';
 import { RevenueAnalyticsDeck } from './RevenueAnalyticsDeck';
 import {
@@ -18,7 +20,6 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
-  Search,
   X,
   Receipt,
   RotateCcw,
@@ -499,374 +500,159 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
-      {/* ─── 1. HEADER & ACTIONS ─── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[#0026b3] text-xs font-bold">
-            <DollarSign className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
-            <span className="truncate">รายงานการเงินและรายได้ค่าลงทะเบียน</span>
-          </div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900 tracking-tight">
-            รายงานรายได้จากการลงทะเบียน
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-600">
-            วิเคราะห์รายได้ ยอดชำระเงิน และสถิติทางการเงินทุกหลักสูตรและรอบการประชุม
-          </p>
-        </div>
+      <AdminPageHeader
+        tab="revenue-report"
+        title="รายงานรายได้จากการลงทะเบียน"
+        description="วิเคราะห์รายได้ ยอดชำระเงิน และสถิติทางการเงินทุกหลักสูตรและรอบการประชุม"
+        actions={
+          <>
+            <HeaderButton icon={FileSpreadsheet} onClick={handleExportFinancialExcel}>
+              ส่งออกข้อมูล Excel
+            </HeaderButton>
+          </>
+        }
+      />
 
-        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-          {/* Active Scope Badge */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200 max-w-full">
-            <Layers className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
-            <span className="truncate max-w-[180px] sm:max-w-[260px]">
-              {selectedMeetingId === 'all'
-                ? `รวมทุกรอบ (${filteredMeetings.length} โครงการ)`
-                : currentMeeting?.titleTh}
-            </span>
-          </div>
-
-          <button
-            onClick={handleExportFinancialExcel}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs sm:text-sm font-bold shadow-xs transition cursor-pointer"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span className="whitespace-nowrap">ส่งออกข้อมูล Excel</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ─── 2. 5 CORE FINANCIAL KPI SCORECARDS ─── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
-        {/* Card 1: Approved Net Revenue (Hero Card) */}
-        <div className="bg-gradient-to-br from-blue-50/70 via-white to-indigo-50/40 border border-[#0026b3]/30 rounded-2xl p-4 sm:p-5 shadow-xs relative overflow-hidden flex flex-col justify-between">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-[#0026b3]/5 rounded-full blur-xl pointer-events-none" />
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-500">
-                {selectedMeetingId === 'all' ? 'ยอดรายได้สุทธิรวม' : 'ยอดรายได้รอบนี้'}
-              </span>
-              <div className="p-2 rounded-xl bg-[#0026b3] text-white shadow-2xs">
-                <DollarSign className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xs font-extrabold text-[#0026b3]">฿</span>
-              <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                {displayRevenue.toLocaleString()}
+      {/* ─── 2. ตัวกรองและรอบการประชุม (กำหนดขอบเขตตัวเลขทั้งหน้า) ─── */}
+      <Toolbar
+        bottom={
+          <div className="flex flex-col md:flex-row md:items-center gap-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-600 shrink-0">
+              <Layers className="w-4 h-4 text-[#0026b3]" />
+              <span>รอบการประชุม</span>
+              <span className="text-[11px] font-semibold text-slate-400">
+                ({filteredMeetings.length} จาก {meetings.length})
               </span>
             </div>
+            <div className="relative flex-1 min-w-0">
+              <CalendarDays className="w-4 h-4 text-[#0026b3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <select
+                  id="revenue-meeting-select"
+                  value={selectedMeetingId}
+                  onChange={(e) => setSelectedMeetingId(e.target.value)}
+                  className="w-full appearance-none bg-slate-50 hover:bg-slate-100/80 border border-slate-200 text-slate-800 text-xs sm:text-sm font-bold rounded-xl pl-10 pr-10 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition cursor-pointer shadow-2xs truncate"
+                >
+                  <option value="all">
+                    🌐 รวมทุกรอบที่กรอง — ฿
+                    {grandTotalRevenue >= 1000000
+                      ? `${(grandTotalRevenue / 1000000).toFixed(2)}M`
+                      : grandTotalRevenue.toLocaleString()}
+                  </option>
+                  {filteredMeetings.map((m) => {
+                    const mRev = getMeetingRevenue(m);
+                    return (
+                      <option key={m.id} value={m.id}>
+                        📅 {m.titleTh} ({m.id}) — ฿
+                        {mRev >= 1000000 ? `${(mRev / 1000000).toFixed(2)}M` : mRev.toLocaleString()}
+                      </option>
+                    );
+                  })}
+                </select>
+              <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+            {selectedMeetingId !== 'all' && (
+              <Btn variant="ghost" icon={X} onClick={() => setSelectedMeetingId('all')}>
+                ดูภาพรวมทุกรอบ
+              </Btn>
+            )}
           </div>
+        }
+      >
+        <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="ค้นหาชื่อการประชุม, สถานที่, หรือรหัสโครงการ..." />
+        <ToolbarGroup>
+          <Segmented
+            value={filterType}
+            onChange={setFilterType}
+            options={[
+              { id: 'all', label: 'ทุกรูปแบบ' },
+              { id: 'hybrid', label: 'Hybrid' },
+              { id: 'onsite', label: 'Onsite' },
+              { id: 'online', label: 'Online' },
+            ]}
+          />
+          <FilterSelect
+            label="สถานะโครงการ"
+            value={filterStatus}
+            onChange={(v) => setFilterStatus(v as typeof filterStatus)}
+            options={[
+              { value: 'all', label: 'ทุกสถานะโครงการ' },
+              { value: 'ongoing', label: 'กำลังจัดงาน' },
+              { value: 'upcoming', label: 'รอเริ่มงาน' },
+              { value: 'completed', label: 'เสร็จสิ้นแล้ว' },
+            ]}
+          />
+          {hasActiveFilters && (
+            <Btn variant="ghost" icon={RotateCcw} onClick={resetAllFilters}>
+              ล้างตัวกรอง
+            </Btn>
+          )}
+        </ToolbarGroup>
+      </Toolbar>
+
+      {/* ─── 3. ตัวเลขการเงินหลัก ─── */}
+      <StatGrid cols={5}>
+        <StatCard
+          label={selectedMeetingId === 'all' ? 'รายได้สุทธิรวม' : 'รายได้รอบนี้'}
+          value={`฿${displayRevenue.toLocaleString()}`}
+          icon={DollarSign}
+          tone="blue"
+          active
+          hint={selectedMeetingId === 'all' ? `จาก ${filteredMeetings.length} รอบการประชุม` : currentMeeting?.id}
+        >
           {(() => {
-            const curBar =
-              selectedMeetingId !== 'all'
-                ? courseBarChartData.find((c) => c.id === selectedMeetingId)
-                : null;
-            if (curBar && (curBar.approvedMainRevenue > 0 || curBar.approvedWorkshopRevenue > 0)) {
-              return (
-                <div className="flex items-center gap-1.5 text-[10px] font-bold mt-2 pt-2 border-t border-slate-100 flex-wrap">
-                  {curBar.approvedMainRevenue > 0 && (
-                    <span className="text-[#0026b3] bg-blue-100/70 px-1.5 py-0.5 rounded border border-blue-200 truncate">
-                      Main: ฿{curBar.approvedMainRevenue.toLocaleString()}
-                    </span>
-                  )}
-                  {curBar.approvedWorkshopRevenue > 0 && (
-                    <span className="text-emerald-800 bg-emerald-100/70 px-1.5 py-0.5 rounded border border-emerald-200 truncate">
-                      WS: ฿{curBar.approvedWorkshopRevenue.toLocaleString()}
-                    </span>
-                  )}
-                </div>
-              );
-            }
+            const curBar = selectedMeetingId !== 'all' ? courseBarChartData.find((c) => c.id === selectedMeetingId) : null;
+            if (!curBar || (curBar.approvedMainRevenue <= 0 && curBar.approvedWorkshopRevenue <= 0)) return null;
             return (
-              <div className="text-[11px] text-slate-500 font-medium pt-2 border-t border-slate-100/80 truncate mt-2">
-                {selectedMeetingId === 'all' ? `จาก ${meetings.length} รอบการประชุม` : currentMeeting?.id}
+              <div className="flex items-center gap-1.5 text-[10px] font-bold mt-2 flex-wrap">
+                {curBar.approvedMainRevenue > 0 && (
+                  <span className="text-[#0026b3] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 truncate">
+                    Main ฿{curBar.approvedMainRevenue.toLocaleString()}
+                  </span>
+                )}
+                {curBar.approvedWorkshopRevenue > 0 && (
+                  <span className="text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 truncate">
+                    Workshop ฿{curBar.approvedWorkshopRevenue.toLocaleString()}
+                  </span>
+                )}
               </div>
             );
           })()}
-        </div>
-
-        {/* Card 2: Verified Slips */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-500">สลิปที่อนุมัติแล้ว</span>
-            <div className="p-2 rounded-xl bg-blue-50 text-[#0026b3] border border-blue-100">
-              <Users className="w-4 h-4" />
-            </div>
+        </StatCard>
+        <StatCard
+          label="สลิปที่อนุมัติแล้ว"
+          value={displayPaidCount.toLocaleString()}
+          unit="รายการ"
+          hint="ชำระเงินเรียบร้อย"
+          icon={CheckCircle2}
+          tone="green"
+        />
+        <StatCard
+          label="ค่าเฉลี่ยต่อรายการ"
+          value={`฿${avgPerPerson.toLocaleString()}`}
+          hint="คำนวณจากยอดสลิปจริง"
+          icon={TrendingUp}
+          tone="violet"
+        />
+        <StatCard
+          label="ยอดเงินรอตรวจสลิป"
+          value={`฿${pendingAmount.toLocaleString()}`}
+          hint={`${pendingCount} รายการรอตรวจสอบ`}
+          icon={Clock}
+          tone="amber"
+          onClick={pendingCount > 0 ? showPendingTransactions : undefined}
+        />
+        <StatCard
+          label="อัตราการจัดเก็บ"
+          value={`${collectionRate}%`}
+          hint={`ยอดเข้ารวม ฿${totalInflow.toLocaleString()}`}
+          icon={BadgePercent}
+          tone="green"
+        >
+          <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden mt-2">
+            <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${collectionRate}%` }} />
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {displayPaidCount.toLocaleString()}
-            </span>
-            <span className="text-xs font-medium text-slate-500">รายการ</span>
-          </div>
-          <div className="text-[11px] text-emerald-800 font-bold pt-2 border-t border-slate-100 flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <span>สถานะชำระเงินเรียบร้อย 100%</span>
-          </div>
-        </div>
-
-        {/* Card 3: Avg per Attendee */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-500">ค่าเฉลี่ยต่อผู้สมัคร</span>
-            <div className="p-2 rounded-xl bg-blue-50 text-[#0026b3] border border-blue-100">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-xs font-extrabold text-[#0026b3]">฿</span>
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {avgPerPerson.toLocaleString()}
-            </span>
-            <span className="text-[11px] text-slate-500 font-normal">/ รายการ</span>
-          </div>
-          <div className="text-[11px] text-slate-500 pt-2 border-t border-slate-100 font-medium truncate">
-            คำนวณจากยอดสลิปจริงในระบบ
-          </div>
-        </div>
-
-        {/* Card 4: Pending Inflow */}
-        <div className="bg-white border border-amber-200/90 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between space-y-2 bg-amber-50/20">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-amber-800">ยอดเงินรอตรวจสลิป</span>
-            <div className="p-2 rounded-xl bg-amber-100 text-amber-800 border border-amber-200">
-              <Receipt className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-xs font-extrabold text-amber-800">฿</span>
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {pendingAmount.toLocaleString()}
-            </span>
-          </div>
-          <div className="text-[11px] text-amber-800 font-bold pt-2 border-t border-amber-200/60 flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-            <span>จำนวน {pendingCount} รายการรอตรวจสอบ</span>
-          </div>
-        </div>
-
-        {/* Card 5: Collection Rate & Total Inflow */}
-        <div className="bg-white border border-emerald-200/90 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between space-y-2 bg-emerald-50/20 sm:col-span-2 lg:col-span-1">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-emerald-800">
-              อัตราการจัดเก็บสำเร็จ
-            </span>
-            <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-200">
-              <BadgePercent className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-black text-emerald-800 tracking-tight">
-              {collectionRate}%
-            </span>
-            <span className="text-[11px] text-slate-500 font-medium">สำเร็จ</span>
-          </div>
-          <div className="pt-2 border-t border-emerald-200/60 space-y-1">
-            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-              <div
-                className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                style={{ width: `${collectionRate}%` }}
-              />
-            </div>
-            <div className="text-[10px] text-slate-500 font-medium flex justify-between">
-              <span>รวมยอดเข้า:</span>
-              <span className="font-bold text-slate-700">฿{totalInflow.toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── 3. SMART CONTROL & FILTER BAR ─── */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3.5">
-        {/* Row 1: Search, Format Pills, Status Dropdown & Reset */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          {/* Search Box */}
-          <div className="relative flex-1 w-full min-w-0">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ค้นหาชื่อการประชุม, สถานที่, หรือรหัสโครงการ..."
-              className="w-full pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-200 transition"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Quick Filters Group */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-            {/* Format Filter (Pills) */}
-            <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/70 text-xs font-bold overflow-x-auto max-w-full">
-              <button
-                type="button"
-                onClick={() => setFilterType('all')}
-                className={`px-2.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
-                  filterType === 'all' ? 'bg-[#0026b3] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                ทุกรูปแบบ
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterType('hybrid')}
-                className={`px-2.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
-                  filterType === 'hybrid'
-                    ? 'bg-[#0026b3] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Hybrid
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterType('onsite')}
-                className={`px-2.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
-                  filterType === 'onsite'
-                    ? 'bg-[#0026b3] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Onsite
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterType('online')}
-                className={`px-2.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
-                  filterType === 'online'
-                    ? 'bg-[#0026b3] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Online
-              </button>
-            </div>
-
-            {/* Status Dropdown Filter */}
-            <div className="relative flex-1 sm:flex-none">
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as any)}
-                className="w-full sm:w-auto appearance-none bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl pl-3 pr-8 py-2 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition cursor-pointer"
-              >
-                <option value="all">ทุกสถานะโครงการ</option>
-                <option value="ongoing">กำลังจัดงาน / เปิดรับ</option>
-                <option value="upcoming">รอเริ่มงาน</option>
-                <option value="completed">เสร็จสิ้นแล้ว</option>
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-
-            {/* Reset All Filters Button */}
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={resetAllFilters}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-xs font-bold transition cursor-pointer whitespace-nowrap"
-              >
-                <RotateCcw className="w-3.5 h-3.5 shrink-0" />
-                <span>ล้างตัวกรอง</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Row 2: Meeting Round Dropdown Selector */}
-        <div className="pt-3 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex-1 w-full min-w-0">
-            <label
-              htmlFor="revenue-meeting-select"
-              className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between mb-1.5"
-            >
-              <div className="flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
-                <span>เลือกรอบการประชุมเจาะจง:</span>
-              </div>
-              <span className="text-[11px] font-bold text-slate-500">
-                แสดง <span className="text-[#0026b3] font-black">{filteredMeetings.length}</span> จาก {meetings.length}{' '}
-                โครงการ
-              </span>
-            </label>
-
-            <div className="relative">
-              <CalendarDays className="w-4 h-4 text-[#0026b3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <select
-                id="revenue-meeting-select"
-                value={selectedMeetingId}
-                onChange={(e) => setSelectedMeetingId(e.target.value)}
-                className="w-full appearance-none bg-slate-50 hover:bg-slate-100/80 border border-slate-200 text-slate-800 text-xs sm:text-sm font-bold rounded-xl pl-10 pr-10 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition cursor-pointer shadow-2xs truncate"
-              >
-                <option value="all">
-                  🌐 รวมทุกรอบที่กรอง — ฿
-                  {grandTotalRevenue >= 1000000
-                    ? `${(grandTotalRevenue / 1000000).toFixed(2)}M`
-                    : grandTotalRevenue.toLocaleString()}
-                </option>
-                {filteredMeetings.map((m) => {
-                  const mRev = getMeetingRevenue(m);
-                  return (
-                    <option key={m.id} value={m.id}>
-                      📅 {m.titleTh} ({m.id}) — ฿
-                      {mRev >= 1000000 ? `${(mRev / 1000000).toFixed(2)}M` : mRev.toLocaleString()}
-                    </option>
-                  );
-                })}
-              </select>
-              <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          </div>
-
-          {/* Quick Active Meeting Pill */}
-          <div className="flex items-center gap-2 self-stretch sm:self-auto md:self-end md:mb-0.5">
-            {selectedMeetingId === 'all' ? (
-              <div className="w-full sm:w-auto inline-flex items-center justify-between sm:justify-start gap-2 px-3 py-2 rounded-xl bg-blue-50 text-[#0026b3] border border-blue-200 text-xs font-bold shadow-2xs">
-                <div className="flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 shrink-0" />
-                  <span>รวมรายได้ทั้งหมด:</span>
-                </div>
-                <span className="font-black text-xs sm:text-sm bg-white px-2 py-0.5 rounded-lg border border-blue-200 text-[#0026b3]">
-                  ฿{grandTotalRevenue.toLocaleString()}
-                </span>
-              </div>
-            ) : (
-              (() => {
-                const sel = filteredMeetings.find((m) => m.id === selectedMeetingId) || currentMeeting;
-                const mRev = sel ? getMeetingRevenue(sel) : 0;
-                return (
-                  <div className="w-full sm:w-auto inline-flex items-center justify-between sm:justify-start gap-2 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-200 text-xs font-bold shadow-2xs">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <CalendarDays className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span className="truncate max-w-[140px] sm:max-w-[200px]">
-                        {sel?.titleTh || selectedMeetingId}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="font-black text-xs sm:text-sm bg-white px-2 py-0.5 rounded-lg border border-emerald-200 text-emerald-700">
-                        ฿{mRev.toLocaleString()}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedMeetingId('all')}
-                        className="text-slate-400 hover:text-slate-700 p-0.5 rounded hover:bg-emerald-100 transition cursor-pointer"
-                        title="กลับไปดูภาพรวมทุกรอบ"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()
-            )}
-          </div>
-        </div>
-      </div>
+        </StatCard>
+      </StatGrid>
 
       {/* ─── 3.5 DASHBOARD ANALYTICS DECK ─── */}
       <RevenueAnalyticsDeck

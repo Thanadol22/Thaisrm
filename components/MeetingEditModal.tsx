@@ -239,6 +239,10 @@ export function MeetingEditModal({
             ...DEFAULT_PRICING_TIERS.participant,
             ...(meeting.pricingTiers.participant || {}),
           },
+          fellow: {
+            ...DEFAULT_PRICING_TIERS.fellow!,
+            ...(meeting.pricingTiers.fellow || {}),
+          },
           changeFee: {
             ...DEFAULT_PRICING_TIERS.changeFee,
             ...(meeting.pricingTiers.changeFee || {}),
@@ -1027,6 +1031,82 @@ export function MeetingEditModal({
                       className="w-full bg-white border border-indigo-300 rounded-lg pl-7 pr-3 py-2 text-sm font-extrabold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Fellow Pricing (ผูกกับฟอร์ม fellow อัตโนมัติ) */}
+              <div className="bg-violet-50/50 border border-violet-200 rounded-xl p-3.5 space-y-2.5">
+                <div>
+                  <div className="text-xs font-extrabold text-violet-900">ราคา Fellow ของการประชุมหลัก</div>
+                  <p className="text-[11px] text-slate-500">ฟอร์ม fellow ของการประชุมนี้ใช้ราคานี้อัตโนมัติ เว้น 0 ทั้งหมด = ใช้ราคาที่ตั้งในฟอร์ม</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-bold text-violet-800">Onsite - สมาชิก</span>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={pricing.fellow?.onsiteMember || ''}
+                        onChange={(e) =>
+                          setPricing({
+                            ...pricing,
+                            fellow: {
+                              ...(pricing.fellow || { onsiteMember: 0, onsiteNonMember: 0, onlineMember: 0 }),
+                              onsiteMember: parseInt(e.target.value) || 0,
+                            },
+                          })
+                        }
+                        placeholder="0"
+                        className="w-full bg-white border border-violet-300 rounded-lg pl-7 pr-3 py-2 text-sm font-extrabold text-violet-800 focus:outline-none focus:ring-2 focus:ring-violet-400/30"
+                      />
+                    </div>
+                  </label>
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-bold text-violet-800">Onsite - บุคคลทั่วไป</span>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={pricing.fellow?.onsiteNonMember || ''}
+                        onChange={(e) =>
+                          setPricing({
+                            ...pricing,
+                            fellow: {
+                              ...(pricing.fellow || { onsiteMember: 0, onsiteNonMember: 0, onlineMember: 0 }),
+                              onsiteNonMember: parseInt(e.target.value) || 0,
+                            },
+                          })
+                        }
+                        placeholder="0"
+                        className="w-full bg-white border border-violet-300 rounded-lg pl-7 pr-3 py-2 text-sm font-extrabold text-violet-800 focus:outline-none focus:ring-2 focus:ring-violet-400/30"
+                      />
+                    </div>
+                  </label>
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-bold text-violet-800">Online - สมาชิก</span>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">฿</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={pricing.fellow?.onlineMember || ''}
+                        onChange={(e) =>
+                          setPricing({
+                            ...pricing,
+                            fellow: {
+                              ...(pricing.fellow || { onsiteMember: 0, onsiteNonMember: 0, onlineMember: 0 }),
+                              onlineMember: parseInt(e.target.value) || 0,
+                            },
+                          })
+                        }
+                        placeholder="0"
+                        className="w-full bg-white border border-violet-300 rounded-lg pl-7 pr-3 py-2 text-sm font-extrabold text-violet-800 focus:outline-none focus:ring-2 focus:ring-violet-400/30"
+                      />
+                    </div>
+                  </label>
                 </div>
               </div>
 

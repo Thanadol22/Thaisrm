@@ -440,7 +440,7 @@ export function OnlineAttendeesPanel({ meetings, meetingId, onMeetingChange, not
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80 space-y-5">
+      <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-xs border border-slate-200/80 space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-4">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-blue-50 text-[#0026b3] shrink-0">
@@ -808,7 +808,7 @@ export function OnlineAttendeesPanel({ meetings, meetingId, onMeetingChange, not
       </div>
 
       {unmatchedLinks.length > 0 && (
-        <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-amber-200 space-y-3">
+        <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-xs border border-amber-200 space-y-3">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-amber-600" />
             <h3 className="text-sm font-black text-slate-900">ลิงก์ที่จับคู่กับผู้ลงทะเบียนไม่ได้ ({unmatchedLinks.length})</h3>

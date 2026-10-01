@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma';
-import { parseSpecialFormItems, SPECIAL_FORM_TYPES } from '@/lib/services/specialFormService';
+import { parseSpecialFormItems, resolveSpecialFormItems, SPECIAL_FORM_TYPES } from '@/lib/services/specialFormService';
 
 /** ตรวจและแปลงข้อมูลฟอร์มจากหน้าแอดมิน (ใช้ทั้งสร้างและแก้ไข) */
 export async function normalizeSpecialFormInput(body: any) {
@@ -59,7 +59,7 @@ export async function serializeSpecialForm(form: any) {
     formType: form.form_type,
     meetingId: form.meeting_id,
     meetingName: form.meeting?.meeting_name || form.meeting_id,
-    items: parseSpecialFormItems(form.items),
+    items: resolveSpecialFormItems(form, form.meeting),
     allowCoupon: form.allow_coupon,
     isOpen: form.is_open,
     closeAt: form.close_at,
@@ -75,6 +75,6 @@ export async function serializeSpecialForm(form: any) {
 }
 
 export const specialFormInclude = {
-  meeting: { select: { meeting_name: true } },
+  meeting: { select: { meeting_name: true, activities: true, pricing_tiers: true } },
   sponsors: { include: { sponsor: { select: { id: true, name: true, contact_email: true } } } },
 } as const;

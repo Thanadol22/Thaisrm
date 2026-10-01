@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { AdminPageHeader, HeaderButton } from './AdminPageHeader';
+import { ContextBar } from './ui';
 import { AdminTab } from '@/components/AdminNavbar';
 import { MeetingItem, SlipItem, AttendeeItem } from './types';
 import { DashboardShortcuts } from './DashboardShortcuts';
@@ -11,7 +13,6 @@ import {
   DollarSign,
   TrendingUp,
   Receipt,
-  Sparkles,
   PlusCircle,
   Filter,
   ChevronDown,
@@ -163,96 +164,60 @@ export function DashboardOverviewPanel({
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
-      {/* Top Banner (TSRM Brand Primary & Accent Green) */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white p-5 sm:p-8 shadow-xl">
-        {/* Subtle Background Glow Spheres */}
-        <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-400/20 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute bottom-0 -left-12 w-44 h-44 bg-[#4ade80]/15 rounded-full blur-2xl pointer-events-none" />
+      <AdminPageHeader
+        tab="dashboard"
+        description="สรุปผลการจัดงาน สถิติผู้เข้าร่วมงาน ยอดชำระเงิน และการตรวจสอบการชำระเงินแบบเรียลไทม์"
+        actions={
+          <>
+            <HeaderButton variant="primary" icon={PlusCircle} onClick={() => onNavigateTab('add-meeting')}>
+              สร้างการประชุมใหม่
+            </HeaderButton>
+            <HeaderButton icon={Receipt} onClick={() => onNavigateTab('verify-slip')}>
+              ตรวจสอบการชำระเงิน ({pendingSlips.length})
+            </HeaderButton>
+          </>
+        }
+      />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6">
-          <div className="space-y-2 max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 border border-white/25 text-[#4ade80] text-xs font-bold">
-              <Sparkles className="w-3.5 h-3.5 text-[#4ade80]" />
-              <span>ระบบบริหารจัดการประชุมสมาคม TSRM</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
-              ภาพรวมแดชบอร์ดผู้ดูแลระบบ
-            </h1>
-            <p className="text-xs sm:text-sm md:text-base text-blue-100 leading-relaxed font-medium text-pretty break-words">
-              สรุปผลการจัดงาน สถิติผู้เข้าร่วมงาน ยอดชำระเงิน และการตรวจสอบการชำระเงินแบบเรียลไทม์
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0">
-            <button
-              onClick={() => onNavigateTab('add-meeting')}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#4ade80] hover:bg-[#3ecb72] text-slate-950 text-xs sm:text-sm font-black shadow-lg shadow-[#4ade80]/20 transition active:scale-95 cursor-pointer"
-            >
-              <PlusCircle className="w-4 h-4 text-slate-950" />
-              <span>สร้างการประชุมใหม่</span>
-            </button>
-            <button
-              onClick={() => onNavigateTab('verify-slip')}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/25 text-xs sm:text-sm font-bold backdrop-blur-md shadow-xs transition active:scale-95 cursor-pointer"
-            >
-              <Receipt className="w-4 h-4 text-[#4ade80]" />
-              <span>ตรวจสอบการชำระเงิน ({pendingSlips.length})</span>
-            </button>
-          </div>
+      <ContextBar
+        icon={Filter}
+        label={
+          <>
+            <span>{activeMeetingId === 'all' ? 'สถิติรวมทุกรอบการประชุม' : currentSelectedMeeting?.titleTh || activeMeetingId}</span>
+            {currentSelectedMeeting && currentSelectedMeeting.status === 'ongoing' && (
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                รอบปัจจุบัน
+              </span>
+            )}
+          </>
+        }
+        description={
+          activeMeetingId === 'all'
+            ? `รวมสถิติจาก ${meetings.length} โครงการในระบบ`
+            : `${currentSelectedMeeting?.date || ''} ${currentSelectedMeeting?.location ? `• ${currentSelectedMeeting.location}` : ''}`
+        }
+      >
+        <div className="relative">
+          <select
+            value={activeMeetingId}
+            onChange={(e) => setSelectedDashboardMeetingId(e.target.value)}
+            className="w-full appearance-none bg-slate-50 border border-slate-300 text-slate-900 text-xs sm:text-sm font-bold rounded-xl pl-9 pr-9 py-2.5 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition cursor-pointer shadow-xs"
+          >
+            {meetings.map((m) => {
+              const isOngoing = m.status === 'ongoing';
+              return (
+                <option key={m.id} value={m.id}>
+                  {isOngoing ? '🟢 [รอบปัจจุบัน] ' : '📅 '}
+                  [{m.id}] {m.titleTh}
+                </option>
+              );
+            })}
+            <option value="all">🌐 รวมทุกรอบการประชุม (รวม {attendees.length} คน)</option>
+          </select>
+          <CalendarDays className="w-4 h-4 text-[#0026b3] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
-      </div>
-
-      {/* ─── Meeting Round Selector Filter Bar (Defaults to Ongoing Round) ─── */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-blue-50 text-[#0026b3] border border-blue-100">
-              <Filter className="w-5 h-5 text-[#0026b3]" />
-            </div>
-            <div>
-              <div className="text-xs sm:text-sm font-extrabold text-slate-800 flex items-center gap-2 flex-wrap">
-                <span>เลือกรอบการประชุมเพื่อดูสถิติ:</span>
-                {currentSelectedMeeting && currentSelectedMeeting.status === 'ongoing' && (
-                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    ● รอบปัจจุบัน (กำลังจัดงาน)
-                  </span>
-                )}
-                {activeMeetingId === 'all' && (
-                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-[#0026b3] border border-blue-200">
-                    🌐 ทุกรอบรวมกัน
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xl">
-                {activeMeetingId === 'all'
-                  ? `รวมสถิติจากทุกรอบการประชุมในระบบ (${meetings.length} โครงการ)`
-                  : `กำลังแสดงข้อมูล: ${currentSelectedMeeting?.titleTh || activeMeetingId} (${currentSelectedMeeting?.date || ''})`}
-              </p>
-            </div>
-          </div>
-
-          <div className="relative shrink-0">
-            <select
-              value={activeMeetingId}
-              onChange={(e) => setSelectedDashboardMeetingId(e.target.value)}
-              className="w-full md:w-auto min-w-[280px] appearance-none bg-slate-50 border border-slate-300 text-slate-900 text-xs sm:text-sm font-bold rounded-xl pl-9 pr-9 py-2.5 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] transition cursor-pointer shadow-xs"
-            >
-              {meetings.map((m) => {
-                const isOngoing = m.status === 'ongoing';
-                return (
-                  <option key={m.id} value={m.id}>
-                    {isOngoing ? '🟢 [รอบปัจจุบัน] ' : '📅 '}
-                    [{m.id}] {m.titleTh}
-                  </option>
-                );
-              })}
-              <option value="all">🌐 รวมทุกรอบการประชุม (รวม {attendees.length} คน)</option>
-            </select>
-            <CalendarDays className="w-4 h-4 text-[#0026b3] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-        </div>
-      </div>
+      </ContextBar>
 
       {/* 4 Core KPI Summary Cards (Brand Primary & Accent High Contrast) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">

@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { AdminPageHeader, HeaderButton } from '@/components/admin/AdminPageHeader';
+import { Btn, FormActionBar } from '@/components/admin/ui';
 import {
-  Settings,
   CreditCard,
   Building2,
   FileCheck,
+  Receipt,
   Save,
   RotateCcw,
   CheckCircle2,
@@ -261,57 +263,23 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12">
-      {/* Header Banner */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#0026b3] shrink-0 shadow-2xs">
-            <Settings className="w-7 h-7" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                ตั้งค่าระบบทั่วไป
-              </h2>
-              <span className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border border-emerald-200">
-                System Settings
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              จัดการข้อมูลบัญชีธนาคารรับโอนเงิน ค่าสมัครสมาชิก รูปแบบใบเสร็จรับเงิน และข้อมูลสมาคม
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 self-end sm:self-center">
-          <button
-            type="button"
-            onClick={handleResetDefaults}
-            className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-xs font-bold transition flex items-center gap-2 cursor-pointer"
-          >
-            <RotateCcw className="w-4 h-4" />
-            <span>คืนค่าเริ่มต้น</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="px-5 py-2.5 rounded-xl bg-[#0026b3] hover:bg-[#001f94] text-white text-xs font-bold shadow-xs transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
-          >
-            {saving ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>กำลังบันทึก...</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                <span>บันทึกการตั้งค่า</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
+    <div className="space-y-6 animate-fade-in pb-12">
+      <AdminPageHeader
+        tab="settings"
+        title="ตั้งค่าระบบทั่วไป"
+        description="จัดการข้อมูลบัญชีธนาคารรับโอนเงิน ค่าสมัครสมาชิก รูปแบบใบเสร็จรับเงิน และข้อมูลสมาคม"
+        actions={
+          <>
+            <HeaderButton variant="primary" icon={saving ? undefined : Save} onClick={handleSave} disabled={saving}>
+              {saving && <span className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />}
+              {saving ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่า'}
+            </HeaderButton>
+            <HeaderButton icon={RotateCcw} onClick={handleResetDefaults}>
+              คืนค่าเริ่มต้น
+            </HeaderButton>
+          </>
+        }
+      />
 
       {/* Alert Notices */}
       {saveSuccess && (
@@ -329,9 +297,32 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
       )}
 
       {/* Main Settings Form */}
-      <form onSubmit={handleSave} className="space-y-6">
+      <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-6 items-start">
+        {/* สารบัญหมวดการตั้งค่า */}
+        <nav className="hidden lg:block sticky top-6 bg-white border border-slate-200/90 rounded-2xl shadow-xs p-2">
+          <div className="px-3 pt-2 pb-1.5 text-[11px] font-bold text-slate-400">หมวดการตั้งค่า</div>
+          {[
+            { id: 'settings-bank', label: 'บัญชีและการชำระเงิน', icon: CreditCard },
+            { id: 'settings-slip', label: 'การตรวจสอบสลิป', icon: FileCheck },
+            { id: 'settings-association', label: 'ข้อมูลสมาคม', icon: Building2 },
+            { id: 'settings-receipt', label: 'รูปแบบใบเสร็จ', icon: Receipt },
+          ].map((item, idx) => (
+            <a
+              key={item.id}
+              href={`#${item.id}`}
+              className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:text-[#0026b3] hover:bg-blue-50 transition"
+            >
+              <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-500 text-[11px] font-black flex items-center justify-center shrink-0">
+                {idx + 1}
+              </span>
+              <span className="truncate">{item.label}</span>
+            </a>
+          ))}
+        </nav>
+
+        <div className="space-y-6 min-w-0">
         {/* Section 1: Bank & Payment Info */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-5">
+        <div id="settings-bank" className="scroll-mt-6 bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-5">
           <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
             <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
               <CreditCard className="w-5 h-5" />
@@ -408,7 +399,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
         </div>
 
         {/* Section 2: Slip Verification Defaults */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-5">
+        <div id="settings-slip" className="scroll-mt-6 bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
@@ -452,7 +443,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
         </div>
 
         {/* Section 3: Association Info & Receipt Signatures */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-5">
+        <div id="settings-association" className="scroll-mt-6 bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0026b3] flex items-center justify-center font-bold">
@@ -586,7 +577,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
         </div>
 
         {/* Section 4: Receipt Templates Configuration */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-6">
+        <div id="settings-receipt" className="scroll-mt-6 bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
@@ -913,33 +904,14 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
           )}
         </div>
 
-        {/* Bottom Action Bar */}
-        <div className="flex items-center justify-end gap-3 pt-2">
-          <button
-            type="button"
-            onClick={handleResetDefaults}
-            className="px-5 py-3 rounded-xl border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-sm font-bold transition flex items-center gap-2 cursor-pointer"
-          >
-            <RotateCcw className="w-4 h-4" />
-            <span>คืนค่าเริ่มต้น</span>
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-8 py-3 rounded-xl bg-[#0026b3] hover:bg-[#001f94] text-white text-sm font-bold shadow-md hover:shadow-lg transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
-          >
-            {saving ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>กำลังบันทึกการตั้งค่า...</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                <span>บันทึกการตั้งค่าระบบ</span>
-              </>
-            )}
-          </button>
+        <FormActionBar note="การตั้งค่าจะมีผลกับหน้าชำระเงิน ใบเสร็จ และอีเมลอัตโนมัติทันทีหลังบันทึก">
+          <Btn icon={RotateCcw} onClick={handleResetDefaults}>
+            คืนค่าเริ่มต้น
+          </Btn>
+          <Btn type="submit" variant="primary" icon={Save} loading={saving}>
+            {saving ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่า'}
+          </Btn>
+        </FormActionBar>
         </div>
       </form>
 

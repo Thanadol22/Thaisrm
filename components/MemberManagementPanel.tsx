@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { AdminPageHeader, HeaderButton } from '@/components/admin/AdminPageHeader';
+import { Btn, IconBtn, EmptyState, StatGrid, StatCard, SearchInput, ToolbarGroup, FilterSelect } from '@/components/admin/ui';
 import { createPortal } from 'react-dom';
 import {
   Member,
@@ -17,8 +19,8 @@ import { MemberAvatar } from '@/components/MemberAvatar';
 import { PaginationControls } from '@/components/PaginationControls';
 import {
   Users,
+  ArrowUpDown,
   PlusCircle,
-  Search,
   Filter,
   RefreshCw,
   Eye,
@@ -30,7 +32,6 @@ import {
   Phone,
   QrCode,
   GraduationCap,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -429,292 +430,160 @@ export function MemberManagementPanel() {
         document.body
       )}
 
-      {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white p-5 sm:p-7 md:p-8 shadow-xl">
-        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 rounded-full bg-white/5 blur-2xl pointer-events-none" />
-        <div className="absolute bottom-0 right-1/4 -mb-10 w-48 h-48 rounded-full bg-[#4ade80]/15 blur-xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-5">
-          <div className="space-y-1.5 sm:space-y-2 max-w-3xl">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-white/10 backdrop-blur-md text-[#4ade80] border border-white/20">
-              <Sparkles className="w-3.5 h-3.5 text-[#4ade80]" />
-              <span>ระบบฐานข้อมูลสมาชิกสมาคม TSRM</span>
-            </div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white">
-              จัดการข้อมูลสมาชิก
-            </h1>
-            <p className="text-xs sm:text-sm text-blue-100/90 leading-relaxed font-medium text-pretty break-words">
-              สืบค้น ค้นหากรองตามสถานะ เพิ่ม แก้ไข และตรวจสอบข้อมูลสมาชิกสมาคมเวชศาสตร์การเจริญพันธุ์ไทย
-            </p>
-          </div>
-
-          {/* Top Actions */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0 w-full sm:w-auto">
-            <button
-              type="button"
+      <AdminPageHeader
+        tab="members"
+        title="จัดการข้อมูลสมาชิก"
+        description="สืบค้น กรองตามสถานะ เพิ่ม แก้ไข และตรวจสอบข้อมูลสมาชิกสมาคมเวชศาสตร์การเจริญพันธุ์ไทย"
+        actions={
+          <>
+            <HeaderButton variant="primary" icon={PlusCircle} onClick={handleOpenCreate}>
+              เพิ่มสมาชิกใหม่
+            </HeaderButton>
+            <HeaderButton
+              icon={CalendarCheck2}
               onClick={handleOpenSyncModal}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-bold transition cursor-pointer border border-white/20 backdrop-blur-md shadow-xs active:scale-95 whitespace-nowrap"
               title="ประมวลผลสถานะสมาชิกตามกฎขาดประชุม 4 ครั้งล่าสุด"
             >
-              <CalendarCheck2 className="w-4 h-4 text-[#4ade80] shrink-0" />
-              <span>ประมวลผล 4 การประชุม</span>
-            </button>
+              ประมวลผล 4 การประชุม
+            </HeaderButton>
+            <HeaderButton icon={FileSpreadsheet} onClick={handleExportCSV}>
+              ส่งออก CSV
+            </HeaderButton>
+          </>
+        }
+      />
 
-            <button
-              type="button"
-              onClick={handleExportCSV}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-bold transition cursor-pointer border border-white/20 backdrop-blur-md shadow-xs active:scale-95 whitespace-nowrap"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-[#4ade80] shrink-0" />
-              <span>ส่งออก CSV</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleOpenCreate}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#4ade80] hover:bg-[#3ecb72] text-slate-950 text-xs sm:text-sm font-black transition cursor-pointer shadow-lg shadow-[#4ade80]/25 active:scale-95 whitespace-nowrap"
-            >
-              <PlusCircle className="w-4 h-4 text-slate-950 shrink-0" />
-              <span>เพิ่มสมาชิกใหม่</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Interactive KPI Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Card 1: Total Members */}
-        <div
+      <StatGrid>
+        <StatCard
+          label="สมาชิกทั้งหมด"
+          value={globalStats.total.toLocaleString()}
+          unit="คน"
+          hint="กดเพื่อล้างตัวกรอง"
+          icon={Users}
+          tone="blue"
+          active={!hasActiveFilters}
           onClick={handleResetFilters}
-          className={`p-4 sm:p-5 rounded-2xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-md ${
-            !hasActiveFilters
-              ? 'border-[#0026b3] ring-2 ring-[#0026b3]/15'
-              : 'border-slate-200/90 hover:border-[#0026b3]/40'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-600">สมาชิกทั้งหมด</span>
-            <div className="p-2 sm:p-2.5 rounded-xl bg-blue-50 text-[#0026b3] border border-blue-100">
-              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
-            </div>
-          </div>
-          <div className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 mt-2">
-            {globalStats.total.toLocaleString()}
-          </div>
-          <div className="text-[11px] text-slate-500 font-medium mt-1">
-            คลิกเพื่อดูทั้งหมด
-          </div>
-        </div>
-
-        {/* Card 2: Regular Members */}
-        <div
+        />
+        <StatCard
+          label="สมาชิกสามัญ"
+          value={globalStats.regular_count.toLocaleString()}
+          unit="คน"
+          hint={globalStats.total > 0 ? `${Math.round((globalStats.regular_count / globalStats.total) * 100)}% ของทั้งหมด` : undefined}
+          icon={Award}
+          tone="blue"
+          active={filterMembershipType === 'Regular'}
           onClick={() => {
-            setFilterMembershipType('Regular');
+            setFilterMembershipType(filterMembershipType === 'Regular' ? 'all' : 'Regular');
             setPage(1);
           }}
-          className={`p-4 sm:p-5 rounded-2xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-md ${
-            filterMembershipType === 'Regular'
-              ? 'border-[#0026b3] ring-2 ring-[#0026b3]/15'
-              : 'border-slate-200/90 hover:border-blue-300'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-600">สมาชิกสามัญ</span>
-            <div className="p-2 sm:p-2.5 rounded-xl bg-blue-50 text-[#0026b3] border border-blue-100">
-              <Award className="w-4 h-4 sm:w-5 sm:h-5" />
-            </div>
-          </div>
-          <div className="text-xl sm:text-2xl md:text-3xl font-black text-[#0026b3] mt-2">
-            {globalStats.regular_count.toLocaleString()}
-          </div>
-          <div className="text-[11px] text-blue-700 font-medium mt-1">
-            {globalStats.total > 0
-              ? `${Math.round((globalStats.regular_count / globalStats.total) * 100)}% ของทั้งหมด`
-              : 'สมาชิกรายปี'}
-          </div>
-        </div>
-
-        {/* Card 3: Lifelong Members */}
-        <div
+        />
+        <StatCard
+          label="สมาชิกตลอดชีพ"
+          value={globalStats.lifelong_count.toLocaleString()}
+          unit="คน"
+          hint={globalStats.total > 0 ? `${Math.round((globalStats.lifelong_count / globalStats.total) * 100)}% ของทั้งหมด` : undefined}
+          icon={Crown}
+          tone="amber"
+          active={filterMembershipType === 'Lifelong'}
           onClick={() => {
-            setFilterMembershipType('Lifelong');
+            setFilterMembershipType(filterMembershipType === 'Lifelong' ? 'all' : 'Lifelong');
             setPage(1);
           }}
-          className={`p-4 sm:p-5 rounded-2xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-md ${
-            filterMembershipType === 'Lifelong'
-              ? 'border-amber-400 ring-2 ring-amber-400/20'
-              : 'border-slate-200/90 hover:border-amber-300'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-600">สมาชิกตลอดชีพ</span>
-            <div className="p-2 sm:p-2.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200">
-              <Crown className="w-4 h-4 sm:w-5 sm:h-5" />
-            </div>
-          </div>
-          <div className="text-xl sm:text-2xl md:text-3xl font-black text-amber-700 mt-2">
-            {globalStats.lifelong_count.toLocaleString()}
-          </div>
-          <div className="text-[11px] text-amber-800 font-medium mt-1">
-            {globalStats.total > 0
-              ? `${Math.round((globalStats.lifelong_count / globalStats.total) * 100)}% สมาชิกถาวร`
-              : 'สมาชิกตลอดชีพ'}
-          </div>
-        </div>
-
-        {/* Card 4: Active / Inactive Status */}
-        <div
+        />
+        <StatCard
+          label="สถานะปกติ"
+          value={globalStats.active_count.toLocaleString()}
+          unit="คน"
+          hint={globalStats.inactive_count > 0 ? `หมดอายุ ${globalStats.inactive_count} คน` : undefined}
+          icon={ShieldCheck}
+          tone="green"
+          active={filterMembershipStatus === 'Active'}
           onClick={() => {
-            setFilterMembershipStatus(filterMembershipStatus === 'Active' ? 'Inactive' : 'Active');
+            setFilterMembershipStatus(filterMembershipStatus === 'Active' ? 'all' : 'Active');
             setPage(1);
           }}
-          className={`p-4 sm:p-5 rounded-2xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-md ${
-            filterMembershipStatus !== 'all'
-              ? 'border-emerald-400 ring-2 ring-emerald-400/20'
-              : 'border-slate-200/90 hover:border-emerald-300'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-600">สถานะปกติ</span>
-            <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200">
-              <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-1.5 sm:gap-2 mt-2">
-            <span className="text-xl sm:text-2xl md:text-3xl font-black text-emerald-800">
-              {globalStats.active_count.toLocaleString()}
-            </span>
-            {globalStats.inactive_count > 0 && (
-              <span className="text-[11px] sm:text-xs font-bold text-rose-700">
-                (หมดอายุ {globalStats.inactive_count})
-              </span>
-            )}
-          </div>
-          <div className="text-[11px] text-emerald-700 font-medium mt-1 flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span>สลับฟิลเตอร์สถานะ</span>
-          </div>
-        </div>
-      </div>
+        />
+      </StatGrid>
 
-      {/* Main Filter & Search Toolbar (Responsive Optimized) */}
-      <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200/90 shadow-xs space-y-3 sm:space-y-4">
-        
-        {/* Top Filter Controls: Clean responsive flex layout */}
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-          
-          {/* Search Bar */}
-          <div className="relative flex-1 min-w-0">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ค้นหาตามชื่อ-นามสกุล, รหัสสมาชิก, เบอร์โทร, อีเมล, ที่ทำงาน..."
-              className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent transition"
+      {/* Main Filter & Search Toolbar */}
+      <div className="p-3 sm:p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-2.5">
+          <SearchInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="ค้นหาชื่อ, รหัสสมาชิก, เบอร์โทร, อีเมล, ที่ทำงาน..."
+          />
+          <ToolbarGroup>
+            <FilterSelect
+              label="สถานะสมาชิก"
+              icon={ShieldCheck}
+              value={filterMembershipStatus}
+              onChange={(v) => {
+                setFilterMembershipStatus(v);
+                setPage(1);
+              }}
+              options={[
+                { value: 'all', label: 'ทุกสถานะ' },
+                { value: 'Active', label: 'ปกติ' },
+                { value: 'Inactive', label: 'หมดอายุ' },
+              ]}
             />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Filter Dropdowns & Unified Sort Group */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            
-            {/* 1. สถานะสมาชิก Filter */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 h-10">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <select
-                value={filterMembershipStatus}
-                onChange={(e) => {
-                  setFilterMembershipStatus(e.target.value);
-                  setPage(1);
-                }}
-                className="text-xs font-bold text-slate-700 bg-transparent pr-1 focus:outline-none cursor-pointer"
-              >
-                <option value="all">สถานะ: ทั้งหมด</option>
-                <option value="Active">ปกติ</option>
-                <option value="Inactive">หมดอายุ</option>
-              </select>
-            </div>
-
-            {/* 2. ประเภทสมาชิก Filter */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 h-10">
-              <Crown className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-              <select
-                value={filterMembershipType}
-                onChange={(e) => {
-                  setFilterMembershipType(e.target.value);
-                  setPage(1);
-                }}
-                className="text-xs font-bold text-slate-700 bg-transparent pr-1 focus:outline-none cursor-pointer"
-              >
-                <option value="all">ประเภท: ทั้งหมด</option>
-                <option value="Regular">สมาชิกสามัญ</option>
-                <option value="Lifelong">สมาชิกตลอดชีพ</option>
-              </select>
-            </div>
-
-            {/* 3. จัดเรียงลำดับ + สลับลำดับ (Unified Group) */}
-            <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50 overflow-hidden h-10 shadow-2xs">
-              <select
+            <FilterSelect
+              label="ประเภทสมาชิก"
+              icon={Crown}
+              value={filterMembershipType}
+              onChange={(v) => {
+                setFilterMembershipType(v);
+                setPage(1);
+              }}
+              options={[
+                { value: 'all', label: 'ทุกประเภท' },
+                { value: 'Regular', label: 'สมาชิกสามัญ' },
+                { value: 'Lifelong', label: 'สมาชิกตลอดชีพ' },
+              ]}
+            />
+            <div className="flex items-center">
+              <FilterSelect
+                label="จัดเรียง"
+                icon={ArrowUpDown}
                 value={sortBy}
-                onChange={(e) => {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  setSortBy(e.target.value as any);
-                }}
-                className="text-xs font-bold text-slate-700 bg-transparent px-2.5 py-1.5 focus:outline-none cursor-pointer"
-              >
-                <option value="member_no">เรียง: รหัสสมาชิก</option>
-                <option value="created_at">เรียง: วันที่สมัคร</option>
-                <option value="full_name_th">เรียง: ชื่อ (ก-ฮ)</option>
-              </select>
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                onChange={(v) => setSortBy(v as any)}
+                className="[&_select]:rounded-r-none"
+                options={[
+                  { value: 'member_no', label: 'เรียงตามรหัสสมาชิก' },
+                  { value: 'created_at', label: 'เรียงตามวันที่สมัคร' },
+                  { value: 'full_name_th', label: 'เรียงตามชื่อ' },
+                ]}
+              />
               <button
                 type="button"
                 onClick={() => setOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
-                className="px-2.5 h-full border-l border-slate-200 hover:bg-slate-200/70 text-xs font-bold text-slate-700 transition cursor-pointer flex items-center gap-1"
-                title={`ลำดับ: ${order === 'asc' ? 'น้อยไปมาก (คลิกเพื่อสลับ)' : 'มากไปน้อย (คลิกเพื่อสลับ)'}`}
+                className="h-10 px-3 -ml-px rounded-r-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 cursor-pointer whitespace-nowrap"
+                title="สลับลำดับ"
               >
-                <span>{order === 'asc' ? '⬆️ น้อย' : '⬇️ มาก'}</span>
+                {order === 'asc' ? 'น้อยไปมาก' : 'มากไปน้อย'}
               </button>
             </div>
-
-            {/* 4. Reset Filters Button */}
             {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="flex items-center gap-1 px-3 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
-                title="ล้างตัวกรองทั้งหมด"
-              >
-                <X className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">ล้างตัวกรอง</span>
-              </button>
+              <Btn variant="ghost" icon={X} onClick={handleResetFilters}>
+                ล้างตัวกรอง
+              </Btn>
             )}
-
-            {/* 5. Refresh Button */}
-            <button
-              type="button"
+            <IconBtn
+              icon={RefreshCw}
+              label="รีเฟรชข้อมูล"
+              tone="blue"
               onClick={() => fetchMembers(false)}
               disabled={isRefreshing || isLoading}
-              className="px-3 h-10 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition cursor-pointer disabled:opacity-50 flex items-center justify-center"
-              title="รีเฟรชข้อมูล"
-            >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-[#0026b3]' : ''}`} />
-            </button>
-          </div>
-
+              className={`w-10 h-10 rounded-xl ${isRefreshing ? '[&_svg]:animate-spin' : ''}`}
+            />
+          </ToolbarGroup>
         </div>
 
         {/* Position Filter Chips (Clean horizontal scroll with smooth responsiveness) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs pt-2 border-t border-slate-100 scrollbar-thin">
-          <span className="text-[11px] font-extrabold text-slate-500 whitespace-nowrap mr-1 shrink-0">ตำแหน่ง:</span>
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs pt-3 border-t border-slate-100 scrollbar-thin">
+          <span className="text-[11px] font-extrabold text-slate-500 whitespace-nowrap mr-1 shrink-0">ตำแหน่ง</span>
           <button
             type="button"
             onClick={() => {
@@ -753,8 +622,7 @@ export function MemberManagementPanel() {
       </div>
 
       {/* Member Table Content (Responsive Table with Fixed Widths & No Wrapping) */}
-      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
-        
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
         {/* Error State */}
         {error && (
           <div className="p-8 text-center space-y-3">
@@ -783,36 +651,26 @@ export function MemberManagementPanel() {
 
         {/* Empty State */}
         {!isLoading && !error && members.length === 0 && (
-          <div className="p-16 text-center space-y-3">
-            <div className="inline-flex p-4 rounded-full bg-slate-50 text-slate-400 border border-slate-200">
-              <Users className="w-8 h-8" />
-            </div>
-            <h3 className="text-base font-bold text-slate-800">ไม่พบข้อมูลสมาชิก</h3>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              {hasActiveFilters
-                ? 'ไม่พบสมาชิกที่ตรงกับเงื่อนไขการค้นหาหรือตัวกรอง ลองเปลี่ยนคำค้นหาหรือกดปุ่มล้างตัวกรอง'
-                : 'ยังไม่มีข้อมูลสมาชิกในระบบ สามารถเพิ่มสมาชิกใหม่ได้โดยกดปุ่มด้านล่าง'}
-            </p>
-            {hasActiveFilters ? (
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0026b3] text-white text-xs font-bold shadow-sm transition cursor-pointer"
-              >
-                <RefreshCw className="w-4 h-4" />
-                <span>ล้างตัวกรองทั้งหมด</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleOpenCreate}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#4ade80] text-slate-950 text-xs font-black shadow-sm hover:bg-[#3ecb72] transition cursor-pointer"
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span>เพิ่มสมาชิกใหม่</span>
-              </button>
-            )}
-          </div>
+          <EmptyState
+            icon={Users}
+            title="ไม่พบข้อมูลสมาชิก"
+            description={
+              hasActiveFilters
+                ? 'ไม่พบสมาชิกที่ตรงกับคำค้นหาหรือตัวกรอง ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง'
+                : 'ยังไม่มีข้อมูลสมาชิกในระบบ เพิ่มสมาชิกใหม่ได้จากปุ่มด้านล่าง'
+            }
+            action={
+              hasActiveFilters ? (
+                <Btn variant="primary" icon={X} onClick={handleResetFilters}>
+                  ล้างตัวกรองทั้งหมด
+                </Btn>
+              ) : (
+                <Btn variant="primary" icon={PlusCircle} onClick={handleOpenCreate}>
+                  เพิ่มสมาชิกใหม่
+                </Btn>
+              )
+            }
+          />
         )}
 
         {/* Table View (Responsive & Non-overflowing Layout) */}
@@ -820,14 +678,14 @@ export function MemberManagementPanel() {
           <div className="overflow-x-auto w-full rounded-2xl">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-black uppercase tracking-wider text-slate-600">
-                  <th className="py-3 px-3 sm:px-4 whitespace-nowrap min-w-[180px]">รหัสสมาชิก & ชื่อ-นามสกุล</th>
-                  <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap min-w-[120px]">ตำแหน่ง / วิชาชีพ</th>
+                <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-600">
+                  <th className="py-3 px-3 sm:px-4 whitespace-nowrap min-w-[180px]">สมาชิก</th>
+                  <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap min-w-[120px]">ตำแหน่งและวิชาชีพ</th>
                   <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap min-w-[130px]">สถานที่ทำงาน</th>
                   <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap min-w-[130px]">ข้อมูลติดต่อ</th>
                   <th className="py-3 px-2 sm:px-3 whitespace-nowrap min-w-[90px]">ประเภทสมาชิก</th>
                   <th className="py-3 px-2 sm:px-3 text-center whitespace-nowrap min-w-[80px]">สถานะ</th>
-                  <th className="py-3 px-3 sm:px-4 text-left whitespace-nowrap min-w-[90px]">จัดการ</th>
+                  <th className="py-3 px-3 sm:px-4 text-right whitespace-nowrap min-w-[120px]">จัดการ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
@@ -926,32 +784,11 @@ export function MemberManagementPanel() {
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3 px-3 sm:px-4 text-left whitespace-nowrap">
-                        <div className="flex items-center justify-start gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenDetail(member)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-[#0026b3] hover:bg-blue-50 transition cursor-pointer"
-                            title="ดูข้อมูลละเอียด"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEdit(member)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-amber-700 hover:bg-amber-50 transition cursor-pointer"
-                            title="แก้ไขข้อมูล"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenDelete(member)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                            title="ลบสมาชิก"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                      <td className="py-3 px-3 sm:px-4 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <IconBtn icon={Eye} label="ดูข้อมูลละเอียด" tone="blue" onClick={() => handleOpenDetail(member)} />
+                          <IconBtn icon={Edit3} label="แก้ไขข้อมูล" tone="amber" onClick={() => handleOpenEdit(member)} />
+                          <IconBtn icon={Trash2} label="ลบสมาชิก" tone="rose" onClick={() => handleOpenDelete(member)} />
                         </div>
                       </td>
                     </tr>

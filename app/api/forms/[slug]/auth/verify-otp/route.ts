@@ -7,7 +7,7 @@ import {
   findAllowedSponsorByEmail,
   getSpecialFormBySlug,
   isSpecialFormOpen,
-  parseSpecialFormItems,
+  resolveSpecialFormItems,
 } from '@/lib/services/specialFormService';
 
 export const dynamic = 'force-dynamic';
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     const meeting = await prisma.meetings.findUnique({ where: { meeting_id: form.meeting_id } });
     if (!meeting) return NextResponse.json({ success: false, message: 'ไม่พบงานประชุมของฟอร์มนี้' }, { status: 404 });
 
-    const items = parseSpecialFormItems(form.items);
+    const items = resolveSpecialFormItems(form, meeting);
     // รหัสเจ้าหน้าที่ใช้เช็คอินหน้างาน ห้ามส่งออกไปหน้าเว็บ
     const { staff_code: _staffCode, ...publicMeeting } = meeting;
     void _staffCode;

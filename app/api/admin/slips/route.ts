@@ -249,6 +249,7 @@ export async function GET(request: NextRequest) {
           dietaryPreference: parsed.dietaryPreference || (parsed.attendees?.[0]?.dietaryPreference) || null,
           foodAllergies: parsed.foodAllergies || (parsed.attendees?.[0]?.foodAllergies) || null,
           specialRequirements: parsed.specialRequirements || (parsed.attendees?.[0]?.specialRequirements) || null,
+          isFellow: Boolean(parsed.isFellow || parsed.priceTier === 'fellow' || parsed.attendees?.[0]?.isFellow),
         };
 
         return {

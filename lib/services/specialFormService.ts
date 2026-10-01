@@ -51,6 +51,36 @@ export function isSpecialFormOpen(form: { is_open: boolean; close_at: Date | nul
 const isMainActivity = (a: any) => a?.type === 'main' || a?.id === 'main';
 
 /**
+ * ราคา fellow ของการประชุมหลักที่ตั้งไว้ใน pricing_tiers.fellow
+ * ตั้งเป็น 0 ทั้งหมด = ไม่ได้ตั้งราคา (ฟอร์ม fellow ใช้ราคาที่ตั้งในฟอร์มเอง)
+ */
+export function getMeetingFellowPrices(meeting: any): { onsiteMember: number; onsiteNonMember: number; online: number } | null {
+  const tiers = meeting?.pricing_tiers && typeof meeting.pricing_tiers === 'object' ? meeting.pricing_tiers : null;
+  const f = tiers?.fellow;
+  if (!f || typeof f !== 'object' || f.enabled === false) return null;
+  const prices = {
+    onsiteMember: toPrice(f.onsiteMember),
+    onsiteNonMember: toPrice(f.onsiteNonMember),
+    online: toPrice(f.onlineMember),
+  };
+  return prices.onsiteMember + prices.onsiteNonMember + prices.online > 0 ? prices : null;
+}
+
+/**
+ * รายการของฟอร์มพร้อมราคาที่ใช้จริง
+ * ฟอร์ม fellow: ราคาการประชุมหลักผูกกับราคา fellow ของการประชุม (ถ้าตั้งไว้) แก้ที่การประชุมแล้วฟอร์มเปลี่ยนตาม
+ */
+export function resolveSpecialFormItems(form: { items: unknown; form_type?: string | null }, meeting: any): SpecialFormItem[] {
+  const items = parseSpecialFormItems(form.items);
+  if (form.form_type !== 'fellow') return items;
+  const fellow = getMeetingFellowPrices(meeting);
+  if (!fellow) return items;
+  const acts: any[] = Array.isArray(meeting?.activities) ? meeting.activities : [];
+  const mainIds = new Set(acts.filter(isMainActivity).map((a) => String(a.id)));
+  return items.map((i) => (mainIds.has(i.activityId) ? { ...i, ...fellow } : i));
+}
+
+/**
  * งานประชุมในมุมมองของฟอร์มเฉพาะ: เหลือเฉพาะกิจกรรมที่เปิดในฟอร์ม ชื่อและราคาตามที่แอดมินตั้ง
  * ฟอร์มลงทะเบียนและหน้าชำระเงินเดิมคำนวณราคาจากข้อมูลชุดนี้ได้ทันที
  * (การประชุมหลักใช้ pricing_tiers.participant / เวิร์กช็อปใช้ memberPrice, nonMemberPrice)

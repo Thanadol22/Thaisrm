@@ -6,7 +6,6 @@ import {
   Copy,
   Check,
   ExternalLink,
-  FileStack,
   HardHat,
   ShieldCheck,
   Users,
@@ -18,13 +17,15 @@ import type { AdminTab } from '@/components/AdminNavbar';
 import { AdminCompanyMemberModal, CompanyOption } from '@/components/AdminCompanyMemberModal';
 import { ADMIN_FORMS, FORM_AUDIENCES, FormAudience, AdminFormItem, FormAction } from './adminFormsCatalog';
 import { SpecialFormsManager } from './SpecialFormsManager';
+import { AdminPageHeader, HeaderTabs } from './AdminPageHeader';
+import { SectionTitle } from './ui';
 import type { MeetingItem } from './types';
 
-const AUDIENCE_STYLE: Record<FormAudience, { icon: React.ElementType; accent: string; chip: string }> = {
-  public: { icon: Users, accent: 'bg-blue-50 text-[#0026b3] border-blue-100', chip: 'bg-blue-50 text-[#0026b3] border-blue-200' },
-  company: { icon: Building2, accent: 'bg-violet-50 text-violet-700 border-violet-100', chip: 'bg-violet-50 text-violet-700 border-violet-200' },
-  staff: { icon: HardHat, accent: 'bg-amber-50 text-amber-700 border-amber-100', chip: 'bg-amber-50 text-amber-800 border-amber-200' },
-  admin: { icon: ShieldCheck, accent: 'bg-emerald-50 text-emerald-700 border-emerald-100', chip: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+const AUDIENCE_STYLE: Record<FormAudience, { icon: React.ElementType; tone: 'blue' | 'violet' | 'amber' | 'green'; accent: string; chip: string }> = {
+  public: { icon: Users, tone: 'blue', accent: 'bg-blue-50 text-[#0026b3] border-blue-100', chip: 'bg-blue-50 text-[#0026b3] border-blue-200' },
+  company: { icon: Building2, tone: 'violet', accent: 'bg-violet-50 text-violet-700 border-violet-100', chip: 'bg-violet-50 text-violet-700 border-violet-200' },
+  staff: { icon: HardHat, tone: 'amber', accent: 'bg-amber-50 text-amber-700 border-amber-100', chip: 'bg-amber-50 text-amber-800 border-amber-200' },
+  admin: { icon: ShieldCheck, tone: 'green', accent: 'bg-emerald-50 text-emerald-700 border-emerald-100', chip: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
 };
 
 export function absoluteFormUrl(href: string): string {
@@ -173,57 +174,33 @@ export function FormsHubPanel({ onNavigateTab, onShowToast, meetings }: FormsHub
   const audiences = FORM_AUDIENCES.filter((a) => filter === 'all' || a.id === filter);
 
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
-      <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-2xl bg-blue-50 text-[#0026b3] border border-blue-100">
-            <FileStack className="w-6 h-6" />
-          </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900">ฟอร์มลงทะเบียน</h2>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              รวมทุกฟอร์มของระบบ แยกตามผู้ใช้งาน พร้อมลิงก์สำหรับส่งต่อและเมนูที่เกี่ยวข้อง
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {[{ id: 'all' as const, title: 'ทั้งหมด' }, ...FORM_AUDIENCES.map((a) => ({ id: a.id, title: a.shortTitle }))].map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setFilter(opt.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                filter === opt.id
-                  ? 'bg-[#0026b3] text-white border-[#0026b3]'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              {opt.title}
-            </button>
-          ))}
-        </div>
-      </div>
+    <div className="space-y-8 animate-fade-in pb-12">
+      <AdminPageHeader
+        tab="forms"
+        description="รวมทุกฟอร์มของระบบ แยกตามผู้ใช้งาน พร้อมลิงก์สำหรับส่งต่อและเมนูที่เกี่ยวข้อง"
+      >
+        <HeaderTabs
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { id: 'all' as const, label: 'ทั้งหมด', count: ADMIN_FORMS.length },
+            ...FORM_AUDIENCES.map((a) => ({
+              id: a.id,
+              label: a.shortTitle,
+              icon: AUDIENCE_STYLE[a.id].icon,
+              count: ADMIN_FORMS.filter((f) => f.audience === a.id).length,
+            })),
+          ]}
+        />
+      </AdminPageHeader>
 
       {audiences.map((aud) => {
         const style = AUDIENCE_STYLE[aud.id];
         const Icon = style.icon;
         const forms = ADMIN_FORMS.filter((f) => f.audience === aud.id);
         return (
-          <section key={aud.id} className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl border ${style.accent}`}>
-                <Icon className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
-                  {aud.title} <span className="text-slate-400 font-bold">({forms.length})</span>
-                </h3>
-                <p className="text-xs text-slate-500">{aud.description}</p>
-              </div>
-            </div>
-            {aud.id === 'company' && (
-              <SpecialFormsManager meetings={meetings} onNavigateTab={onNavigateTab} onShowToast={onShowToast} />
-            )}
+          <section key={aud.id} className="space-y-4">
+            <SectionTitle icon={Icon} tone={style.tone} title={aud.title} count={forms.length} description={aud.description} />
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {forms.map((form) => (
                 <FormCard
@@ -235,6 +212,11 @@ export function FormsHubPanel({ onNavigateTab, onShowToast, meetings }: FormsHub
                 />
               ))}
             </div>
+            {aud.id === 'company' && (
+              <div className="pt-3">
+                <SpecialFormsManager meetings={meetings} onNavigateTab={onNavigateTab} onShowToast={onShowToast} />
+              </div>
+            )}
           </section>
         );
       })}

@@ -521,6 +521,8 @@ export async function POST(request: NextRequest) {
       amount = 3500,
       programs = [],
       position,
+      memberNo,
+      isFellow = false,
     } = body;
 
     if (!meetingId || !nameTh || !phone) {
@@ -530,11 +532,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ผูกกับสมาชิกด้วย member_no เท่านั้น ตรวจจากฐานข้อมูลอีกครั้ง ไม่เชื่อข้อมูลจากหน้าเว็บ
+    const rawMemberNo = String(memberNo || '').trim();
+    let linkedMember: { member_no: string; membership_status: string | null } | null = null;
+    if (rawMemberNo) {
+      linkedMember = await prisma.member.findFirst({
+        where: { OR: [{ member_no: rawMemberNo }, { member_no: rawMemberNo.padStart(4, '0') }] },
+        select: { member_no: true, membership_status: true },
+      });
+      if (!linkedMember) {
+        return NextResponse.json({ success: false, error: `ไม่พบเลขสมาชิก ${rawMemberNo} ในระบบ` }, { status: 404 });
+      }
+      const existing = await prisma.meeting_attendances.findFirst({
+        where: { meeting_id: meetingId, member_no: linkedMember.member_no },
+        select: { attendance_id: true },
+      });
+      if (existing) {
+        return NextResponse.json(
+          { success: false, error: `สมาชิกเลขที่ ${linkedMember.member_no} ลงทะเบียนการประชุมรอบนี้แล้ว` },
+          { status: 409 }
+        );
+      }
+    }
+    const linkedStatus = String(linkedMember?.membership_status || '').toLowerCase().trim();
+    const isActiveMember = Boolean(linkedMember) && (linkedStatus === '' || linkedStatus === 'active');
+
     const activities = (Array.isArray(programs) ? programs : [])
       .map((p: any) => ({ id: String(p?.id ?? ''), name: String(p?.name ?? '') }))
       .filter((p: AttendeeProgram) => p.id || p.name);
     const selectedActivities =
-      activities.length > 0 || position ? { activities, position: position || null, memberType, ticketType } : null;
+      activities.length > 0 || position || isFellow
+        ? {
+            activities,
+            position: position || null,
+            memberType,
+            ticketType,
+            ...(isFellow ? { isFellow: true, priceTier: 'fellow' } : {}),
+          }
+        : null;
     const parsedAmount = Number(amount);
     const slipAmount = Number.isFinite(parsedAmount) && parsedAmount >= 0 ? parsedAmount : 3500;
     const createSlip = paymentStatus === 'paid' && Boolean((prisma as any).payment_slips);
@@ -551,6 +586,7 @@ export async function POST(request: NextRequest) {
       const created = await tx.meeting_attendances.create({
         data: {
           meeting_id: meetingId,
+          member_no: linkedMember?.member_no ?? null,
           attendee_name: nameTh,
           attendee_email: email || `${phone}@walkin.tsrm.org`,
           attendee_phone: phone,
@@ -567,11 +603,12 @@ export async function POST(request: NextRequest) {
         await tx.payment_slips.create({
           data: {
             meeting_id: meetingId,
+            member_no: linkedMember?.member_no ?? null,
             guest_name: nameTh,
             guest_email: email || `${phone}@walkin.tsrm.org`,
             guest_phone: phone,
             guest_workplace: workplace || 'โรงพยาบาล/คลินิก',
-            is_member: false,
+            is_member: isActiveMember,
             ticket_code: code,
             amount: slipAmount,
             selected_activities: selectedActivities ?? undefined,

@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { AdminPageHeader, HeaderButton } from './AdminPageHeader';
+import { Btn, IconBtn, Panel, EmptyState, StatGrid, StatCard, Toolbar, ToolbarGroup, SearchInput, Segmented } from './ui';
 import { AdminTab } from '@/components/AdminNavbar';
 import { MeetingItem } from './types';
 import {
   ClipboardList,
   FileSpreadsheet,
-  Search,
-  X,
+  CheckCircle2,
   CalendarDays,
   MapPin,
   UserCheck,
@@ -58,6 +59,8 @@ export function MeetingHistoryPanel({
       });
   }, [meetings, search, filterStatus]);
 
+  const countByStatus = (status: MeetingItem['status']) => meetings.filter((m) => m.status === status).length;
+
   const handleExportMeetingsExcel = () => {
     const headers = [
       'รหัสโครงการ',
@@ -100,77 +103,50 @@ export function MeetingHistoryPanel({
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[#0026b3] text-xs font-bold mb-2">
-            <ClipboardList className="w-4 h-4 text-[#0026b3]" />
-            <span>ระบบติดตามและประวัติการประชุมทั้งหมด</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">ประวัติและการจัดการประชุม</h1>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            ดูสถิติผู้เข้าร่วม อัตราการเช็คอิน และรายได้ของการประชุมแต่ละรอบ ({filteredMeetings.length} โครงการ)
-          </p>
-        </div>
+      <AdminPageHeader
+        tab="meeting-history"
+        title="ประวัติและการจัดการประชุม"
+        description={`ดูสถิติผู้เข้าร่วม อัตราการเช็คอิน และรายได้ของการประชุมแต่ละรอบ (${filteredMeetings.length} โครงการ)`}
+        actions={
+          <HeaderButton icon={FileSpreadsheet} onClick={handleExportMeetingsExcel}>
+            Export Excel ({filteredMeetings.length})
+          </HeaderButton>
+        }
+      />
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleExportMeetingsExcel}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs sm:text-sm font-bold shadow-xs transition cursor-pointer"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span>Export Excel ({filteredMeetings.length})</span>
-          </button>
-        </div>
-      </div>
+      <StatGrid>
+        <StatCard label="โครงการทั้งหมด" value={meetings.length} unit="โครงการ" icon={ClipboardList} tone="blue" />
+        <StatCard label="กำลังจัดงาน" value={countByStatus('ongoing')} unit="โครงการ" icon={CalendarDays} tone="green" />
+        <StatCard label="รอเริ่มงาน" value={countByStatus('upcoming')} unit="โครงการ" icon={CalendarDays} tone="amber" />
+        <StatCard label="เสร็จสิ้นแล้ว" value={countByStatus('completed')} unit="โครงการ" icon={CheckCircle2} tone="slate" />
+      </StatGrid>
 
-      {/* Filters & Search */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 w-full sm:w-80 shadow-xs focus-within:ring-2 focus-within:ring-[#0026b3]/20 focus-within:border-[#0026b3]">
-          <Search className="w-4 h-4 text-slate-400 shrink-0" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหาชื่อการประชุม หรือสถานที่..."
-            className="bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none w-full"
+      <Toolbar>
+        <SearchInput value={search} onChange={setSearch} placeholder="ค้นหาชื่อการประชุม หรือสถานที่..." />
+        <ToolbarGroup>
+          <Segmented
+            value={filterStatus}
+            onChange={setFilterStatus}
+            options={[
+              { id: 'all', label: 'ทั้งหมด', count: meetings.length },
+              { id: 'ongoing', label: 'กำลังจัด', count: countByStatus('ongoing') },
+              { id: 'upcoming', label: 'รอเริ่มงาน', count: countByStatus('upcoming') },
+              { id: 'completed', label: 'เสร็จสิ้น', count: countByStatus('completed') },
+            ]}
           />
-          {search && (
-            <button onClick={() => setSearch('')} className="text-slate-400 hover:text-slate-600 p-0.5">
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200 w-full sm:w-auto overflow-x-auto">
-          {[
-            { id: 'all', label: `ทั้งหมด (${meetings.length})` },
-            { id: 'ongoing', label: `กำลังจัด (${meetings.filter((m) => m.status === 'ongoing').length})` },
-            { id: 'upcoming', label: `รอเริ่มงาน (${meetings.filter((m) => m.status === 'upcoming').length})` },
-            { id: 'completed', label: `เสร็จสิ้น (${meetings.filter((m) => m.status === 'completed').length})` },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setFilterStatus(tab.id as any)}
-              className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap ${
-                filterStatus === tab.id
-                  ? 'bg-[#0026b3] text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
+        </ToolbarGroup>
+      </Toolbar>
 
       {/* Meetings List */}
       <div className="space-y-4">
         {filteredMeetings.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center text-slate-500 space-y-2 shadow-xs">
-            <ClipboardList className="w-8 h-8 text-slate-300 mx-auto" />
-            <div className="text-base font-bold text-slate-800">ไม่พบโครงการการประชุมตามเงื่อนไข</div>
-            <p className="text-xs text-slate-500">กรุณาลองเปลี่ยนคำค้นหา หรือเลือกตัวกรองสถานะอื่น</p>
-          </div>
+          <Panel>
+            <EmptyState
+              icon={ClipboardList}
+              title="ไม่พบโครงการการประชุมตามเงื่อนไข"
+              description="ลองเปลี่ยนคำค้นหา หรือเลือกตัวกรองสถานะอื่น"
+            />
+          </Panel>
         ) : (
           filteredMeetings.map((m) => {
             const attendancePercent = m.registered > 0 ? Math.round((m.attended / m.registered) * 100) : 0;
@@ -297,66 +273,47 @@ export function MeetingHistoryPanel({
                 </div>
 
                 {/* Management Action Bar */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-500">เปลี่ยนสถานะ:</span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                  <label className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-500 whitespace-nowrap">สถานะงาน</span>
                     <select
                       value={m.status}
                       onChange={(e) => onUpdateStatus?.(m.id, e.target.value as any)}
-                      className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-700 cursor-pointer focus:outline-none focus:border-[#0026b3]"
+                      className="text-xs font-bold bg-white border border-slate-200 rounded-lg pl-2.5 pr-7 py-1.5 text-slate-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3]"
                     >
                       <option value="upcoming">รอเริ่มงาน</option>
                       <option value="ongoing">กำลังดำเนินการ</option>
                       <option value="completed">เสร็จสิ้นแล้ว</option>
                     </select>
-                  </div>
+                  </label>
 
-                  <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
+                  <div className="flex flex-wrap items-center gap-2">
                     {onNavigateTab && (
                       <>
-                        <button
-                          type="button"
-                          onClick={() => onNavigateTab('verify-attendees', m.id)}
-                          className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#0026b3] text-xs font-bold border border-blue-200 transition cursor-pointer"
-                        >
-                          <UserCheck className="w-3.5 h-3.5 shrink-0" />
-                          <span>ดูผู้เข้าร่วม</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onNavigateTab('revenue-report', m.id)}
-                          className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold border border-slate-200 transition cursor-pointer"
-                        >
-                          <DollarSign className="w-3.5 h-3.5 shrink-0" />
-                          <span>รายงานรายได้</span>
-                        </button>
+                        <Btn size="sm" variant="soft" icon={UserCheck} onClick={() => onNavigateTab('verify-attendees', m.id)}>
+                          ดูผู้เข้าร่วม
+                        </Btn>
+                        <Btn size="sm" icon={DollarSign} onClick={() => onNavigateTab('revenue-report', m.id)}>
+                          รายงานรายได้
+                        </Btn>
                       </>
                     )}
                     {onEditMeeting && (
-                      <button
-                        type="button"
-                        onClick={() => onEditMeeting(m)}
-                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold border border-amber-200 transition cursor-pointer"
-                        title="แก้ไขการประชุม"
-                      >
-                        <Pencil className="w-3.5 h-3.5 shrink-0" />
-                        <span>แก้ไข</span>
-                      </button>
+                      <Btn size="sm" variant="warning" icon={Pencil} onClick={() => onEditMeeting(m)}>
+                        แก้ไข
+                      </Btn>
                     )}
                     {onDeleteMeeting && (
-                      <button
-                        type="button"
+                      <IconBtn
+                        icon={Trash2}
+                        tone="rose"
+                        label="ลบโครงการ"
                         onClick={() => {
                           if (confirm(`ยืนยันการลบโครงการประชุม "${m.titleTh}"?`)) {
                             onDeleteMeeting(m.id);
                           }
                         }}
-                        className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-rose-600 hover:bg-rose-50 border border-rose-200 text-xs font-bold transition cursor-pointer"
-                        title="ลบโครงการ"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                        <span>ลบ</span>
-                      </button>
+                      />
                     )}
                   </div>
                 </div>
