@@ -50,6 +50,7 @@ import { CouponUsagesModal } from '@/components/CouponUsagesModal';
 import { SponsorCouponHistoryModal } from '@/components/SponsorCouponHistoryModal';
 import { PaginationControls } from '@/components/PaginationControls';
 import { AdminCompanyMemberModal } from '@/components/AdminCompanyMemberModal';
+import SponsorRegistrationsSheet from '@/components/admin/SponsorRegistrationsSheet';
 
 import { statusLabelTh } from '@/lib/statusLabels';
 interface SponsorQuota {
@@ -180,10 +181,6 @@ export default function AdminSponsorsPanel({
     coupons: CouponItem[];
   } | null>(null);
 
-  // ─── Global Usage History ───
-  const [globalHistory, setGlobalHistory] = useState<any[]>([]);
-  const [globalHistoryLoading, setGlobalHistoryLoading] = useState(false);
-  const [historySearch, setHistorySearch] = useState('');
 
   // SSR Mounted
   const [mounted, setMounted] = useState(false);
@@ -315,25 +312,6 @@ export default function AdminSponsorsPanel({
     }
   };
 
-  // ─── Fetch Global Usage History ───
-  const fetchGlobalHistory = async () => {
-    setGlobalHistoryLoading(true);
-    try {
-      const res = await fetch('/api/admin/attendees');
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        const filtered = json.data.filter(
-          (a: any) => a.sponsor_id || a.coupon_code || a.sponsor_company_name
-        );
-        setGlobalHistory(filtered);
-      }
-    } catch (err) {
-      console.error('Failed to load history:', err);
-    } finally {
-      setGlobalHistoryLoading(false);
-    }
-  };
-
   useEffect(() => {
     fetchSponsors();
     fetchMeetings();
@@ -345,8 +323,6 @@ export default function AdminSponsorsPanel({
       fetchCoupons();
     } else if (activeSubTab === 'sponsors') {
       fetchSponsors();
-    } else if (activeSubTab === 'history') {
-      fetchGlobalHistory();
     }
   }, [activeSubTab, selectedCouponMeeting]);
 
@@ -462,22 +438,6 @@ export default function AdminSponsorsPanel({
     const start = (validPage - 1) * couponPageSize;
     return sortedCoupons.slice(start, start + couponPageSize);
   }, [sortedCoupons, couponPage, couponPageSize]);
-
-  // Filtered Global History
-  const filteredGlobalHistory = useMemo(() => {
-    if (!historySearch.trim()) return globalHistory;
-    const s = historySearch.toLowerCase();
-    return globalHistory.filter(
-      (h) =>
-        (h.nameTh && h.nameTh.toLowerCase().includes(s)) ||
-        (h.nameEn && h.nameEn.toLowerCase().includes(s)) ||
-        (h.email && h.email.toLowerCase().includes(s)) ||
-        (h.memberNo && h.memberNo.toLowerCase().includes(s)) ||
-        (h.ticketCode && h.ticketCode.toLowerCase().includes(s)) ||
-        (h.sponsor_company_name && h.sponsor_company_name.toLowerCase().includes(s)) ||
-        (h.coupon_code && h.coupon_code.toLowerCase().includes(s))
-    );
-  }, [globalHistory, historySearch]);
 
   // Copy Coupon Code
   const handleCopyCode = (code: string) => {
@@ -711,7 +671,7 @@ export default function AdminSponsorsPanel({
           options={[
             { id: 'coupons', label: 'รายการรหัสคูปอง', icon: Ticket, count: couponStats.total },
             { id: 'sponsors', label: 'บริษัทสปอนเซอร์', icon: Building2, count: sponsorStats.total },
-            { id: 'history', label: 'ประวัติการใช้สิทธิ์ลงทะเบียน', icon: History },
+            { id: 'history', label: 'ประวัติการลงทะเบียนของบริษัท', icon: History },
           ]}
         />
       </AdminPageHeader>
@@ -1277,100 +1237,9 @@ export default function AdminSponsorsPanel({
       )}
 
       {/* ========================================================================= */}
-      {/* 3. SUB-TAB: REGISTRATION & USAGE HISTORY */}
+      {/* 3. SUB-TAB: ALL COMPANY REGISTRATIONS (EVERY BILL IN ONE SHEET) */}
       {/* ========================================================================= */}
-      {activeSubTab === 'history' && (
-        <div className="space-y-6">
-          <Toolbar>
-            <SearchInput
-              value={historySearch}
-              onChange={setHistorySearch}
-              placeholder="ค้นหาชื่อสมาชิก, เลขสมาชิก, รหัสบัตร หรือชื่อบริษัท..."
-            />
-            <ToolbarGroup>
-              <span className="text-xs font-semibold text-slate-500">{filteredGlobalHistory.length} รายการ</span>
-              <IconBtn
-                icon={RotateCw}
-                label="รีเฟรชข้อมูล"
-                tone="blue"
-                onClick={fetchGlobalHistory}
-                className={`w-10 h-10 rounded-xl ${globalHistoryLoading ? '[&_svg]:animate-spin' : ''}`}
-              />
-            </ToolbarGroup>
-          </Toolbar>
-
-          <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
-            {globalHistoryLoading ? (
-              <div className="py-16 text-center text-xs text-slate-500 flex items-center justify-center gap-2.5">
-                <RotateCw className="w-5 h-5 animate-spin text-blue-600" />
-                <span>กำลังโหลดประวัติการใช้สิทธิ์และลงทะเบียน...</span>
-              </div>
-            ) : filteredGlobalHistory.length === 0 ? (
-              <EmptyState icon={Users} title="ไม่พบประวัติการใช้สิทธิ์ตามเงื่อนไขที่ค้นหา" />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-700 min-w-[920px]">
-                  <thead className="bg-slate-50 text-slate-600 text-xs font-bold border-b border-slate-200">
-                    <tr>
-                      <th className="py-3.5 px-4 whitespace-nowrap min-w-[110px]">เลขสมาชิก</th>
-                      <th className="py-3.5 px-4 whitespace-nowrap min-w-[180px]">ชื่อและอีเมล</th>
-                      <th className="py-3.5 px-4 whitespace-nowrap min-w-[160px]">บริษัทสปอนเซอร์</th>
-                      <th className="py-3.5 px-4 whitespace-nowrap min-w-[150px]">รหัสคูปอง</th>
-                      <th className="py-3.5 px-4 whitespace-nowrap min-w-[150px]">งานประชุม</th>
-                      <th className="py-3.5 px-4 whitespace-nowrap min-w-[120px]">รหัส Ticket</th>
-                      <th className="py-3.5 px-4 text-center whitespace-nowrap min-w-[100px]">สถานะเช็คอิน</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
-                    {filteredGlobalHistory.map((row: any) => (
-                      <tr key={row.id || row.attendance_id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3.5 px-4 font-mono font-bold text-blue-600">
-                          {row.memberNo || '-'}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-slate-900">{row.nameTh || row.nameEn || row.attendee_name}</div>
-                          <div className="text-[11px] text-slate-500">{row.email}</div>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className="font-semibold text-slate-800">
-                            {row.sponsor_company_name || row.sponsored_by_company || '-'}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          {row.coupon_code ? (
-                            <span className="font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-                              {row.coupon_code}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400">-</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-700">
-                          {row.meetingName || row.meetingId}
-                        </td>
-                        <td className="py-3.5 px-4 font-mono font-bold text-amber-600">
-                          {row.ticketCode || '-'}
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                              row.status === 'Checked-in' || row.attendance_status === 'Attended'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-slate-100 text-slate-600 border border-slate-200'
-                            }`}
-                          >
-                            {statusLabelTh(row.status || row.attendance_status || 'Registered')}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {activeSubTab === 'history' && <SponsorRegistrationsSheet />}
 
       {/* ======================================================= */}
       {/* MODAL: MEMBER HISTORY OF SPONSOR */}
