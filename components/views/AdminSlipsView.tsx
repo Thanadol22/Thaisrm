@@ -28,6 +28,8 @@ import {
   Users,
   FileText,
   ChevronDown,
+  Trash2,
+  UserPlus,
   ChevronUp,
   Upload,
 } from 'lucide-react';
@@ -35,6 +37,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { uploadImageToStorage } from '@/lib/blobUpload';
 import { PaginationControls } from '@/components/PaginationControls';
 import { MemberDetailModal } from '@/components/MemberDetailModal';
+import { GroupAttendeeEditorModal, type GroupAttendeeEditorTarget } from '@/components/admin/GroupAttendeeEditorModal';
 
 export interface SlipActivityItem {
   id?: string;
@@ -465,6 +468,9 @@ export function AdminSlipsView() {
   const [formatSaving, setFormatSaving] = useState(false);
   const [formatError, setFormatError] = useState('');
 
+  // Admin add / edit / remove attendees of a group conference slip
+  const [attendeeEditor, setAttendeeEditor] = useState<GroupAttendeeEditorTarget | null>(null);
+
   useEffect(() => {
     setMounted(true);
     fetchSlips();
@@ -490,12 +496,14 @@ export function AdminSlipsView() {
       const json = await res.json();
       if (json.success) {
         setSlips(json.data || []);
+        return (json.data || []) as SlipRecord[];
       }
     } catch (err) {
       console.error('Error loading slips:', err);
     } finally {
       setLoading(false);
     }
+    return null;
   };
 
   const showToast = (msg: string) => {
@@ -586,6 +594,36 @@ export function AdminSlipsView() {
     !slip.isGroupMembership &&
     !slip.isFormatChange &&
     !slip.isAddOn;
+
+  const canEditGroupAttendees = (slip: SlipRecord) =>
+    (slip.status === 'pending' || slip.status === 'approved') && Boolean(slip.isGroupConference) && !slip.isAddOn;
+
+  const openAttendeeEditor = (
+    slip: SlipRecord,
+    mode: GroupAttendeeEditorTarget['mode'],
+    attendeeIndex: number | null = null,
+    attendee: any = null
+  ) => {
+    setAttendeeEditor({
+      slipId: slip.id,
+      ticketCode: slip.ticketCode,
+      slipStatus: slip.status,
+      slipAmount: Number(slip.amount) || 0,
+      mode,
+      attendeeIndex,
+      attendee,
+    });
+  };
+
+  const handleAttendeeSaved = async (message: string) => {
+    const slipId = attendeeEditor?.slipId;
+    setAttendeeEditor(null);
+    showToast(message);
+    const fresh = await fetchSlips();
+    if (fresh && slipId) {
+      setSelectedSlip((prev) => (prev && prev.id === slipId ? fresh.find((s) => s.id === slipId) || prev : prev));
+    }
+  };
 
   const openFormatEdit = (
     slip: SlipRecord,
@@ -1857,29 +1895,71 @@ export function AdminSlipsView() {
                     </p>
                     {Array.isArray(selectedSlip.groupPayload.removedAttendees) &&
                       selectedSlip.groupPayload.removedAttendees.length > 0 && (
-                        <details className="group">
-                          <summary className="cursor-pointer text-[11px] font-bold text-amber-800 hover:text-amber-950 select-none">
+                        <div className="space-y-2 pt-1">
+                          <p className="text-[11px] font-bold text-amber-800">
                             {lang === 'th'
-                              ? `รายชื่อที่นำออก ${selectedSlip.groupPayload.removedAttendees.length} ท่าน`
+                              ? `ลบรายชื่อออก ${selectedSlip.groupPayload.removedAttendees.length} ท่าน`
                               : `Removed attendees (${selectedSlip.groupPayload.removedAttendees.length})`}
-                          </summary>
-                          <ol className="mt-2 space-y-1 list-decimal pl-5 text-[11px] text-amber-950">
-                            {selectedSlip.groupPayload.removedAttendees.map((att: any, idx: number) => (
-                              <li key={idx}>
-                                <span className="font-bold">{att.nameTh || att.nameEn || '-'}</span>
-                                {att.memberNo ? (
-                                  <span className="text-amber-700">
-                                    {' '}
-                                    • {lang === 'th' ? 'สมาชิก' : 'Member'} {att.memberNo}
-                                  </span>
-                                ) : null}
-                                {typeof att.price === 'number' && (
-                                  <span className="text-amber-700"> • ฿{att.price.toLocaleString()}</span>
+                          </p>
+                          {selectedSlip.groupPayload.removedAttendees.map((att: any, idx: number) => {
+                            const hasAmounts = typeof att.amountBefore === 'number' && typeof att.amountAfter === 'number';
+                            return (
+                              <div key={idx} className="bg-white/80 border border-amber-200 rounded-xl p-2.5 space-y-1.5">
+                                <div className="text-[11px] text-amber-950">
+                                  <span className="font-bold">{idx + 1}. {att.nameTh || att.nameEn || '-'}</span>
+                                  {att.memberNo ? (
+                                    <span className="text-amber-700"> • {lang === 'th' ? 'สมาชิก' : 'Member'} {att.memberNo}</span>
+                                  ) : null}
+                                  {typeof att.price === 'number' && (
+                                    <span className="text-amber-700"> • ฿{att.price.toLocaleString()}</span>
+                                  )}
+                                  {att.removedReason && (
+                                    <span className="block text-amber-700 mt-0.5">{att.removedReason}</span>
+                                  )}
+                                </div>
+                                {(Number(att.couponRightsReturned) > 0 || (Array.isArray(att.seatsReturned) && att.seatsReturned.length > 0)) && (
+                                  <div className="text-[11px] text-emerald-800 space-y-0.5">
+                                    {Number(att.couponRightsReturned) > 0 && (
+                                      <p>
+                                        {lang === 'th'
+                                          ? `• คืนสิทธิ์คูปองบริษัท ${att.couponRightsReturned} สิทธิ์${typeof att.couponRightsRemaining === 'number' ? ` คงเหลือ ${att.couponRightsRemaining} สิทธิ์` : ''}`
+                                          : `• Returned ${att.couponRightsReturned} coupon right${typeof att.couponRightsRemaining === 'number' ? `, ${att.couponRightsRemaining} remaining` : ''}`}
+                                      </p>
+                                    )}
+                                    {Array.isArray(att.seatsReturned) &&
+                                      att.seatsReturned.map((seat: any, sIdx: number) => (
+                                        <p key={sIdx}>
+                                          {lang === 'th'
+                                            ? `• คืนที่นั่ง ${seat.name} ${seat.count} ที่นั่ง`
+                                            : `• Returned ${seat.count} seat of ${seat.name}`}
+                                        </p>
+                                      ))}
+                                  </div>
                                 )}
-                              </li>
-                            ))}
-                          </ol>
-                        </details>
+                                {hasAmounts && (
+                                  <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
+                                    <div>
+                                      <span className="block text-[10px] font-bold text-amber-700">
+                                        {lang === 'th' ? 'ยอดเดิม' : 'Original total'}
+                                      </span>
+                                      <span className="text-lg font-black text-amber-950 font-mono leading-none">
+                                        ฿{att.amountBefore.toLocaleString()}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="block text-[10px] font-bold text-slate-500">
+                                        {lang === 'th' ? 'ยอดหลังลบรายชื่อ' : 'Total after removal'}
+                                      </span>
+                                      <span className="text-xs font-bold text-slate-600 font-mono">
+                                        ฿{att.amountAfter.toLocaleString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                   </div>
                 )}
@@ -2150,7 +2230,30 @@ export function AdminSlipsView() {
                                           })()}
                                         </div>
 
-                                        {/* View All Button on Top Right (Always accessible) */}
+                                        {/* Actions on Top Right: edit / remove (admin) + view all */}
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                        {canEditGroupAttendees(selectedSlip) && !isAddOnAttendee && (
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() => openAttendeeEditor(selectedSlip, 'update', idx, att)}
+                                              className="p-1.5 sm:p-2 rounded-xl bg-white hover:bg-sky-50 text-slate-500 hover:text-[#0026b3] border border-slate-200 hover:border-sky-300 shadow-2xs transition active:scale-95 cursor-pointer"
+                                              title={lang === 'th' ? 'แก้ไขข้อมูลผู้ลงทะเบียน' : 'Edit attendee'}
+                                            >
+                                              <Pencil className="w-3.5 h-3.5" />
+                                            </button>
+                                            {totalAttendees.length > 1 && (
+                                              <button
+                                                type="button"
+                                                onClick={() => openAttendeeEditor(selectedSlip, 'delete', idx, att)}
+                                                className="p-1.5 sm:p-2 rounded-xl bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-300 shadow-2xs transition active:scale-95 cursor-pointer"
+                                                title={lang === 'th' ? 'นำออกจากรายการ' : 'Remove attendee'}
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
+                                            )}
+                                          </>
+                                        )}
                                         <button
                                           type="button"
                                           onClick={() =>
@@ -2176,6 +2279,7 @@ export function AdminSlipsView() {
                                           <Eye className="w-3.5 h-3.5 text-[#0026b3]" />
                                           <span>{lang === 'th' ? 'ดูทั้งหมด' : 'View'}</span>
                                         </button>
+                                        </div>
                                       </div>
 
                                       {/* Row 2: English Name Below Thai Name */}
@@ -2274,9 +2378,20 @@ export function AdminSlipsView() {
                               })}
                             </div>
 
-                            {/* Show More / Show Less Toggle (Starts at 2) */}
-                            {totalAttendees.length > 2 && (
-                              <div className="pt-1.5 flex justify-center">
+                            {/* Show More / Show Less Toggle (Starts at 2) + admin add attendee */}
+                            {(totalAttendees.length > 2 || canEditGroupAttendees(selectedSlip)) && (
+                              <div className="pt-1.5 flex flex-wrap justify-center gap-2">
+                                {canEditGroupAttendees(selectedSlip) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => openAttendeeEditor(selectedSlip, 'create')}
+                                    className="px-4 py-1.5 rounded-xl bg-[#0026b3] hover:bg-[#001f94] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+                                  >
+                                    <UserPlus className="w-3.5 h-3.5" />
+                                    <span>{lang === 'th' ? 'เพิ่มผู้ลงทะเบียน' : 'Add Attendee'}</span>
+                                  </button>
+                                )}
+                                {totalAttendees.length > 2 && (
                                 <button
                                   type="button"
                                   onClick={() => setShowAllGroupAttendees((prev) => !prev)}
@@ -2298,6 +2413,7 @@ export function AdminSlipsView() {
                                     </>
                                   )}
                                 </button>
+                                )}
                               </div>
                             )}
                           </>
@@ -2913,6 +3029,16 @@ export function AdminSlipsView() {
           </div>,
           document.body
         )}
+
+      {/* Admin Add / Edit / Remove Group Attendee Modal */}
+      {attendeeEditor && (
+        <GroupAttendeeEditorModal
+          key={`${attendeeEditor.slipId}:${attendeeEditor.mode}:${attendeeEditor.attendeeIndex ?? 'new'}`}
+          target={attendeeEditor}
+          onClose={() => setAttendeeEditor(null)}
+          onSaved={handleAttendeeSaved}
+        />
+      )}
 
       {/* Admin Edit Attendance Format Modal */}
       {mounted &&
