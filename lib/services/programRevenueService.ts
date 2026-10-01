@@ -151,8 +151,9 @@ export function aggregateMeetingSlips(m: MeetingRow, slips: SlipRow[]): MeetingP
 
   /**
    * รายการหลักสูตรของผู้เข้าร่วม 1 คน (ไม่เลือกอะไรเลย = ลงเฉพาะการประชุมหลัก)
-   * personNet = ยอดสุทธิของคนนี้ที่บันทึกในบิล: ใช้ราคาสุทธิรายรายการ (netPrice) เป็นยอดจริง
-   * หากผลรวมรายรายการไม่ตรงกับยอดสุทธิของคน (เช่น แอดมินแก้ยอดภายหลัง) จึงแบ่งยอดของคนนั้นตามสัดส่วน
+   * personNet = ยอดสุทธิค่าหลักสูตรของคนนี้ที่บันทึกในบิล
+   * ใช้ราคาสุทธิรายรายการ (netPrice) ก่อน ไม่มีจึงใช้ราคาเต็มรายรายการแล้วหักส่วนลดของคนนั้น
+   * ทีละรายการ (การประชุมหลักก่อน ตามวิธีหักคูปองตอนลงทะเบียน) ยอดแต่ละรายการจึงเป็นราคาจริงไม่มีเศษ
    */
   const personLines = (items: any[], person: string, isMember: boolean, online: boolean, personNet: number | null = null): Line[] => {
     const list = items.length > 0 ? items : mainAct ? [mainAct] : [];
@@ -161,13 +162,37 @@ export function aggregateMeetingSlips(m: MeetingRow, slips: SlipRow[]): MeetingP
       const act = findAct(item);
       return { key: act ? `act:${act.id}` : 'unassigned', weight: weightOf(item, act, isMember, online), person };
     });
+
     const nets = items.length > 0 ? list.map((item) => priceOrNull(item?.netPrice)) : list.map(() => null);
-    const allNets = nets.every((n): n is number => n !== null);
-    const netSum = allNets ? nets.reduce((s, n) => s + n, 0) : 0;
-    if (allNets && (personNet === null || personNet === netSum)) {
-      lines.forEach((l, i) => (l.exact = nets[i]));
+    let amounts: number[] | null = nets.every((n): n is number => n !== null) ? nets : null;
+    if (!amounts && items.length > 0) {
+      const gross = list.map((item) => priceOrNull(item?.originalPrice ?? item?.price));
+      if (gross.every((g): g is number => g !== null)) amounts = gross;
+    }
+    if (!amounts && items.length === 0 && personNet !== null) {
+      // ไม่มีรายการหลักสูตร (ลงเฉพาะการประชุมหลัก): ยอดของคนคือยอดการประชุมหลัก
+      amounts = [personNet];
+    }
+
+    if (amounts) {
+      const sum = amounts.reduce((a, b) => a + b, 0);
+      let discount = personNet !== null ? sum - personNet : 0;
+      if (discount > 0) {
+        const order = list
+          .map((item, i) => ({ i, main: findAct(item)?.type === 'main' || item?.type === 'main' || item?.id === 'main' }))
+          .sort((a, b) => Number(b.main) - Number(a.main));
+        amounts = [...amounts];
+        for (const { i } of order) {
+          const cut = Math.min(amounts[i], discount);
+          amounts[i] -= cut;
+          discount -= cut;
+          if (discount <= 0) break;
+        }
+      }
+      // ยอดของคนสูงกว่าราคารายการ: ใช้ราคารายการ ส่วนเกินไปอยู่ที่แถวส่วนต่างยอดบิล
+      lines.forEach((l, i) => (l.exact = amounts![i]));
     } else if (personNet !== null) {
-      const parts = splitAmount(personNet, allNets && netSum > 0 ? lines.map((l, i) => ({ ...l, weight: nets[i] })) : lines);
+      const parts = splitAmount(personNet, lines);
       lines.forEach((l, i) => (l.exact = parts[i]));
     }
     return lines;
@@ -220,8 +245,17 @@ export function aggregateMeetingSlips(m: MeetingRow, slips: SlipRow[]): MeetingP
         const person = `${s.slip_id}:${i}`;
         const isMember = Boolean(att?.isMember || att?.memberNo);
         const online = (att?.selectedFormat || att?.attendanceType || att?.format) === 'online';
-        lines.push(...personLines(resolveAttendeeActivities(att, acts), person, isMember, online, priceOrNull(att?.price ?? att?.netPrice)));
-        attendeeBackdatedCharges(att).forEach((c) => lines.push({ key: 'backdated', weight: c.amount, person, exact: c.amount }));
+        const backdated = attendeeBackdatedCharges(att);
+        const backdatedSum = backdated.reduce((sum, c) => sum + c.amount, 0);
+        let personNet = priceOrNull(att?.price ?? att?.netPrice);
+        // ยอดของคนรวมรายการลงบิลย้อนหลังไว้แล้ว: หักออกก่อนแจกลงหลักสูตร ไม่นับซ้ำ
+        if (personNet !== null && backdatedSum > 0 && personNet >= backdatedSum) {
+          const items = resolveAttendeeActivities(att, acts);
+          const listTotal = items.reduce((sum: number, it: any) => sum + (priceOrNull(it?.netPrice ?? it?.originalPrice ?? it?.price) ?? 0), 0);
+          if (items.length === 0 || personNet - backdatedSum <= listTotal) personNet -= backdatedSum;
+        }
+        lines.push(...personLines(resolveAttendeeActivities(att, acts), person, isMember, online, personNet));
+        backdated.forEach((c) => lines.push({ key: 'backdated', weight: c.amount, person, exact: c.amount }));
       });
     } else {
       const items: any[] = Array.isArray(payload)
