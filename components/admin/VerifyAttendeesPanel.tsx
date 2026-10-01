@@ -450,27 +450,20 @@ export function VerifyAttendeesPanel({
 
   const selectedProgram = meetingPrograms.find((p) => p.id === filterProgram);
 
-  // Narrow round attendees by the selected program
-  const programAttendees = useMemo(() => {
-    if (!selectedProgram) return roundAttendees;
-    return roundAttendees.filter((a) => attendeeHasProgram(a, selectedProgram));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roundAttendees, selectedProgram]);
+  const getAttendanceType = (a: AttendeeItem) => a.attendanceType || 'onsite';
+  const getPaymentGroup = (a: AttendeeItem): 'paid' | 'pending' | 'rejected' =>
+    a.paymentStatus === 'paid' ? 'paid' : a.paymentStatus === 'rejected' ? 'rejected' : 'pending';
 
-  // Secondary filtering (search, check-in status, payment status)
-  const filteredAttendees = useMemo(() => {
-    return programAttendees.filter((a) => {
-      const matchStatus = filterCheckIn === 'all' || a.checkInStatus === filterCheckIn;
-      const matchAttendanceType =
-        filterAttendanceType === 'all' || (a.attendanceType || 'onsite') === filterAttendanceType;
-      const matchPayment =
-        filterPayment === 'all' ||
-        (filterPayment === 'pending'
-          ? a.paymentStatus === 'pending' || a.paymentStatus === 'unpaid'
-          : a.paymentStatus === filterPayment);
-      const q = search.toLowerCase().trim();
+  // ตัวกรองทุกตัว ยกเว้นตัวที่ระบุใน skip — ใช้นับจำนวนของแต่ละตัวเลือกตามตัวกรองอื่นที่เลือกอยู่
+  type FilterKey = 'search' | 'checkIn' | 'program' | 'attendanceType' | 'payment';
+  const matchesFilters = (a: AttendeeItem, skip?: FilterKey) => {
+    if (skip !== 'program' && selectedProgram && !attendeeHasProgram(a, selectedProgram)) return false;
+    if (skip !== 'checkIn' && filterCheckIn !== 'all' && a.checkInStatus !== filterCheckIn) return false;
+    if (skip !== 'attendanceType' && filterAttendanceType !== 'all' && getAttendanceType(a) !== filterAttendanceType) return false;
+    if (skip !== 'payment' && filterPayment !== 'all' && getPaymentGroup(a) !== filterPayment) return false;
+    const q = search.toLowerCase().trim();
+    if (skip !== 'search' && q) {
       const matchSearch =
-        !q ||
         a.nameTh.toLowerCase().includes(q) ||
         a.nameEn.toLowerCase().includes(q) ||
         a.id4Digits.includes(q) ||
@@ -478,9 +471,54 @@ export function VerifyAttendeesPanel({
         a.phone.includes(q) ||
         a.workplace.toLowerCase().includes(q) ||
         a.ticketCode.toLowerCase().includes(q);
-      return matchStatus && matchAttendanceType && matchPayment && matchSearch;
-    });
-  }, [programAttendees, filterCheckIn, filterAttendanceType, filterPayment, search]);
+      if (!matchSearch) return false;
+    }
+    return true;
+  };
+
+  const filteredAttendees = useMemo(
+    () => roundAttendees.filter((a) => matchesFilters(a)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [roundAttendees, selectedProgram, filterCheckIn, filterAttendanceType, filterPayment, search]
+  );
+
+  // จำนวนของแต่ละตัวเลือกในตัวกรอง (นับตามตัวกรองอื่นที่เลือกอยู่)
+  const facetCounts = useMemo(() => {
+    const byCheckIn = roundAttendees.filter((a) => matchesFilters(a, 'checkIn'));
+    const byType = roundAttendees.filter((a) => matchesFilters(a, 'attendanceType'));
+    const byPayment = roundAttendees.filter((a) => matchesFilters(a, 'payment'));
+    const byProgram = roundAttendees.filter((a) => matchesFilters(a, 'program'));
+    return {
+      checkIn: {
+        all: byCheckIn.length,
+        checked_in: byCheckIn.filter((a) => a.checkInStatus === 'checked_in').length,
+      },
+      attendanceType: {
+        all: byType.length,
+        online: byType.filter((a) => getAttendanceType(a) === 'online').length,
+      },
+      payment: {
+        all: byPayment.length,
+        paid: byPayment.filter((a) => getPaymentGroup(a) === 'paid').length,
+        pending: byPayment.filter((a) => getPaymentGroup(a) === 'pending').length,
+        rejected: byPayment.filter((a) => getPaymentGroup(a) === 'rejected').length,
+      },
+      programAll: byProgram.length,
+      programs: meetingPrograms.map((prog) => {
+        const list = byProgram.filter((a) => attendeeHasProgram(a, prog));
+        return {
+          ...prog,
+          total: list.length,
+          onsite: list.filter((a) => getAttendanceType(a) === 'onsite').length,
+          online: list.filter((a) => getAttendanceType(a) === 'online').length,
+          checkedIn: list.filter((a) => a.checkInStatus === 'checked_in').length,
+          paid: list.filter((a) => getPaymentGroup(a) === 'paid').length,
+          pending: list.filter((a) => getPaymentGroup(a) === 'pending').length,
+        };
+      }),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundAttendees, meetingPrograms, selectedProgram, filterCheckIn, filterAttendanceType, filterPayment, search]);
 
   // Total pages and Paginated Slice (5 items per page default)
   const totalPages = Math.max(1, Math.ceil(filteredAttendees.length / pageSize));
@@ -500,13 +538,6 @@ export function VerifyAttendeesPanel({
   const totalInRound = roundAttendees.length;
   const checkedInInRound = roundAttendees.filter((a) => a.checkInStatus === 'checked_in').length;
   const notCheckedInInRound = totalInRound - checkedInInRound;
-  const paidInRound = programAttendees.filter((a) => a.paymentStatus === 'paid').length;
-  const pendingInRound = programAttendees.filter(
-    (a) => a.paymentStatus === 'pending' || a.paymentStatus === 'unpaid'
-  ).length;
-  const rejectedInRound = programAttendees.filter((a) => a.paymentStatus === 'rejected').length;
-  const checkedInInProgram = programAttendees.filter((a) => a.checkInStatus === 'checked_in').length;
-  const onlineInProgram = programAttendees.filter((a) => a.attendanceType === 'online').length;
   const rateInRound = totalInRound > 0 ? Math.round((checkedInInRound / totalInRound) * 100) : 0;
 
   // Export CSV handler
@@ -685,9 +716,9 @@ export function VerifyAttendeesPanel({
             value={filterCheckIn}
             onChange={setFilterCheckIn}
             options={[
-              { id: 'all', label: 'ทั้งหมด', count: programAttendees.length },
-              { id: 'checked_in', label: 'เช็คอินแล้ว', count: checkedInInProgram },
-              { id: 'not_checked_in', label: 'ยังไม่เข้าร่วม', count: programAttendees.length - checkedInInProgram },
+              { id: 'all', label: 'ทั้งหมด', count: facetCounts.checkIn.all },
+              { id: 'checked_in', label: 'เช็คอินแล้ว', count: facetCounts.checkIn.checked_in },
+              { id: 'not_checked_in', label: 'ยังไม่เข้าร่วม', count: facetCounts.checkIn.all - facetCounts.checkIn.checked_in },
             ]}
           />
           {meetingPrograms.length > 0 && (
@@ -697,10 +728,10 @@ export function VerifyAttendeesPanel({
               onChange={setFilterProgram}
               className="max-w-[240px]"
               options={[
-                { value: 'all', label: 'ทุกโปรแกรม' },
-                ...meetingPrograms.map((prog) => ({
+                { value: 'all', label: `ทุกโปรแกรม · ${facetCounts.programAll} คน` },
+                ...facetCounts.programs.map((prog) => ({
                   value: prog.id,
-                  label: `${prog.name} (${roundAttendees.filter((a) => attendeeHasProgram(a, prog)).length})`,
+                  label: `${prog.name} · ${prog.total} คน`,
                 })),
               ]}
             />
@@ -710,9 +741,9 @@ export function VerifyAttendeesPanel({
             value={filterAttendanceType}
             onChange={(v) => setFilterAttendanceType(v as typeof filterAttendanceType)}
             options={[
-              { value: 'all', label: 'ทุกรูปแบบ' },
-              { value: 'onsite', label: `ออนไซต์ (${programAttendees.length - onlineInProgram})` },
-              { value: 'online', label: `ออนไลน์ (${onlineInProgram})` },
+              { value: 'all', label: `ทุกรูปแบบ · ${facetCounts.attendanceType.all} คน` },
+              { value: 'onsite', label: `ออนไซต์ · ${facetCounts.attendanceType.all - facetCounts.attendanceType.online} คน` },
+              { value: 'online', label: `ออนไลน์ · ${facetCounts.attendanceType.online} คน` },
             ]}
           />
           <FilterSelect
@@ -720,14 +751,76 @@ export function VerifyAttendeesPanel({
             value={filterPayment}
             onChange={(v) => setFilterPayment(v as typeof filterPayment)}
             options={[
-              { value: 'all', label: 'ทุกสถานะชำระเงิน' },
-              { value: 'paid', label: `ชำระแล้ว (${paidInRound})` },
-              { value: 'pending', label: `รอชำระ (${pendingInRound})` },
-              { value: 'rejected', label: `สลิปถูกปฏิเสธ (${rejectedInRound})` },
+              { value: 'all', label: `ทุกสถานะชำระเงิน · ${facetCounts.payment.all} คน` },
+              { value: 'paid', label: `ชำระแล้ว · ${facetCounts.payment.paid} คน` },
+              { value: 'pending', label: `รอชำระ · ${facetCounts.payment.pending} คน` },
+              { value: 'rejected', label: `สลิปถูกปฏิเสธ · ${facetCounts.payment.rejected} คน` },
             ]}
           />
         </ToolbarGroup>
       </Toolbar>
+
+      {/* ─── Breakdown by program / attendance type ──────────────────────── */}
+      {facetCounts.programs.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <h3 className="text-sm font-bold text-slate-800">สรุปผู้ลงทะเบียนแยกตามโปรแกรม</h3>
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+              {([
+                { id: 'onsite', label: 'ออนไซต์', count: facetCounts.attendanceType.all - facetCounts.attendanceType.online, cls: 'bg-blue-50 text-[#0026b3] border-blue-200' },
+                { id: 'online', label: 'ออนไลน์', count: facetCounts.attendanceType.online, cls: 'bg-violet-50 text-violet-700 border-violet-200' },
+              ] as const).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setFilterAttendanceType(filterAttendanceType === t.id ? 'all' : t.id)}
+                  className={`px-2.5 py-1 rounded-full border transition cursor-pointer ${t.cls} ${
+                    filterAttendanceType === t.id ? 'ring-2 ring-offset-1 ring-[#0026b3]/40' : 'hover:shadow-sm'
+                  }`}
+                >
+                  {t.label} {t.count} คน
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+            {facetCounts.programs.map((prog) => {
+              const active = filterProgram === prog.id;
+              const paidPct = prog.total > 0 ? Math.round((prog.paid / prog.total) * 100) : 0;
+              return (
+                <button
+                  key={prog.id}
+                  type="button"
+                  onClick={() => setFilterProgram(active ? 'all' : prog.id)}
+                  className={`text-left rounded-xl border p-3 transition cursor-pointer ${
+                    active ? 'border-[#0026b3] bg-blue-50/60 ring-2 ring-[#0026b3]/15' : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-xs sm:text-[13px] font-bold text-slate-800 leading-snug line-clamp-2">{prog.name}</span>
+                    <span className="shrink-0 text-lg font-black text-[#0026b3] tabular-nums leading-none">
+                      {prog.total}
+                      <span className="text-[10px] font-bold text-slate-500 ml-0.5">คน</span>
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-bold">
+                    <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-[#0026b3]">ออนไซต์ {prog.onsite}</span>
+                    <span className="px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-700">ออนไลน์ {prog.online}</span>
+                    <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700">เช็คอิน {prog.checkedIn}</span>
+                    <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600">ชำระแล้ว {prog.paid}</span>
+                    {prog.pending > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">รอชำระ {prog.pending}</span>
+                    )}
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden mt-2">
+                    <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${paidPct}%` }} />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ─── Attendees Table ─────────────────────────────────────────────── */}
       <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-xs bg-white">
