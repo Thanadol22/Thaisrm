@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AdminPageHeader, HeaderButton, HeaderTabs } from '@/components/admin/AdminPageHeader';
-import { Btn, EmptyState, StatGrid, StatCard, Toolbar, ToolbarGroup, SearchInput } from '@/components/admin/ui';
+import { Btn, EmptyState, FilterSelect, StatGrid, StatCard, Toolbar, ToolbarGroup, SearchInput } from '@/components/admin/ui';
 import { createPortal } from 'react-dom';
 import {
   Receipt,
@@ -35,6 +35,7 @@ import {
   ChevronUp,
   Upload,
   Download,
+  CalendarDays,
   Loader2,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -498,6 +499,7 @@ export function AdminSlipsView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'pay_later'>('all');
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'individual' | 'corporate' | 'corporate_pay_later'>('all');
+  const [meetingFilter, setMeetingFilter] = useState('all');
   const [selectedSlip, setSelectedSlip] = useState<SlipRecord | null>(null);
   const [viewingApplicant, setViewingApplicant] = useState<any | null>(null);
   const [viewingAttendee, setViewingAttendee] = useState<any | null>(null);
@@ -558,7 +560,7 @@ export function AdminSlipsView() {
   // Reset to page 1 on filter or search change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, categoryFilter]);
+  }, [searchQuery, statusFilter, categoryFilter, meetingFilter]);
 
   const fetchSlips = async () => {
     try {
@@ -1016,9 +1018,27 @@ export function AdminSlipsView() {
 
   const isPayLaterSlip = (s: SlipRecord) => isRegisteredAsPayLater(s);
 
-  // Slips filtered only by Category (used for scoped metrics and status filter counts)
+  // รอบประชุมที่มีรายการชำระเงิน (เรียงตามรายการล่าสุด)
+  const meetingOptions = React.useMemo(() => {
+    const map = new Map<string, string>();
+    slips.forEach((s) => {
+      if (s.meetingId && !map.has(s.meetingId)) map.set(s.meetingId, s.meetingName || s.meetingId);
+    });
+    return [...map].map(([value, label]) => ({ value, label }));
+  }, [slips]);
+
+  // รอบประชุมที่เลือกไม่มีรายการแล้ว (เช่น หลังรีเฟรช) ให้กลับไปแสดงทุกรอบ
+  const activeMeetingFilter = meetingFilter !== 'all' && meetingOptions.some((m) => m.value === meetingFilter) ? meetingFilter : 'all';
+
+  // Slips filtered by meeting (ตัวเลขทุกแท็บและการ์ดสรุปนับตามรอบประชุมที่เลือก)
+  const meetingSlips = React.useMemo(
+    () => (activeMeetingFilter === 'all' ? slips : slips.filter((s) => s.meetingId === activeMeetingFilter)),
+    [slips, activeMeetingFilter]
+  );
+
+  // Slips filtered by meeting and Category (used for scoped metrics and status filter counts)
   const categorySlips = React.useMemo(() => {
-    return slips.filter((s) => {
+    return meetingSlips.filter((s) => {
       const isCorporate = isCorporateSlip(s);
       const isPayLater = isPayLaterSlip(s);
       if (categoryFilter === 'individual' && isCorporate) return false;
@@ -1026,21 +1046,21 @@ export function AdminSlipsView() {
       if (categoryFilter === 'corporate_pay_later' && (!isCorporate || !isPayLater)) return false;
       return true;
     });
-  }, [slips, categoryFilter]);
+  }, [meetingSlips, categoryFilter]);
 
   // Overall category counts
-  const totalCount = slips.length;
+  const totalCount = meetingSlips.length;
   const individualSlips = React.useMemo(
-    () => slips.filter((s) => !isCorporateSlip(s)),
-    [slips]
+    () => meetingSlips.filter((s) => !isCorporateSlip(s)),
+    [meetingSlips]
   );
   const corporateSlips = React.useMemo(
-    () => slips.filter((s) => isCorporateSlip(s)),
-    [slips]
+    () => meetingSlips.filter((s) => isCorporateSlip(s)),
+    [meetingSlips]
   );
   const corporatePayLaterSlips = React.useMemo(
-    () => slips.filter((s) => isCorporateSlip(s) && isPayLaterSlip(s)),
-    [slips]
+    () => meetingSlips.filter((s) => isCorporateSlip(s) && isPayLaterSlip(s)),
+    [meetingSlips]
   );
 
   // Scoped metrics for current category
@@ -1221,6 +1241,17 @@ export function AdminSlipsView() {
           }
         />
         <ToolbarGroup>
+          <FilterSelect
+            value={activeMeetingFilter}
+            onChange={setMeetingFilter}
+            icon={CalendarDays}
+            label={lang === 'th' ? 'รอบประชุม' : 'Meeting'}
+            className="w-full sm:w-72"
+            options={[
+              { value: 'all', label: lang === 'th' ? 'ทุกรอบประชุม' : 'All meetings' },
+              ...meetingOptions,
+            ]}
+          />
           <span className="text-xs font-semibold text-slate-500">
             {lang === 'th' ? `แสดง ${filteredSlips.length} รายการ` : `${filteredSlips.length} items`}
           </span>
