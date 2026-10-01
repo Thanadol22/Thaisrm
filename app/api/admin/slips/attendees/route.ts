@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
+import { buildSpecialFormMeeting, parseSpecialFormItems } from '@/lib/services/specialFormService';
 import { parseSlipPayload } from '@/lib/services/registrationAddOnService';
 import {
   countSlipSeatClaims,
@@ -83,6 +84,18 @@ async function findMember(db: Tx | typeof prisma, rawNo: string) {
       OR: [{ member_no: no }, { member_no: no.padStart(4, '0') }, { member_no: no.replace(/^0+/, '') }],
     },
   });
+}
+
+/** รายการที่ลงผ่านฟอร์มเฉพาะ: ใช้กิจกรรมและราคาของฟอร์มแทนราคาปกติของงานประชุม */
+async function withSpecialFormPricing<T extends { activities: unknown; pricing_tiers: unknown } | null>(
+  meeting: T,
+  payload: any
+): Promise<T> {
+  const formId = payload && !Array.isArray(payload) ? payload.specialFormId : null;
+  if (!meeting || !formId) return meeting;
+  const form = await prisma.special_forms.findUnique({ where: { id: String(formId) }, select: { items: true } });
+  if (!form) return meeting;
+  return buildSpecialFormMeeting(meeting, parseSpecialFormItems(form.items)) as T;
 }
 
 /** ราคาตั้งต้นของกิจกรรมตามสถานะสมาชิกและรูปแบบการเข้าร่วม (ตรงกับหน้าชำระเงิน) */
@@ -442,15 +455,18 @@ export async function GET(req: NextRequest) {
   }
   const slip = await prisma.payment_slips.findUnique({
     where: { slip_id: slipId },
-    select: { meeting_id: true },
+    select: { meeting_id: true, selected_activities: true },
   });
   if (!slip) {
     return NextResponse.json({ success: false, error: 'ไม่พบรายการลงทะเบียน' }, { status: 404 });
   }
-  const meeting = await prisma.meetings.findUnique({
-    where: { meeting_id: slip.meeting_id },
-    select: { meeting_id: true, meeting_name: true, activities: true, pricing_tiers: true, base_price: true },
-  });
+  const meeting = await withSpecialFormPricing(
+    await prisma.meetings.findUnique({
+      where: { meeting_id: slip.meeting_id },
+      select: { meeting_id: true, meeting_name: true, activities: true, pricing_tiers: true, base_price: true },
+    }),
+    parseSlipPayload(slip.selected_activities)
+  );
   const activities = (Array.isArray(meeting?.activities) ? (meeting!.activities as any[]) : []).map((a) => ({
     id: String(a?.id ?? ''),
     name: a?.name || String(a?.id ?? ''),
@@ -520,10 +536,13 @@ export async function POST(req: NextRequest) {
           throw new EditError('รายการต้องมีผู้ลงทะเบียนอย่างน้อย 1 ท่าน หากต้องการยกเลิกทั้งหมดให้ปฏิเสธรายการแทน');
         }
 
-        const meeting = await tx.meetings.findUnique({
-          where: { meeting_id: slip.meeting_id },
-          select: { activities: true, pricing_tiers: true, base_price: true },
-        });
+        const meeting = await withSpecialFormPricing(
+          await tx.meetings.findUnique({
+            where: { meeting_id: slip.meeting_id },
+            select: { activities: true, pricing_tiers: true, base_price: true },
+          }),
+          payload
+        );
         const meetingActivities: any[] = Array.isArray(meeting?.activities) ? (meeting!.activities as any[]) : [];
         const isApproved = slip.status === 'approved';
 

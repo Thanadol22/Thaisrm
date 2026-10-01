@@ -7,6 +7,8 @@ export interface OtpSessionPayload {
   email: string;
   member_no?: string;
   sponsorId?: string;
+  /** ฟอร์มเฉพาะที่ token นี้ใช้ได้ (ออกจาก OTP ของฟอร์มเฉพาะเท่านั้น) */
+  formId?: string;
   userType: 'member' | 'sponsor';
   issuedAt: number;
   expiresAt: number;
@@ -44,6 +46,7 @@ export function createOtpSessionToken(params: {
   userType: 'member' | 'sponsor';
   member_no?: string;
   sponsorId?: string;
+  formId?: string;
 }): string {
   const now = Math.floor(Date.now() / 1000);
   const payload: OtpSessionPayload = {
@@ -51,6 +54,7 @@ export function createOtpSessionToken(params: {
     userType: params.userType,
     member_no: params.member_no,
     sponsorId: params.sponsorId,
+    ...(params.formId ? { formId: params.formId } : {}),
     issuedAt: now,
     expiresAt: now + OTP_SESSION_MAX_AGE_SECONDS,
   };

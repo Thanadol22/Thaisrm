@@ -19,6 +19,15 @@ import {
   lockAndAssertSeats,
   SeatUnavailableError,
 } from '@/lib/services/activitySeatService';
+import { verifyOtpSessionToken } from '@/lib/security/otpSessionAuth';
+import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
+import {
+  isSpecialFormOpen,
+  isSponsorAllowedForForm,
+  parseSpecialFormItems,
+  priceSpecialFormAttendees,
+  SpecialFormPricingError,
+} from '@/lib/services/specialFormService';
 
 export async function POST(
   request: NextRequest,
@@ -200,6 +209,99 @@ export async function POST(
         }
       }
 
+      // ฟอร์มเฉพาะ (เช่น ราคา fellow): ตรวจสิทธิ์บริษัทจาก token ของฟอร์ม และคำนวณราคาใหม่จากรายการของฟอร์ม
+      let specialFormMeta: Record<string, unknown> | null = null;
+      if (body.specialFormId) {
+        const session = verifyOtpSessionToken(String(body.specialFormToken || ''));
+        const form = await prisma.special_forms.findUnique({ where: { id: String(body.specialFormId) } });
+        if (!form || form.meeting_id !== meetingId) {
+          return NextResponse.json({ success: false, error: 'ไม่พบฟอร์มที่ใช้ลงทะเบียน' }, { status: 404 });
+        }
+        if (!isSpecialFormOpen(form)) {
+          return NextResponse.json({ success: false, error: 'ฟอร์มนี้ปิดรับลงทะเบียนแล้ว' }, { status: 403 });
+        }
+        // ตัวแทนบริษัทใช้ token จาก OTP ของฟอร์ม / แอดมินทำรายการแทนบริษัทที่มีสิทธิ์ในฟอร์มนี้
+        const adminSession = getAdminSessionFromRequest(request);
+        const formSponsorId = adminSession
+          ? String(body.sponsorId || '')
+          : session && session.userType === 'sponsor' && session.formId === form.id
+            ? session.sponsorId || ''
+            : '';
+        if (!formSponsorId || !(await isSponsorAllowedForForm(form.id, formSponsorId))) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: adminSession
+                ? 'บริษัทที่เลือกไม่มีสิทธิ์ในฟอร์มนี้'
+                : 'สิทธิ์การเข้าใช้ฟอร์มหมดอายุ กรุณาเปิดลิงก์ฟอร์มและยืนยันตัวตนใหม่',
+            },
+            { status: 401 }
+          );
+        }
+        const formSponsor = await prisma.sponsors.findUnique({ where: { id: formSponsorId } });
+        if (!formSponsor) {
+          return NextResponse.json({ success: false, error: 'ไม่พบข้อมูลบริษัท' }, { status: 404 });
+        }
+        if (groupCoupon && (!form.allow_coupon || groupCoupon.company_name.trim().toLowerCase() !== formSponsor.name.trim().toLowerCase())) {
+          return NextResponse.json({ success: false, error: 'รหัสคูปองนี้ใช้กับฟอร์มนี้ไม่ได้' }, { status: 400 });
+        }
+
+        const items = parseSpecialFormItems(form.items);
+        let priced;
+        try {
+          priced = await priceSpecialFormAttendees({
+            meeting,
+            items,
+            attendees,
+            coupon: groupCoupon,
+            freeSeatsLimit: null,
+          });
+        } catch (err) {
+          if (err instanceof SpecialFormPricingError) {
+            return NextResponse.json({ success: false, error: err.message }, { status: 400 });
+          }
+          throw err;
+        }
+        const serverTotal = priced.reduce((sum, p) => sum + p.price, 0);
+        if (serverTotal !== numericAmount) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `ยอดชำระไม่ตรงกับราคาของฟอร์ม (ยอดที่ถูกต้อง ฿${serverTotal.toLocaleString()}) กรุณาเปิดลิงก์ฟอร์มและลงทะเบียนใหม่อีกครั้ง`,
+              code: 'SPECIAL_FORM_PRICE_MISMATCH',
+            },
+            { status: 400 }
+          );
+        }
+        // ใช้ราคาที่คำนวณจากเซิร์ฟเวอร์เท่านั้น
+        priced.forEach((p) => {
+          const att = attendees[p.index];
+          att.price = p.price;
+          att.originalTotal = p.originalTotal;
+          att.subtotal = p.originalTotal;
+          att.discountTotal = p.discountTotal;
+          att.attendanceType = p.attendanceType;
+          att.priceTier = form.form_type;
+        });
+        body.sponsorId = formSponsor.id;
+        body.originalAmount = priced.reduce((sum, p) => sum + p.originalTotal, 0);
+        body.discountAmount = priced.reduce((sum, p) => sum + p.discountTotal, 0);
+        specialFormMeta = {
+          specialFormId: form.id,
+          specialFormSlug: form.slug,
+          specialFormTitle: form.title,
+          priceTier: form.form_type,
+          isFellow: form.form_type === 'fellow',
+          sponsorId: formSponsor.id,
+          companyName: formSponsor.name,
+          groupContact: {
+            coordinatorEmail: formSponsor.contact_email,
+            coordinatorName: formSponsor.contact_name || formSponsor.name,
+            coordinatorPhone: '',
+          },
+        };
+      }
+
       // นับเป็นการใช้สิทธิ์คูปองเฉพาะผู้ที่ได้รับส่วนลดจริง และลงโปรแกรมที่คูปองครอบคลุม
       // (เช่น คูปองฟรีการประชุมหลัก แต่ลงเฉพาะเวิร์กช็อป จะไม่ตัดโควต้า)
       const couponCoveredAttendees = groupCoupon
@@ -227,6 +329,7 @@ export async function POST(
         originalAmount: Number(body.originalAmount) || (numericAmount + (Number(body.discountAmount) || 0)),
         totalAmount: numericAmount,
         submittedAt: new Date().toISOString(),
+        ...(specialFormMeta || {}),
       };
 
       // Resolve Sponsor Record ก่อนเริ่ม Transaction (read-only, ไม่ต้องอยู่ใน tx)

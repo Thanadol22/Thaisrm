@@ -41,6 +41,9 @@ function PaymentContent() {
     }
   }, [paymentType]);
 
+  // ลงทะเบียนผ่านฟอร์มเฉพาะ: ย้อนกลับ/ปิดหน้าสำเร็จแล้วกลับไปที่ลิงก์ฟอร์มเดิม
+  const specialFormSlug: string | undefined = (regData as any)?.specialForm?.slug;
+
   const handleSubmitted = () => {
     // Clean up draft localStorage
     try {
@@ -61,9 +64,17 @@ function PaymentContent() {
           paymentType={paymentType}
           regData={regData}
           membershipRegData={membershipRegData}
-          onNavigateBack={() => router.push(paymentType === 'registration' ? '/login?tab=conference&restore=1' : '/signup')}
+          onNavigateBack={() =>
+            router.push(
+              paymentType !== 'registration'
+                ? '/signup'
+                : specialFormSlug
+                  ? `/forms/${specialFormSlug}?restore=1`
+                  : '/login?tab=conference&restore=1'
+            )
+          }
           onSubmitted={handleSubmitted}
-          onSuccessClose={() => router.push('/login')}
+          onSuccessClose={() => router.push(specialFormSlug ? `/forms/${specialFormSlug}` : '/login')}
           onMissingMembershipData={() => router.push('/signup')}
         />
       </main>

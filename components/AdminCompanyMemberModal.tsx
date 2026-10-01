@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Building2 } from 'lucide-react';
-import { LoginView } from '@/components/views/LoginView';
+import { LoginView, SpecialFormContext } from '@/components/views/LoginView';
 import { PaymentFlow, RegistrationPaymentData } from '@/components/views/PaymentFlow';
 import { SponsorSessionData } from '@/components/SponsorAuthModal';
 
@@ -21,18 +21,29 @@ interface PendingSubmission {
   payload: unknown;
 }
 
+/** ลงทะเบียนแทนบริษัทผ่านฟอร์มเฉพาะ: ใช้รายการและราคาของฟอร์ม เลือกได้เฉพาะบริษัทที่มีสิทธิ์ในฟอร์ม */
+export interface AdminSpecialFormOption {
+  id: string;
+  slug: string;
+  title: string;
+  formType: string;
+  allowCoupon: boolean;
+  meeting: any;
+}
+
 interface AdminCompanyMemberModalProps {
   isOpen: boolean;
   onClose: () => void;
   companies: CompanyOption[];
   onSuccess?: (message: string) => void;
+  specialForm?: AdminSpecialFormOption | null;
 }
 
 /**
  * แอดมินทำรายการแทนบริษัท โดยใช้ฟอร์มลงทะเบียน/สมัครสมาชิกและขั้นตอนชำระเงินชุดเดียวกับหน้าเว็บจริง
  * (ไม่บังคับแนบสลิป หากไม่แนบจะบันทึกเป็นสถานะรอสลิป)
  */
-export function AdminCompanyMemberModal({ isOpen, onClose, companies, onSuccess }: AdminCompanyMemberModalProps) {
+export function AdminCompanyMemberModal({ isOpen, onClose, companies, onSuccess, specialForm = null }: AdminCompanyMemberModalProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -62,6 +73,25 @@ export function AdminCompanyMemberModal({ isOpen, onClose, companies, onSuccess 
     [company]
   );
 
+  const specialFormContext = useMemo<SpecialFormContext | null>(
+    () =>
+      specialForm && sponsorSession
+        ? {
+            id: specialForm.id,
+            slug: specialForm.slug,
+            title: specialForm.title,
+            formType: specialForm.formType,
+            // แอดมินทำรายการด้วยสิทธิ์แอดมิน ไม่ใช้ token ของบริษัท
+            token: '',
+            meeting: specialForm.meeting,
+            allowCoupon: specialForm.allowCoupon,
+            sponsorSession,
+            onSessionEnd: () => {},
+          }
+        : null,
+    [specialForm, sponsorSession]
+  );
+
   const handleClose = () => {
     setPending(null);
     setCompanyId('');
@@ -81,8 +111,14 @@ export function AdminCompanyMemberModal({ isOpen, onClose, companies, onSuccess 
               <Building2 className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base text-slate-900">เพิ่มสมาชิกบริษัท</h3>
-              <p className="text-xs text-slate-500 mt-0.5">ลงทะเบียนหรือสมัครสมาชิกแทนบริษัท ไม่บังคับแนบสลิป</p>
+              <h3 className="font-bold text-base text-slate-900">
+                {specialForm ? `ลงทะเบียนแทนบริษัท: ${specialForm.title}` : 'เพิ่มสมาชิกบริษัท'}
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {specialForm
+                  ? 'ใช้รายการและราคาของฟอร์มนี้ เลือกได้เฉพาะบริษัทที่มีสิทธิ์ ไม่บังคับแนบสลิป'
+                  : 'ลงทะเบียนหรือสมัครสมาชิกแทนบริษัท ไม่บังคับแนบสลิป'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -124,6 +160,7 @@ export function AdminCompanyMemberModal({ isOpen, onClose, companies, onSuccess 
                 <LoginView
                   key={`${company.id}-${formKey}`}
                   adminSponsorSession={sponsorSession}
+                  specialForm={specialFormContext}
                   onAdminSubmit={(type, payload) => setPending({ type, payload })}
                   onNavigateToSignup={() => {}}
                   onGoogleSignIn={() => {}}

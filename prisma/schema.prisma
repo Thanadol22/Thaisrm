@@ -107,6 +107,7 @@ model meetings {
   sponsor_quotas       sponsor_quotas[]
   sponsor_group_members sponsor_group_members[]
   online_meeting_links  online_meeting_links[]
+  special_forms         special_forms[]
 }
 
 model meeting_daily_checkins {
@@ -289,6 +290,7 @@ model sponsors {
   group_members sponsor_group_members[]
   attendances   meeting_attendances[]
   members       Member[]
+  special_forms special_form_sponsors[]
 
   @@index([name], map: "idx_sponsors_name")
   @@index([tier], map: "idx_sponsors_tier")
@@ -379,4 +381,43 @@ model online_meeting_links {
 
   @@unique([meeting_id, link_date, import_email], map: "uq_online_link_meeting_date_email")
   @@index([meeting_id, link_date], map: "idx_online_link_meeting_date")
+}
+
+/// ฟอร์มเฉพาะ (เช่น ราคา fellow): แอดมินตั้งรายการและราคาเอง และเลือกบริษัทที่เข้าใช้ได้
+/// items = [{ activityId, label, onsiteMember, onsiteNonMember, online }] อ้างอิงกิจกรรมใน meetings.activities
+/// การลงทะเบียนบันทึกเป็นรายการกลุ่มใน payment_slips (selected_activities.specialFormId)
+model special_forms {
+  id           String                  @id @default(uuid()) @db.VarChar(50)
+  slug         String                  @unique @db.VarChar(50)
+  form_type    String                  @default("fellow") @db.VarChar(30)
+  title        String                  @db.VarChar(255)
+  description  String?
+  meeting_id   String                  @db.VarChar(50)
+  items        Json                    @default("[]")
+  allow_coupon Boolean                 @default(true)
+  is_open      Boolean                 @default(true)
+  close_at     DateTime?               @db.Timestamptz(6)
+  created_at   DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime                @default(now()) @updatedAt @db.Timestamptz(6)
+
+  meeting  meetings                @relation(fields: [meeting_id], references: [meeting_id], onDelete: Cascade, onUpdate: NoAction)
+  sponsors special_form_sponsors[]
+
+  @@index([meeting_id], map: "idx_special_forms_meeting")
+  @@map("special_forms")
+}
+
+/// บริษัทที่มีสิทธิ์เข้าฟอร์มเฉพาะ (เข้าระบบด้วย sponsors.contact_email + OTP)
+model special_form_sponsors {
+  id         BigInt   @id @default(autoincrement())
+  form_id    String   @db.VarChar(50)
+  sponsor_id String   @db.VarChar(50)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  form    special_forms @relation(fields: [form_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sponsor sponsors      @relation(fields: [sponsor_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([form_id, sponsor_id], map: "uq_special_form_sponsor")
+  @@index([sponsor_id], map: "idx_special_form_sponsors_sponsor")
+  @@map("special_form_sponsors")
 }

@@ -158,6 +158,24 @@ interface LoginViewProps {
   adminSponsorSession?: SponsorSessionData | null;
   /** แอดมิน: ส่งข้อมูลกลับแทนการไปหน้าชำระเงิน */
   onAdminSubmit?: (type: 'registration' | 'membership', payload: unknown) => void;
+  /** ฟอร์มเฉพาะ (เช่น ราคา fellow): ลงทะเบียนแบบกลุ่มในนามบริษัทที่ยืนยันตัวตนผ่านลิงก์ฟอร์ม ด้วยรายการและราคาของฟอร์ม */
+  specialForm?: SpecialFormContext | null;
+}
+
+export interface SpecialFormContext {
+  id: string;
+  slug: string;
+  title: string;
+  formType: string;
+  /** token จากการยืนยันรหัสผ่านชั่วคราวของฟอร์ม (เซิร์ฟเวอร์ใช้ตรวจสิทธิ์และคำนวณราคา) */
+  token: string;
+  /** งานประชุมที่แปลงเป็นรายการและราคาของฟอร์มแล้ว */
+  meeting: any;
+  /** ใช้คูปองสิทธิ์ฟรีของบริษัทในฟอร์มนี้ได้ */
+  allowCoupon: boolean;
+  sponsorSession: SponsorSessionData;
+  /** ออกจากระบบบริษัท หรือหมดเวลาใช้งาน: กลับไปหน้ากรอกอีเมลของฟอร์ม */
+  onSessionEnd: () => void;
 }
 
 function formatMeetingDateDisplay(meetingOrDate?: any, lang: 'th' | 'en' = 'th'): string {
@@ -242,9 +260,13 @@ export function LoginView({
   initialGoogleUser,
   adminSponsorSession = null,
   onAdminSubmit,
+  specialForm = null,
 }: LoginViewProps) {
   const router = useRouter();
   const isAdminMode = Boolean(adminSponsorSession);
+  const isSpecialForm = Boolean(specialForm);
+  // แอดมินทำรายการแทน หรือฟอร์มเฉพาะ: ไม่แสดงส่วนหัว แท็บสมัครสมาชิก และส่วนท้ายของหน้าแรก
+  const hidePublicChrome = isAdminMode || isSpecialForm;
   const { lang, toggleLang, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'conference' | 'membership'>(defaultTab);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -256,12 +278,12 @@ export function LoginView({
   const [loadingMeeting, setLoadingMeeting] = useState(true);
 
   // Registration Mode: Individual vs Group
-  const [regMode, setRegMode] = useState<'individual' | 'group'>(adminSponsorSession ? 'group' : 'individual');
+  const [regMode, setRegMode] = useState<'individual' | 'group'>(adminSponsorSession || specialForm ? 'group' : 'individual');
   const [activeAttendeeIdx, setActiveAttendeeIdx] = useState(0);
 
   // Corporate Sponsor Auth Modal state & Inactivity Tracker (5 Mins)
   const [sponsorAuthModalOpen, setSponsorAuthModalOpen] = useState(false);
-  const [sponsorSession, setSponsorSession] = useState<SponsorSessionData | null>(adminSponsorSession);
+  const [sponsorSession, setSponsorSession] = useState<SponsorSessionData | null>(adminSponsorSession || specialForm?.sponsorSession || null);
   const [sponsorSecondsRemaining, setSponsorSecondsRemaining] = useState<number>(300);
   const lastSponsorActivityRef = useRef<number>(Date.now());
 
@@ -371,6 +393,13 @@ export function LoginView({
   };
 
   const handleSponsorLogout = () => {
+    if (specialForm) {
+      try {
+        localStorage.removeItem('conference_registration');
+      } catch (e) { }
+      specialForm.onSessionEnd();
+      return;
+    }
     setSponsorSession(adminSponsorSession);
     setRegMode(adminSponsorSession ? 'group' : 'individual');
     setCouponState(null);
@@ -413,8 +442,9 @@ export function LoginView({
   useEffect(() => {
     let isMounted = true;
     setLoadingMeeting(true);
-    fetch('/api/meetings?action=latest')
-      .then(res => res.json())
+    (specialForm
+      ? Promise.resolve({ success: true, data: specialForm.meeting })
+      : fetch('/api/meetings?action=latest').then(res => res.json()))
       .then(data => {
         if (isMounted) {
           if (data.success && data.data) {
@@ -429,7 +459,12 @@ export function LoginView({
 
               if (isRestoreRequested && savedDraftStr) {
                 const savedDraft = JSON.parse(savedDraftStr);
-                if (savedDraft && savedDraft.meetingId === data.data.meeting_id) {
+                if (
+                  savedDraft &&
+                  savedDraft.meetingId === data.data.meeting_id &&
+                  // ร่างจากฟอร์มเฉพาะกู้คืนได้เฉพาะในฟอร์มเดิม (ราคาต่างกัน)
+                  (savedDraft.specialForm?.id || null) === (specialForm?.id || null)
+                ) {
                   if (savedDraft.isGroup && Array.isArray(savedDraft.attendees) && savedDraft.attendees.length > 0) {
                     setRegMode('group');
                     setAttendees(savedDraft.attendees.map((att: any, idx: number) => ({
@@ -1469,6 +1504,17 @@ export function LoginView({
           totalAmount: groupTotalAmount,
           couponData: effectiveCoupon || undefined,
           sponsorSession: sponsorSession || undefined,
+          ...(specialForm
+            ? {
+                specialForm: {
+                  id: specialForm.id,
+                  slug: specialForm.slug,
+                  title: specialForm.title,
+                  formType: specialForm.formType,
+                  token: specialForm.token,
+                },
+              }
+            : {}),
           groupContact: sponsorSession ? {
             coordinatorEmail: sponsorSession.contactEmail,
             coordinatorName: sponsorSession.contactName || sponsorSession.sponsorName,
@@ -1520,9 +1566,9 @@ export function LoginView({
   };
 
   return (
-    <div className={`flex-1 flex flex-col justify-between animate-fade-in ${isAdminMode ? '' : 'min-h-[640px]'}`}>
+    <div className={`flex-1 flex flex-col justify-between animate-fade-in ${hidePublicChrome ? '' : 'min-h-[640px]'}`}>
       {/* Header Blue Card Section */}
-      {!isAdminMode && (
+      {!hidePublicChrome && (
       <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-3.5 xs:px-5 sm:px-8 lg:px-12 pt-3.5 sm:pt-7 pb-5 sm:pb-8 rounded-b-[24px] sm:rounded-b-[36px] shadow-xl relative overflow-hidden">
         <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute bottom-0 -left-12 w-40 h-40 bg-[#4ade80]/15 rounded-full blur-2xl pointer-events-none" />
@@ -1618,6 +1664,7 @@ export function LoginView({
         <div className="space-y-3.5 sm:space-y-6">
 
           {/* Main Action Segmented Buttons (Conference vs Membership) */}
+          {!isSpecialForm && (
           <div className="relative grid grid-cols-2 p-1 bg-slate-200/80 rounded-2xl border border-slate-200/90 shadow-inner select-none max-w-xl mx-auto w-full">
             <div
               aria-hidden="true"
@@ -1660,6 +1707,7 @@ export function LoginView({
               <span className="leading-tight text-center">{lang === 'th' ? 'สมัครสมาชิก TSRM' : 'TSRM Membership'}</span>
             </button>
           </div>
+          )}
 
           {/* View 1: Conference Registration Form */}
           {activeTab === 'conference' ? (
@@ -1704,7 +1752,7 @@ export function LoginView({
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                         <span className="bg-[#0026b3] text-white text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
-                          {lang === 'th' ? 'การประชุมล่าสุด' : 'LATEST CONFERENCE'}
+                          {specialForm ? specialForm.title : lang === 'th' ? 'การประชุมล่าสุด' : 'LATEST CONFERENCE'}
                         </span>
                         <span className="bg-emerald-100 text-emerald-700 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -1734,7 +1782,7 @@ export function LoginView({
                   {/* Mode Selector: Individual vs Group */}
                   <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-2 sm:p-2.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
                     <div className="grid grid-cols-1 xs:grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
-                      {!isAdminMode && (
+                      {!isAdminMode && !isSpecialForm && (
                       <button
                         type="button"
                         onClick={() => {
@@ -1825,7 +1873,7 @@ export function LoginView({
                   )}
 
                   {/* Corporate Coupon Card - Only shown for Corporate / Group Registration */}
-                  {regMode === 'group' && (
+                  {regMode === 'group' && (!specialForm || specialForm.allowCoupon) && (
                     <div className="bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-blue-50/80 border border-blue-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-2 animate-fade-in">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -2574,7 +2622,7 @@ export function LoginView({
       </div>
 
       {/* Receipt Request Footer */}
-      {!isAdminMode && (
+      {!hidePublicChrome && (
       <footer className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-3.5 xs:px-5 sm:px-8 lg:px-12 pt-5 sm:pt-7 pb-5 sm:pb-7 rounded-t-[24px] sm:rounded-t-[36px] shadow-xl relative overflow-hidden mt-2">
         <div className="absolute -top-12 -left-12 w-48 h-48 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute bottom-0 -right-12 w-40 h-40 bg-[#4ade80]/15 rounded-full blur-2xl pointer-events-none" />

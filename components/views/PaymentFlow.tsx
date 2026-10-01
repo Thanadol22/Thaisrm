@@ -652,6 +652,9 @@ export function PaymentFlow({
               couponCode: regData?.couponData?.code || undefined,
               couponData: regData?.couponData || undefined,
               sponsorId: (regData as any)?.sponsorSession?.sponsorId || (regData?.couponData as any)?.sponsorId || undefined,
+              // ฟอร์มเฉพาะ: เซิร์ฟเวอร์ตรวจสิทธิ์จาก token ของฟอร์ม และคำนวณราคาใหม่จากรายการของฟอร์ม
+              specialFormId: (regData as any)?.specialForm?.id || undefined,
+              specialFormToken: (regData as any)?.specialForm?.token || undefined,
               bank: isFreeOrSponsored
                 ? `สิทธิ์สปอนเซอร์: ${regData?.couponData?.companyName || (regData as any).companyName || 'Corporate Pass'}`
                 : (isPayLater ? 'ชำระเงินภายหลัง (Pay Later)' : systemSettings.bank_name),
