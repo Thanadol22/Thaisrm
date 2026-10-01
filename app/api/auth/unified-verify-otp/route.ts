@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import prisma from '@/lib/prisma';
 import { createOtpSessionToken } from '@/lib/security/otpSessionAuth';
 import { statusLabelTh } from '@/lib/statusLabels';
-import { resolveAttendeeActivities } from '@/lib/services/sponsorCouponService';
+import { attendeeBackdatedCharges, resolveAttendeeActivities } from '@/lib/services/sponsorCouponService';
 
 export async function POST(req: NextRequest) {
   try {
@@ -507,6 +507,9 @@ export async function POST(req: NextRequest) {
             isFellow: isFellowAttendee && (isMain || a?.priceTier === 'fellow'),
           };
         });
+        for (const c of attendeeBackdatedCharges(att)) {
+          programs.push({ name: c.label, type: 'main', format: attFormat, price: c.amount });
+        }
         // ราคาแยกหลักสูตรต้องรวมได้เท่ายอดสุทธิของผู้ลงทะเบียน ไม่เช่นนั้นไม่แสดงราคาแยก (ข้อมูลเก่าที่คำนวณต่างกัน)
         const attNet = Number(att.price ?? att.netPrice);
         const sumPrograms = programs.reduce((sum, p) => sum + (p.price ?? NaN), 0);

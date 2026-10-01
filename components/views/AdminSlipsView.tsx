@@ -56,6 +56,15 @@ export interface SlipActivityItem {
 
 export function getAttendeeActivities(att: any): { name: string; price?: number }[] {
   if (!att) return [];
+  // รายการลงบิลย้อนหลัง (เช่น Main Program (เพิ่มเติม)) แสดงต่อท้ายในบิล ไม่ผูกกับสิทธิ์กิจกรรม
+  const raw = att.backdatedCharge;
+  const backdated = (Array.isArray(raw) ? raw : raw ? [raw] : [])
+    .filter((c: any) => c && typeof c === 'object' && c.label)
+    .map((c: any) => ({ name: String(c.label), price: Number(c.amount) || 0 }));
+  return [...getRegisteredActivities(att), ...backdated];
+}
+
+function getRegisteredActivities(att: any): { name: string; price?: number }[] {
 
   // 1. Array of activity objects
   if (Array.isArray(att.selectedActivityObjects) && att.selectedActivityObjects.length > 0) {

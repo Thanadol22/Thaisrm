@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
-import { resolveAttendeeActivities } from '@/lib/services/sponsorCouponService';
+import { attendeeBackdatedCharges, resolveAttendeeActivities } from '@/lib/services/sponsorCouponService';
 import { ADD_ON_MERGED_STATUS } from '@/lib/services/registrationAddOnService';
 
 const NO_SLIP_URLS = new Set(['PAY_LATER', 'pay_later_pending', '/placeholder-slip.png', 'GROUP_REGISTRATION', 'GROUP_MEMBERSHIP']);
@@ -115,7 +115,10 @@ export async function GET(req: NextRequest) {
         const email = String(att.email || att.attendee_email || '').trim().toLowerCase();
         const programs = isMembership
           ? []
-          : resolveAttendeeActivities(att, meetingActs).map((a: any) => String(a?.name || '')).filter(Boolean);
+          : [
+              ...resolveAttendeeActivities(att, meetingActs).map((a: any) => String(a?.name || '')),
+              ...attendeeBackdatedCharges(att).map((c) => c.label),
+            ].filter(Boolean);
         const format = (att.selectedFormat || att.attendanceType || att.format) === 'online' ? 'ออนไลน์' : 'ออนไซต์';
         const no = cleanNo(memberNo);
         if (no) coveredPeople.add(`${s.meeting_id}|m:${no}`);

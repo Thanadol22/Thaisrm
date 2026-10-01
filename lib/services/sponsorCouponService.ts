@@ -76,6 +76,18 @@ export function resolveAttendeeActivities(att: any, meetingActivities: unknown):
   return [];
 }
 
+/**
+ * รายการลงบิลย้อนหลังของผู้เข้าร่วม (เช่น Main Program (เพิ่มเติม)) ที่แอดมินบันทึกใน `backdatedCharge`
+ * แสดงในรายการบิลเท่านั้น ไม่ผูกกับสิทธิ์กิจกรรม ที่นั่ง หรือรายได้รายกิจกรรม
+ */
+export function attendeeBackdatedCharges(att: any): { label: string; amount: number }[] {
+  const raw = att?.backdatedCharge;
+  const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  return list
+    .filter((c: any) => c && typeof c === 'object' && c.label)
+    .map((c: any) => ({ label: String(c.label), amount: Number(c.amount) || 0 }));
+}
+
 function buildCouponPrefix(companyName: string): string {
   const words = (companyName || '').toUpperCase().replace(/[^A-Z0-9\s]/g, '').split(/\s+/).filter(Boolean);
   if (words.length >= 2) return (words[0].slice(0, 2) + words[1].slice(0, 1)).toUpperCase();
