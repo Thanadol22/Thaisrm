@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { MeetingItem, SlipItem, AttendeeItem } from './types';
+import { RevenueAnalyticsDeck } from './RevenueAnalyticsDeck';
 import {
   DollarSign,
   TrendingUp,
@@ -49,7 +50,7 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
   const [filterType, setFilterType] = useState<'all' | 'hybrid' | 'onsite' | 'online'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'ongoing' | 'upcoming' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeChartTab, setActiveChartTab] = useState<'programs' | 'rounds' | 'comparison' | 'donut'>('programs');
+  const [activeChartTab, setActiveChartTab] = useState<'programs' | 'comparison' | 'donut'>('programs');
   const [hoveredTier, setHoveredTier] = useState<string | null>(null);
   const [txFilter, setTxFilter] = useState<'all' | 'approved' | 'pending'>('all');
 
@@ -324,12 +325,6 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
     });
   }, [filteredMeetings, getMeetingRevenue, slips]);
 
-  // Benchmark max revenue for scaling bar heights proportionally
-  const maxBarRevenue = useMemo(() => {
-    const max = Math.max(...courseBarChartData.map((d) => d.totalInflow), 0);
-    return max > 0 ? max : 10000;
-  }, [courseBarChartData]);
-
   // ─── Real Individual Course Programs from Database ───
   const allCoursePrograms = useMemo(() => {
     const list: Array<{
@@ -460,6 +455,11 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
     }
     return filtered.slice(0, 8);
   }, [slips, selectedMeetingId, txFilter]);
+
+  const showPendingTransactions = () => {
+    setTxFilter('pending');
+    document.getElementById('revenue-transactions')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const handleExportFinancialExcel = () => {
     const headers = [
@@ -868,6 +868,16 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
         </div>
       </div>
 
+      {/* ─── 3.5 DASHBOARD ANALYTICS DECK ─── */}
+      <RevenueAnalyticsDeck
+        meetings={filteredMeetings}
+        slips={slips}
+        selectedMeetingId={selectedMeetingId}
+        onSelectMeeting={setSelectedMeetingId}
+        onShowPending={showPendingTransactions}
+        rounds={courseBarChartData}
+      />
+
       {/* ─── 4. MAIN VISUAL ANALYTICS SECTION (Interactive Charts Hub) ─── */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 lg:p-7 shadow-xs space-y-6">
         {/* Chart Header & View Switcher */}
@@ -883,7 +893,6 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
             </div>
             <p className="text-xs sm:text-sm text-slate-500">
               {activeChartTab === 'programs' && 'กราฟแท่งแสดงรายได้จริงแยกตามรายชื่อหลักสูตรที่เปิดในฐานข้อมูล'}
-              {activeChartTab === 'rounds' && 'กราฟแท่งแยกแท่งคู่เปรียบเทียบ Main vs Workshop แยกตามรอบโครงการ'}
               {activeChartTab === 'comparison' &&
                 'กราฟแท่งคู่เปรียบเทียบจำนวนผู้ลงทะเบียน vs ผู้เข้าร่วมงานจริงในแต่ละรอบ'}
               {activeChartTab === 'donut' && 'กราฟวงแหวนสัดส่วนรายได้แยกตามประเภทสมาชิกและบัตร'}
@@ -902,17 +911,6 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
             >
               <BarChart3 className="w-4 h-4 text-[#0026b3] shrink-0" />
               <span>รายได้ตามหลักสูตรจริง</span>
-            </button>
-            <button
-              onClick={() => setActiveChartTab('rounds')}
-              className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                activeChartTab === 'rounds'
-                  ? 'bg-white text-[#0026b3] shadow-xs border border-slate-200/80 font-black'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Layers className="w-4 h-4 text-[#0026b3] shrink-0" />
-              <span>แยกแท่งคู่ตามรอบ</span>
             </button>
             <button
               onClick={() => setActiveChartTab('comparison')}
@@ -1129,157 +1127,6 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
 
                             <div className="text-[10px] text-slate-400 font-medium break-words leading-tight px-1">
                               {p.dateText}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── 2. BAR CHART: SIDE-BY-SIDE DUAL BARS BY ROUND ── */}
-        {activeChartTab === 'rounds' && (
-          <div className="space-y-6 animate-fade-in">
-            {/* Top Bar Summary & Legend */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-1">
-              <div className="flex items-center gap-3 sm:gap-5 flex-wrap">
-                <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800">
-                  <span className="w-3.5 h-3.5 rounded-xs bg-[#0026b3] shrink-0 shadow-xs" />
-                  <span>Main Program</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800">
-                  <span className="w-3.5 h-3.5 rounded-xs bg-emerald-500 shrink-0 shadow-xs" />
-                  <span>Workshop (WS)</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-500">
-                  <span className="w-3.5 h-3.5 rounded-xs bg-slate-200 border border-slate-300 shrink-0" />
-                  <span>ยังไม่มีข้อมูลรายได้ (฿0)</span>
-                </div>
-              </div>
-
-              <div className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
-                แยกแท่งคู่เคียงข้างกันตาม {courseBarChartData.length} รอบโครงการ
-              </div>
-            </div>
-
-            {/* Side-by-Side Bar Chart Canvas */}
-            <div className="relative pt-8 pb-6 px-4 sm:px-6 bg-white border border-slate-200/90 rounded-2xl shadow-xs">
-              <div className="overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-200">
-                <div className="min-w-[700px] relative">
-                  <div className="absolute inset-x-0 top-0 h-64 pointer-events-none flex flex-col justify-between opacity-50 z-0">
-                    {[1, 0.75, 0.5, 0.25, 0].map((ratio, idx) => {
-                      const val = Math.round(maxBarRevenue * ratio);
-                      return (
-                        <div
-                          key={idx}
-                          className="border-b border-dashed border-slate-200 w-full flex justify-between items-center text-[10px] text-slate-400"
-                        >
-                          <span>฿{val.toLocaleString()}</span>
-                          <span className="opacity-40">{Math.round(ratio * 100)}%</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div
-                    className="grid gap-3 sm:gap-4 relative z-10"
-                    style={{
-                      gridTemplateColumns: `repeat(${Math.max(courseBarChartData.length, 3)}, minmax(0, 1fr))`,
-                    }}
-                  >
-                    {courseBarChartData.map((course) => {
-                      const isSelected = selectedMeetingId === course.id;
-                      const maxBarHeight = 150;
-                      const mainH =
-                        maxBarRevenue > 0 && course.approvedMainRevenue > 0
-                          ? Math.max(12, Math.round((course.approvedMainRevenue / maxBarRevenue) * maxBarHeight))
-                          : 0;
-                      const wsH =
-                        maxBarRevenue > 0 && course.approvedWorkshopRevenue > 0
-                          ? Math.max(12, Math.round((course.approvedWorkshopRevenue / maxBarRevenue) * maxBarHeight))
-                          : 0;
-
-                      return (
-                        <div
-                          key={course.id}
-                          onClick={() => setSelectedMeetingId(isSelected ? 'all' : course.id)}
-                          className={`flex flex-col items-center group cursor-pointer transition-all duration-200 p-2 rounded-xl ${
-                            isSelected ? 'bg-blue-50/60 ring-2 ring-[#0026b3] shadow-sm' : 'hover:bg-slate-50/80'
-                          }`}
-                        >
-                          <div className="h-64 w-full flex flex-col justify-end items-center pb-1">
-                            <div className="mb-2 text-center">
-                              {course.approvedRevenue > 0 ? (
-                                <div className="text-xs sm:text-sm font-black text-[#0026b3] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 shadow-2xs whitespace-nowrap">
-                                  ฿{course.approvedRevenue.toLocaleString()}
-                                </div>
-                              ) : (
-                                <div className="text-[11px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200/80 whitespace-nowrap">
-                                  ฿0
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="flex items-end justify-center gap-1.5 w-full max-w-[80px]">
-                              {/* Left Bar: Main Program */}
-                              <div className="flex-1 flex flex-col items-center">
-                                {mainH > 0 && (
-                                  <span className="text-[9px] font-black text-[#0026b3] mb-1">
-                                    ฿{(course.approvedMainRevenue / 1000).toFixed(1)}k
-                                  </span>
-                                )}
-                                {mainH > 0 ? (
-                                  <div
-                                    style={{ height: `${mainH}px` }}
-                                    className="w-full bg-gradient-to-t from-[#0026b3] via-[#1d4ed8] to-[#3b82f6] rounded-t-md shadow-xs"
-                                    title={`Main Program: ฿${course.approvedMainRevenue.toLocaleString()}`}
-                                  />
-                                ) : (
-                                  <div className="w-full h-2 bg-slate-200 rounded-t-sm" />
-                                )}
-                              </div>
-
-                              {/* Right Bar: Workshop */}
-                              <div className="flex-1 flex flex-col items-center">
-                                {wsH > 0 && (
-                                  <span className="text-[9px] font-black text-emerald-700 mb-1">
-                                    ฿{(course.approvedWorkshopRevenue / 1000).toFixed(1)}k
-                                  </span>
-                                )}
-                                {wsH > 0 ? (
-                                  <div
-                                    style={{ height: `${wsH}px` }}
-                                    className="w-full bg-gradient-to-t from-emerald-600 via-emerald-500 to-teal-400 rounded-t-md shadow-xs"
-                                    title={`Workshop: ฿${course.approvedWorkshopRevenue.toLocaleString()}`}
-                                  />
-                                ) : (
-                                  <div className="w-full h-2 bg-slate-200 rounded-t-sm" />
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="w-full border-t border-slate-200 my-1" />
-
-                          <div className="pt-2 text-center space-y-1 w-full">
-                            <span
-                              className={`text-[11px] font-black px-2.5 py-0.5 rounded-md ${
-                                course.approvedRevenue > 0
-                                  ? 'bg-[#0026b3] text-white shadow-2xs'
-                                  : 'bg-slate-200 text-slate-700'
-                              }`}
-                            >
-                              {course.id}
-                            </span>
-                            <div className="text-xs font-extrabold text-slate-800 line-clamp-2 leading-snug">
-                              {course.titleTh}
-                            </div>
-                            <div className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
-                              {course.date}
                             </div>
                           </div>
                         </div>
@@ -1727,7 +1574,7 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
       </div>
 
       {/* ─── 7. RECENT REVENUE TRANSACTIONS LOG ─── */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 lg:p-7 shadow-xs space-y-4">
+      <div id="revenue-transactions" className="scroll-mt-24 bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 lg:p-7 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-blue-50 text-[#0026b3]">

@@ -172,6 +172,45 @@ body {
   animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* กราฟรายได้: เผยเส้นจากซ้ายไปขวา และจุดล่าสุดเรืองเป็นจังหวะ */
+@keyframes chartReveal {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes chartPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.18;
+  }
+  50% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+.chart-reveal {
+  transform-origin: 0 0;
+  animation: chartReveal 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.chart-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: chartPulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-reveal,
+  .chart-pulse {
+    animation: none;
+  }
+}
+
 .animate-scale-up {
   animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

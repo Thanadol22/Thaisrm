@@ -80,6 +80,8 @@ export interface SlipItem {
   slipUrl: string;
   status: 'pending' | 'approved' | 'rejected';
   rejectionReason?: string;
+  /** เวลาที่ส่งสลิปเข้าระบบ (ISO) ใช้เมื่อวันที่โอนอ่านไม่ได้ */
+  createdAt?: string;
   /** บันทึกแยกสำหรับผู้ดูแลระบบ ยอดรวมอยู่ในบิลอื่นแล้ว ไม่นับรายได้ซ้ำ */
   isAdminLedger?: boolean;
   selectedActivities?: Array<{
