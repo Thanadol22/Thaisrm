@@ -97,7 +97,8 @@ export async function GET(req: NextRequest) {
 
     for (const s of slips) {
       const payload = parsePayload(s.selected_activities);
-      if (!payload) continue;
+      // บันทึกแยกสำหรับผู้ดูแลระบบ (เช่น รายการ fellow ที่รวมอยู่ในบิลเดิมแล้ว) ไม่ใช่บิลจริงของบริษัท
+      if (!payload || payload.adminOnly) continue;
       const isMembership = payload.type === 'membership_group_registration' || Array.isArray(payload.applicants) && !Array.isArray(payload.attendees);
       const people: any[] = Array.isArray(payload.attendees) ? payload.attendees : Array.isArray(payload.applicants) ? payload.applicants : [];
       if (!payload.isGroup && payload.type !== 'conference_group_registration' && !isMembership) continue;
