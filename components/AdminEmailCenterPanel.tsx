@@ -805,7 +805,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
                                 <span>
                                   {prog.format === 'online' ? '💻 Online' : prog.format === 'onsite' ? '🏢 Onsite' : '🌐 Onsite & Online'}
                                 </span>
-                                {prog.maxSeats ? (
+                                {prog.maxSeats && !prog.isMainProgram ? (
                                   <span
                                     className={
                                       typeof prog.remainingSeats === 'number' && prog.remainingSeats <= 0
