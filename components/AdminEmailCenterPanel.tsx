@@ -20,8 +20,6 @@ import {
   ChevronRight,
   HelpCircle,
   Server,
-  Trash2,
-  Ban,
   Check,
   Zap,
   Globe,
@@ -29,9 +27,9 @@ import {
   Video,
   ExternalLink,
   History,
+  Building2,
 } from 'lucide-react';
 import { EmailPreviewModal } from '@/components/EmailPreviewModal';
-import { PaginationControls } from '@/components/PaginationControls';
 import { ThaiDatePicker } from '@/components/ThaiDatePicker';
 import { renderAttendeeTicketEmail } from '@/lib/emailTemplates/attendeeQrTemplate';
 import { renderCustomBroadcastEmail } from '@/lib/emailTemplates/customTemplate';
@@ -40,6 +38,7 @@ import { formatThaiDate, DailyProgramInfo, programSupportsFormat } from '@/lib/s
 import { statusLabelTh } from '@/lib/statusLabels';
 import { OnlineAttendeesPanel } from '@/components/admin/OnlineAttendeesPanel';
 import { EmailLogPanel } from '@/components/admin/EmailLogPanel';
+import { SponsorHistoryEmailPanel } from '@/components/admin/SponsorHistoryEmailPanel';
 interface MeetingOption {
   meeting_id: string;
   meeting_name: string;
@@ -51,7 +50,7 @@ interface AdminEmailCenterPanelProps {
   onShowToast?: (message: string) => void;
 }
 
-type EmailSubTab = 'tickets' | 'online' | 'composer' | 'schedule' | 'logs' | 'smtp';
+type EmailSubTab = 'tickets' | 'online' | 'sponsors' | 'composer' | 'logs' | 'smtp';
 
 export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProps) {
   const [activeSubTab, setActiveSubTab] = useState<EmailSubTab>('tickets');
@@ -67,7 +66,6 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
   const [selectedDailyProgramKeys, setSelectedDailyProgramKeys] = useState<string[]>([]);
   const [dailyPrograms, setDailyPrograms] = useState<DailyProgramInfo[]>([]);
   const [loadingDailyPrograms, setLoadingDailyPrograms] = useState(false);
-  const [autoScheduling, setAutoScheduling] = useState(false);
   const [sendingTickets, setSendingTickets] = useState(false);
   const [ticketSendProgress, setTicketSendProgress] = useState<{
     total: number;
@@ -85,21 +83,6 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
   const [testRecipient, setTestRecipient] = useState('');
   const [sendingCustom, setSendingCustom] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
-
-  // --- Sub-Tab 3: Scheduled Dispatch State ---
-  const [scheduleDateTime, setScheduleDateTime] = useState('');
-  const [scheduledTasks, setScheduledTasks] = useState<any[]>([]);
-  const [loadingSchedule, setLoadingSchedule] = useState(false);
-  const [savingSchedule, setSavingSchedule] = useState(false);
-  const [schedulePage, setSchedulePage] = useState(1);
-  const [schedulePageSize, setSchedulePageSize] = useState(5);
-
-  const paginatedScheduledTasks = React.useMemo(() => {
-    const totalPages = Math.max(1, Math.ceil(scheduledTasks.length / schedulePageSize));
-    const validPage = Math.min(Math.max(1, schedulePage), totalPages);
-    const start = (validPage - 1) * schedulePageSize;
-    return scheduledTasks.slice(start, start + schedulePageSize);
-  }, [scheduledTasks, schedulePage, schedulePageSize]);
 
   // --- Sub-Tab 4: SMTP State ---
   const [testingSmtp, setTestingSmtp] = useState(false);
@@ -209,28 +192,6 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
     [isDailyPassMode, selectedPrograms]
   );
 
-  // 2. Fetch scheduled queue when opening schedule tab
-  const fetchScheduledQueue = async () => {
-    try {
-      setLoadingSchedule(true);
-      const res = await fetch('/api/email/schedule');
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        setScheduledTasks(json.data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch scheduled queue:', err);
-    } finally {
-      setLoadingSchedule(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeSubTab === 'schedule') {
-      fetchScheduledQueue();
-    }
-  }, [activeSubTab]);
-
   const notify = (msg: string) => {
     if (onShowToast) onShowToast(msg);
     else alert(msg);
@@ -303,41 +264,6 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
       notify(`เกิดข้อผิดพลาด: ${err?.message || 'Server error'}`);
     } finally {
       setSendingTickets(false);
-    }
-  };
-
-  // 1.1 Auto-schedule all daily QR dispatches (07:00 AM every meeting day)
-  const handleAutoScheduleDaily = async () => {
-    if (!selectedMeetingId) {
-      notify('กรุณาเลือกการประชุมที่ต้องการตั้งเวลา');
-      return;
-    }
-    const meeting = meetings.find((m) => m.meeting_id === selectedMeetingId);
-    const confirmMsg = `ยืนยันการตั้งระบบส่ง QR Code ประจำวันอัตโนมัติ ทุกเช้าเวลา 07:00 น. ตลอดทุกวันของงาน "${meeting?.meeting_name || selectedMeetingId}"?`;
-    if (!window.confirm(confirmMsg)) return;
-
-    try {
-      setAutoScheduling(true);
-      const res = await fetch('/api/email/schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'auto_schedule_daily',
-          meetingId: selectedMeetingId,
-          dispatchTime: '07:00',
-        }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        notify(json.message || 'ตั้งเวลาส่ง QR Code รายวันอัตโนมัติสำเร็จ');
-        fetchScheduledQueue();
-      } else {
-        notify(`ข้อผิดพลาด: ${json.error}`);
-      }
-    } catch (err: any) {
-      notify(`เกิดข้อผิดพลาด: ${err?.message}`);
-    } finally {
-      setAutoScheduling(false);
     }
   };
 
@@ -478,113 +404,6 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
     }
   };
 
-  // 4. Schedule Email Handler
-  const handleAddSchedule = async (type: 'tickets' | 'custom') => {
-    if (!scheduleDateTime) {
-      notify('กรุณาเลือกวันและเวลาที่ต้องการส่งล่วงหน้า');
-      return;
-    }
-
-    const selectedTime = new Date(scheduleDateTime).getTime();
-    if (isNaN(selectedTime) || selectedTime <= Date.now()) {
-      notify('กรุณาเลือกวันและเวลาในอนาคต');
-      return;
-    }
-
-    try {
-      setSavingSchedule(true);
-      let payload: any = {};
-      let title = '';
-
-      if (type === 'tickets') {
-        const meeting = meetings.find((m) => m.meeting_id === selectedMeetingId);
-        title = `ส่ง QR Code: ${meeting?.meeting_name || selectedMeetingId}`;
-        payload = {
-          meetingId: selectedMeetingId,
-          meetingName: meeting?.meeting_name,
-          statusFilter,
-          extraNote,
-        };
-      } else {
-        if (!subject.trim() || !content.trim()) {
-          notify('กรุณาระบุหัวข้อและเนื้อหาอีเมลในแท็บร่างอีเมลก่อนตั้งเวลา');
-          return;
-        }
-        title = `บรอดแคสต์: ${subject}`;
-        payload = {
-          subject,
-          content,
-          targetType,
-          targetMeetingId,
-          customEmails,
-        };
-      }
-
-      const res = await fetch('/api/email/schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'add',
-          task: {
-            title,
-            taskType: type,
-            scheduledAt: scheduleDateTime,
-            payload,
-          },
-        }),
-      });
-
-      const json = await res.json();
-      if (json.success) {
-        notify('บันทึกการตั้งเวลาส่งอีเมลสำเร็จเรียบร้อย');
-        setScheduleDateTime('');
-        fetchScheduledQueue();
-      } else {
-        notify(`ข้อผิดพลาด: ${json.error}`);
-      }
-    } catch (err: any) {
-      notify(`เกิดข้อผิดพลาด: ${err?.message}`);
-    } finally {
-      setSavingSchedule(false);
-    }
-  };
-
-  const handleCancelScheduleTask = async (taskId: string) => {
-    if (!window.confirm('ต้องการยกเลิกรายการตั้งเวลานี้หรือไม่?')) return;
-    try {
-      const res = await fetch('/api/email/schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'cancel', taskId }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        notify('ยกเลิกรายการตั้งเวลาแล้ว');
-        fetchScheduledQueue();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleDeleteScheduleTask = async (taskId: string) => {
-    if (!window.confirm('ต้องการลบรายการนี้ออกจากประวัติหรือไม่?')) return;
-    try {
-      const res = await fetch('/api/email/schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete', taskId }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        notify('ลบรายการสำเร็จ');
-        fetchScheduledQueue();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   // 5. Test SMTP Connection
   const handleTestSmtp = async () => {
     try {
@@ -619,7 +438,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
     <div className="space-y-6 animate-fade-in pb-12 select-none">
       <AdminPageHeader
         tab="emails"
-        description="ศูนย์ควบคุมการส่งบัตรเข้างานและ QR Code ลิงก์ประชุมออนไลน์ ร่างอีเมลอิสระ และตั้งเวลาส่งล่วงหน้า"
+        description="ศูนย์ควบคุมการส่งบัตรเข้างานและ QR Code ลิงก์ประชุมออนไลน์ ประวัติการลงทะเบียนของบริษัท และร่างอีเมลอิสระ"
       >
         <HeaderTabs
           value={activeSubTab}
@@ -627,13 +446,8 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
           options={[
             { id: 'tickets', label: 'ส่ง QR Code ผู้เข้าร่วม', icon: QrCode },
             { id: 'online', label: 'ลิงก์ประชุมออนไลน์', icon: Video },
+            { id: 'sponsors', label: 'ประวัติบริษัท', icon: Building2 },
             { id: 'composer', label: 'ร่างอีเมลแบบกำหนดเอง', icon: Send },
-            {
-              id: 'schedule',
-              label: 'ตั้งเวลาส่งล่วงหน้า',
-              icon: Clock,
-              count: scheduledTasks.filter((t) => t.status === 'pending').length || undefined,
-            },
             { id: 'logs', label: 'ประวัติการส่ง', icon: History },
             { id: 'smtp', label: 'สถานะ SMTP', icon: Server },
           ]}
@@ -965,69 +779,8 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
             </div>
           </div>
 
-          {/* Right Column: Information & Scheduled shortcut */}
+          {/* Right Column: Information */}
           <div className="space-y-6">
-            <div className="bg-gradient-to-br from-blue-900 to-indigo-950 text-white rounded-2xl p-5 sm:p-6 shadow-md relative overflow-hidden">
-              <div className="absolute -right-6 -bottom-6 w-32 h-32 rounded-full bg-white/5 blur-xl pointer-events-none" />
-              <div className="flex items-center gap-2 text-[#4ade80] text-xs font-extrabold uppercase tracking-wider mb-2">
-                <Clock className="w-4 h-4" />
-                <span>ตั้งเวลาส่งล่วงหน้า</span>
-              </div>
-              <h3 className="text-base font-black mb-2">ส่งบัตรก่อนวันประชุม</h3>
-              <p className="text-xs text-blue-200/80 leading-relaxed mb-4">
-                คุณสามารถระบุวันและเวลาเพื่อตั้งระบบให้ส่งบัตร QR Code อัตโนมัติ เช่น ล่วงหน้า 1 วันก่อนวันงาน
-              </p>
-
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={handleAutoScheduleDaily}
-                  disabled={autoScheduling}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-xs font-black hover:from-amber-300 hover:to-amber-400 transition cursor-pointer shadow-sm disabled:opacity-50 text-center"
-                >
-                  {autoScheduling ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
-                      <span>กำลังสร้างตารางส่ง...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                      <span className="leading-tight">ตั้งเวลาส่ง QR ประจำวันอัตโนมัติ (ทุกเช้า 07:00 น.)</span>
-                    </>
-                  )}
-                </button>
-
-                <div className="relative flex items-center justify-center my-1">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-white/20" />
-                  </div>
-                  <div className="relative bg-[#172554] px-2.5 py-0.5 rounded-full text-[10px] text-blue-200/80 font-bold uppercase border border-white/10">
-                    หรือระบุเวลาเอง
-                  </div>
-                </div>
-
-                <ThaiDatePicker
-                  showTime
-                  theme="dark"
-                  value={scheduleDateTime}
-                  onChange={setScheduleDateTime}
-                  outputFormat="iso"
-                  placeholder="เลือกวันและเวลาที่ต้องการส่ง"
-                  className="w-full"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleAddSchedule('tickets')}
-                  disabled={savingSchedule}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#4ade80] text-slate-950 text-xs font-black hover:bg-emerald-300 transition cursor-pointer shadow-sm"
-                >
-                  <Clock className="w-3.5 h-3.5 shrink-0" />
-                  <span>บันทึกตารางเวลาส่ง</span>
-                </button>
-              </div>
-            </div>
-
             {/* Help Card */}
             <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-xs border border-slate-200/90 space-y-3">
               <div className="flex items-center gap-2 text-xs font-black text-slate-800">
@@ -1054,12 +807,14 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
         />
       )}
 
+      {activeSubTab === 'sponsors' && <SponsorHistoryEmailPanel notify={notify} />}
+
       {activeSubTab === 'logs' && <EmailLogPanel notify={notify} />}
 
       {/* ─── TAB 2: CUSTOM EMAIL COMPOSER & BROADCAST ─── */}
       {activeSubTab === 'composer' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white rounded-2xl p-5 sm:p-6 shadow-xs border border-slate-200/90 space-y-5">
+        <div className="max-w-4xl">
+          <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-xs border border-slate-200/90 space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-blue-50 text-[#0026b3]">
@@ -1213,163 +968,10 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
             </div>
           </div>
 
-          {/* Right Column: Schedule & Info */}
-          <div className="space-y-6">
-            <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white rounded-2xl p-5 sm:p-6 shadow-md space-y-3">
-              <div className="flex items-center gap-2 text-[#4ade80] text-xs font-extrabold uppercase tracking-wider">
-                <Clock className="w-4 h-4" />
-                <span>ตั้งเวลาบรอดแคสต์ล่วงหน้า</span>
-              </div>
-              <h3 className="text-base font-black">ส่งข่าวสารถึงสมาชิกตามเวลา</h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                บันทึกเนื้อหาที่ร่างไว้นี้เพื่อตั้งเวลาส่งล่วงหน้าในระบบ
-              </p>
-              <ThaiDatePicker
-                showTime
-                theme="dark"
-                value={scheduleDateTime}
-                onChange={setScheduleDateTime}
-                outputFormat="iso"
-                placeholder="เลือกวันและเวลาที่ต้องการส่ง"
-                className="w-full"
-              />
-              <button
-                type="button"
-                onClick={() => handleAddSchedule('custom')}
-                disabled={savingSchedule}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white text-xs font-black transition cursor-pointer shadow-sm"
-              >
-                <Clock className="w-3.5 h-3.5 shrink-0" />
-                <span>บันทึกการตั้งเวลาบรอดแคสต์</span>
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
-      {/* ─── TAB 3: SCHEDULED TASKS QUEUE ─── */}
-      {activeSubTab === 'schedule' && (
-        <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-xs border border-slate-200/90 space-y-5">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-amber-50 text-amber-600">
-                <Clock className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-base font-black text-slate-900">รายการงานที่ตั้งเวลาส่งล่วงหน้า</h2>
-                <p className="text-xs text-slate-500">ตรวจสอบและจัดการคิวการส่งอีเมลอัตโนมัติตามกำหนดเวลา</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={fetchScheduledQueue}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loadingSchedule ? 'animate-spin' : ''}`} />
-              <span>รีเฟรช</span>
-            </button>
-          </div>
-
-          {loadingSchedule ? (
-            <div className="py-12 text-center text-xs text-slate-400">กำลังโหลดคิวงาน...</div>
-          ) : scheduledTasks.length === 0 ? (
-            <div className="py-16 text-center space-y-2">
-              <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
-                <Clock className="w-6 h-6" />
-              </div>
-              <div className="text-sm font-bold text-slate-700">ไม่มีรายการตั้งเวลาในขณะนี้</div>
-              <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                คุณสามารถตั้งเวลาส่งบัตรเข้างาน หรืออีเมลข่าวสารล่วงหน้าได้จากแท็บส่ง QR Code หรือแท็บร่างอีเมล
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 text-[11px] font-black text-slate-400 uppercase tracking-wider">
-                    <th className="py-3 px-3">รหัสงาน</th>
-                    <th className="py-3 px-3">ชื่องาน / หัวข้อ</th>
-                    <th className="py-3 px-3">ประเภท</th>
-                    <th className="py-3 px-3">กำหนดเวลาส่ง</th>
-                    <th className="py-3 px-3">สถานะ</th>
-                    <th className="py-3 px-3 text-right">จัดการ</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs font-medium">
-                  {paginatedScheduledTasks.map((task) => (
-                    <tr key={task.id} className="hover:bg-slate-50/80 transition">
-                      <td className="py-3.5 px-3 font-mono font-bold text-slate-500">{task.id}</td>
-                      <td className="py-3.5 px-3 font-bold text-slate-900">{task.title}</td>
-                      <td className="py-3.5 px-3">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-blue-50 text-[#0026b3] border border-blue-200/60">
-                          {task.taskType === 'tickets' ? 'บัตร QR Code' : 'บรอดแคสต์'}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-3 text-slate-600">
-                        {new Date(task.scheduledAt).toLocaleString('th-TH')}
-                      </td>
-                      <td className="py-3.5 px-3">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
-                            task.status === 'pending'
-                              ? 'bg-amber-100 text-amber-800'
-                              : task.status === 'completed'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          {task.status === 'pending'
-                            ? 'รอดำเนินการ'
-                            : task.status === 'completed'
-                            ? 'ส่งแล้ว'
-                            : 'ยกเลิกแล้ว'}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {task.status === 'pending' && (
-                            <button
-                              type="button"
-                              onClick={() => handleCancelScheduleTask(task.id)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition cursor-pointer"
-                              title="ยกเลิก"
-                            >
-                              <Ban className="w-4 h-4" />
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteScheduleTask(task.id)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                            title="ลบรายการ"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Pagination Controls */}
-          {scheduledTasks.length > 0 && (
-            <PaginationControls
-              currentPage={schedulePage}
-              totalItems={scheduledTasks.length}
-              pageSize={schedulePageSize}
-              onPageChange={setSchedulePage}
-              onPageSizeChange={setSchedulePageSize}
-              pageSizeOptions={[5, 10, 20, 50]}
-              itemLabel="รายการงาน"
-            />
-          )}
-        </div>
-      )}
-
-      {/* ─── TAB 4: SMTP STATUS & TEST ─── */}
+      {/* ─── TAB 3: SMTP STATUS & TEST ─── */}
       {activeSubTab === 'smtp' && (
         <div className="max-w-2xl mx-auto bg-white rounded-2xl p-5 sm:p-6 shadow-xs border border-slate-200/90 space-y-6">
           <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
