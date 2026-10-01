@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
-import { isAddOnPayload } from '@/lib/services/registrationAddOnService';
+import { isAddOnPayload, parseSlipPayload } from '@/lib/services/registrationAddOnService';
 import {
   assertSeatsForReactivatedSlip,
   countSlipSeatClaims,
@@ -186,8 +186,12 @@ export async function GET(request: NextRequest) {
           selected_activities: true,
         },
       });
-      // รายการลงทะเบียนเพิ่มเติมไม่ใช่รายการหลักของผู้เข้าร่วม (อนุมัติแล้วจะรวมเข้ารายการเดิม)
-      slips = slips.filter((s: any) => !isAddOnPayload(s.selected_activities));
+      // รายการลงทะเบียนเพิ่มเติม / คำขอเปลี่ยนรูปแบบ ไม่ใช่รายการหลักของผู้เข้าร่วม
+      // (อนุมัติแล้วจะรวมเข้ารายการเดิม) — ถ้าไม่กรองออก สลิปที่ใหม่กว่าจะถูกจับคู่แทนและไม่มีรายการกิจกรรม
+      slips = slips.filter((s: any) => {
+        const payload = parseSlipPayload(s.selected_activities);
+        return !isAddOnPayload(payload) && !payload?.isFormatChange && payload?.type !== 'format_change';
+      });
     }
 
     // Fetch sponsor group members to enrich ticket_code & slip matching
