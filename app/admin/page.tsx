@@ -29,6 +29,7 @@ import {
 import { DashboardOverviewPanel } from '@/components/admin/DashboardOverviewPanel';
 import { FormsHubPanel } from '@/components/admin/FormsHubPanel';
 import { RevenueReportPanel } from '@/components/admin/RevenueReportPanel';
+import { CompanyRevenuePanel } from '@/components/admin/CompanyRevenuePanel';
 import { AddMeetingPanel } from '@/components/admin/AddMeetingPanel';
 import { MeetingHistoryPanel } from '@/components/admin/MeetingHistoryPanel';
 import { VerifyAttendeesPanel } from '@/components/admin/VerifyAttendeesPanel';
@@ -47,6 +48,7 @@ const VALID_ADMIN_TABS: AdminTab[] = [
   'dashboard',
   'forms',
   'revenue-report',
+  'company-revenue',
   'members',
   'add-meeting',
   'meeting-history',
@@ -788,6 +790,8 @@ export default function AdminPage() {
             initialMeetingId={selectedRevenueMeetingId}
           />
         );
+      case 'company-revenue':
+        return <CompanyRevenuePanel />;
       case 'receipts':
         return (
           <ReceiptManagementPanel

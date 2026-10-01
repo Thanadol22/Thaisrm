@@ -21,10 +21,11 @@ import {
   Settings,
   Mail,
   Ticket,
-  FileStack
+  FileStack,
+  Building2
 } from 'lucide-react';
 
-export type AdminTab = 'dashboard' | 'forms' | 'revenue-report' | 'members' | 'add-meeting' | 'meeting-history' | 'sponsors' | 'coupons' | 'verify-slip' | 'verify-attendees' | 'receipts' | 'emails' | 'settings';
+export type AdminTab = 'dashboard' | 'forms' | 'revenue-report' | 'company-revenue' | 'members' | 'add-meeting' | 'meeting-history' | 'sponsors' | 'coupons' | 'verify-slip' | 'verify-attendees' | 'receipts' | 'emails' | 'settings';
 
 interface AdminNavbarProps {
   activeTab: AdminTab;
@@ -69,6 +70,7 @@ export const navGroups: { title: string; items: NavItem[] }[] = [
       { id: 'verify-slip', labelTh: 'ตรวจสอบการชำระเงิน', labelEn: 'Payment Verification', icon: Receipt, badgeKey: 'slips' },
       { id: 'receipts', labelTh: 'ออกใบเสร็จรับเงิน', labelEn: 'Receipts & Invoices', icon: FileText, badgeKey: 'receipts' },
       { id: 'revenue-report', labelTh: 'รายงานรายได้', labelEn: 'Revenue Report', icon: DollarSign },
+      { id: 'company-revenue', labelTh: 'ยอดรวมรายบริษัท', labelEn: 'Company Totals', icon: Building2 },
     ],
   },
   {
