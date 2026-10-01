@@ -80,6 +80,15 @@ function parsePayload(raw: unknown): any {
   return raw && typeof raw === 'object' ? raw : null;
 }
 
+/** รายชื่อในบิลกลุ่ม: บิลสมัครสมาชิกใช้ applicants บิลประชุมใช้ attendees
+ * (บางบิลมีทั้งสองคีย์โดยคีย์หนึ่งเป็นรายการว่าง จึงเลือกคีย์ที่มีรายชื่อ) */
+export function groupPeople(payload: any): any[] {
+  const attendees = Array.isArray(payload?.attendees) ? payload.attendees : [];
+  const applicants = Array.isArray(payload?.applicants) ? payload.applicants : [];
+  if (payload?.type === 'membership_group_registration') return applicants.length > 0 ? applicants : attendees;
+  return attendees.length > 0 ? attendees : applicants;
+}
+
 const cleanNo = (v: unknown) => String(v ?? '').trim().replace(/^0+/, '');
 
 export async function getSponsorRegistrationRows(): Promise<SponsorRegistrationRow[]> {
@@ -131,8 +140,10 @@ export async function getSponsorRegistrationRows(): Promise<SponsorRegistrationR
     const payload = parsePayload(s.selected_activities);
     // บันทึกแยกสำหรับผู้ดูแลระบบ (เช่น รายการ fellow ที่รวมอยู่ในบิลเดิมแล้ว) ไม่ใช่บิลจริงของบริษัท
     if (!payload || payload.adminOnly) continue;
-    const isMembership = payload.type === 'membership_group_registration' || Array.isArray(payload.applicants) && !Array.isArray(payload.attendees);
-    const people: any[] = Array.isArray(payload.attendees) ? payload.attendees : Array.isArray(payload.applicants) ? payload.applicants : [];
+    const people: any[] = groupPeople(payload);
+    const isMembership =
+      payload.type === 'membership_group_registration' ||
+      (Array.isArray(payload.applicants) && payload.applicants.length > 0 && !(Array.isArray(payload.attendees) && payload.attendees.length > 0));
     if (!payload.isGroup && payload.type !== 'conference_group_registration' && !isMembership) continue;
     if (people.length === 0) continue;
 
