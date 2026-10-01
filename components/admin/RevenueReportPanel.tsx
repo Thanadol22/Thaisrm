@@ -5,6 +5,7 @@ import { AdminPageHeader, HeaderButton } from './AdminPageHeader';
 import { Btn, StatGrid, StatCard, Toolbar, ToolbarGroup, SearchInput, Segmented, FilterSelect } from './ui';
 import { MeetingItem, SlipItem, AttendeeItem } from './types';
 import { RevenueAnalyticsDeck } from './RevenueAnalyticsDeck';
+import type { MeetingProgramRevenue } from '@/lib/services/programRevenueService';
 import {
   DollarSign,
   TrendingUp,
@@ -54,6 +55,22 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
   const [activeChartTab, setActiveChartTab] = useState<'programs' | 'comparison' | 'donut'>('programs');
   const [hoveredTier, setHoveredTier] = useState<string | null>(null);
   const [txFilter, setTxFilter] = useState<'all' | 'approved' | 'pending'>('all');
+
+  // รายได้แยกตามหลักสูตรที่คำนวณจากทุกบิล (รวมบิลกลุ่มบริษัท) ฝั่ง server
+  const [programRevenue, setProgramRevenue] = useState<Record<string, MeetingProgramRevenue>>({});
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/admin/revenue/programs')
+      .then((res) => res.json())
+      .then((json) => {
+        if (!cancelled && json.success && json.data) setProgramRevenue(json.data);
+      })
+      .catch((err) => console.error('Failed to load program revenue:', err));
+    return () => {
+      cancelled = true;
+    };
+    // คำนวณใหม่เมื่อรายการสลิปเปลี่ยน (เช่น อนุมัติสลิปแล้วกลับมาหน้านี้)
+  }, [allSlips]);
 
   // Filtered Meetings based on comprehensive filters (sorted newest first)
   const filteredMeetings = useMemo(() => {
@@ -127,22 +144,26 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
 
   const avgPerPerson = displayPaidCount > 0 ? Math.round(displayRevenue / displayPaidCount) : 0;
 
-  // Pending slips amount and count
-  const pendingAmount = useMemo(() => {
-    if (selectedMeetingId === 'all') {
-      return slips.filter((s) => s.status === 'pending').reduce((sum, s) => sum + s.amount, 0);
-    }
-    return slips
-      .filter((s) => s.status === 'pending' && s.meetingId === selectedMeetingId)
-      .reduce((sum, s) => sum + s.amount, 0);
-  }, [selectedMeetingId, slips]);
+  // ยอดของรอบที่เลือก จากการคำนวณฝั่ง server
+  const scopedProgramRevenue = useMemo(() => {
+    const ids = selectedMeetingId === 'all' ? filteredMeetings.map((m) => m.id) : [selectedMeetingId];
+    const sum = { pendingTotal: 0, pendingBills: 0, payLaterApprovedTotal: 0, payLaterPendingTotal: 0, payLaterPendingBills: 0 };
+    ids.forEach((id) => {
+      const d = programRevenue[id];
+      if (!d) return;
+      sum.pendingTotal += d.pendingTotal;
+      sum.pendingBills += d.pendingBills;
+      sum.payLaterApprovedTotal += d.payLaterApprovedTotal;
+      sum.payLaterPendingTotal += d.payLaterPendingTotal;
+      sum.payLaterPendingBills += d.payLaterPendingBills;
+    });
+    return sum;
+  }, [selectedMeetingId, filteredMeetings, programRevenue]);
 
-  const pendingCount = useMemo(() => {
-    if (selectedMeetingId === 'all') {
-      return slips.filter((s) => s.status === 'pending').length;
-    }
-    return slips.filter((s) => s.status === 'pending' && s.meetingId === selectedMeetingId).length;
-  }, [selectedMeetingId, slips]);
+  // ยอดรอตรวจสลิป ไม่รวมบิลชำระภายหลังที่ยังไม่แนบสลิป (แสดงแยกในการ์ดชำระภายหลัง)
+  const pendingAmount = scopedProgramRevenue.pendingTotal - scopedProgramRevenue.payLaterPendingTotal;
+  const pendingCount = scopedProgramRevenue.pendingBills - scopedProgramRevenue.payLaterPendingBills;
+  const payLaterAmount = scopedProgramRevenue.payLaterApprovedTotal + scopedProgramRevenue.payLaterPendingTotal;
 
   // Total Inflow & Collection Rate
   const totalInflow = displayRevenue + pendingAmount;
@@ -240,68 +261,11 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
   const courseBarChartData = useMemo(() => {
     return filteredMeetings.map((m) => {
       const meetingSlips = slips.filter((s) => s.meetingId === m.id);
-      const approvedMeetingSlips = meetingSlips.filter((s) => s.status === 'approved');
-      const pendingMeetingSlips = meetingSlips.filter((s) => s.status === 'pending');
-
-      let approvedMainRev = 0;
-      let approvedWorkshopRev = 0;
-
-      approvedMeetingSlips.forEach((s) => {
-        const acts =
-          Array.isArray(s.selectedActivities) && s.selectedActivities.length > 0 ? s.selectedActivities : null;
-        if (acts) {
-          acts.forEach((a) => {
-            const price = Number(a.price) || 0;
-            const type = (a.type || '').toLowerCase();
-            const name = (a.name || '').toLowerCase();
-            if (
-              type === 'workshop' ||
-              type === 'ws' ||
-              name.includes('workshop') ||
-              name.includes('ws') ||
-              name.includes('nurse')
-            ) {
-              approvedWorkshopRev += price;
-            } else {
-              approvedMainRev += price;
-            }
-          });
-        } else {
-          approvedMainRev += s.amount || 0;
-        }
-      });
-
-      let pendingMainRev = 0;
-      let pendingWorkshopRev = 0;
-
-      pendingMeetingSlips.forEach((s) => {
-        const acts =
-          Array.isArray(s.selectedActivities) && s.selectedActivities.length > 0 ? s.selectedActivities : null;
-        if (acts) {
-          acts.forEach((a) => {
-            const price = Number(a.price) || 0;
-            const type = (a.type || '').toLowerCase();
-            const name = (a.name || '').toLowerCase();
-            if (
-              type === 'workshop' ||
-              type === 'ws' ||
-              name.includes('workshop') ||
-              name.includes('ws') ||
-              name.includes('nurse')
-            ) {
-              pendingWorkshopRev += price;
-            } else {
-              pendingMainRev += price;
-            }
-          });
-        } else {
-          pendingMainRev += s.amount || 0;
-        }
-      });
-
-      const calculatedApproved = approvedMainRev + approvedWorkshopRev;
-      const approvedRev = calculatedApproved > 0 ? calculatedApproved : getMeetingRevenue(m);
-      const pendingRev = pendingMainRev + pendingWorkshopRev;
+      const rows = programRevenue[m.id]?.rows || [];
+      const sumBy = (kind: string, field: 'approvedRevenue' | 'pendingRevenue') =>
+        rows.filter((r) => r.kind === kind).reduce((sum, r) => sum + r[field], 0);
+      const approvedRev = getMeetingRevenue(m);
+      const pendingRev = programRevenue[m.id]?.pendingTotal ?? 0;
 
       return {
         id: m.id,
@@ -314,124 +278,70 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
         registered: m.registered,
         attended: m.attended,
         approvedRevenue: approvedRev,
-        approvedMainRevenue: approvedMainRev,
-        approvedWorkshopRevenue: approvedWorkshopRev,
+        approvedMainRevenue: sumBy('main', 'approvedRevenue'),
+        approvedWorkshopRevenue: sumBy('workshop', 'approvedRevenue'),
         pendingRevenue: pendingRev,
-        pendingMainRevenue: pendingMainRev,
-        pendingWorkshopRevenue: pendingWorkshopRev,
+        pendingMainRevenue: sumBy('main', 'pendingRevenue'),
+        pendingWorkshopRevenue: sumBy('workshop', 'pendingRevenue'),
         totalInflow: approvedRev + pendingRev,
-        approvedSlipCount: approvedMeetingSlips.length,
-        pendingSlipCount: pendingMeetingSlips.length,
+        approvedSlipCount: meetingSlips.filter((s) => s.status === 'approved').length,
+        pendingSlipCount: meetingSlips.filter((s) => s.status === 'pending').length,
       };
     });
-  }, [filteredMeetings, getMeetingRevenue, slips]);
+  }, [filteredMeetings, getMeetingRevenue, slips, programRevenue]);
 
-  // ─── Real Individual Course Programs from Database ───
-  const allCoursePrograms = useMemo(() => {
-    const list: Array<{
-      id: string;
-      meetingId: string;
-      meetingName: string;
-      programName: string;
-      programType: 'main' | 'workshop';
-      dateText: string;
-      approvedRevenue: number;
-      pendingRevenue: number;
-      totalInflow: number;
-      approvedSlipCount: number;
-      pendingSlipCount: number;
-      maxSeats?: number;
-    }> = [];
-
+  // ─── รายได้แยกตามหลักสูตร (แถวทั้งหมดรวมกันเท่ากับยอดสลิปจริง) ───
+  const programTableRows = useMemo(() => {
     const targetMeetings =
       selectedMeetingId === 'all'
         ? filteredMeetings
         : filteredMeetings.filter((m) => m.id === selectedMeetingId);
 
-    targetMeetings.forEach((m) => {
-      const meetingSlips = slips.filter((s) => s.meetingId === m.id);
-      const approvedMeetingSlips = meetingSlips.filter((s) => s.status === 'approved');
-      const pendingMeetingSlips = meetingSlips.filter((s) => s.status === 'pending');
+    return targetMeetings.flatMap((m) =>
+      (programRevenue[m.id]?.rows || []).map((r) => ({
+        id: `${m.id}_${r.key}`,
+        meetingId: m.id,
+        meetingName: m.titleTh,
+        programName: r.name,
+        programType: r.kind,
+        dateText: r.dateText || m.date,
+        approvedRevenue: r.approvedRevenue,
+        pendingRevenue: r.pendingRevenue,
+        totalInflow: r.approvedRevenue + r.pendingRevenue,
+        approvedPeople: r.approvedPeople,
+        pendingPeople: r.pendingPeople,
+        // แยก 3 ส่วนไม่ซ้ำกัน: รับเงินแล้ว / ชำระภายหลัง / รอตรวจสลิป
+        receivedRevenue: r.approvedRevenue - r.payLaterApprovedRevenue,
+        payLaterRevenue: r.payLaterApprovedRevenue + r.payLaterPendingRevenue,
+        payLaterApprovedRevenue: r.payLaterApprovedRevenue,
+        reviewRevenue: r.pendingRevenue - r.payLaterPendingRevenue,
+        payLaterPeople: r.payLaterPeople,
+      }))
+    );
+  }, [filteredMeetings, selectedMeetingId, programRevenue]);
 
-      const mActivities = Array.isArray(m.activities) && m.activities.length > 0 ? m.activities : null;
+  // เฉพาะหลักสูตรจริง (ใช้กับกราฟแท่งรายหลักสูตร)
+  const allCoursePrograms = useMemo(
+    () => programTableRows.filter((p) => p.programType === 'main' || p.programType === 'workshop'),
+    [programTableRows]
+  );
 
-      if (mActivities) {
-        mActivities.forEach((act: any, actIdx: number) => {
-          const actName = act.name || `หลักสูตร ${actIdx + 1}`;
-          const actType = (act.type || '').toLowerCase() === 'workshop' ? 'workshop' : 'main';
-
-          // Match approved slips
-          let approvedRev = 0;
-          let approvedCount = 0;
-          approvedMeetingSlips.forEach((s) => {
-            const sActs = Array.isArray(s.selectedActivities) ? s.selectedActivities : [];
-            const matched = sActs.find(
-              (sa: any) =>
-                sa.id === act.id ||
-                (sa.name && act.name && sa.name.trim().toLowerCase() === act.name.trim().toLowerCase()) ||
-                (sActs.length === 1 && sa.type && act.type && sa.type.toLowerCase() === act.type.toLowerCase())
-            );
-            if (matched) {
-              approvedRev += Number(matched.price) || 0;
-              approvedCount += 1;
-            }
-          });
-
-          // Match pending slips
-          let pendingRev = 0;
-          let pendingCount = 0;
-          pendingMeetingSlips.forEach((s) => {
-            const sActs = Array.isArray(s.selectedActivities) ? s.selectedActivities : [];
-            const matched = sActs.find(
-              (sa: any) =>
-                sa.id === act.id ||
-                (sa.name && act.name && sa.name.trim().toLowerCase() === act.name.trim().toLowerCase()) ||
-                (sActs.length === 1 && sa.type && act.type && sa.type.toLowerCase() === act.type.toLowerCase())
-            );
-            if (matched) {
-              pendingRev += Number(matched.price) || 0;
-              pendingCount += 1;
-            }
-          });
-
-          list.push({
-            id: `${m.id}_${act.id || actName}`,
-            meetingId: m.id,
-            meetingName: m.titleTh,
-            programName: actName,
-            programType: actType,
-            dateText: act.date || m.date,
-            approvedRevenue: approvedRev,
-            pendingRevenue: pendingRev,
-            totalInflow: approvedRev + pendingRev,
-            approvedSlipCount: approvedCount,
-            pendingSlipCount: pendingCount,
-            maxSeats: act.maxSeats || 0,
-          });
-        });
-      } else {
-        let approvedRev = getMeetingRevenue(m);
-        let pendingRev = pendingMeetingSlips.reduce((sum, s) => sum + s.amount, 0);
-
-        list.push({
-          id: `${m.id}_main`,
-          meetingId: m.id,
-          meetingName: m.titleTh,
-          programName: m.titleTh,
-          programType: 'main',
-          dateText: m.date,
-          approvedRevenue: approvedRev,
-          pendingRevenue: pendingRev,
-          totalInflow: approvedRev + pendingRev,
-          approvedSlipCount: approvedMeetingSlips.length,
-          pendingSlipCount: pendingMeetingSlips.length,
-          maxSeats: m.maxSeats || 0,
-        });
-      }
+  const programTableTotals = useMemo(() => {
+    const meetingIds = new Set(programTableRows.map((p) => p.meetingId));
+    let bills = 0;
+    meetingIds.forEach((id) => {
+      bills += programRevenue[id]?.approvedBills || 0;
     });
-
-    return list;
-  }, [filteredMeetings, selectedMeetingId, slips, getMeetingRevenue]);
+    const total = (field: 'receivedRevenue' | 'payLaterRevenue' | 'payLaterApprovedRevenue' | 'reviewRevenue') =>
+      programTableRows.reduce((sum, p) => sum + p[field], 0);
+    return {
+      received: total('receivedRevenue'),
+      payLater: total('payLaterRevenue'),
+      payLaterApproved: total('payLaterApprovedRevenue'),
+      review: total('reviewRevenue'),
+      bills,
+    };
+  }, [programTableRows, programRevenue]);
 
   // Benchmark max revenue for individual programs
   const maxProgramRevenue = useMemo(() => {
@@ -590,7 +500,7 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
       </Toolbar>
 
       {/* ─── 3. ตัวเลขการเงินหลัก ─── */}
-      <StatGrid cols={5}>
+      <StatGrid cols={6}>
         <StatCard
           label={selectedMeetingId === 'all' ? 'รายได้สุทธิรวม' : 'รายได้รอบนี้'}
           value={`฿${displayRevenue.toLocaleString()}`}
@@ -640,6 +550,17 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
           icon={Clock}
           tone="amber"
           onClick={pendingCount > 0 ? showPendingTransactions : undefined}
+        />
+        <StatCard
+          label="ยอดชำระภายหลัง"
+          value={`฿${payLaterAmount.toLocaleString()}`}
+          hint={
+            payLaterAmount > 0
+              ? `อนุมัติแล้ว ฿${scopedProgramRevenue.payLaterApprovedTotal.toLocaleString()} · รออนุมัติ ฿${scopedProgramRevenue.payLaterPendingTotal.toLocaleString()}`
+              : 'ไม่มียอดค้างชำระ'
+          }
+          icon={Receipt}
+          tone="rose"
         />
         <StatCard
           label="อัตราการจัดเก็บ"
@@ -1147,33 +1068,37 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
                 ตารางสรุปรายได้แยกตามหลักสูตรจริงในฐานข้อมูล
               </h3>
               <p className="text-xs text-slate-500">
-                แจกแจงรายได้จริง จำนวนที่นั่ง และสลิปที่อนุมัติแล้วของแต่ละหลักสูตร
+                แจกยอดทุกบิลรวมบิลกลุ่มบริษัทตามหลักสูตรที่ผู้ลงทะเบียนแต่ละคนเลือก แยกยอดรับเงินแล้ว ชำระภายหลัง และรอตรวจสลิป
               </p>
             </div>
           </div>
           <div className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 shrink-0 self-start sm:self-auto">
-            {allCoursePrograms.length} หลักสูตรย่อย
+            {allCoursePrograms.length} หลักสูตร
           </div>
         </div>
 
         {/* Breakdown Table Grid */}
         <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <table className="w-full min-w-[640px] text-left text-xs sm:text-sm">
+          <table className="w-full min-w-[760px] text-left text-xs sm:text-sm">
             <thead>
               <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
                 <th className="py-3 px-3.5 rounded-l-xl">หลักสูตร / โครงการ</th>
                 <th className="py-3 px-3">ประเภท</th>
-                <th className="py-3 px-3 text-center">สลิปอนุมัติ</th>
+                <th className="py-3 px-3 text-center">ผู้ลงทะเบียนที่อนุมัติ</th>
                 <th className="py-3 px-3 text-right">ยอดรอตรวจ</th>
-                <th className="py-3 px-3 text-right">รายได้อนุมัติ (บาท)</th>
+                <th className="py-3 px-3 text-right">ชำระภายหลัง</th>
+                <th className="py-3 px-3 text-right">รับเงินแล้ว (บาท)</th>
                 <th className="py-3 px-3 text-center rounded-r-xl">สัดส่วนรายได้</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
-              {allCoursePrograms.map((p) => {
+              {programTableRows.map((p) => {
                 const isMain = p.programType === 'main';
+                const isCourse = p.programType === 'main' || p.programType === 'workshop';
                 const pct =
-                  grandTotalRevenue > 0 ? Number(((p.approvedRevenue / grandTotalRevenue) * 100).toFixed(1)) : 0;
+                  programTableTotals.received > 0
+                    ? Number(((p.receivedRevenue / programTableTotals.received) * 100).toFixed(1))
+                    : 0;
 
                 return (
                   <tr key={p.id} className="hover:bg-blue-50/30 transition">
@@ -1188,33 +1113,49 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
                     <td className="py-3.5 px-3">
                       <span
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold ${
-                          isMain ? 'bg-blue-100 text-[#0026b3]' : 'bg-emerald-100 text-emerald-800'
+                          isMain
+                            ? 'bg-blue-100 text-[#0026b3]'
+                            : isCourse
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-slate-100 text-slate-600'
                         }`}
                       >
-                        {isMain ? 'Main Program' : 'Workshop'}
+                        {isMain ? 'Main Program' : isCourse ? 'Workshop' : 'รายได้อื่น'}
                       </span>
                     </td>
                     <td className="py-3.5 px-3 text-center">
-                      <span className="font-extrabold text-slate-900">{p.approvedSlipCount}</span>
-                      <span className="text-xs text-slate-500"> รายการ</span>
+                      <span className="font-extrabold text-slate-900">{p.approvedPeople}</span>
+                      <span className="text-xs text-slate-500"> คน</span>
                     </td>
                     <td className="py-3.5 px-3 text-right">
-                      {p.pendingRevenue > 0 ? (
+                      {p.reviewRevenue > 0 ? (
                         <span className="text-amber-700 font-bold text-xs bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                          +฿{p.pendingRevenue.toLocaleString()}
+                          +฿{p.reviewRevenue.toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-xs">-</span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-3 text-right">
+                      {p.payLaterRevenue > 0 ? (
+                        <span className="inline-flex flex-col items-end">
+                          <span className="text-rose-700 font-bold text-xs bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                            ฿{p.payLaterRevenue.toLocaleString()}
+                          </span>
+                          <span className="text-[10px] text-slate-500 mt-0.5">{p.payLaterPeople} คน</span>
                         </span>
                       ) : (
                         <span className="text-slate-400 text-xs">-</span>
                       )}
                     </td>
                     <td className="py-3.5 px-3 text-right font-black text-slate-900 text-sm sm:text-base">
-                      ฿{p.approvedRevenue.toLocaleString()}
+                      ฿{p.receivedRevenue.toLocaleString()}
                     </td>
                     <td className="py-3.5 px-3 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <div className="w-16 bg-slate-100 rounded-full h-2 overflow-hidden">
                           <div
-                            className={`h-full rounded-full ${isMain ? 'bg-[#0026b3]' : 'bg-emerald-500'}`}
+                            className={`h-full rounded-full ${isMain ? 'bg-[#0026b3]' : isCourse ? 'bg-emerald-500' : 'bg-slate-400'}`}
                             style={{ width: `${Math.min(100, pct)}%` }}
                           />
                         </div>
@@ -1228,21 +1169,33 @@ export function RevenueReportPanel({ meetings, slips: allSlips, attendees = [], 
             <tfoot>
               <tr className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 font-black border-t-2 border-[#0026b3]/30">
                 <td className="py-3.5 px-3.5 rounded-l-xl text-slate-900">
-                  รวมรายได้หลักสูตรทั้งหมด ({allCoursePrograms.length} หลักสูตร)
+                  รวมรายได้ทั้งหมด
                 </td>
                 <td className="py-3.5 px-3 text-xs text-slate-600">ทุกประเภท</td>
-                <td className="py-3.5 px-3 text-center text-slate-900">{displayPaidCount} รายการ</td>
+                <td className="py-3.5 px-3 text-center text-slate-900">{programTableTotals.bills} บิล</td>
                 <td className="py-3.5 px-3 text-right text-amber-800 text-xs">
-                  {pendingAmount > 0 ? `+฿${pendingAmount.toLocaleString()}` : '-'}
+                  {programTableTotals.review > 0 ? `+฿${programTableTotals.review.toLocaleString()}` : '-'}
+                </td>
+                <td className="py-3.5 px-3 text-right text-rose-700 text-xs">
+                  {programTableTotals.payLater > 0 ? `฿${programTableTotals.payLater.toLocaleString()}` : '-'}
                 </td>
                 <td className="py-3.5 px-3 text-right text-base sm:text-lg text-[#0026b3]">
-                  ฿{grandTotalRevenue.toLocaleString()}
+                  ฿{programTableTotals.received.toLocaleString()}
                 </td>
                 <td className="py-3.5 px-3 text-center rounded-r-xl">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#4ade80] text-slate-950 text-xs font-black">
-                    <Check className="w-3.5 h-3.5" />
-                    <span>100% สมบูรณ์</span>
-                  </span>
+                  {programTableTotals.received + programTableTotals.payLaterApproved === displayRevenue ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#4ade80] text-slate-950 text-xs font-black">
+                      <Check className="w-3.5 h-3.5" />
+                      <span>ตรงกับยอดรวม</span>
+                    </span>
+                  ) : (
+                    <span
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-black"
+                      title={`ยอดรายได้รวมของหน้านี้ ฿${displayRevenue.toLocaleString()}`}
+                    >
+                      ต่างจากยอดรวม ฿{Math.abs(displayRevenue - programTableTotals.received - programTableTotals.payLaterApproved).toLocaleString()}
+                    </span>
+                  )}
                 </td>
               </tr>
             </tfoot>

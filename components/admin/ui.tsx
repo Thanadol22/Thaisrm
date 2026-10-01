@@ -200,8 +200,8 @@ export function SectionTitle({
 
 /* ─── การ์ดตัวเลขสรุป ───────────────────────────────────────────────── */
 
-export function StatGrid({ cols = 4, children }: { cols?: 3 | 4 | 5; children: React.ReactNode }) {
-  const c = cols === 5 ? 'lg:grid-cols-5' : cols === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4';
+export function StatGrid({ cols = 4, children }: { cols?: 3 | 4 | 5 | 6; children: React.ReactNode }) {
+  const c = cols === 6 ? 'sm:grid-cols-3 xl:grid-cols-6' : cols === 5 ? 'lg:grid-cols-5' : cols === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4';
   return <div className={`grid grid-cols-2 ${c} gap-3 sm:gap-4`}>{children}</div>;
 }
 
