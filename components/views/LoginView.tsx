@@ -116,6 +116,16 @@ interface AddOnInfo {
   registeredActivities: Array<{ id: string; name: string; type?: string; pending?: boolean }>;
 }
 
+/** รายการลงทะเบียนเดิมแบบกลุ่มหรือที่เจ้าหน้าที่บันทึกให้ (รวมไม่ได้) — ลงกิจกรรมอื่นเป็นรายการใหม่ */
+interface PriorRegistrationInfo {
+  identityKey: string;
+  ticketCode: string | null;
+  originalKind?: 'individual' | 'group' | 'attendance' | null;
+  originalStatus?: 'pending' | 'approved';
+  registeredActivityIds: string[];
+  registeredActivities: Array<{ id: string; name: string; type?: string; pending?: boolean }>;
+}
+
 /** ตัวระบุผู้ลงทะเบียน: เลขสมาชิก หรืออีเมลสำหรับบุคคลทั่วไป */
 const addOnIdentityKey = (att?: { memberNo?: string; email?: string }) =>
   att?.memberNo?.trim() || att?.email?.trim().toLowerCase() || '';
@@ -581,10 +591,15 @@ export function LoginView({
     regMode === 'individual' && addOnInfo && addOnInfo.identityKey === addOnIdentityKey(attendees[0])
       ? addOnInfo
       : null;
+  const [priorRegInfo, setPriorRegInfo] = useState<PriorRegistrationInfo | null>(null);
+  const activePriorReg =
+    regMode === 'individual' && !activeAddOn && priorRegInfo && priorRegInfo.identityKey === addOnIdentityKey(attendees[0])
+      ? priorRegInfo
+      : null;
   // กิจกรรมที่ลงทะเบียนแล้วของผู้ลงทะเบียนที่กำลังแก้ไข (รายบุคคลหรือแต่ละคนในกลุ่ม)
   const currentAddOn: Pick<AddOnInfo, 'ticketCode' | 'originalStatus' | 'registeredActivityIds' | 'registeredActivities'> | null =
     regMode === 'individual'
-      ? activeAddOn
+      ? activeAddOn || activePriorReg
       : (() => {
         const g = groupAddOnOf(currentAttendee);
         return g ? { ...g, originalStatus: g.originalStatus === 'pending' ? 'pending' : 'approved' } : null;
@@ -750,15 +765,22 @@ export function LoginView({
             if (addOn) {
               setAddOnInfo({ ...addOn, identityKey: memNo });
             }
-            data = alreadyRegistered && !addOn
+            // ลงไว้แล้วแบบกลุ่ม/เจ้าหน้าที่บันทึกให้: ดึงข้อมูลได้ตามปกติ แล้วตรวจกิจกรรมซ้ำตอนเลือกโปรแกรมและตอนดำเนินการต่อ
+            const prior = alreadyRegistered && !addOn && regData?.canRegisterSeparately && regData.priorRegistration
+              ? regData.priorRegistration
+              : null;
+            setPriorRegInfo(prior ? { ...prior, identityKey: memNo } : null);
+            data = alreadyRegistered && !addOn && !prior
               ? { valid: false, alreadyRegistered: true, addOnMessage: regData?.addOnMessage || null }
               : !status || status.toLowerCase() === 'active'
-                ? { valid: true, member, addOn }
+                ? { valid: true, member, addOn, prior }
                 : { valid: false, member };
           }
         }
         if (data.valid && data.member) {
-          const addOnRegisteredIds: string[] = data.addOn?.registeredActivityIds || [];
+          const addOnRegisteredIds: string[] =
+            data.addOn?.registeredActivityIds || data.prior?.registeredActivityIds || [];
+          const alreadyRegisteredInfo = data.addOn || data.prior;
           setAttendees(prev => prev.map((att, idx) => {
             if (idx !== activeAttendeeIdx) return att;
             // Autofill fields strictly from verified member profile
@@ -783,7 +805,11 @@ export function LoginView({
                 workplace: data.member.workplace,
                 position: data.member.position,
               }),
-              memberCheckMessage: data.addOn
+              memberCheckMessage: data.prior
+                ? (lang === 'th'
+                  ? `✅ ${data.member.fullNameTh || data.member.fullNameEn} #${data.member.member_no} ลงทะเบียนงานประชุมนี้ไว้แล้ว${data.prior.ticketCode ? ` รหัส ${data.prior.ticketCode}` : ''} เลือกกิจกรรมที่ยังไม่ได้ลงทะเบียนได้ ระบบจะสร้างเป็นรายการลงทะเบียนใหม่`
+                  : `✅ ${data.member.fullNameEn || data.member.fullNameTh} #${data.member.member_no} is already registered${data.prior.ticketCode ? ` (${data.prior.ticketCode})` : ''}. You can register other activities as a new registration.`)
+                : data.addOn
                 ? (lang === 'th'
                   ? `✅ ${data.member.fullNameTh || data.member.fullNameEn} #${data.member.member_no} ลงทะเบียนงานประชุมนี้แล้ว สามารถเลือกกิจกรรมเพิ่มเติมได้`
                   : `✅ ${data.member.fullNameEn || data.member.fullNameTh} #${data.member.member_no} is already registered. You can add more activities.`)
@@ -793,10 +819,10 @@ export function LoginView({
               verifiedMember: data.member,
               // ลงทะเบียนเพิ่มเติม: ล้างกิจกรรมที่ลงทะเบียนไว้แล้วออกจากรายการที่เลือก
               registeredAddOn: sponsorSession && data.addOn ? data.addOn : null,
-              ...(data.addOn
+              ...(alreadyRegisteredInfo
                 ? {
                   selectedPrograms: att.selectedPrograms.filter(id => !addOnRegisteredIds.includes(id)),
-                  attendanceType: data.addOn.attendanceType || att.attendanceType,
+                  attendanceType: data.addOn?.attendanceType || att.attendanceType,
                 }
                 : {}),
             };
@@ -1360,7 +1386,42 @@ export function LoginView({
             `/api/meetings/${encodeURIComponent(activeMeeting.meeting_id)}/check-registration?memberNo=${encodeURIComponent(single.memberNo)}&email=${encodeURIComponent(single.email)}`
           );
           const checkData = await checkRes.json();
-          if (checkData.success && checkData.isRegistered) {
+          if (checkData.success && checkData.isRegistered && checkData.canRegisterSeparately && checkData.priorRegistration) {
+            // ลงไว้แล้วแบบกลุ่ม/เจ้าหน้าที่บันทึกให้: ลงกิจกรรมที่ยังไม่ได้ลงเป็นรายการใหม่ (ห้ามซ้ำ)
+            const prior: PriorRegistrationInfo = { ...checkData.priorRegistration, identityKey: addOnIdentityKey(attendeesToSubmit[0]) };
+            setPriorRegInfo(prior);
+            const registeredIds = new Set(prior.registeredActivityIds.map(String));
+            const duplicated = single.selectedActivities.filter((a: any) => registeredIds.has(String(a.id)));
+            if (duplicated.length > 0) {
+              const remaining = single.selectedActivities.filter((a: any) => !registeredIds.has(String(a.id)));
+              const duplicatedNames = duplicated.map((a: any) => a.name).join(', ');
+              if (remaining.length === 0) {
+                alert(
+                  lang === 'th'
+                    ? `สมาชิกท่านนี้ลงทะเบียนกิจกรรมที่เลือกไว้แล้ว: ${duplicatedNames}\nกรุณาเลือกกิจกรรมอื่นที่ยังไม่ได้ลงทะเบียน`
+                    : `This member is already registered for: ${duplicatedNames}\nPlease select other activities.`
+                );
+                return;
+              }
+              const remainingNames = remaining.map((a: any) => a.name).join(', ');
+              const proceed = confirm(
+                lang === 'th'
+                  ? `สมาชิกท่านนี้ลงทะเบียนกิจกรรมต่อไปนี้ไว้แล้ว: ${duplicatedNames}\n\nระบบจะสร้างรายการลงทะเบียนใหม่เฉพาะ: ${remainingNames}\n\nต้องการดำเนินการต่อหรือไม่`
+                  : `This member is already registered for: ${duplicatedNames}\n\nA new registration will be created for: ${remainingNames}\n\nContinue?`
+              );
+              if (!proceed) return;
+              const remainingLabel = remaining.map((a: any) => a.name).join(' + ');
+              single = {
+                ...single,
+                selectedActivities: remaining,
+                selectedProgramIds: remaining.map((a: any) => a.id),
+                programKey: remaining.map((a: any) => a.id).join(','),
+                programNameTh: remainingLabel,
+                programNameEn: remainingLabel,
+                subtotal: remaining.reduce((sum: number, a: any) => sum + a.price, 0),
+              };
+            }
+          } else if (checkData.success && checkData.isRegistered) {
             if (!checkData.canAddOn || !checkData.addOn) {
               alert(
                 [checkData.message, checkData.addOnMessage].filter(Boolean).join('\n') ||
@@ -2278,6 +2339,13 @@ export function LoginView({
                               {lang === 'th'
                                 ? `ท่านลงทะเบียนงานประชุมนี้ไว้แล้ว${activeAddOn.ticketCode ? ` รหัส ${activeAddOn.ticketCode}` : ''}${activeAddOn.originalStatus === 'pending' ? ' ซึ่งอยู่ระหว่างรอเจ้าหน้าที่ตรวจสอบ' : ''} เลือกเฉพาะกิจกรรมที่ต้องการเพิ่ม ยอดชำระคิดเฉพาะกิจกรรมที่เพิ่ม และระบบจะรวมเข้ากับรายการเดิมหลังเจ้าหน้าที่ตรวจสอบการชำระเงิน`
                                 : `You are already registered${activeAddOn.ticketCode ? ` (${activeAddOn.ticketCode})` : ''}${activeAddOn.originalStatus === 'pending' ? ', pending staff review' : ''}. Select only the activities you want to add; you pay only for those, and they will be merged into your registration after payment is verified.`}
+                            </div>
+                          )}
+                          {activePriorReg && (
+                            <div className="p-3 rounded-xl border border-sky-200 bg-sky-50 text-sky-800 text-[11px] sm:text-xs font-semibold leading-relaxed">
+                              {lang === 'th'
+                                ? `สมาชิกท่านนี้ลงทะเบียนงานประชุมนี้ไว้แล้ว${activePriorReg.ticketCode ? ` รหัส ${activePriorReg.ticketCode}` : ''}${activePriorReg.originalKind === 'group' ? ' แบบกลุ่ม' : ''} เลือกกิจกรรมที่ยังไม่ได้ลงทะเบียน ระบบจะสร้างเป็นรายการลงทะเบียนใหม่แยกจากรายการเดิม`
+                                : `This member is already registered${activePriorReg.ticketCode ? ` (${activePriorReg.ticketCode})` : ''}. Select activities not yet registered; they will be submitted as a new, separate registration.`}
                             </div>
                           )}
                           {effectiveActivities.map((act) => {

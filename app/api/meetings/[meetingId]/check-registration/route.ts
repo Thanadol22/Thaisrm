@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getAddOnEligibility, parseSlipPayload } from '@/lib/services/registrationAddOnService';
+import {
+  getAddOnEligibility,
+  getMemberRegistrationSummary,
+  parseSlipPayload,
+} from '@/lib/services/registrationAddOnService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -135,11 +139,36 @@ async function buildAddOnInfo(meetingId: string, identity: { memberNo?: string; 
     unsupported: 'รายการลงทะเบียนของท่านเป็นแบบกลุ่มหรือบันทึกโดยเจ้าหน้าที่ หากต้องการลงทะเบียนกิจกรรมเพิ่มเติม กรุณาติดต่อเจ้าหน้าที่สมาคมฯ',
   };
 
+  // สมาชิกที่ลงทะเบียนแบบกลุ่มหรือเจ้าหน้าที่บันทึกให้: ลงกิจกรรมที่ยังไม่ได้ลงเป็นรายการรายบุคคลใหม่ได้
+  if (eligibility.state === 'unsupported' && identity.memberNo) {
+    const summary = await getMemberRegistrationSummary(meetingId, identity.memberNo);
+    return {
+      canAddOn: false,
+      addOnState: eligibility.state,
+      addOnMessage: null,
+      canRegisterSeparately: true,
+      priorRegistration: {
+        ticketCode: summary.originalTicketCode,
+        originalKind: summary.originalKind,
+        originalStatus: summary.originalStatus === 'pending' ? 'pending' : 'approved',
+        registeredActivityIds: summary.registeredActivities.map((a) => a.id),
+        registeredActivities: summary.registeredActivities,
+      },
+    };
+  }
+
   if (eligibility.state !== 'eligible') {
     return { canAddOn: false, addOnState: eligibility.state, addOnMessage: addOnMessages[eligibility.state] || null };
   }
 
-  const { originalSlip, pendingAddOnSlips, registeredActivities } = eligibility;
+  const { originalSlip, pendingAddOnSlips } = eligibility;
+  // รวมกิจกรรมที่ลงผ่านช่องทางอื่น (เช่น แบบกลุ่ม) เพื่อไม่ให้เลือกซ้ำ
+  const registeredActivities = [...eligibility.registeredActivities];
+  if (identity.memberNo) {
+    const summary = await getMemberRegistrationSummary(meetingId, identity.memberNo);
+    const seen = new Set(registeredActivities.map((a) => a.id));
+    summary.registeredActivities.forEach((a) => !seen.has(a.id) && registeredActivities.push(a));
+  }
   const payload = parseSlipPayload(originalSlip.selected_activities);
   return {
     canAddOn: true,

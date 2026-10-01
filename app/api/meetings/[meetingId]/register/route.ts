@@ -772,7 +772,37 @@ export async function POST(
       `;
       const existingAttendance = memberAttendances?.[0];
 
+      // ลงทะเบียนไว้แล้วแบบกลุ่มหรือเจ้าหน้าที่บันทึกให้ (ไม่มีรายการรายบุคคลให้รวม):
+      // ลงกิจกรรมที่ยังไม่ได้ลงทะเบียนเป็นรายการใหม่ได้ แต่ห้ามเลือกกิจกรรมซ้ำ
+      let separateFromPrior = false;
       if (!addOnToSlipId && (existingSlip || existingAttendance)) {
+        const eligibility = await getAddOnEligibility(meetingId, { memberNo: validMemberNo });
+        if (eligibility.state === 'unsupported') {
+          const summary = await getMemberRegistrationSummary(meetingId, validMemberNo!);
+          const registeredIds = new Set(summary.registeredActivities.map((a) => a.id));
+          const requested = slipActivityList(selectedActivities);
+          if (requested.length === 0) {
+            return NextResponse.json(
+              { success: false, error: 'กรุณาเลือกกิจกรรมที่ต้องการลงทะเบียนอย่างน้อย 1 รายการ' },
+              { status: 400 }
+            );
+          }
+          const duplicated = requested.filter((a: any) => registeredIds.has(String(a?.id)));
+          if (duplicated.length > 0) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `สมาชิกท่านนี้ลงทะเบียนกิจกรรมนี้ไว้แล้ว: ${duplicated.map((a: any) => a?.name || a?.id).join(', ')}`,
+                code: 'DUPLICATE_REGISTRATION',
+              },
+              { status: 400 }
+            );
+          }
+          separateFromPrior = true;
+        }
+      }
+
+      if (!addOnToSlipId && !separateFromPrior && (existingSlip || existingAttendance)) {
         const isApproved = existingSlip?.status === 'approved' || existingAttendance?.attendance_status === 'Registered';
         return NextResponse.json(
           {
@@ -862,6 +892,11 @@ export async function POST(
       }
 
       const registeredIds = new Set(eligibility.registeredActivities.map((a) => a.id));
+      if (isMember && validMemberNo) {
+        // รวมกิจกรรมที่ลงผ่านช่องทางอื่น (เช่น แบบกลุ่ม) ด้วย
+        const summary = await getMemberRegistrationSummary(meetingId, validMemberNo);
+        summary.registeredActivities.forEach((a) => registeredIds.add(a.id));
+      }
       const requestedActivities = slipActivityList(selectedActivities);
       if (requestedActivities.length === 0) {
         return NextResponse.json(
