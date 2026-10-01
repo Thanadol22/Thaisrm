@@ -363,15 +363,15 @@ export function AdminCouponsPanel({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full min-w-[960px] text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-black uppercase tracking-wider text-slate-500">
-                  <th className="py-3.5 px-4 sm:px-6">รหัสคูปอง / บริษัท</th>
-                  <th className="py-3.5 px-4">รอบการประชุม</th>
-                  <th className="py-3.5 px-4">รูปแบบส่วนลด</th>
-                  <th className="py-3.5 px-4">สิทธิ์การใช้งาน</th>
-                  <th className="py-3.5 px-4">วันหมดอายุ / สถานะ</th>
-                  <th className="py-3.5 px-4 sm:px-6 text-right">การจัดการ</th>
+                  <th className="py-3.5 px-4 sm:px-6 whitespace-nowrap min-w-[220px]">รหัสคูปอง / บริษัท</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap min-w-[180px]">รอบการประชุม</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap min-w-[150px]">รูปแบบส่วนลด</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap min-w-[160px]">สิทธิ์การใช้งาน</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap min-w-[140px]">วันหมดอายุ / สถานะ</th>
+                  <th className="py-3.5 px-4 sm:px-6 text-right whitespace-nowrap min-w-[120px]">การจัดการ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">

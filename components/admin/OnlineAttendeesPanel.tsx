@@ -683,16 +683,16 @@ export function OnlineAttendeesPanel({ meetings, meetingId, onMeetingChange, not
         </div>
 
         <div className="overflow-x-auto rounded-2xl border border-slate-200">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead className="bg-slate-50 text-xs font-black text-slate-600">
+          <table className="w-full min-w-[920px] text-left border-collapse text-sm">
+            <thead className="bg-slate-50 text-xs font-black text-slate-600 border-b border-slate-200">
               <tr>
-                <th className="px-3 py-2.5 w-14 text-center">ลำดับ</th>
-                <th className="px-3 py-2.5">ชื่อ-นามสกุล</th>
-                <th className="px-3 py-2.5">อีเมล</th>
-                <th className="px-3 py-2.5">รายการ</th>
-                <th className="px-3 py-2.5">ลิงก์ประชุม</th>
-                <th className="px-3 py-2.5">สถานะการส่ง</th>
-                <th className="px-3 py-2.5 text-center">ส่งรายบุคคล</th>
+                <th className="px-3 py-2.5 w-14 text-center whitespace-nowrap">ลำดับ</th>
+                <th className="px-3 py-2.5 whitespace-nowrap min-w-[180px]">ชื่อ-นามสกุล</th>
+                <th className="px-3 py-2.5 whitespace-nowrap min-w-[180px]">อีเมล</th>
+                <th className="px-3 py-2.5 whitespace-nowrap min-w-[180px]">รายการ</th>
+                <th className="px-3 py-2.5 whitespace-nowrap min-w-[140px]">ลิงก์ประชุม</th>
+                <th className="px-3 py-2.5 whitespace-nowrap min-w-[120px]">สถานะการส่ง</th>
+                <th className="px-3 py-2.5 text-center whitespace-nowrap min-w-[100px]">ส่งรายบุคคล</th>
               </tr>
             </thead>
             <tbody>

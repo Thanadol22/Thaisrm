@@ -648,16 +648,16 @@ export function VerifyAttendeesPanel({
 
       {/* ─── Attendees Table ─────────────────────────────────────────────── */}
       <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-xs bg-white">
-        <table className="w-full min-w-[760px] text-left">
+        <table className="w-full min-w-[1080px] text-left">
           <thead>
             <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 text-xs font-bold">
-              <th className="px-5 py-3.5">รหัสสมาชิก</th>
-              <th className="px-5 py-3.5">ชื่อและสังกัด</th>
-              <th className="px-5 py-3.5">รอบการประชุม</th>
-              <th className="px-5 py-3.5">ประเภทและบัตร</th>
-              <th className="px-5 py-3.5">การชำระเงิน</th>
-              <th className="px-5 py-3.5">สถานะเช็คอิน</th>
-              <th className="px-5 py-3.5 text-right">การจัดการ</th>
+              <th className="px-5 py-3.5 whitespace-nowrap min-w-[110px]">รหัสสมาชิก</th>
+              <th className="px-5 py-3.5 whitespace-nowrap min-w-[220px]">ชื่อและสังกัด</th>
+              <th className="px-5 py-3.5 whitespace-nowrap min-w-[200px]">รอบการประชุม</th>
+              <th className="px-5 py-3.5 whitespace-nowrap min-w-[170px]">ประเภทและบัตร</th>
+              <th className="px-5 py-3.5 whitespace-nowrap min-w-[130px]">การชำระเงิน</th>
+              <th className="px-5 py-3.5 whitespace-nowrap min-w-[130px]">สถานะเช็คอิน</th>
+              <th className="px-5 py-3.5 text-right whitespace-nowrap min-w-[180px]">การจัดการ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
@@ -677,16 +677,16 @@ export function VerifyAttendeesPanel({
 
                 return (
                   <tr key={a.id} className="hover:bg-slate-50/80 transition group">
-                    <td className="px-5 py-4 font-mono text-slate-700 font-bold">
+                    <td className="px-5 py-4 font-mono text-slate-700 font-bold whitespace-nowrap">
                       {a.code}
-                      <div className="text-xs text-slate-400 font-normal">ID4: {a.id4Digits}</div>
+                      <div className="text-xs text-slate-400 font-normal whitespace-nowrap">ID4: {a.id4Digits}</div>
                     </td>
-                    <td className="px-5 py-4">
-                      <div className="font-bold text-slate-900 group-hover:text-[#0026b3] transition">{a.nameTh}</div>
-                      <div className="text-xs text-slate-500 truncate max-w-[220px]">{a.workplace}</div>
+                    <td className="px-5 py-4 min-w-[220px]">
+                      <div className="font-bold text-slate-900 group-hover:text-[#0026b3] transition whitespace-nowrap">{a.nameTh}</div>
+                      <div className="text-xs text-slate-500 truncate max-w-[240px]" title={a.workplace}>{a.workplace}</div>
                     </td>
-                    <td className="px-5 py-4">
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-blue-50 text-[#0026b3] border border-blue-200 max-w-[200px] truncate">
+                    <td className="px-5 py-4 min-w-[200px]">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-blue-50 text-[#0026b3] border border-blue-200 whitespace-nowrap max-w-full">
                         <CalendarDays className="w-3 h-3 shrink-0 text-[#0026b3]" />
                         <span className="truncate">{meeting ? meeting.titleTh : a.meetingTitle}</span>
                       </span>
@@ -708,9 +708,9 @@ export function VerifyAttendeesPanel({
                         </div>
                       )}
                     </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-slate-700 font-semibold">{a.memberType}</span>
+                    <td className="px-5 py-4 whitespace-nowrap min-w-[170px]">
+                      <div className="flex items-center gap-1.5 flex-nowrap">
+                        <span className="text-slate-700 font-semibold whitespace-nowrap">{a.memberType}</span>
                         <span
                           className={`text-[10px] font-bold px-1.5 py-0.5 rounded border whitespace-nowrap ${
                             a.attendanceType === 'online'
@@ -721,10 +721,10 @@ export function VerifyAttendeesPanel({
                           {a.attendanceType === 'online' ? 'ออนไลน์' : 'ออนไซต์'}
                         </span>
                       </div>
-                      <div className="text-xs text-[#0026b3] font-mono font-medium">{a.ticketCode}</div>
+                      <div className="text-xs text-[#0026b3] font-mono font-medium whitespace-nowrap tracking-wide mt-0.5">{a.ticketCode}</div>
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
+                    <td className="px-5 py-4 whitespace-nowrap min-w-[130px]">
+                      <div className="flex items-center gap-1.5 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap ${
                             a.paymentStatus === 'paid'
@@ -758,13 +758,13 @@ export function VerifyAttendeesPanel({
                         </div>
                       )}
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap">
+                    <td className="px-5 py-4 whitespace-nowrap min-w-[130px]">
                       {a.checkInStatus === 'checked_in' ? (
                         <div>
                           <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
                             <CheckCircle2 className="w-3.5 h-3.5" /> เช็คอินแล้ว
                           </span>
-                          <div className="text-xs text-slate-500 mt-0.5">{a.checkInTime}</div>
+                          <div className="text-xs text-slate-500 mt-0.5 whitespace-nowrap">{a.checkInTime}</div>
                         </div>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap">
@@ -772,14 +772,14 @@ export function VerifyAttendeesPanel({
                         </span>
                       )}
                     </td>
-                    <td className="px-5 py-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                    <td className="px-5 py-4 text-right whitespace-nowrap min-w-[180px]">
+                      <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                         <Btn
                           size="sm"
                           variant={a.checkInStatus === 'checked_in' ? 'secondary' : 'primary'}
                           icon={a.checkInStatus === 'checked_in' ? XCircle : Check}
                           onClick={() => onToggleCheckIn(a.id)}
-                          className="min-w-[96px]"
+                          className="min-w-[96px] whitespace-nowrap"
                         >
                           {a.checkInStatus === 'checked_in' ? 'ยกเลิก' : 'เช็คอิน'}
                         </Btn>
