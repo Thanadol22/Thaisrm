@@ -349,10 +349,26 @@ export async function POST(req: NextRequest) {
       if (mail && mail !== '-') return `${meetingId}|e:${mail}`;
       return null;
     };
+    // คนเดียวกันอาจถูกบันทึกด้วยเลขสมาชิกในแหล่งหนึ่ง แต่มีเพียงอีเมลในอีกแหล่ง (เช่น สลิปกลุ่มที่ไม่ได้กรอกเลขสมาชิก)
+    // จึงจับคู่ทั้งเลขสมาชิกและอีเมลเข้ากับแถวเดียวกัน เพื่อไม่ให้แสดงชื่อซ้ำ
+    const keyAliases = new Map<string, string>();
+    const resolvePersonKey = (meetingId: unknown, memberNo: unknown, email: unknown): string | null => {
+      const memberKey = personKey(meetingId, memberNo, '');
+      const emailKey = personKey(meetingId, '', email);
+      const byMember = memberKey ? keyAliases.get(memberKey) : undefined;
+      let byEmail = emailKey ? keyAliases.get(emailKey) : undefined;
+      // อีเมลเดียวกันแต่เป็นเลขสมาชิกคนละคน ไม่นับเป็นคนเดียวกัน
+      if (byEmail && memberKey && byEmail.includes('|m:') && byEmail !== memberKey) byEmail = undefined;
+      const key = byMember || byEmail || memberKey || emailKey;
+      if (!key) return null;
+      if (memberKey && !keyAliases.has(memberKey)) keyAliases.set(memberKey, key);
+      if (emailKey && !keyAliases.has(emailKey)) keyAliases.set(emailKey, key);
+      return key;
+    };
 
     // 1. From sponsor.group_members
     (sponsor.group_members || []).forEach((m: any) => {
-      const key = personKey(m.meeting_id, m.member_no, m.attendee_email);
+      const key = resolvePersonKey(m.meeting_id, m.member_no, m.attendee_email);
       if (!key || aggregatedMembersMap.has(key)) return;
       aggregatedMembersMap.set(key, {
         id: m.id ? m.id.toString() : '',
@@ -391,7 +407,7 @@ export async function POST(req: NextRequest) {
       attendances.forEach((att: any) => {
         const mem = att.members;
         const attEmail = att.attendee_email || mem?.email || '';
-        const key = personKey(att.meeting_id, att.member_no, attEmail);
+        const key = resolvePersonKey(att.meeting_id, att.member_no, attEmail);
         if (key && !aggregatedMembersMap.has(key)) {
           aggregatedMembersMap.set(key, {
             id: att.attendance_id ? att.attendance_id.toString() : '',
@@ -423,7 +439,7 @@ export async function POST(req: NextRequest) {
         if (!att || typeof att !== 'object') return;
         const emailKey = att.email?.trim()?.toLowerCase() || '';
         const memberNoKey = att.memberNo || att.member_no || '';
-        const key = personKey(s.meeting_id, memberNoKey, emailKey);
+        const key = resolvePersonKey(s.meeting_id, memberNoKey, emailKey);
         if (!key) return;
         if (payload.type !== 'membership_group_registration') {
           payloadNetByPerson.set(key, (payloadNetByPerson.get(key) || 0) + Number(att.price ?? att.netPrice ?? 0));
@@ -503,15 +519,14 @@ export async function POST(req: NextRequest) {
       });
     });
 
-    const rawGroupMembers = Array.from(aggregatedMembersMap.values()).map((m: any) => {
+    const rawGroupMembers = Array.from(aggregatedMembersMap.entries()).map(([ownKey, m]: [string, any]) => {
       const memberKey = personKey(m.meeting_id, m.member_no, '');
       const emailKey = personKey(m.meeting_id, '', m.attendee_email);
       const programs =
         (memberKey && programLookup.get(memberKey)) ||
         (emailKey && programLookup.get(emailKey)) ||
         [];
-      const ownKey = memberKey || emailKey;
-      const payloadNet = ownKey ? payloadNetByPerson.get(ownKey) : undefined;
+      const payloadNet = payloadNetByPerson.get(ownKey);
       return {
         ...m,
         net_price: payloadNet !== undefined ? payloadNet : m.net_price,
