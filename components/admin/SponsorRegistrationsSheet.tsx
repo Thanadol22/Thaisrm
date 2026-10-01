@@ -54,7 +54,10 @@ const PERSON_COLS = ['ลำดับ', 'เลขสมาชิก', 'ชื�
 const th = 'sticky top-0 z-10 bg-slate-100 border border-slate-300 px-2 py-1.5 text-[11px] font-bold text-slate-600 whitespace-nowrap text-left';
 const td = 'border border-slate-200 px-2 py-1 align-top whitespace-nowrap';
 
-export default function SponsorRegistrationsSheet() {
+const TIER_WEIGHT: Record<string, number> = { Platinum: 1, Gold: 2, Silver: 3 };
+
+/** sponsors: รายชื่อบริษัทตามลำดับในหน้าบริษัท ใช้เรียงตัวเลือกบริษัทตามเทียร์แล้วตามลำดับบริษัท */
+export default function SponsorRegistrationsSheet({ sponsors = [] }: { sponsors?: { name: string; tier: string }[] }) {
   const [rows, setRows] = useState<RegistrationRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -80,10 +83,24 @@ export default function SponsorRegistrationsSheet() {
     fetchRows();
   }, [fetchRows]);
 
-  const companyOptions = useMemo(
-    () => [...new Set(rows.map((r) => r.company))].sort((a, b) => a.localeCompare(b, 'th')),
-    [rows]
-  );
+  const companyOptions = useMemo(() => {
+    const order = new Map<string, { tier: number; index: number }>();
+    sponsors.forEach((sp, index) => order.set(sp.name.toLowerCase().trim(), { tier: TIER_WEIGHT[sp.tier] ?? 4, index }));
+    const rank = (name: string) => order.get(name.toLowerCase().trim()) ?? { tier: 4, index: 999 };
+    return [...new Set(rows.map((r) => r.company))].sort((a, b) => {
+      const ra = rank(a);
+      const rb = rank(b);
+      return ra.tier - rb.tier || ra.index - rb.index || a.localeCompare(b, 'th');
+    });
+  }, [rows, sponsors]);
+
+  // เริ่มต้นที่บริษัทแรกตามลำดับเทียร์ (ยังเลือกทุกบริษัทได้จากตัวเลือก)
+  const [companyInitialized, setCompanyInitialized] = useState(false);
+  useEffect(() => {
+    if (companyInitialized || companyOptions.length === 0 || sponsors.length === 0) return;
+    setCompany(companyOptions[0]);
+    setCompanyInitialized(true);
+  }, [companyInitialized, companyOptions, sponsors.length]);
   const meetingOptions = useMemo(() => {
     const map = new Map<string, string>();
     rows.forEach((r) => map.set(r.meetingId, r.meetingName));

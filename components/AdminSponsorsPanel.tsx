@@ -1239,7 +1239,7 @@ export default function AdminSponsorsPanel({
       {/* ========================================================================= */}
       {/* 3. SUB-TAB: ALL COMPANY REGISTRATIONS (EVERY BILL IN ONE SHEET) */}
       {/* ========================================================================= */}
-      {activeSubTab === 'history' && <SponsorRegistrationsSheet />}
+      {activeSubTab === 'history' && <SponsorRegistrationsSheet sponsors={sponsors} />}
 
       {/* ======================================================= */}
       {/* MODAL: MEMBER HISTORY OF SPONSOR */}
