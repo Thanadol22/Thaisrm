@@ -32,9 +32,12 @@ import {
   UserPlus,
   ChevronUp,
   Upload,
+  Download,
+  Loader2,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { uploadImageToStorage } from '@/lib/blobUpload';
+import { buildZip, type ZipEntry } from '@/lib/zipStore';
 import { PaginationControls } from '@/components/PaginationControls';
 import { MemberDetailModal } from '@/components/MemberDetailModal';
 import { GroupAttendeeEditorModal, type GroupAttendeeEditorTarget } from '@/components/admin/GroupAttendeeEditorModal';
@@ -248,6 +251,40 @@ export const hasActualSlip = (s?: SlipRecord | null) =>
 /** รอตรวจสอบ หรืออนุมัติสิทธิ์แล้วแต่มีสลิปที่แอดมินแนบไว้รออนุมัติการชำระเงิน */
 export const canApproveSlip = (s: SlipRecord) =>
   s.status === 'pending' || (s.status === 'approved' && Boolean(s.adminAttachedSlip));
+
+/** มีไฟล์สลิปให้ดาวน์โหลด (รวมสลิปที่แอดมินแนบไว้รออนุมัติ) */
+export const isDownloadableSlipUrl = (url?: string | null) =>
+  Boolean(url && (/^(https?:|\/)/.test(url) || url.startsWith('data:')) && url !== '/placeholder-slip.png');
+
+/** ปุ่มเครื่องมือรองในแถบล่างของการ์ดสลิป */
+const CARD_ACTION_BTN =
+  'h-9 px-2.5 sm:px-3 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 hover:border-slate-300 text-slate-700 text-xs font-bold transition cursor-pointer active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed';
+
+type SlipFile = { blob: Blob; fileName: string };
+
+async function fetchSlipFile(slipId: string): Promise<SlipFile> {
+  const res = await fetch(`/api/admin/slips/download?id=${encodeURIComponent(slipId)}`);
+  if (!res.ok) {
+    const json = await res.json().catch(() => null);
+    throw new Error(json?.error || `HTTP ${res.status}`);
+  }
+  const encodedName = res.headers.get('X-Slip-Filename');
+  return {
+    blob: await res.blob(),
+    fileName: encodedName ? decodeURIComponent(encodedName) : `slip_${slipId}`,
+  };
+}
+
+function saveBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 export const isPdfSlipUrl = (url?: string | null) => {
   if (!url) return false;
@@ -522,6 +559,81 @@ export function AdminSlipsView() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const [downloadingSlipId, setDownloadingSlipId] = useState<string | null>(null);
+  const [bulkDownload, setBulkDownload] = useState<{ done: number; total: number } | null>(null);
+
+  const downloadSlip = async (slipId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (downloadingSlipId) return;
+    setDownloadingSlipId(slipId);
+    try {
+      const file = await fetchSlipFile(slipId);
+      saveBlob(file.blob, file.fileName);
+    } catch (err: any) {
+      showToast(`${lang === 'th' ? 'ดาวน์โหลดสลิปไม่สำเร็จ' : 'Slip download failed'}: ${err?.message || ''}`);
+    } finally {
+      setDownloadingSlipId(null);
+    }
+  };
+
+  /** ดาวน์โหลดสลิปทุกรายการตามตัวกรองปัจจุบันเป็นไฟล์ ZIP (รวมสลิปของรายการเพิ่มเติมที่รวมแล้ว) */
+  const downloadSlipsZip = async (records: SlipRecord[]) => {
+    if (bulkDownload) return;
+    const ids = Array.from(
+      new Set(
+        records.flatMap((s) => [
+          ...(isDownloadableSlipUrl(s.slipUrl) ? [s.id] : []),
+          ...(s.addOnPayments || []).filter((p) => isDownloadableSlipUrl(p.slipUrl)).map((p) => p.slipId),
+        ])
+      )
+    );
+    if (ids.length === 0) {
+      showToast(lang === 'th' ? 'ไม่มีไฟล์สลิปในรายการที่เลือก' : 'No slip files in the current list');
+      return;
+    }
+
+    setBulkDownload({ done: 0, total: ids.length });
+    const entries: ZipEntry[] = [];
+    const usedNames = new Set<string>();
+    let failed = 0;
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < ids.length) {
+        const id = ids[cursor++];
+        try {
+          const file = await fetchSlipFile(id);
+          let name = file.fileName;
+          for (let n = 2; usedNames.has(name); n++) name = file.fileName.replace(/(\.[^.]+)?$/, `_${n}$1`);
+          usedNames.add(name);
+          entries.push({ name, data: new Uint8Array(await file.blob.arrayBuffer()) });
+        } catch {
+          failed++;
+        }
+        setBulkDownload((prev) => (prev ? { ...prev, done: prev.done + 1 } : prev));
+      }
+    };
+
+    try {
+      await Promise.all(Array.from({ length: Math.min(4, ids.length) }, worker));
+      if (entries.length === 0) {
+        showToast(lang === 'th' ? 'ดาวน์โหลดสลิปไม่สำเร็จ' : 'Slip download failed');
+        return;
+      }
+      entries.sort((a, b) => a.name.localeCompare(b.name));
+      const stamp = new Date().toISOString().slice(0, 10);
+      saveBlob(buildZip(entries), `slips_${statusFilter}_${stamp}.zip`);
+      showToast(
+        failed > 0
+          ? (lang === 'th'
+              ? `ดาวน์โหลด ${entries.length} ไฟล์ ไม่สำเร็จ ${failed} ไฟล์`
+              : `Downloaded ${entries.length} files, ${failed} failed`)
+          : (lang === 'th' ? `ดาวน์โหลดสลิป ${entries.length} ไฟล์เรียบร้อย` : `Downloaded ${entries.length} slip files`)
+      );
+    } finally {
+      setBulkDownload(null);
+    }
   };
 
   const openAttachModal = (slip: SlipRecord, e?: React.MouseEvent) => {
@@ -1289,6 +1401,20 @@ export function AdminSlipsView() {
               {categoryRejectedCount}
             </span>
           </button>
+
+          <button
+            onClick={() => downloadSlipsZip(filteredSlips)}
+            disabled={Boolean(bulkDownload) || filteredSlips.length === 0}
+            title={lang === 'th' ? 'ดาวน์โหลดรูปสลิปทุกรายการตามตัวกรองเป็นไฟล์ ZIP' : 'Download all slips in this list as ZIP'}
+            className="ml-auto px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer text-[#0026b3] bg-blue-50 hover:bg-blue-100 border border-blue-200/60 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {bulkDownload ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            <span>
+              {bulkDownload
+                ? `${bulkDownload.done}/${bulkDownload.total}`
+                : (lang === 'th' ? 'ดาวน์โหลดสลิป' : 'Download slips')}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -1309,10 +1435,11 @@ export function AdminSlipsView() {
             <div
               key={slip.id}
               onClick={() => setSelectedSlip(slip)}
-              className="bg-white hover:bg-slate-50/80 rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-2xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4"
+              className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs hover:shadow-md hover:border-slate-300 transition-all duration-200 cursor-pointer flex flex-col overflow-hidden"
             >
-              {/* Left Details */}
-              <div className="flex items-start gap-3.5 min-w-0">
+              <div className="p-4 sm:p-5 space-y-3">
+              {/* Header: รูปสลิป / ชื่อและสถานะ / ยอดเงิน */}
+              <div className="flex items-start gap-3 sm:gap-3.5">
                 {/* Slip Thumbnail Preview & Status Overlay */}
                 <div
                   onClick={(e) => {
@@ -1365,7 +1492,7 @@ export function AdminSlipsView() {
                 </div>
 
                 {/* Main Information */}
-                <div className="space-y-1.5 min-w-0">
+                <div className="flex-1 space-y-1.5 min-w-0">
                   {/* Row 1: Name & Ticket Code */}
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-extrabold text-sm sm:text-base text-slate-900 leading-tight">
@@ -1474,8 +1601,23 @@ export function AdminSlipsView() {
                     )}
                   </div>
 
+                </div>
+
+                <div className="shrink-0 text-right pl-1">
+                  <p className="text-[10px] text-slate-400 font-bold">
+                    {lang === 'th' ? 'ยอดเงินที่ชำระ' : 'Amount'}
+                  </p>
+                  <p className="text-base sm:text-xl font-black text-slate-900 leading-tight whitespace-nowrap">
+                    ฿{slip.amount.toLocaleString()}
+                    <span className="ml-1 text-[11px] font-semibold text-slate-400">THB</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Body: รายละเอียด / รายการที่ลงทะเบียน / ข้อมูลการโอน */}
+              <div className="space-y-2 sm:pl-[4.375rem] min-w-0">
                   {/* Row 3: Meta Info (ธนาคาร, ชื่องานประชุม, ตำแหน่ง, หน่วยงานบุคคล) */}
-                  <div className="flex items-center gap-3 text-xs text-slate-600 flex-wrap pt-0.5">
+                  <div className="flex items-center gap-x-3 gap-y-1 text-xs text-slate-600 flex-wrap">
                     {/* ไม่แสดง workplace ส่วนบุคคลมาปนกับบริษัท (ข้อ 2) */}
                     {slip.workplace && !slip.isGroupMembership && !slip.isGroupConference && !slip.ticketCode?.startsWith('GRP-') && !slip.ticketCode?.startsWith('MEMGRP') && slip.workplace !== slip.nameTh && (
                       <>
@@ -1512,7 +1654,7 @@ export function AdminSlipsView() {
                     const acts = parseSlipActivities(slip.selectedActivities, slip.amount);
                     if (acts.length > 0) {
                       return (
-                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           {acts.map((act, i) => {
                             const rawPrice = act.price !== undefined ? Number(act.price) : 0;
                             const effectivePrice = rawPrice > 0 ? rawPrice : Number(slip.amount || 0);
@@ -1562,32 +1704,24 @@ export function AdminSlipsView() {
                     return null;
                   })()}
 
-                  <p className="text-[11px] text-slate-400 font-normal">
-                    {lang === 'th' ? 'วันที่โอน' : 'Transfer'}: {slip.transferDate || '-'} {slip.transferTime || ''} |
-                    Ref: {slip.refNo}
+                  <p className="flex flex-wrap gap-x-2 text-[11px] text-slate-400 font-normal">
+                    <span>{lang === 'th' ? 'วันที่โอน' : 'Transfer'}: {slip.transferDate || '-'} {slip.transferTime || ''}</span>
+                    <span className="text-slate-300">|</span>
+                    <span className="break-all">Ref: {slip.refNo}</span>
                   </p>
                 </div>
               </div>
 
-              {/* Right Side: Amount & Action Buttons */}
-              <div className="flex items-center justify-between md:justify-end gap-3 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
-                <div className="text-left md:text-right">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">
-                    {lang === 'th' ? 'ยอดเงินที่ชำระ' : 'Amount'}
-                  </p>
-                  <p className="text-base sm:text-lg font-black text-slate-900 leading-tight">
-                    ฿{slip.amount.toLocaleString()} <span className="text-xs font-normal text-slate-500">THB</span>
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
+              {/* Action Bar: เครื่องมือรอง (ซ้าย) / การตัดสินใจอนุมัติ (ขวา) */}
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-5 py-3 bg-slate-50/70 border-t border-slate-100 cursor-default"
+              >
+                <div className="flex flex-wrap items-center gap-1.5">
                   {slip.isGroupMembership || slip.isGroupConference || slip.groupPayload?.attendees || slip.groupPayload?.applicants || slip.ticketCode?.startsWith('MEMGRP') || slip.ticketCode?.startsWith('GRP-') ? (
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedSlip(slip);
-                      }}
-                      className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+                      onClick={() => setSelectedSlip(slip)}
+                      className={CARD_ACTION_BTN}
                       title={lang === 'th' ? 'ดูรายชื่อผู้ลงทะเบียนในกลุ่ม' : 'View Group List'}
                     >
                       <Users className="w-4 h-4 text-indigo-600" />
@@ -1599,27 +1733,51 @@ export function AdminSlipsView() {
                     </button>
                   ) : !(slip.bank?.includes('ชำระเงินภายหลัง') || slip.bank?.toLowerCase().includes('pay later') || !slip.slipUrl || slip.slipUrl === '/placeholder-slip.png' || slip.slipUrl === 'PAY_LATER') ? (
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedSlip(slip);
-                      }}
-                      className="p-2 sm:px-3 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                      onClick={() => setSelectedSlip(slip)}
+                      className={CARD_ACTION_BTN}
                       title={lang === 'th' ? 'ดูหลักฐานสลิป' : 'View Slip'}
+                      aria-label={lang === 'th' ? 'ดูหลักฐานสลิป' : 'View Slip'}
                     >
                       <Eye className="w-4 h-4 text-[#0026b3]" />
                       <span className="hidden sm:inline">{lang === 'th' ? 'ดูสลิป' : 'View'}</span>
                     </button>
                   ) : (
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedSlip(slip);
-                      }}
-                      className="p-2 sm:px-3 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                      onClick={() => setSelectedSlip(slip)}
+                      className={CARD_ACTION_BTN}
                       title={lang === 'th' ? 'ดูรายละเอียด' : 'View Details'}
+                      aria-label={lang === 'th' ? 'ดูรายละเอียด' : 'View Details'}
                     >
-                      <Eye className="w-4 h-4 text-slate-600" />
+                      <Eye className="w-4 h-4 text-slate-500" />
                       <span className="hidden sm:inline">{lang === 'th' ? 'ดูรายละเอียด' : 'Details'}</span>
+                    </button>
+                  )}
+
+                  {isDownloadableSlipUrl(slip.slipUrl) && (
+                    <button
+                      onClick={(e) => downloadSlip(slip.id, e)}
+                      disabled={downloadingSlipId === slip.id}
+                      className={CARD_ACTION_BTN}
+                      title={lang === 'th' ? 'ดาวน์โหลดรูปสลิป' : 'Download slip'}
+                      aria-label={lang === 'th' ? 'ดาวน์โหลดรูปสลิป' : 'Download slip'}
+                    >
+                      {downloadingSlipId === slip.id
+                        ? <Loader2 className="w-4 h-4 text-[#0026b3] animate-spin" />
+                        : <Download className="w-4 h-4 text-[#0026b3]" />}
+                      <span className="hidden sm:inline">{lang === 'th' ? 'ดาวน์โหลด' : 'Download'}</span>
+                    </button>
+                  )}
+
+                  {(slip.status === 'pending' || slip.status === 'approved') && (
+                    <button
+                      onClick={(e) => openAttachModal(slip, e)}
+                      disabled={isProcessing}
+                      className={CARD_ACTION_BTN}
+                      title={lang === 'th' ? 'แนบสลิปแทนผู้ลงทะเบียน' : 'Attach slip on behalf of registrant'}
+                      aria-label={lang === 'th' ? 'แนบสลิปแทนผู้ลงทะเบียน' : 'Attach slip on behalf of registrant'}
+                    >
+                      <Upload className="w-4 h-4 text-sky-600" />
+                      <span className="hidden sm:inline">{slip.adminAttachedSlip || hasActualSlip(slip) ? (lang === 'th' ? 'เปลี่ยนสลิป' : 'Replace Slip') : (lang === 'th' ? 'แนบสลิป' : 'Attach Slip')}</span>
                     </button>
                   )}
 
@@ -1628,79 +1786,62 @@ export function AdminSlipsView() {
                       (slip.attendanceType || slip.guestPayload?.attendanceType) === 'online' ? 'online' : 'onsite';
                     return (
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openFormatEdit(slip, cardFormat);
-                        }}
-                        className={`p-2 rounded-xl text-xs font-bold transition flex items-center cursor-pointer shadow-2xs active:scale-95 border ${cardFormat === 'online'
-                          ? 'bg-violet-50 hover:bg-violet-100 text-violet-800 border-violet-200'
-                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                          }`}
+                        onClick={() => openFormatEdit(slip, cardFormat)}
+                        className={CARD_ACTION_BTN}
                         title={lang === 'th' ? 'แก้ไขรูปแบบการเข้าร่วม' : 'Edit attendance format'}
                         aria-label={lang === 'th' ? 'แก้ไขรูปแบบการเข้าร่วม' : 'Edit attendance format'}
                       >
-                        <Pencil className="w-4 h-4" />
+                        <Pencil className={`w-4 h-4 ${cardFormat === 'online' ? 'text-violet-600' : 'text-amber-600'}`} />
+                        <span className="hidden sm:inline">{lang === 'th' ? 'แก้รูปแบบ' : 'Format'}</span>
                       </button>
                     );
                   })()}
-
-                  {(slip.status === 'pending' || slip.status === 'approved') && (
-                    <button
-                      onClick={(e) => openAttachModal(slip, e)}
-                      disabled={isProcessing}
-                      className="p-2 sm:px-3 sm:py-2 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
-                      title={lang === 'th' ? 'แนบสลิปแทนผู้ลงทะเบียน' : 'Attach slip on behalf of registrant'}
-                    >
-                      <Upload className="w-4 h-4 text-sky-600" />
-                      <span className="hidden sm:inline">{slip.adminAttachedSlip || hasActualSlip(slip) ? (lang === 'th' ? 'เปลี่ยนสลิป' : 'Replace Slip') : (lang === 'th' ? 'แนบสลิป' : 'Attach Slip')}</span>
-                    </button>
-                  )}
-
-                  {canApproveSlip(slip) && (
-                    <>
-                      <button
-                        onClick={(e) => handleApprove(slip.id, e)}
-                        disabled={isProcessing}
-                        className={`px-3 py-2 text-[#061d08] rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 ${processingSlipId === slip.id
-                            ? 'bg-emerald-300 opacity-90 cursor-wait'
-                            : 'bg-[#4ade80] hover:bg-[#3ec424]'
-                          }`}
-                        title={
-                          slip.adminAttachedSlip
-                            ? (lang === 'th' ? 'อนุมัติการชำระเงิน' : 'Approve Payment')
-                            : (lang === 'th' ? 'อนุมัติ' : 'Approve')
-                        }
-                      >
-                        {processingSlipId === slip.id ? (
-                          <>
-                            <RotateCw className="w-4 h-4 animate-spin text-[#061d08]" />
-                            <span>{lang === 'th' ? 'กำลังอนุมัติ...' : 'Approving...'}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Check className="w-4 h-4 stroke-[3]" />
-                            <span>
-                              {slip.adminAttachedSlip
-                                ? (lang === 'th' ? 'อนุมัติการชำระเงิน' : 'Approve Payment')
-                                : (lang === 'th' ? 'อนุมัติ' : 'Approve')}
-                            </span>
-                          </>
-                        )}
-                      </button>
-
-                      {slip.status === 'pending' && (
-                        <button
-                          onClick={(e) => openRejectModal(slip.id, e)}
-                          disabled={isProcessing}
-                          className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer active:scale-95"
-                          title={lang === 'th' ? 'ปฏิเสธ' : 'Reject'}
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
-                    </>
-                  )}
                 </div>
+
+                {canApproveSlip(slip) && (
+                  <div className="flex items-center gap-1.5 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/70">
+                    {slip.status === 'pending' && (
+                      <button
+                        onClick={(e) => openRejectModal(slip.id, e)}
+                        disabled={isProcessing}
+                        className="h-9 px-3 flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition cursor-pointer active:scale-95 disabled:opacity-60"
+                        title={lang === 'th' ? 'ปฏิเสธ' : 'Reject'}
+                      >
+                        <X className="w-4 h-4" />
+                        <span>{lang === 'th' ? 'ปฏิเสธ' : 'Reject'}</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => handleApprove(slip.id, e)}
+                      disabled={isProcessing}
+                      className={`h-9 px-4 flex-[2] sm:flex-none inline-flex items-center justify-center gap-1.5 text-[#061d08] rounded-xl text-xs font-black transition cursor-pointer shadow-xs active:scale-95 ${processingSlipId === slip.id
+                          ? 'bg-emerald-300 opacity-90 cursor-wait'
+                          : 'bg-[#4ade80] hover:bg-[#3ec424]'
+                        }`}
+                      title={
+                        slip.adminAttachedSlip
+                          ? (lang === 'th' ? 'อนุมัติการชำระเงิน' : 'Approve Payment')
+                          : (lang === 'th' ? 'อนุมัติ' : 'Approve')
+                      }
+                    >
+                      {processingSlipId === slip.id ? (
+                        <>
+                          <RotateCw className="w-4 h-4 animate-spin text-[#061d08]" />
+                          <span>{lang === 'th' ? 'กำลังอนุมัติ...' : 'Approving...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4 stroke-[3]" />
+                          <span>
+                            {slip.adminAttachedSlip
+                              ? (lang === 'th' ? 'อนุมัติการชำระเงิน' : 'Approve Payment')
+                              : (lang === 'th' ? 'อนุมัติ' : 'Approve')}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))
@@ -1826,6 +1967,17 @@ export function AdminSlipsView() {
                             {lang === 'th' ? 'ดูสลิป' : 'View slip'}
                           </a>
                         )}
+                        {isDownloadableSlipUrl(p.slipUrl) && (
+                          <button
+                            type="button"
+                            onClick={(e) => downloadSlip(p.slipId, e)}
+                            disabled={downloadingSlipId === p.slipId}
+                            className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-[#0026b3] hover:underline cursor-pointer disabled:opacity-60"
+                          >
+                            {downloadingSlipId === p.slipId ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                            {lang === 'th' ? 'ดาวน์โหลด' : 'Download'}
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1860,6 +2012,19 @@ export function AdminSlipsView() {
                             : (lang === 'th' ? 'เปิดดูภาพขนาดเต็ม' : 'Open full size')}
                         </span>
                       </a>
+                      {isDownloadableSlipUrl(selectedSlip.slipUrl) && (
+                        <button
+                          type="button"
+                          onClick={(e) => downloadSlip(selectedSlip.id, e)}
+                          disabled={downloadingSlipId === selectedSlip.id}
+                          className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold transition flex items-center gap-1 backdrop-blur-md cursor-pointer border border-white/15 active:scale-95 disabled:opacity-60"
+                        >
+                          {downloadingSlipId === selectedSlip.id
+                            ? <Loader2 className="w-3 h-3 animate-spin text-[#4ade80]" />
+                            : <Download className="w-3 h-3 text-[#4ade80]" />}
+                          <span>{lang === 'th' ? 'ดาวน์โหลดสลิป' : 'Download slip'}</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 ) : selectedSlip.slipUrl === 'PAY_LATER' || selectedSlip.slipUrl === 'pay_later_pending' ? (
