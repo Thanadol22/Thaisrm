@@ -27,6 +27,7 @@ import {
   DEFAULT_PRICING_TIERS,
 } from '@/components/admin/types';
 import { DashboardOverviewPanel } from '@/components/admin/DashboardOverviewPanel';
+import { FormsHubPanel } from '@/components/admin/FormsHubPanel';
 import { RevenueReportPanel } from '@/components/admin/RevenueReportPanel';
 import { AddMeetingPanel } from '@/components/admin/AddMeetingPanel';
 import { MeetingHistoryPanel } from '@/components/admin/MeetingHistoryPanel';
@@ -44,6 +45,7 @@ const INITIAL_RECEIPTS: ReceiptData[] = [];
 
 const VALID_ADMIN_TABS: AdminTab[] = [
   'dashboard',
+  'forms',
   'revenue-report',
   'members',
   'add-meeting',
@@ -322,6 +324,7 @@ export default function AdminPage() {
           slipUrl: s.slipUrl,
           status: s.status,
           rejectionReason: s.notes,
+          createdAt: s.createdAt,
           isAdminLedger: Boolean(s.isAdminLedger),
           selectedActivities: s.selectedActivities || [],
         }));
@@ -751,6 +754,11 @@ export default function AdminPage() {
     setTimeout(() => setGlobalToastMessage(null), 5000);
   };
 
+  const showGlobalToast = (msg: string) => {
+    setGlobalToastMessage(msg);
+    setTimeout(() => setGlobalToastMessage(null), 4000);
+  };
+
   const renderActivePanel = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -761,8 +769,11 @@ export default function AdminPage() {
             slips={slips}
             attendees={attendees}
             onEditMeeting={handleEditMeeting}
+            onShowToast={showGlobalToast}
           />
         );
+      case 'forms':
+        return <FormsHubPanel onNavigateTab={handleNavigateTab} onShowToast={showGlobalToast} meetings={meetings} />;
       case 'members':
         return <MemberManagementPanel />;
       case 'revenue-report':

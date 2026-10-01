@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { AdminTab } from '@/components/AdminNavbar';
 import { MeetingItem, SlipItem, AttendeeItem } from './types';
+import { DashboardShortcuts } from './DashboardShortcuts';
 import {
   CalendarDays,
   Users,
@@ -32,6 +33,7 @@ export interface DashboardOverviewProps {
   slips: SlipItem[];
   attendees: AttendeeItem[];
   onEditMeeting?: (meeting: MeetingItem) => void;
+  onShowToast?: (msg: string) => void;
 }
 
 export function DashboardOverviewPanel({
@@ -40,6 +42,7 @@ export function DashboardOverviewPanel({
   slips,
   attendees,
   onEditMeeting,
+  onShowToast,
 }: DashboardOverviewProps) {
   // Find current ongoing meeting (or first upcoming, or fallback to first meeting)
   const currentOngoingMeeting = useMemo(() => {
@@ -353,6 +356,15 @@ export function DashboardOverviewPanel({
         </div>
       </div>
 
+      {/* ฟอร์มลงทะเบียน ฟอร์มที่แอดมินกรอก และเมนูจัดการแยกตามประเภท */}
+      <DashboardShortcuts
+        onNavigateTab={(tab) => onNavigateTab(tab)}
+        onShowToast={onShowToast}
+        pendingSlipsCount={pendingSlips.length}
+        checkedInCount={totalAttended}
+        registeredCount={totalRegistered}
+      />
+
       {/* Main Analytics Content Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column (2 spans): Check-in Time distribution & Recent Meetings */}
@@ -547,48 +559,6 @@ export function DashboardOverviewPanel({
                 <p className="text-[11px] text-slate-400">สัดส่วนประเภทสมาชิกจะคำนวณจากผู้ลงทะเบียนจริงในฐานข้อมูล</p>
               </div>
             )}
-          </div>
-
-          {/* Quick Shortcuts / Recent Activity */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs space-y-4">
-            <h3 className="text-base sm:text-lg font-extrabold text-slate-900 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-[#0026b3]" />
-              รายการดำเนินการด่วน
-            </h3>
-
-            <div className="space-y-3">
-              <div
-                onClick={() => onNavigateTab('verify-slip')}
-                className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/80 hover:bg-amber-100/70 transition cursor-pointer flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-amber-200/70 rounded-lg text-amber-900">
-                    <Receipt className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs sm:text-sm font-bold text-amber-950">สลิปใหม่รอตรวจสอบ</div>
-                    <div className="text-xs text-amber-700">มีสลิปโอนเงินรออนุมัติ {pendingSlips.length} รายการ</div>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-amber-800" />
-              </div>
-
-              <div
-                onClick={() => onNavigateTab('verify-attendees', activeMeetingId !== 'all' ? activeMeetingId : undefined)}
-                className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200/80 hover:bg-blue-100/70 transition cursor-pointer flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-200/70 rounded-lg text-[#0026b3]">
-                    <UserCheck className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs sm:text-sm font-bold text-blue-950">ตรวจสอบรายชื่อผู้เข้าร่วม</div>
-                    <div className="text-xs text-[#0026b3]">เช็คอินแล้ว {totalAttended} จาก {totalRegistered} คน</div>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#0026b3]" />
-              </div>
-            </div>
           </div>
         </div>
       </div>

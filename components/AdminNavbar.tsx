@@ -21,10 +21,10 @@ import {
   Settings,
   Mail,
   Ticket,
-  Building2
+  FileStack
 } from 'lucide-react';
 
-export type AdminTab = 'dashboard' | 'revenue-report' | 'members' | 'add-meeting' | 'meeting-history' | 'sponsors' | 'coupons' | 'verify-slip' | 'verify-attendees' | 'receipts' | 'emails' | 'settings';
+export type AdminTab = 'dashboard' | 'forms' | 'revenue-report' | 'members' | 'add-meeting' | 'meeting-history' | 'sponsors' | 'coupons' | 'verify-slip' | 'verify-attendees' | 'receipts' | 'emails' | 'settings';
 
 interface AdminNavbarProps {
   activeTab: AdminTab;
@@ -38,85 +38,56 @@ interface AdminNavbarProps {
   couponsCount?: number;
 }
 
-const navItems: {
+type NavItem = {
   id: AdminTab;
   labelTh: string;
   labelEn: string;
   icon: React.ElementType;
   badgeKey?: 'slips' | 'attendees' | 'receipts' | 'members' | 'coupons';
-}[] = [
-    {
-      id: 'dashboard',
-      labelTh: 'ภาพรวมแดชบอร์ด',
-      labelEn: 'Overview Dashboard',
-      icon: LayoutDashboard,
-    },
-    {
-      id: 'sponsors',
-      labelTh: 'จัดการข้อมูลบริษัทและคูปอง',
-      labelEn: 'Companies & Coupons',
-      icon: Ticket,
-      badgeKey: 'coupons',
-    },
-    {
-      id: 'members',
-      labelTh: 'จัดการสมาชิก',
-      labelEn: 'Member Management',
-      icon: Users,
-      badgeKey: 'members',
-    },
-    {
-      id: 'revenue-report',
-      labelTh: 'รายงานรายได้',
-      labelEn: 'Revenue Report',
-      icon: DollarSign,
-    },
-    {
-      id: 'receipts',
-      labelTh: 'ออกใบเสร็จรับเงิน',
-      labelEn: 'Receipts & Invoices',
-      icon: FileText,
-      badgeKey: 'receipts',
-    },
-    {
-      id: 'add-meeting',
-      labelTh: 'เพิ่มการประชุม',
-      labelEn: 'Add Meeting',
-      icon: PlusCircle,
-    },
-    {
-      id: 'meeting-history',
-      labelTh: 'ประวัติการประชุม',
-      labelEn: 'Meeting History',
-      icon: ClipboardList,
-    },
-    {
-      id: 'verify-slip',
-      labelTh: 'ตรวจสอบการชำระเงิน',
-      labelEn: 'Payment Verification',
-      icon: Receipt,
-      badgeKey: 'slips',
-    },
-    {
-      id: 'verify-attendees',
-      labelTh: 'ตรวจสอบผู้เข้าร่วม',
-      labelEn: 'Verify Attendees',
-      icon: UserCheck,
-      badgeKey: 'attendees',
-    },
-    {
-      id: 'emails',
-      labelTh: 'ระบบจัดการอีเมล',
-      labelEn: 'Email Center',
-      icon: Mail,
-    },
-    {
-      id: 'settings',
-      labelTh: 'ตั้งค่าระบบ',
-      labelEn: 'System Settings',
-      icon: Settings,
-    },
-  ];
+};
+
+/** เมนูแยกตามประเภทงาน */
+export const navGroups: { title: string; items: NavItem[] }[] = [
+  {
+    title: 'ภาพรวม',
+    items: [
+      { id: 'dashboard', labelTh: 'ภาพรวมแดชบอร์ด', labelEn: 'Overview Dashboard', icon: LayoutDashboard },
+      { id: 'forms', labelTh: 'ฟอร์มลงทะเบียน', labelEn: 'Registration Forms', icon: FileStack },
+    ],
+  },
+  {
+    title: 'งานประชุม',
+    items: [
+      { id: 'add-meeting', labelTh: 'เพิ่มการประชุม', labelEn: 'Add Meeting', icon: PlusCircle },
+      { id: 'meeting-history', labelTh: 'ประวัติการประชุม', labelEn: 'Meeting History', icon: ClipboardList },
+      { id: 'verify-attendees', labelTh: 'ตรวจสอบผู้เข้าร่วม', labelEn: 'Verify Attendees', icon: UserCheck, badgeKey: 'attendees' },
+    ],
+  },
+  {
+    title: 'การเงิน',
+    items: [
+      { id: 'verify-slip', labelTh: 'ตรวจสอบการชำระเงิน', labelEn: 'Payment Verification', icon: Receipt, badgeKey: 'slips' },
+      { id: 'receipts', labelTh: 'ออกใบเสร็จรับเงิน', labelEn: 'Receipts & Invoices', icon: FileText, badgeKey: 'receipts' },
+      { id: 'revenue-report', labelTh: 'รายงานรายได้', labelEn: 'Revenue Report', icon: DollarSign },
+    ],
+  },
+  {
+    title: 'สมาชิกและบริษัท',
+    items: [
+      { id: 'members', labelTh: 'จัดการสมาชิก', labelEn: 'Member Management', icon: Users, badgeKey: 'members' },
+      { id: 'sponsors', labelTh: 'จัดการข้อมูลบริษัทและคูปอง', labelEn: 'Companies & Coupons', icon: Ticket, badgeKey: 'coupons' },
+    ],
+  },
+  {
+    title: 'ระบบ',
+    items: [
+      { id: 'emails', labelTh: 'ระบบจัดการอีเมล', labelEn: 'Email Center', icon: Mail },
+      { id: 'settings', labelTh: 'ตั้งค่าระบบ', labelEn: 'System Settings', icon: Settings },
+    ],
+  },
+];
+
+const navItems: NavItem[] = navGroups.flatMap((g) => g.items);
 
 export function AdminNavbar({
   activeTab,
@@ -185,11 +156,13 @@ export function AdminNavbar({
 
         {/* Navigation Items (Scrollable when screen height is short) */}
         <nav className="flex-1 px-3.5 py-3 space-y-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-          <div className="text-[11px] font-extrabold text-blue-200/70 uppercase tracking-wider px-3 py-1 mb-1 flex items-center justify-between">
-            <span>เมนูจัดการระบบ</span>
-            <Sparkles className="w-3.5 h-3.5 text-blue-300" />
+          {navGroups.map((group, groupIdx) => (
+          <div key={group.title} className={`space-y-1 ${groupIdx > 0 ? 'pt-2.5 mt-1 border-t border-white/10' : ''}`}>
+          <div className="text-[11px] font-extrabold text-blue-200/70 uppercase tracking-wider px-3 py-1 flex items-center justify-between">
+            <span>{group.title}</span>
+            {groupIdx === 0 && <Sparkles className="w-3.5 h-3.5 text-blue-300" />}
           </div>
-          {navItems.map((item) => {
+          {group.items.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id || (item.id === 'sponsors' && activeTab === 'coupons');
             const badge = getBadge(item.badgeKey);
@@ -247,6 +220,8 @@ export function AdminNavbar({
               </button>
             );
           })}
+          </div>
+          ))}
         </nav>
 
         {/* Quick summary footer (Pinned at bottom, never cut off) */}
@@ -318,8 +293,12 @@ export function AdminNavbar({
               onClick={() => setIsMobileOpen(false)}
             />
             <div className="fixed inset-x-0 top-[57px] z-50 bg-gradient-to-b from-[#0026b3] to-[#001768] text-white border-t border-white/10 p-4 max-h-[calc(100vh-60px)] overflow-y-auto animate-slide-down shadow-2xl space-y-3">
-              <div className="space-y-1.5">
-                {navItems.map((item) => {
+              {navGroups.map((group) => (
+              <div key={group.title} className="space-y-1.5">
+                <div className="text-[11px] font-extrabold text-blue-200/70 uppercase tracking-wider px-1 pt-1">
+                  {group.title}
+                </div>
+                {group.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id || (item.id === 'sponsors' && activeTab === 'coupons');
                   const badge = getBadge(item.badgeKey);
@@ -372,6 +351,7 @@ export function AdminNavbar({
                   );
                 })}
               </div>
+              ))}
               {onLogout && (
                 <div className="pt-3 border-t border-white/10">
                   <button
