@@ -40,6 +40,7 @@ import { ThaiDatePicker } from '@/components/ThaiDatePicker';
 import { uploadImageToStorage } from '@/lib/blobUpload';
 
 import { statusLabelTh } from '@/lib/statusLabels';
+import { PaginationControls } from '@/components/PaginationControls';
 interface EducationItem {
   edu_id?: string;
   degree: string;
@@ -143,6 +144,9 @@ interface ProfileAndSponsorUpdateModalProps {
   lang?: 'th' | 'en';
 }
 
+// จำนวนรายชื่อสมาชิกของบริษัทต่อหน้า
+const GROUP_MEMBERS_PAGE_SIZE = 5;
+
 export function ProfileAndSponsorUpdateModal({
   isOpen,
   onClose,
@@ -150,6 +154,7 @@ export function ProfileAndSponsorUpdateModal({
 }: ProfileAndSponsorUpdateModalProps) {
   const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState<'email' | 'otp' | 'member_view' | 'sponsor_view'>('email');
+  const [groupMembersPage, setGroupMembersPage] = useState(1);
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -381,6 +386,7 @@ export function ProfileAndSponsorUpdateModal({
         setStep('member_view');
       } else if (data.userType === 'sponsor') {
         setSponsorData(data.data);
+        setGroupMembersPage(1);
         setStep('sponsor_view');
       }
     } catch (err) {
@@ -1733,8 +1739,9 @@ export function ProfileAndSponsorUpdateModal({
                     ยังไม่มีรายชื่อสมาชิกที่ลงทะเบียนในนามบริษัทนี้
                   </div>
                 ) : (
+                  <>
                   <ul className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
-                    {sponsorData.groupMembers.map((m, idx) => {
+                    {sponsorData.groupMembers.slice((groupMembersPage - 1) * GROUP_MEMBERS_PAGE_SIZE, groupMembersPage * GROUP_MEMBERS_PAGE_SIZE).map((m, idx) => {
                       const hasMemberNo = Boolean(m.member_no && m.member_no !== '-');
                       const hasEmail = Boolean(m.attendee_email && m.attendee_email !== '-');
                       return (
@@ -1807,6 +1814,16 @@ export function ProfileAndSponsorUpdateModal({
                       );
                     })}
                   </ul>
+                  {sponsorData.groupMembers.length > GROUP_MEMBERS_PAGE_SIZE && (
+                    <PaginationControls
+                      currentPage={groupMembersPage}
+                      totalItems={sponsorData.groupMembers.length}
+                      pageSize={GROUP_MEMBERS_PAGE_SIZE}
+                      onPageChange={setGroupMembersPage}
+                      itemLabel="ท่าน"
+                    />
+                  )}
+                  </>
                 )}
               </div>
 
