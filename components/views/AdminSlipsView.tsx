@@ -238,7 +238,7 @@ export interface SlipRecord {
   adminAttachedSlip?: boolean;
 }
 
-/** รายการราคา fellow: มาจากฟอร์ม fellow (ทั้งบิล) หรือแอดมินระบุรายคน/walk-in */
+/** รายการราคา fellow: มาจากฟอร์ม fellow (ทั้งบิล) หรือแอดมินระบุรายคน/แอดมินลงทะเบียนให้ */
 export const isFellowSlip = (s?: SlipRecord | null, att?: any) =>
   Boolean(
     att?.isFellow ||

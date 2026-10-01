@@ -9,6 +9,7 @@ import { PaginationControls } from '@/components/PaginationControls';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
 import { PositionSelect, POSITION_CATEGORY_OPTIONS } from '@/components/PositionSelect';
 import { uploadImageToStorage } from '@/lib/blobUpload';
+import { isPersonalEmail, personalEmailRequiredMessage } from '@/lib/validators/emailPolicy';
 import {
   UserCheck,
   PlusCircle,
@@ -37,7 +38,7 @@ import {
 /* ─── 5. VERIFY ATTENDEES PANEL (Light Theme with Round Filter) ───────────── */
 
 // ประเภทสมาชิกเดียวกับที่ระบบใช้แสดงผลผู้เข้าร่วม (สามัญ / ตลอดชีพ / บุคคลทั่วไป)
-const WALK_IN_MEMBER_TYPES = ['บุคคลทั่วไป', 'สมาชิกสามัญ', 'สมาชิกตลอดชีพ'];
+const ADMIN_REG_MEMBER_TYPES = ['บุคคลทั่วไป', 'สมาชิกสามัญ', 'สมาชิกตลอดชีพ'];
 
 export interface VerifyAttendeesPanelProps {
   attendees: AttendeeItem[];
@@ -107,7 +108,7 @@ export function VerifyAttendeesPanel({
 
   // Registration modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [walkInData, setWalkInData] = useState({
+  const [adminRegData, setAdminRegData] = useState({
     memberNo: '',
     isFellow: false,
     nameTh: '',
@@ -117,7 +118,7 @@ export function VerifyAttendeesPanel({
     email: '',
     workplace: '',
     meetingId: meetings[0]?.id || '',
-    memberType: WALK_IN_MEMBER_TYPES[0],
+    memberType: ADMIN_REG_MEMBER_TYPES[0],
     position: '',
     positionOther: '',
     selectedPrograms: [] as string[],
@@ -132,14 +133,14 @@ export function VerifyAttendeesPanel({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const slipInputRef = useRef<HTMLInputElement>(null);
 
-  const walkInMeeting = meetings.find((m) => m.id === walkInData.meetingId) || meetings[0];
+  const adminRegMeeting = meetings.find((m) => m.id === adminRegData.meetingId) || meetings[0];
 
   // ค้นหาสมาชิกจากเลขสมาชิกแล้วเติมข้อมูลอัตโนมัติ
   const [linkedMember, setLinkedMember] = useState<{ memberNo: string; nameTh: string; status: string; isActive: boolean } | null>(null);
   const [memberLookup, setMemberLookup] = useState<{ state: 'idle' | 'loading' | 'error'; message?: string }>({ state: 'idle' });
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
 
-  const checkWalkInRegistration = async (meetingId: string, memberNo: string) => {
+  const checkAdminRegRegistration = async (meetingId: string, memberNo: string) => {
     if (!meetingId || !memberNo) return setAlreadyRegistered(false);
     try {
       const res = await fetch(
@@ -152,14 +153,14 @@ export function VerifyAttendeesPanel({
     }
   };
 
-  const unlinkWalkInMember = () => {
+  const unlinkAdminRegMember = () => {
     setLinkedMember(null);
     setAlreadyRegistered(false);
     setMemberLookup({ state: 'idle' });
   };
 
-  const handleLookupWalkInMember = async () => {
-    const raw = walkInData.memberNo.trim();
+  const handleLookupAdminRegMember = async () => {
+    const raw = adminRegData.memberNo.trim();
     if (!raw) return;
     setMemberLookup({ state: 'loading' });
     setAlreadyRegistered(false);
@@ -182,7 +183,7 @@ export function VerifyAttendeesPanel({
           o.value.slice(2).toLowerCase() === jobText.toLowerCase() ||
           o.labelTh === jobText
       );
-      setWalkInData((prev) => ({
+      setAdminRegData((prev) => ({
         ...prev,
         memberNo,
         nameTh: m.full_name_th || prev.nameTh,
@@ -203,45 +204,45 @@ export function VerifyAttendeesPanel({
       }));
       setLinkedMember({ memberNo, nameTh: m.full_name_th || '', status, isActive });
       setMemberLookup({ state: 'idle' });
-      checkWalkInRegistration(walkInData.meetingId, memberNo);
+      checkAdminRegRegistration(adminRegData.meetingId, memberNo);
     } catch {
       setMemberLookup({ state: 'error', message: 'ค้นหาสมาชิกไม่สำเร็จ กรุณาลองใหม่' });
     }
   };
-  const walkInActivities = useMemo<any[]>(
-    () => (Array.isArray(walkInMeeting?.activities) ? walkInMeeting.activities.filter((a: any) => a && a.id) : []),
-    [walkInMeeting]
+  const adminRegActivities = useMemo<any[]>(
+    () => (Array.isArray(adminRegMeeting?.activities) ? adminRegMeeting.activities.filter((a: any) => a && a.id) : []),
+    [adminRegMeeting]
   );
-  const walkInIsMember = walkInData.memberType !== 'บุคคลทั่วไป';
+  const adminRegIsMember = adminRegData.memberType !== 'บุคคลทั่วไป';
   // ราคา fellow ของการประชุมหลัก (0 ทั้งหมด = ยังไม่ได้ตั้ง ใช้ราคาปกติ)
-  const walkInTiers = (walkInMeeting?.pricingTiers || {}) as any;
-  const walkInFellowTier =
-    walkInTiers.fellow &&
-    Number(walkInTiers.fellow.onsiteMember || 0) + Number(walkInTiers.fellow.onsiteNonMember || 0) + Number(walkInTiers.fellow.onlineMember || 0) > 0
-      ? walkInTiers.fellow
+  const adminRegTiers = (adminRegMeeting?.pricingTiers || {}) as any;
+  const adminRegFellowTier =
+    adminRegTiers.fellow &&
+    Number(adminRegTiers.fellow.onsiteMember || 0) + Number(adminRegTiers.fellow.onsiteNonMember || 0) + Number(adminRegTiers.fellow.onlineMember || 0) > 0
+      ? adminRegTiers.fellow
       : null;
-  const getWalkInPrice = (act: any) => {
+  const getAdminRegPrice = (act: any) => {
     const isMainAct = act?.type === 'main' || act?.id === 'main';
     if (isMainAct) {
       // ลงทะเบียนแบบออนไซต์
-      const tier = walkInData.isFellow && walkInFellowTier ? walkInFellowTier : walkInTiers.participant;
-      if (tier) return Number(walkInIsMember ? tier.onsiteMember : tier.onsiteNonMember) || 0;
+      const tier = adminRegData.isFellow && adminRegFellowTier ? adminRegFellowTier : adminRegTiers.participant;
+      if (tier) return Number(adminRegIsMember ? tier.onsiteMember : tier.onsiteNonMember) || 0;
     }
     const mPrice = typeof act.memberPrice === 'number' ? act.memberPrice : 0;
     const nonMPrice = typeof act.nonMemberPrice === 'number' ? act.nonMemberPrice : mPrice;
-    return walkInIsMember ? mPrice : nonMPrice;
+    return adminRegIsMember ? mPrice : nonMPrice;
   };
-  const walkInSelectedActs = walkInActivities.filter((a) => walkInData.selectedPrograms.includes(String(a.id)));
-  const walkInTotal = walkInSelectedActs.reduce((sum, a) => sum + getWalkInPrice(a), 0);
+  const adminRegSelectedActs = adminRegActivities.filter((a) => adminRegData.selectedPrograms.includes(String(a.id)));
+  const adminRegTotal = adminRegSelectedActs.reduce((sum, a) => sum + getAdminRegPrice(a), 0);
 
   // เปลี่ยนรอบการประชุม: เลือกหลักสูตรหลักของรอบนั้นไว้ให้ก่อน
-  const walkInMainId = walkInActivities.find((a) => a.type === 'main' || a.id === 'main')?.id;
+  const adminRegMainId = adminRegActivities.find((a) => a.type === 'main' || a.id === 'main')?.id;
   useEffect(() => {
-    setWalkInData((prev) => ({ ...prev, selectedPrograms: walkInMainId ? [String(walkInMainId)] : [] }));
-  }, [walkInMeeting?.id, walkInMainId]);
+    setAdminRegData((prev) => ({ ...prev, selectedPrograms: adminRegMainId ? [String(adminRegMainId)] : [] }));
+  }, [adminRegMeeting?.id, adminRegMainId]);
 
-  const toggleWalkInProgram = (id: string) => {
-    setWalkInData((prev) => ({
+  const toggleAdminRegProgram = (id: string) => {
+    setAdminRegData((prev) => ({
       ...prev,
       selectedPrograms: prev.selectedPrograms.includes(id)
         ? prev.selectedPrograms.filter((p) => p !== id)
@@ -275,10 +276,10 @@ export function VerifyAttendeesPanel({
     }
   };
 
-  const handleCreateWalkIn = async (e: React.FormEvent) => {
+  const handleCreateAdminReg = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
-    if (walkInData.memberNo.trim() && !linkedMember) {
+    if (adminRegData.memberNo.trim() && !linkedMember) {
       alert('กรุณากดค้นหาเลขสมาชิกก่อน หรือลบเลขสมาชิกออกหากไม่ใช่สมาชิก');
       return;
     }
@@ -286,20 +287,41 @@ export function VerifyAttendeesPanel({
       alert(`สมาชิกเลขที่ ${linkedMember.memberNo} ลงทะเบียนการประชุมรอบนี้แล้ว`);
       return;
     }
-    if (!walkInData.nameTh || !walkInData.phone) {
-      alert('กรุณากรอกชื่อและเบอร์โทรศัพท์');
+    if (!adminRegData.nameTh.trim()) {
+      alert('กรุณากรอกชื่อ-นามสกุล');
       return;
     }
-    if (!walkInData.position) {
+    if (!adminRegData.nameEn.trim()) {
+      alert('กรุณากรอกชื่อ-นามสกุล ภาษาอังกฤษ');
+      return;
+    }
+    const emailTrimmed = adminRegData.email.trim();
+    if (!emailTrimmed) {
+      alert('กรุณากรอกอีเมล');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
+      alert('รูปแบบอีเมลไม่ถูกต้อง');
+      return;
+    }
+    if (!linkedMember && !isPersonalEmail(emailTrimmed)) {
+      alert(personalEmailRequiredMessage('th'));
+      return;
+    }
+    if (!adminRegData.workplace.trim()) {
+      alert('กรุณากรอกหน่วยงาน / บริษัท');
+      return;
+    }
+    if (!adminRegData.position) {
       alert('กรุณาเลือกตำแหน่ง');
       return;
     }
-    const isOtherPosition = walkInData.position === '0 อื่นๆ';
-    if (isOtherPosition && !walkInData.positionOther.trim()) {
+    const isOtherPosition = adminRegData.position === '0 อื่นๆ';
+    if (isOtherPosition && !adminRegData.positionOther.trim()) {
       alert('กรุณาระบุตำแหน่งอื่นๆ');
       return;
     }
-    if (walkInActivities.length > 0 && walkInSelectedActs.length === 0) {
+    if (adminRegActivities.length > 0 && adminRegSelectedActs.length === 0) {
       alert('กรุณาเลือกโปรแกรมที่ต้องการเข้าร่วมอย่างน้อย 1 รายการ');
       return;
     }
@@ -323,44 +345,44 @@ export function VerifyAttendeesPanel({
       }
     }
 
-    const meeting = walkInMeeting;
-    const programs = walkInSelectedActs.map((a) => ({ id: String(a.id), name: String(a.name || a.id) }));
+    const meeting = adminRegMeeting;
+    const programs = adminRegSelectedActs.map((a) => ({ id: String(a.id), name: String(a.name || a.id) }));
     const position = isOtherPosition
-      ? walkInData.positionOther.trim()
-      : POSITION_CATEGORY_OPTIONS.find((o) => o.value === walkInData.position)?.labelTh || walkInData.position;
+      ? adminRegData.positionOther.trim()
+      : POSITION_CATEGORY_OPTIONS.find((o) => o.value === adminRegData.position)?.labelTh || adminRegData.position;
     const newAttendee: AttendeeItem = {
       id: `ATT-${Date.now()}`,
       code: linkedMember?.memberNo || Math.floor(100100 + Math.random() * 9000).toString(),
       memberNo: linkedMember?.memberNo,
-      isFellow: walkInData.isFellow,
-      nameTh: walkInData.nameTh,
-      nameEn: walkInData.nameEn || walkInData.nameTh,
-      id4Digits: walkInData.id4Digits || walkInData.phone.slice(-4),
-      email: walkInData.email || 'attendee@tsrm.org',
-      phone: walkInData.phone,
-      workplace: walkInData.workplace || 'โรงพยาบาล/คลินิก',
-      memberType: walkInData.memberType,
-      ticketType: programs.map((p) => p.name).join(', ') || walkInData.memberType,
+      isFellow: adminRegData.isFellow,
+      nameTh: adminRegData.nameTh.trim(),
+      nameEn: adminRegData.nameEn.trim(),
+      id4Digits: adminRegData.id4Digits || adminRegData.phone.slice(-4),
+      email: emailTrimmed,
+      phone: adminRegData.phone,
+      workplace: adminRegData.workplace.trim(),
+      memberType: adminRegData.memberType,
+      ticketType: programs.map((p) => p.name).join(', ') || adminRegData.memberType,
       position,
       programs,
-      amount: walkInTotal,
+      amount: adminRegTotal,
       ticketCode: `TSRM-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       meetingId: meeting?.id || '',
       meetingTitle: meeting?.titleTh || 'การประชุมวิชาการประจำปี TSRM Congress 2026',
       registeredDate: new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }),
-      paymentStatus: walkInData.paymentStatus,
-      checkInStatus: walkInData.checkInNow ? 'checked_in' : 'not_checked_in',
-      checkInTime: walkInData.checkInNow ? new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.' : undefined,
+      paymentStatus: adminRegData.paymentStatus,
+      checkInStatus: adminRegData.checkInNow ? 'checked_in' : 'not_checked_in',
+      checkInTime: adminRegData.checkInNow ? new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.' : undefined,
       slipUrl: uploadedSlipUrl || undefined,
     };
 
     onAddAttendee?.(newAttendee);
     setIsAddModalOpen(false);
-    unlinkWalkInMember();
+    unlinkAdminRegMember();
     setSlipFile(null);
     setSlipPreview(null);
     setIsSubmitting(false);
-    setWalkInData((prev) => ({
+    setAdminRegData((prev) => ({
       ...prev,
       memberNo: '',
       isFellow: false,
@@ -370,10 +392,10 @@ export function VerifyAttendeesPanel({
       phone: '',
       email: '',
       workplace: '',
-      memberType: WALK_IN_MEMBER_TYPES[0],
+      memberType: ADMIN_REG_MEMBER_TYPES[0],
       position: '',
       positionOther: '',
-      selectedPrograms: walkInMainId ? [String(walkInMainId)] : [],
+      selectedPrograms: adminRegMainId ? [String(adminRegMainId)] : [],
       paymentStatus: 'pending',
       checkInNow: false,
     }));
@@ -1224,14 +1246,14 @@ export function VerifyAttendeesPanel({
                 </button>
               </div>
 
-              <form onSubmit={handleCreateWalkIn} className="space-y-3.5 text-xs sm:text-sm">
+              <form onSubmit={handleCreateAdminReg} className="space-y-3.5 text-xs sm:text-sm">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">รอบการประชุมที่ลงทะเบียน *</label>
                   <select
-                    value={walkInData.meetingId}
+                    value={adminRegData.meetingId}
                     onChange={(e) => {
-                      setWalkInData({ ...walkInData, meetingId: e.target.value });
-                      if (linkedMember) checkWalkInRegistration(e.target.value, linkedMember.memberNo);
+                      setAdminRegData({ ...adminRegData, meetingId: e.target.value });
+                      if (linkedMember) checkAdminRegRegistration(e.target.value, linkedMember.memberNo);
                     }}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 font-medium focus:bg-white focus:outline-none focus:border-[#0026b3]"
                     required
@@ -1253,23 +1275,23 @@ export function VerifyAttendeesPanel({
                     <input
                       type="text"
                       inputMode="numeric"
-                      value={walkInData.memberNo}
+                      value={adminRegData.memberNo}
                       disabled={!!linkedMember}
                       onChange={(e) => {
-                        setWalkInData({ ...walkInData, memberNo: e.target.value.replace(/\s/g, '').slice(0, 20) });
+                        setAdminRegData({ ...adminRegData, memberNo: e.target.value.replace(/\s/g, '').slice(0, 20) });
                         if (memberLookup.state === 'error') setMemberLookup({ state: 'idle' });
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
-                          handleLookupWalkInMember();
+                          handleLookupAdminRegMember();
                         }
                       }}
                       placeholder="เช่น 0123"
                       className="flex-1 min-w-0 bg-white border border-slate-300 rounded-xl px-3 py-2 font-mono font-bold text-slate-800 focus:outline-none focus:border-[#0026b3] disabled:bg-slate-100 disabled:text-slate-500"
                     />
                     {linkedMember ? (
-                      <Btn variant="secondary" icon={X} onClick={unlinkWalkInMember}>
+                      <Btn variant="secondary" icon={X} onClick={unlinkAdminRegMember}>
                         ยกเลิกการผูก
                       </Btn>
                     ) : (
@@ -1277,8 +1299,8 @@ export function VerifyAttendeesPanel({
                         variant="primary"
                         icon={Search}
                         loading={memberLookup.state === 'loading'}
-                        disabled={!walkInData.memberNo.trim()}
-                        onClick={handleLookupWalkInMember}
+                        disabled={!adminRegData.memberNo.trim()}
+                        onClick={handleLookupAdminRegMember}
                       >
                         ค้นหา
                       </Btn>
@@ -1309,62 +1331,37 @@ export function VerifyAttendeesPanel({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">ชื่อ-นามสกุล (ภาษาไทย) *</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      ชื่อ-นามสกุล <span className="text-rose-500">*</span>
+                    </label>
                     <input
                       type="text"
                       required
                       readOnly={!!linkedMember}
                       title={linkedMember ? 'ชื่อตามข้อมูลสมาชิก ยกเลิกการผูกเพื่อแก้ไข' : undefined}
-                      value={walkInData.nameTh}
+                      value={adminRegData.nameTh}
                       onChange={(e) =>
-                        setWalkInData({
-                          ...walkInData,
+                        setAdminRegData({
+                          ...adminRegData,
                           nameTh: e.target.value.replace(/[^\u0E00-\u0E7F\s\.\-]/g, ''),
                         })
                       }
-                      placeholder="ชื่อ-นามสกุล (ไม่ต้องมีคำนำหน้า)"
+                      placeholder="ชื่อ-นามสกุล"
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:bg-white focus:outline-none focus:border-[#0026b3]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">ชื่อ-นามสกุล (ภาษาอังกฤษ)</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      ชื่อ-นามสกุล ภาษาอังกฤษ <span className="text-rose-500">*</span>
+                    </label>
                     <input
                       type="text"
-                      value={walkInData.nameEn}
-                      onChange={(e) =>
-                        setWalkInData({ ...walkInData, nameEn: e.target.value.replace(/[^a-zA-Z\s\.\-']/g, '') })
-                      }
-                      placeholder="Full Name (Without prefix)"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:bg-white focus:outline-none focus:border-[#0026b3]"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">เบอร์โทรศัพท์ติดต่อ *</label>
-                    <input
-                      type="tel"
                       required
-                      maxLength={10}
-                      value={walkInData.phone}
+                      value={adminRegData.nameEn}
                       onChange={(e) =>
-                        setWalkInData({ ...walkInData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })
+                        setAdminRegData({ ...adminRegData, nameEn: e.target.value.replace(/[^a-zA-Z\s\.\-']/g, '') })
                       }
-                      placeholder="081-234-5678"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:bg-white focus:outline-none focus:border-[#0026b3]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">เลขท้าย 4 หลักบัตรประชาชน</label>
-                    <input
-                      type="text"
-                      maxLength={4}
-                      value={walkInData.id4Digits}
-                      onChange={(e) =>
-                        setWalkInData({ ...walkInData, id4Digits: e.target.value.replace(/\D/g, '').slice(0, 4) })
-                      }
-                      placeholder="1234"
+                      placeholder="Full Name (English)"
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:bg-white focus:outline-none focus:border-[#0026b3]"
                     />
                   </div>
@@ -1373,20 +1370,29 @@ export function VerifyAttendeesPanel({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <SmartEmailInput
-                      value={walkInData.email}
-                      onChange={(val) => setWalkInData({ ...walkInData, email: val })}
+                      value={adminRegData.email}
+                      onChange={(val) => setAdminRegData({ ...adminRegData, email: val })}
                       label="อีเมล"
-                      placeholder="doctor@hospital.com"
-                      helperText="กรุณากรอกอีเมลที่มีอยู่จริง"
+                      placeholder="youremail@example.com"
+                      helperText={
+                        linkedMember
+                          ? 'ระบบจะส่ง QR Code เข้าร่วมงานไปยังอีเมลสมาชิกนี้'
+                          : 'กรุณากรอกอีเมลที่มีอยู่จริง เพื่อรับ QR Code เข้าร่วมงาน'
+                      }
+                      required
+                      personalOnly={!linkedMember}
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">หน่วยงาน / สถานที่ทำงาน</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      หน่วยงาน / บริษัท <span className="text-rose-500">*</span>
+                    </label>
                     <input
                       type="text"
-                      value={walkInData.workplace}
-                      onChange={(e) => setWalkInData({ ...walkInData, workplace: e.target.value })}
-                      placeholder="เช่น รพ.รามาธิบดี"
+                      required
+                      value={adminRegData.workplace}
+                      onChange={(e) => setAdminRegData({ ...adminRegData, workplace: e.target.value })}
+                      placeholder="โรงพยาบาล / คลินิก / บริษัท"
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:bg-white focus:outline-none focus:border-[#0026b3]"
                     />
                   </div>
@@ -1395,13 +1401,13 @@ export function VerifyAttendeesPanel({
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">ประเภทสมาชิก</label>
                   <div className="grid grid-cols-3 gap-2">
-                    {WALK_IN_MEMBER_TYPES.map((type) => {
-                      const isActive = walkInData.memberType === type;
+                    {ADMIN_REG_MEMBER_TYPES.map((type) => {
+                      const isActive = adminRegData.memberType === type;
                       return (
                         <button
                           key={type}
                           type="button"
-                          onClick={() => setWalkInData({ ...walkInData, memberType: type })}
+                          onClick={() => setAdminRegData({ ...adminRegData, memberType: type })}
                           className={`px-2 py-2 rounded-xl border text-xs font-bold transition cursor-pointer ${
                             isActive
                               ? 'bg-blue-50 border-[#0026b3] text-[#0026b3] ring-1 ring-[#0026b3]/30'
@@ -1417,37 +1423,37 @@ export function VerifyAttendeesPanel({
 
                 <label
                   className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition ${
-                    walkInData.isFellow ? 'border-violet-400 bg-violet-50 ring-1 ring-violet-300' : 'border-slate-300 bg-slate-50 hover:border-slate-400'
+                    adminRegData.isFellow ? 'border-violet-400 bg-violet-50 ring-1 ring-violet-300' : 'border-slate-300 bg-slate-50 hover:border-slate-400'
                   }`}
                 >
                   <input
                     type="checkbox"
-                    checked={walkInData.isFellow}
-                    onChange={(e) => setWalkInData({ ...walkInData, isFellow: e.target.checked })}
+                    checked={adminRegData.isFellow}
+                    onChange={(e) => setAdminRegData({ ...adminRegData, isFellow: e.target.checked })}
                     className="mt-0.5 w-4 h-4 accent-violet-600 cursor-pointer"
                   />
                   <span className="min-w-0">
                     <span className="block text-xs font-bold text-slate-800">ลงทะเบียนเป็น Fellow</span>
                     <span className="block text-[11px] text-slate-500">
-                      {walkInFellowTier
-                        ? `ใช้ราคา Fellow ของการประชุมหลัก สมาชิก ${Number(walkInFellowTier.onsiteMember || 0).toLocaleString()} บาท บุคคลทั่วไป ${Number(walkInFellowTier.onsiteNonMember || 0).toLocaleString()} บาท`
+                      {adminRegFellowTier
+                        ? `ใช้ราคา Fellow ของการประชุมหลัก สมาชิก ${Number(adminRegFellowTier.onsiteMember || 0).toLocaleString()} บาท บุคคลทั่วไป ${Number(adminRegFellowTier.onsiteNonMember || 0).toLocaleString()} บาท`
                         : 'การประชุมนี้ยังไม่ได้ตั้งราคา Fellow จะบันทึกว่าเป็น Fellow แต่คิดราคาปกติ'}
                     </span>
                   </span>
                 </label>
 
                 <PositionSelect
-                  value={walkInData.position}
-                  onChange={(val) => setWalkInData({ ...walkInData, position: val })}
+                  value={adminRegData.position}
+                  onChange={(val) => setAdminRegData({ ...adminRegData, position: val })}
                   label="ตำแหน่ง"
                   required
                   showOtherInput={false}
                 />
-                {walkInData.position === '0 อื่นๆ' && (
+                {adminRegData.position === '0 อื่นๆ' && (
                   <input
                     type="text"
-                    value={walkInData.positionOther}
-                    onChange={(e) => setWalkInData({ ...walkInData, positionOther: e.target.value })}
+                    value={adminRegData.positionOther}
+                    onChange={(e) => setAdminRegData({ ...adminRegData, positionOther: e.target.value })}
                     placeholder="โปรดระบุตำแหน่งอื่นๆ..."
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:bg-white focus:outline-none focus:border-[#0026b3]"
                   />
@@ -1456,30 +1462,30 @@ export function VerifyAttendeesPanel({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-bold text-slate-700">
-                      โปรแกรมที่เข้าร่วม {walkInActivities.length > 0 && <span className="text-rose-500">*</span>}
+                      โปรแกรมที่เข้าร่วม {adminRegActivities.length > 0 && <span className="text-rose-500">*</span>}
                     </label>
-                    {walkInActivities.length > 0 && (
+                    {adminRegActivities.length > 0 && (
                       <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
-                        เลือกแล้ว {walkInSelectedActs.length} รายการ
+                        เลือกแล้ว {adminRegSelectedActs.length} รายการ
                       </span>
                     )}
                   </div>
 
-                  {walkInActivities.length === 0 ? (
+                  {adminRegActivities.length === 0 ? (
                     <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
                       รอบการประชุมนี้ยังไม่มีรายการโปรแกรม
                     </p>
                   ) : (
                     <div className="grid grid-cols-1 gap-2">
-                      {walkInActivities.map((act) => {
+                      {adminRegActivities.map((act) => {
                         const id = String(act.id);
-                        const isSelected = walkInData.selectedPrograms.includes(id);
-                        const price = getWalkInPrice(act);
+                        const isSelected = adminRegData.selectedPrograms.includes(id);
+                        const price = getAdminRegPrice(act);
                         return (
                           <button
                             key={id}
                             type="button"
-                            onClick={() => toggleWalkInProgram(id)}
+                            onClick={() => toggleAdminRegProgram(id)}
                             className={`p-3 rounded-xl border text-left transition flex items-center justify-between gap-3 cursor-pointer ${
                               isSelected
                                 ? 'bg-blue-50/90 border-[#0026b3] ring-1 ring-[#0026b3]/30'
@@ -1520,7 +1526,7 @@ export function VerifyAttendeesPanel({
                       })}
                       <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 border border-slate-200">
                         <span className="text-xs font-bold text-slate-600">ยอดชำระรวม</span>
-                        <span className="text-sm font-extrabold text-[#0026b3]">{walkInTotal.toLocaleString()} บาท</span>
+                        <span className="text-sm font-extrabold text-[#0026b3]">{adminRegTotal.toLocaleString()} บาท</span>
                       </div>
                     </div>
                   )}
@@ -1604,8 +1610,8 @@ export function VerifyAttendeesPanel({
                       <input
                         type="radio"
                         name="paymentStatus"
-                        checked={walkInData.paymentStatus === 'paid'}
-                        onChange={() => setWalkInData({ ...walkInData, paymentStatus: 'paid' })}
+                        checked={adminRegData.paymentStatus === 'paid'}
+                        onChange={() => setAdminRegData({ ...adminRegData, paymentStatus: 'paid' })}
                         className="accent-[#0026b3]"
                       />
                       <span className="text-xs font-bold text-emerald-700">ชำระเงินแล้ว</span>
@@ -1614,8 +1620,8 @@ export function VerifyAttendeesPanel({
                       <input
                         type="radio"
                         name="paymentStatus"
-                        checked={walkInData.paymentStatus === 'pending'}
-                        onChange={() => setWalkInData({ ...walkInData, paymentStatus: 'pending' })}
+                        checked={adminRegData.paymentStatus === 'pending'}
+                        onChange={() => setAdminRegData({ ...adminRegData, paymentStatus: 'pending' })}
                         className="accent-[#0026b3]"
                       />
                       <span className="text-xs font-bold text-amber-700">รอชำระ</span>
@@ -1625,8 +1631,8 @@ export function VerifyAttendeesPanel({
                   <label className="flex items-center gap-2 cursor-pointer bg-blue-50/80 px-3 py-1.5 rounded-xl border border-blue-200/60">
                     <input
                       type="checkbox"
-                      checked={walkInData.checkInNow}
-                      onChange={(e) => setWalkInData({ ...walkInData, checkInNow: e.target.checked })}
+                      checked={adminRegData.checkInNow}
+                      onChange={(e) => setAdminRegData({ ...adminRegData, checkInNow: e.target.checked })}
                       className="rounded accent-[#0026b3] w-4 h-4"
                     />
                     <span className="text-xs font-bold text-[#0026b3]">เช็คอินเข้างานทันที</span>

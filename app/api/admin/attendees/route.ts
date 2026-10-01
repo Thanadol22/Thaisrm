@@ -526,9 +526,11 @@ export async function POST(request: NextRequest) {
       slipUrl,
     } = body;
 
-    if (!meetingId || !nameTh || !phone) {
+    const cleanEmail = String(email || '').trim();
+    const cleanPhone = String(phone || '').trim() || null;
+    if (!meetingId || !nameTh || !cleanEmail) {
       return NextResponse.json(
-        { success: false, error: 'ข้อมูลไม่ครบถ้วน: กรุณาระบุรหัสการประชุม, ชื่อ-นามสกุล และเบอร์โทรศัพท์' },
+        { success: false, error: 'ข้อมูลไม่ครบถ้วน: กรุณาระบุรหัสการประชุม, ชื่อ-นามสกุล และอีเมล' },
         { status: 400 }
       );
     }
@@ -595,8 +597,8 @@ export async function POST(request: NextRequest) {
           meeting_id: meetingId,
           member_no: linkedMember?.member_no ?? null,
           attendee_name: nameTh,
-          attendee_email: email || `${phone}@register.tsrm.org`,
-          attendee_phone: phone,
+          attendee_email: cleanEmail,
+          attendee_phone: cleanPhone,
           workplace: workplace || 'โรงพยาบาล/คลินิก',
           attendance_status: checkInNow ? 'Attended' : 'Registered',
           checkin_time: checkInNow ? new Date() : null,
@@ -612,8 +614,8 @@ export async function POST(request: NextRequest) {
             meeting_id: meetingId,
             member_no: linkedMember?.member_no ?? null,
             guest_name: nameTh,
-            guest_email: email || `${phone}@register.tsrm.org`,
-            guest_phone: phone,
+            guest_email: cleanEmail,
+            guest_phone: cleanPhone,
             guest_workplace: workplace || 'โรงพยาบาล/คลินิก',
             is_member: isActiveMember,
             ticket_code: code,
