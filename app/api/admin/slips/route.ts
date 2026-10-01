@@ -296,7 +296,9 @@ export async function GET(request: NextRequest) {
       if (!couponCode && matchedSgm.length > 0) {
         couponCode = matchedSgm.find((m: any) => m.coupon_code)?.coupon_code || null;
       }
-      if (!couponCode) {
+      // ดูคูปองจาก meeting_attendances เฉพาะรายการกลุ่ม — รายบุคคลไม่มีคูปอง
+      // (สมาชิกที่เคยลงแบบกลุ่มแล้วลงรายบุคคลเพิ่ม จะมีคูปองของรายการกลุ่มติดอยู่ที่ attendance)
+      if (!couponCode && parsedAct.groupPayload) {
         const matchedAtt = allMeetingAttendances.find(
           (a: any) => a.meeting_id === s.meeting_id && (
             (s.member_no && a.member_no === s.member_no) ||

@@ -272,7 +272,8 @@ export async function GET(request: NextRequest) {
         });
         if (sgm?.coupon_code) couponCode = sgm.coupon_code;
       }
-      if (!couponCode && slip.meeting_id) {
+      // รายบุคคลไม่มีคูปอง: ดูจาก meeting_attendances เฉพาะรายการกลุ่ม
+      if (!couponCode && slip.meeting_id && groupPayload) {
         const att = await prisma.meeting_attendances.findFirst({
           where: {
             meeting_id: slip.meeting_id,
