@@ -243,6 +243,8 @@ export async function POST(req: NextRequest) {
     } catch (e) {
       console.error('[UnifiedVerifyOTP] Error fetching sponsor slips:', e);
     }
+    // บันทึกแยกสำหรับผู้ดูแลระบบ (เช่น รายการ fellow ที่รวมอยู่ในบิลเดิมแล้ว) ไม่แสดงให้บริษัท
+    sponsorSlipsRaw = sponsorSlipsRaw.filter((s: any) => !(s.selected_activities as any)?.adminOnly);
 
     // Process slips to determine actual payment & pay-later status
     const sponsorSlips = sponsorSlipsRaw.map((s: any) => {
@@ -308,9 +310,10 @@ export async function POST(req: NextRequest) {
         groupPayload.membershipType
       );
 
+      const isFellowSlip = Boolean(groupPayload.isFellow || groupPayload.priceTier === 'fellow');
       const title = isGroupMembership
         ? `ค่าสมัครสมาชิกแบบกลุ่ม (${sponsor.name} - รวม ${attendeesCount} ท่าน)`
-        : `ลงทะเบียนประชุมแบบกลุ่ม (${sponsor.name} - รวม ${attendeesCount} ท่าน)`;
+        : `ลงทะเบียนประชุมแบบกลุ่ม${isFellowSlip ? ' ราคา fellow' : ''} (${sponsor.name} - รวม ${attendeesCount} ท่าน)`;
 
       return {
         id: s.id ? s.id.toString() : '',
@@ -337,11 +340,20 @@ export async function POST(req: NextRequest) {
     });
 
     // Aggregating all registered group members (from sponsor_group_members + meeting_attendances + slips payload)
+    // 1 คน / 1 งานประชุม = 1 แถว: ใช้เลขสมาชิกเป็นหลัก (ตัดศูนย์นำหน้า) หากไม่มีจึงใช้อีเมล
     const aggregatedMembersMap = new Map<string, any>();
+    const personKey = (meetingId: unknown, memberNo: unknown, email: unknown): string | null => {
+      const no = String(memberNo ?? '').trim().replace(/^0+/, '');
+      if (no && no !== '-' && no !== 'null') return `${meetingId}|m:${no}`;
+      const mail = String(email ?? '').trim().toLowerCase();
+      if (mail && mail !== '-') return `${meetingId}|e:${mail}`;
+      return null;
+    };
 
     // 1. From sponsor.group_members
     (sponsor.group_members || []).forEach((m: any) => {
-      const key = `${m.member_no || ''}_${m.attendee_email || ''}_${m.meeting_id || ''}`;
+      const key = personKey(m.meeting_id, m.member_no, m.attendee_email);
+      if (!key || aggregatedMembersMap.has(key)) return;
       aggregatedMembersMap.set(key, {
         id: m.id ? m.id.toString() : '',
         member_no: m.member_no || '-',
@@ -378,13 +390,14 @@ export async function POST(req: NextRequest) {
 
       attendances.forEach((att: any) => {
         const mem = att.members;
-        const key = `${att.member_no || ''}_${mem?.email || ''}_${att.meeting_id}`;
-        if (!aggregatedMembersMap.has(key)) {
+        const attEmail = att.attendee_email || mem?.email || '';
+        const key = personKey(att.meeting_id, att.member_no, attEmail);
+        if (key && !aggregatedMembersMap.has(key)) {
           aggregatedMembersMap.set(key, {
             id: att.attendance_id ? att.attendance_id.toString() : '',
             member_no: att.member_no || '-',
-            attendee_name: mem?.fullNameTh || mem?.fullNameEn || `สมาชิก #${att.member_no}`,
-            attendee_email: mem?.email || '-',
+            attendee_name: att.attendee_name || mem?.fullNameTh || mem?.fullNameEn || (att.member_no ? `สมาชิก #${att.member_no}` : '-'),
+            attendee_email: attEmail ? String(attEmail).toLowerCase() : '-',
             ticket_code: att.ticket_code || '-',
             discount_amount: 0,
             net_price: 0,
@@ -399,14 +412,22 @@ export async function POST(req: NextRequest) {
       console.error('[UnifiedVerifyOTP] Error fetching attendances for sponsor:', attErr);
     }
 
-    // 3. From payment_slips payload attendees
-    sponsorSlipsRaw.forEach((s: any) => {
+    // 3. From payment_slips payload attendees (ไม่นับรายการที่ถูกปฏิเสธ)
+    const activeSponsorSlips = sponsorSlipsRaw.filter((s: any) => s.status !== 'rejected');
+    // ยอดสุทธิรวมของแต่ละคนจากทุกรายการ (เช่น ลงเวิร์กช็อปรายการหนึ่ง แล้วลงการประชุมหลักเพิ่มอีกรายการ)
+    const payloadNetByPerson = new Map<string, number>();
+    activeSponsorSlips.forEach((s: any) => {
       const payload = (s.selected_activities as any) || {};
       const attendees = Array.isArray(payload.attendees) ? payload.attendees : [];
       attendees.forEach((att: any) => {
+        if (!att || typeof att !== 'object') return;
         const emailKey = att.email?.trim()?.toLowerCase() || '';
         const memberNoKey = att.memberNo || att.member_no || '';
-        const key = `${memberNoKey}_${emailKey}_${s.meeting_id}`;
+        const key = personKey(s.meeting_id, memberNoKey, emailKey);
+        if (!key) return;
+        if (payload.type !== 'membership_group_registration') {
+          payloadNetByPerson.set(key, (payloadNetByPerson.get(key) || 0) + Number(att.price ?? att.netPrice ?? 0));
+        }
         if (!aggregatedMembersMap.has(key)) {
           aggregatedMembersMap.set(key, {
             id: `payload_${s.id}_${emailKey}`,
@@ -427,9 +448,19 @@ export async function POST(req: NextRequest) {
 
     // รายการหลักสูตรและรูปแบบการเข้าร่วมของแต่ละคน จากข้อมูลการลงทะเบียนประชุมแบบกลุ่ม
     // เพื่อให้บริษัทตรวจสอบได้เองว่าแต่ละคนลงหลักสูตรใด แบบออนไซต์หรือออนไลน์
-    type ProgramEntry = { name: string; type: string; format: 'onsite' | 'online' };
+    // คนเดียวกันอาจลงหลายรายการ (เช่น เวิร์กช็อปรายการหนึ่ง การประชุมหลักอีกรายการ) จึงรวมหลักสูตรจากทุกรายการ
+    // price = ราคาสุทธิของหลักสูตรนั้น (หักสิทธิ์ฟรีจากคูปองบริษัท ซึ่งครอบคลุมเฉพาะการประชุมหลัก)
+    type ProgramEntry = { name: string; type: string; format: 'onsite' | 'online'; price?: number; isFellow?: boolean };
     const programLookup = new Map<string, ProgramEntry[]>();
-    sponsorSlipsRaw.forEach((s: any) => {
+    const addPrograms = (key: string, programs: ProgramEntry[]) => {
+      const list = programLookup.get(key) || [];
+      for (const p of programs) {
+        if (!list.some((x) => x.name.trim().toLowerCase() === p.name.trim().toLowerCase())) list.push(p);
+      }
+      list.sort((a, b) => Number(b.type === 'main') - Number(a.type === 'main'));
+      programLookup.set(key, list);
+    };
+    activeSponsorSlips.forEach((s: any) => {
       const payload = (s.selected_activities as any) || {};
       if (payload.type === 'membership_group_registration' || !Array.isArray(payload.attendees)) return;
       const meetingActs = Array.isArray(s.meetings?.activities) ? (s.meetings.activities as any[]) : [];
@@ -439,33 +470,51 @@ export async function POST(req: NextRequest) {
         const attFormat = (att.selectedFormat || att.attendanceType || att.format) === 'online' ? 'online' : 'onsite';
         let acts = resolveAttendeeActivities(att, meetingActs);
         if (acts.length === 0) acts = meetingActs.filter((a: any) => a?.type === 'main').slice(0, 1);
+        let discountLeft = Math.max(0, Number(att.discountTotal ?? att.discountAmount ?? 0) || 0);
+        const isFellowAttendee = Boolean(payload.isFellow || payload.priceTier === 'fellow' || att.priceTier === 'fellow');
         const programs: ProgramEntry[] = acts.map((a: any) => {
           // หลักสูตรที่กำหนดรูปแบบตายตัว (เช่น workshop ออนไซต์) คงตามนั้น ที่เหลือตามรูปแบบที่ผู้เข้าร่วมเลือก
           const fixed = a?.format || (a?.type === 'workshop' ? 'onsite' : 'both');
+          const isMain = a?.type === 'main' || a?.id === 'main';
+          const listPrice = Number(a?.price);
+          let price: number | undefined;
+          if (Number.isFinite(listPrice)) {
+            const discount = isMain ? Math.min(discountLeft, listPrice) : 0;
+            discountLeft -= discount;
+            price = Math.max(0, listPrice - discount);
+          }
           return {
             name: String(a?.name || 'Main Program'),
             type: String(a?.type || 'main'),
             format: fixed === 'onsite' || fixed === 'online' ? fixed : attFormat,
+            price,
+            isFellow: isFellowAttendee && (isMain || a?.priceTier === 'fellow'),
           };
         });
+        // ราคาแยกหลักสูตรต้องรวมได้เท่ายอดสุทธิของผู้ลงทะเบียน ไม่เช่นนั้นไม่แสดงราคาแยก (ข้อมูลเก่าที่คำนวณต่างกัน)
+        const attNet = Number(att.price ?? att.netPrice);
+        const sumPrograms = programs.reduce((sum, p) => sum + (p.price ?? NaN), 0);
+        if (!Number.isFinite(attNet) || sumPrograms !== attNet) programs.forEach((p) => delete p.price);
 
-        const memberNo = String(att.memberNo || att.member_no || '').trim();
-        const email = String(att.email || '').trim().toLowerCase();
-        for (const key of [memberNo && `${s.meeting_id}|m:${memberNo}`, email && `${s.meeting_id}|e:${email}`]) {
-          if (key && !programLookup.has(key)) programLookup.set(key, programs);
-        }
+        const memberKey = personKey(s.meeting_id, att.memberNo || att.member_no, '');
+        const emailKey = personKey(s.meeting_id, '', att.email);
+        if (memberKey) addPrograms(memberKey, programs);
+        if (emailKey) addPrograms(emailKey, programs);
       });
     });
 
     const rawGroupMembers = Array.from(aggregatedMembersMap.values()).map((m: any) => {
-      const memberNo = m.member_no && m.member_no !== '-' ? m.member_no : '';
-      const email = m.attendee_email && m.attendee_email !== '-' ? String(m.attendee_email).toLowerCase() : '';
+      const memberKey = personKey(m.meeting_id, m.member_no, '');
+      const emailKey = personKey(m.meeting_id, '', m.attendee_email);
       const programs =
-        (memberNo && programLookup.get(`${m.meeting_id}|m:${memberNo}`)) ||
-        (email && programLookup.get(`${m.meeting_id}|e:${email}`)) ||
+        (memberKey && programLookup.get(memberKey)) ||
+        (emailKey && programLookup.get(emailKey)) ||
         [];
+      const ownKey = memberKey || emailKey;
+      const payloadNet = ownKey ? payloadNetByPerson.get(ownKey) : undefined;
       return {
         ...m,
+        net_price: payloadNet !== undefined ? payloadNet : m.net_price,
         programs,
         isMembershipOnly: programs.length === 0 && String(m.ticket_code || '').startsWith('MEMGRP'),
       };

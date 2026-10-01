@@ -94,7 +94,7 @@ interface SponsorGroupMember {
   meeting_id: string;
   meeting_name: string;
   created_at: string;
-  programs?: { name: string; type: string; format: 'onsite' | 'online' }[];
+  programs?: { name: string; type: string; format: 'onsite' | 'online'; price?: number; isFellow?: boolean }[];
   isMembershipOnly?: boolean;
 }
 
@@ -1778,7 +1778,19 @@ export function ProfileAndSponsorUpdateModal({
                                         ? (lang === 'th' ? 'ออนไลน์' : 'Online')
                                         : (lang === 'th' ? 'ออนไซต์' : 'Onsite')}
                                     </span>
-                                    <span className="leading-snug pt-px break-words min-w-0">{p.name}</span>
+                                    <span className="leading-snug pt-px break-words min-w-0 flex-1">
+                                      {p.name}
+                                      {p.isFellow && (
+                                        <span className="ml-1.5 inline-block px-1.5 py-px rounded bg-lime-50 text-lime-800 border border-lime-200 text-[10px] font-bold align-middle">
+                                          {lang === 'th' ? 'ราคา fellow' : 'Fellow rate'}
+                                        </span>
+                                      )}
+                                    </span>
+                                    {typeof p.price === 'number' && (
+                                      <span className="shrink-0 pt-px font-semibold text-slate-600 whitespace-nowrap">
+                                        {p.price > 0 ? `฿${p.price.toLocaleString()}` : (lang === 'th' ? 'ฟรี' : 'Free')}
+                                      </span>
+                                    )}
                                   </li>
                                 ))}
                               </ul>
