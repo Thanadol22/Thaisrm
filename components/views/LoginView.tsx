@@ -1279,6 +1279,24 @@ export function LoginView({
           }
         }
 
+        // การประชุมหลักแบบออนไลน์ลงได้เฉพาะสมาชิกสถานะปกติ
+        const choosesOnlineMain =
+          att.attendanceType === 'online' &&
+          effectiveActivities.some(a => a.type === 'main' && a.format !== 'onsite' && att.selectedPrograms.includes(a.id));
+        if (choosesOnlineMain && !(isMemberCalculated && !isExpiredMember)) {
+          const personLabel = regMode === 'group' ? (lang === 'th' ? `ผู้ลงทะเบียนคนที่ ${i + 1}: ` : `Attendee #${i + 1}: `) : '';
+          alert(
+            personLabel + (lang === 'th'
+              ? (isExpiredMember
+                  ? 'สถานะสมาชิกไม่ปกติ การเข้าร่วมการประชุมหลักแบบออนไลน์สงวนสิทธิ์เฉพาะสมาชิกที่มีสถานะปกติ กรุณาเลือกเข้าร่วมที่งาน'
+                  : 'การเข้าร่วมการประชุมหลักแบบออนไลน์สงวนสิทธิ์เฉพาะสมาชิกสมาคมฯ บุคคลทั่วไปกรุณาเลือกเข้าร่วมที่งาน')
+              : 'Online attendance for the main program is reserved for active TSRM members. Please choose Onsite.')
+          );
+          setActiveAttendeeIdx(i);
+          setVerifyingMember(false);
+          return;
+        }
+
         // Selected activities calculation
         const selectedActivityObjects = effectiveActivities
           .filter(a => att.selectedPrograms.includes(a.id))
@@ -2422,7 +2440,9 @@ export function LoginView({
                         const hasOnlineOnly = onlineOnlyActs.length > 0;
                         // ลง main พร้อม workshop onsite → เลือกออนไลน์ได้ (main = online, workshop = onsite)
                         const hasOnlineCapableMain = selectedActs.some(a => a.type === 'main' && fmtOf(a) !== 'onsite');
-                        const hasOnsiteOnly = onsiteOnlyActs.length > 0 && !hasOnlineCapableMain;
+                        // ออนไลน์สงวนสิทธิ์เฉพาะสมาชิก — ไม่มีเลขสมาชิกเลือกได้เฉพาะเข้าร่วมที่งาน
+                        const onlineMembersOnly = hasOnlineCapableMain && !hasOnlineOnly && !currentAttendee.memberNo.trim();
+                        const hasOnsiteOnly = (onsiteOnlyActs.length > 0 && !hasOnlineCapableMain) || onlineMembersOnly;
                         const showMixedNotice = onsiteOnlyActs.length > 0 && hasOnlineCapableMain && currentAttendee.attendanceType === 'online';
 
                         return (
@@ -2469,7 +2489,18 @@ export function LoginView({
                               </button>
                             </div>
 
-                            {hasOnsiteOnly && (
+                            {onlineMembersOnly && (
+                              <div className="flex items-start gap-1.5 p-2.5 rounded-xl bg-amber-50/90 border border-amber-200/70 text-amber-800 text-sm leading-relaxed">
+                                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <span>
+                                  {lang === 'th'
+                                    ? 'การเข้าร่วมการประชุมหลักแบบออนไลน์สงวนสิทธิ์เฉพาะสมาชิกสมาคมฯ ที่มีสถานะปกติ กรุณากรอกเลขสมาชิกหากต้องการเข้าร่วมออนไลน์'
+                                    : 'Online attendance for the main program is reserved for active TSRM members. Enter a member number to attend online.'}
+                                </span>
+                              </div>
+                            )}
+
+                            {hasOnsiteOnly && !onlineMembersOnly && (
                               <div className="flex items-start gap-1.5 p-2.5 rounded-xl bg-amber-50/90 border border-amber-200/70 text-amber-800 text-sm leading-relaxed">
                                 <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                                 <span>

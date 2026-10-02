@@ -633,8 +633,18 @@ export function PaymentFlow({
           // Group Conference Registration Submission
           const enrichedAttendees = ((regData as any).attendees || []).map((att: any, idx: number) => {
             const summaryItem = calculationResult.groupSummary?.[idx];
+            // ใช้รูปแบบที่ผ่านการตรวจสิทธิ์แล้ว (ออนไลน์เฉพาะสมาชิกสถานะปกติ) ไม่ใช่ค่าที่เลือกไว้เดิม
+            const attType: 'onsite' | 'online' = (summaryItem as any)?.attendanceType || att.attendanceType || 'onsite';
             return {
               ...att,
+              attendanceType: attType,
+              selectedActivities: Array.isArray(att.selectedActivities)
+                ? att.selectedActivities.map((a: any) =>
+                    (a.type === 'main' || a.id === 'main') && a.format === 'online' && attType !== 'online'
+                      ? { ...a, format: attType }
+                      : a
+                  )
+                : att.selectedActivities,
               originalTotal: summaryItem?.originalTotal || att.originalTotal || att.subtotal || att.price || 0,
               subtotal: summaryItem?.originalTotal || att.subtotal || att.price || 0,
               price: summaryItem?.price !== undefined ? summaryItem.price : att.price,
@@ -703,7 +713,7 @@ export function PaymentFlow({
             position: regData?.position,
             positionCode: regData?.positionCode,
             memberNo: regData?.memberNo,
-            attendanceType: regData?.attendanceType,
+            attendanceType: calculationResult.attendType,
             attendees: [
               {
                 nameTh: regData?.nameTh,
@@ -714,7 +724,7 @@ export function PaymentFlow({
                 position: regData?.position,
                 positionCode: regData?.positionCode,
                 memberNo: regData?.memberNo,
-                attendanceType: regData?.attendanceType,
+                attendanceType: calculationResult.attendType,
               }
             ]
           };
