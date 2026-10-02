@@ -1,6 +1,8 @@
 import prisma from '@/lib/prisma';
 import { statusLabelTh } from '@/lib/statusLabels';
 import { attendeeBackdatedCharges, resolveAttendeeActivities } from '@/lib/services/sponsorCouponService';
+import { getAttendeePricingReason } from '@/lib/attendeePricingReason';
+import { registrationStatusLabel, type RegistrationStatusKey } from '@/lib/registrationStatus';
 
 /**
  * ข้อมูลหน้าบริษัท (ตรวจสอบสถานะและสลิปการชำระเงินบริษัท)
@@ -29,14 +31,19 @@ const STATUS_PRIORITY: PortalStatusKey[] = [
   'rejected',
 ];
 
-export const PORTAL_STATUS_LABEL_TH: Record<PortalStatusKey, string> = {
-  confirmed: 'ยืนยันสิทธิ์แล้ว',
-  approved_awaiting_payment: 'อนุมัติสิทธิ์แล้ว รอชำระเงิน',
-  pending_payment_review: 'แนบสลิปแล้ว รอตรวจสอบยอดเงิน',
-  awaiting_payment: 'รออนุมัติสิทธิ์',
-  pending_review: 'รอตรวจสอบ',
-  rejected: 'ต้องแก้ไข',
+/** สถานะของหน้าบริษัท → สถานะกลางของทั้งระบบ (ชื่อสถานะกำหนดใน lib/registrationStatus.ts) */
+export const PORTAL_TO_REGISTRATION_STATUS: Record<PortalStatusKey, RegistrationStatusKey> = {
+  confirmed: 'registered',
+  approved_awaiting_payment: 'registered_awaiting_payment',
+  pending_payment_review: 'pending_payment_review',
+  awaiting_payment: 'pending_pay_later',
+  pending_review: 'pending',
+  rejected: 'rejected',
 };
+
+export const PORTAL_STATUS_LABEL_TH = Object.fromEntries(
+  Object.entries(PORTAL_TO_REGISTRATION_STATUS).map(([k, v]) => [k, registrationStatusLabel(v)])
+) as Record<PortalStatusKey, string>;
 
 type ItemStatus =
   | 'approved'
@@ -197,6 +204,8 @@ export async function buildSponsorPortalData(email: string) {
       status: s.status,
       itemStatus,
       statusKey: itemToPortalStatus(itemStatus),
+      /** ใบสมัครสมาชิก: สถานะอนุมัติแล้วใช้คำ "สมัครสมาชิกสำเร็จ" */
+      isMembership: isGroupMembership,
       isPayLater,
       hasActualSlip,
       requiresSlipUpload,
@@ -335,6 +344,12 @@ export async function buildSponsorPortalData(email: string) {
       // หมายเหตุให้บริษัทเข้าใจตรงกันกับเจ้าหน้าที่
       const discount = Number(att.discountTotal ?? att.discountAmount ?? 0) || 0;
       if (discount > 0) addNote(p, `ใช้สิทธิ์คูปองบริษัท ส่วนลด ฿${discount.toLocaleString()}`);
+      const pricing = getAttendeePricingReason(att, {
+        discount,
+        couponCode: payload.couponCode || payload.couponData?.code,
+        audience: 'sponsor',
+      });
+      if (pricing.kind === 'expired' || pricing.kind === 'non_member') addNote(p, pricing.reason);
       if (att.isAddOn) addNote(p, `ลงทะเบียนกิจกรรมเพิ่มเติมในรายการ ${s.ticket_code || s.slip_id}`);
       if (att.addedByAdmin) addNote(p, `เจ้าหน้าที่เพิ่มรายชื่อนี้ในรายการ ${s.ticket_code || s.slip_id}`);
       if (att.formatUpdatedAt) {

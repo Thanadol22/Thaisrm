@@ -42,6 +42,7 @@ import { ThaiDatePicker } from '@/components/ThaiDatePicker';
 import { uploadImageToStorage } from '@/lib/blobUpload';
 
 import { statusLabelTh } from '@/lib/statusLabels';
+import { registrationStatusBadge, registrationStatusLabel, type RegistrationStatusKey } from '@/lib/registrationStatus';
 import { PaginationControls } from '@/components/PaginationControls';
 interface EducationItem {
   edu_id?: string;
@@ -136,6 +137,7 @@ interface SponsorSlip {
   rejection_reason?: string | null;
   attendeesCount?: number;
   statusKey?: PortalStatusKey;
+  isMembership?: boolean;
   attendeeNames?: string[];
   receipt_no?: string | null;
   created_at: string;
@@ -187,53 +189,57 @@ const PORTAL_STATUS_ORDER: PortalStatusKey[] = [
   'rejected',
 ];
 
+const PORTAL_TO_REGISTRATION_STATUS: Record<PortalStatusKey, RegistrationStatusKey> = {
+  confirmed: 'registered',
+  approved_awaiting_payment: 'registered_awaiting_payment',
+  pending_payment_review: 'pending_payment_review',
+  awaiting_payment: 'pending_pay_later',
+  pending_review: 'pending',
+  rejected: 'rejected',
+};
+
+/** ชื่อและสีของสถานะดึงจากสถานะกลาง (lib/registrationStatus.ts) */
+const portalStatusLabel = (key: RegistrationStatusKey) => ({
+  th: registrationStatusLabel(key, 'th'),
+  en: registrationStatusLabel(key, 'en'),
+  badge: registrationStatusBadge(key),
+});
+
 const PORTAL_STATUS_INFO: Record<PortalStatusKey, { th: string; en: string; descTh: string; descEn: string; badge: string; dot: string }> = {
   confirmed: {
-    th: 'ยืนยันสิทธิ์แล้ว',
-    en: 'Confirmed',
-    descTh: 'ชำระเงินหรือได้รับสิทธิ์เรียบร้อยแล้ว เข้าร่วมงานได้ตามรูปแบบที่ระบุ',
-    descEn: 'Payment or entitlement confirmed. Ready to attend in the stated format.',
-    badge: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    ...portalStatusLabel('registered'),
+    descTh: 'เจ้าหน้าที่อนุมัติแล้ว ชำระเงินหรือได้รับสิทธิ์เรียบร้อย เข้าร่วมงานได้ตามรูปแบบที่ระบุ',
+    descEn: 'Approved. Payment or entitlement confirmed. Ready to attend in the stated format.',
     dot: 'bg-emerald-500',
   },
   approved_awaiting_payment: {
-    th: 'อนุมัติสิทธิ์แล้ว รอชำระเงิน',
-    en: 'Approved, awaiting payment',
-    descTh: 'เจ้าหน้าที่อนุมัติสิทธิ์และออกใบเสร็จให้แล้ว กรุณาชำระเงินและแนบสลิปตามยอดของรายการ',
+    ...portalStatusLabel('registered_awaiting_payment'),
+    descTh: 'เจ้าหน้าที่อนุมัติและออกใบเสร็จให้แล้ว กรุณาชำระเงินและแนบสลิปตามยอดของรายการ',
     descEn: 'Approved and receipt issued. Please pay and attach the slip for this item.',
-    badge: 'bg-sky-50 text-sky-800 border-sky-200',
-    dot: 'bg-sky-500',
+    dot: 'bg-orange-500',
   },
   pending_payment_review: {
-    th: 'แนบสลิปแล้ว รอตรวจสอบยอดเงิน',
-    en: 'Slip received, under review',
+    ...portalStatusLabel('pending_payment_review'),
     descTh: 'ได้รับสลิปแล้ว เจ้าหน้าที่กำลังตรวจสอบยอดเงิน บริษัทไม่ต้องดำเนินการเพิ่ม',
     descEn: 'Slip received. Staff are verifying the payment. No action needed.',
-    badge: 'bg-indigo-50 text-indigo-800 border-indigo-200',
-    dot: 'bg-indigo-500',
+    dot: 'bg-sky-500',
   },
   awaiting_payment: {
-    th: 'รออนุมัติสิทธิ์',
-    en: 'Awaiting approval',
-    descTh: 'ลงทะเบียนแบบชำระเงินภายหลัง รอเจ้าหน้าที่อนุมัติสิทธิ์ บริษัทแนบสลิปล่วงหน้าได้',
-    descEn: 'Pay-later registration awaiting approval. You may attach the slip in advance.',
-    badge: 'bg-amber-50 text-amber-800 border-amber-200',
+    ...portalStatusLabel('pending_pay_later'),
+    descTh: 'ลงทะเบียนแบบชำระเงินภายหลัง รอเจ้าหน้าที่ตรวจสอบ บริษัทแนบสลิปล่วงหน้าได้',
+    descEn: 'Pay-later registration pending review. You may attach the slip in advance.',
     dot: 'bg-amber-500',
   },
   pending_review: {
-    th: 'รอตรวจสอบ',
-    en: 'Under review',
+    ...portalStatusLabel('pending'),
     descTh: 'เจ้าหน้าที่กำลังตรวจสอบรายการลงทะเบียน',
     descEn: 'Staff are reviewing the registration.',
-    badge: 'bg-amber-50 text-amber-800 border-amber-200',
     dot: 'bg-amber-500',
   },
   rejected: {
-    th: 'ต้องแก้ไข',
-    en: 'Needs correction',
+    ...portalStatusLabel('rejected'),
     descTh: 'เจ้าหน้าที่ส่งรายการกลับให้แก้ไข ดูเหตุผลแล้วแนบสลิปใหม่หรือแจ้งแก้ไขข้อมูล ระบบยังถือสิทธิ์ไว้ให้ระหว่างรอแก้ไข หากไม่มีการแก้ไข เจ้าหน้าที่อาจยกเลิกรายการและคืนสิทธิ์',
     descEn: 'Returned for correction. Rights are held meanwhile; without a fix, staff may cancel the item.',
-    badge: 'bg-rose-50 text-rose-800 border-rose-200',
     dot: 'bg-rose-500',
   },
 };
@@ -243,8 +249,8 @@ const OVERALL_STATUS_INFO: Record<
   { th: string; en: string; descTh: string; descEn: string; box: string; icon: string; Icon: React.ElementType }
 > = {
   approved: {
-    th: 'ดำเนินการครบถ้วนแล้ว',
-    en: 'All set',
+    th: registrationStatusLabel('registered', 'th'),
+    en: registrationStatusLabel('registered', 'en'),
     descTh: 'ทุกรายการได้รับการยืนยันแล้ว ไม่มีรายการที่บริษัทต้องดำเนินการเพิ่ม',
     descEn: 'All registrations are confirmed. Nothing else is needed.',
     box: 'bg-emerald-50/70 border-emerald-200 text-emerald-900',
@@ -252,9 +258,9 @@ const OVERALL_STATUS_INFO: Record<
     Icon: CheckCircle2,
   },
   approved_awaiting_payment: {
-    th: 'อนุมัติสิทธิ์แล้ว รอชำระเงิน',
-    en: 'Approved, awaiting payment',
-    descTh: 'มีรายการที่อนุมัติสิทธิ์แล้ว กรุณาชำระเงินและแนบสลิปในส่วนรายการที่ต้องแนบสลิปด้านล่าง',
+    th: registrationStatusLabel('registered_awaiting_payment', 'th'),
+    en: registrationStatusLabel('registered_awaiting_payment', 'en'),
+    descTh: 'มีรายการที่อนุมัติแล้ว กรุณาชำระเงินและแนบสลิปในส่วนรายการที่ต้องแนบสลิปด้านล่าง',
     descEn: 'Some items are approved. Please pay and attach slips below.',
     box: 'bg-sky-50/70 border-sky-200 text-sky-900',
     icon: 'text-sky-600',
@@ -270,8 +276,8 @@ const OVERALL_STATUS_INFO: Record<
     Icon: CreditCard,
   },
   pending_payment_review: {
-    th: 'ส่งสลิปแล้ว รอตรวจสอบยอดเงิน',
-    en: 'Slips under review',
+    th: registrationStatusLabel('pending_payment_review', 'th'),
+    en: registrationStatusLabel('pending_payment_review', 'en'),
     descTh: 'เจ้าหน้าที่กำลังตรวจสอบยอดเงิน บริษัทไม่ต้องดำเนินการเพิ่ม',
     descEn: 'Staff are verifying the payments. No action needed.',
     box: 'bg-indigo-50/70 border-indigo-200 text-indigo-900',
@@ -279,8 +285,8 @@ const OVERALL_STATUS_INFO: Record<
     Icon: Clock,
   },
   pending_review: {
-    th: 'รอเจ้าหน้าที่ตรวจสอบ',
-    en: 'Under review',
+    th: registrationStatusLabel('pending', 'th'),
+    en: registrationStatusLabel('pending', 'en'),
     descTh: 'เจ้าหน้าที่กำลังตรวจสอบรายการลงทะเบียนของบริษัท',
     descEn: 'Staff are reviewing your registrations.',
     box: 'bg-amber-50/70 border-amber-200 text-amber-900',
@@ -323,12 +329,13 @@ function formatThaiDateTime(value?: string | null): string {
   });
 }
 
-function PortalStatusBadge({ statusKey, lang }: { statusKey: PortalStatusKey; lang: 'th' | 'en' }) {
+function PortalStatusBadge({ statusKey, lang, membership = false }: { statusKey: PortalStatusKey; lang: 'th' | 'en'; membership?: boolean }) {
   const info = PORTAL_STATUS_INFO[statusKey] || PORTAL_STATUS_INFO.pending_review;
+  const label = registrationStatusLabel(PORTAL_TO_REGISTRATION_STATUS[statusKey] || 'pending', lang, membership ? 'membership' : 'registration');
   return (
     <span className={`inline-flex items-center gap-1.5 max-w-full px-2 py-0.5 rounded-full border text-[11px] font-bold leading-tight ${info.badge}`}>
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${info.dot}`} />
-      <span className="min-w-0">{lang === 'th' ? info.th : info.en}</span>
+      <span className="min-w-0">{label}</span>
     </span>
   );
 }
@@ -1702,9 +1709,9 @@ export function ProfileAndSponsorUpdateModal({
           {step === 'sponsor_view' && sponsorData && (() => {
             const counts = sponsorData.peopleCounts || ({} as Partial<Record<PortalStatusKey, number>>);
             const totalPeople = sponsorData.groupMembers.length;
-            const confirmedCount = counts.confirmed || 0;
+            // ลงทะเบียนสำเร็จ = อนุมัติแล้ว (รวมที่รอชำระเงิน) · รอตรวจสอบ = ยังไม่อนุมัติ
+            const confirmedCount = (counts.confirmed || 0) + (counts.approved_awaiting_payment || 0);
             const inProgressCount =
-              (counts.approved_awaiting_payment || 0) +
               (counts.pending_payment_review || 0) +
               (counts.awaiting_payment || 0) +
               (counts.pending_review || 0);
@@ -1716,9 +1723,10 @@ export function ProfileAndSponsorUpdateModal({
             const q = memberSearch.trim().toLowerCase();
             const filteredMembers = sponsorData.groupMembers.filter((m) => {
               const key = (m.statusKey || 'pending_review') as PortalStatusKey;
-              if (memberFilter === 'confirmed' && key !== 'confirmed') return false;
+              const isRegistered = key === 'confirmed' || key === 'approved_awaiting_payment';
+              if (memberFilter === 'confirmed' && !isRegistered) return false;
               if (memberFilter === 'rejected' && key !== 'rejected') return false;
-              if (memberFilter === 'in_progress' && (key === 'confirmed' || key === 'rejected')) return false;
+              if (memberFilter === 'in_progress' && (isRegistered || key === 'rejected')) return false;
               if (!q) return true;
               return (
                 m.attendee_name?.toLowerCase().includes(q) ||
@@ -1735,9 +1743,9 @@ export function ProfileAndSponsorUpdateModal({
             );
             const filterOptions: { id: typeof memberFilter; label: string; count: number }[] = [
               { id: 'all', label: lang === 'th' ? 'ทั้งหมด' : 'All', count: totalPeople },
-              { id: 'confirmed', label: lang === 'th' ? 'ยืนยันสิทธิ์แล้ว' : 'Confirmed', count: confirmedCount },
-              { id: 'in_progress', label: lang === 'th' ? 'อยู่ระหว่างดำเนินการ' : 'In progress', count: inProgressCount },
-              { id: 'rejected', label: lang === 'th' ? 'ต้องแก้ไข' : 'Needs fix', count: rejectedCount },
+              { id: 'confirmed', label: registrationStatusLabel('registered', lang), count: confirmedCount },
+              { id: 'in_progress', label: registrationStatusLabel('pending', lang), count: inProgressCount },
+              { id: 'rejected', label: registrationStatusLabel('rejected', lang), count: rejectedCount },
             ];
 
             return (
@@ -1820,9 +1828,9 @@ export function ProfileAndSponsorUpdateModal({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
                     { label: lang === 'th' ? 'ผู้ลงทะเบียน' : 'Registrants', value: totalPeople, tone: 'text-slate-900' },
-                    { label: lang === 'th' ? 'ยืนยันสิทธิ์แล้ว' : 'Confirmed', value: confirmedCount, tone: 'text-emerald-700' },
-                    { label: lang === 'th' ? 'ระหว่างดำเนินการ' : 'In progress', value: inProgressCount, tone: 'text-sky-700' },
-                    { label: lang === 'th' ? 'ต้องแก้ไข' : 'Needs fix', value: rejectedCount, tone: 'text-rose-700' },
+                    { label: registrationStatusLabel('registered', lang), value: confirmedCount, tone: 'text-emerald-700' },
+                    { label: registrationStatusLabel('pending', lang), value: inProgressCount, tone: 'text-amber-700' },
+                    { label: registrationStatusLabel('rejected', lang), value: rejectedCount, tone: 'text-rose-700' },
                   ].map((c) => (
                     <div key={c.label} className="bg-white/80 border border-white rounded-xl px-3 py-2 min-w-0">
                       <span className="block text-[11px] text-slate-500 font-semibold truncate">{c.label}</span>
@@ -1931,7 +1939,7 @@ export function ProfileAndSponsorUpdateModal({
                                 <span className="font-mono text-xs font-extrabold bg-white text-slate-800 px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs">
                                   {slip.ticket_code || slip.slip_id}
                                 </span>
-                                <PortalStatusBadge statusKey={statusKey} lang={lang} />
+                                <PortalStatusBadge statusKey={statusKey} lang={lang} membership={Boolean(slip.isMembership)} />
                               </div>
                               <h5 className="font-bold text-xs sm:text-sm text-slate-800 leading-snug break-words">
                                 {slip.title || slip.meeting_name}
@@ -2138,7 +2146,7 @@ export function ProfileAndSponsorUpdateModal({
                                 </p>
                               </div>
                               <div className="flex flex-wrap items-center gap-1.5 min-[420px]:justify-end min-[420px]:max-w-[55%]">
-                                <PortalStatusBadge statusKey={statusKey} lang={lang} />
+                                <PortalStatusBadge statusKey={statusKey} lang={lang} membership={Boolean(m.isMembershipOnly)} />
                                 {m.checkedIn && <CheckedInBadge lang={lang} time={m.checkinTime} />}
                               </div>
                             </div>
@@ -2246,7 +2254,7 @@ export function ProfileAndSponsorUpdateModal({
                           <div className="min-w-0 space-y-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-mono font-bold text-slate-700">{s.ticket_code || s.slip_id}</span>
-                              <PortalStatusBadge statusKey={statusKey} lang={lang} />
+                              <PortalStatusBadge statusKey={statusKey} lang={lang} membership={Boolean(s.isMembership)} />
                             </div>
                             <p className="text-slate-600 break-words">{s.title || s.meeting_name}</p>
                             <p className="text-slate-500 text-[11px] break-words">

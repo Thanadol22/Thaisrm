@@ -1,3 +1,4 @@
+import { registrationStatusLabel } from '@/lib/registrationStatus';
 import { renderBaseEmailLayout } from './baseLayout';
 
 export interface MembershipApprovalEmailOptions {
@@ -315,7 +316,7 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
         ` : ''}
         <tr>
           <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">สถานะการลงทะเบียน</td>
-          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">ยืนยันสิทธิ์เรียบร้อย</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">${registrationStatusLabel('registered')}</td>
         </tr>
 
         ${items.length > 0 ? `
@@ -588,7 +589,7 @@ export function renderAttendeeSponsoredRegistrationEmail(options: AttendeeSponso
         </tr>
         <tr>
           <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">สถานะการลงทะเบียน</td>
-          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">ยืนยันสิทธิ์เรียบร้อย</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">${registrationStatusLabel('registered')}</td>
         </tr>
 
         ${items.length > 0 ? `

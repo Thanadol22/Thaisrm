@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Building2, CalendarDays, FileSpreadsheet, Filter, RotateCw, Users } from 'lucide-react';
 import { Btn, EmptyState, FilterSelect, IconBtn, SearchInput, Toolbar, ToolbarGroup } from '@/components/admin/ui';
 import { statusLabelTh } from '@/lib/statusLabels';
+import { normalizeRegistrationStatus, registrationStatusBadge, type RegistrationStatusKey } from '@/lib/registrationStatus';
+import { getPricingTone, PRICING_KIND_LABEL_TH, PRICING_TONE_CLASSES, type AttendeePricingKind } from '@/lib/attendeePricingReason';
 
 interface RegistrationRow {
   key: string;
@@ -14,6 +16,7 @@ interface RegistrationRow {
   billCount: number;
   billStatus: string;
   billStatusLabel: string;
+  billRegStatus: RegistrationStatusKey;
   billType: string;
   company: string;
   couponCode: string | null;
@@ -31,17 +34,9 @@ interface RegistrationRow {
   discount: number;
   netPrice: number;
   attendanceStatus: string | null;
+  pricingKind?: AttendeePricingKind | null;
+  pricingReason?: string | null;
 }
-
-const STATUS_TONE: Record<string, string> = {
-  paid: 'text-emerald-700 bg-emerald-50',
-  free: 'text-emerald-700 bg-emerald-50',
-  quota: 'text-blue-700 bg-blue-50',
-  review: 'text-amber-700 bg-amber-50',
-  awaiting: 'text-orange-700 bg-orange-50',
-  pending: 'text-slate-600 bg-slate-100',
-  rejected: 'text-rose-700 bg-rose-50',
-};
 
 const fmtMoney = (n: number) => n.toLocaleString('th-TH');
 const fmtDate = (d: string) =>
@@ -49,7 +44,7 @@ const fmtDate = (d: string) =>
 
 // คอลัมน์ระดับบิล (รวมเซลล์ตามจำนวนผู้เข้าร่วมในบิล)
 const BILL_COLS = ['เลขที่บิล', 'วันที่', 'บริษัท', 'งานประชุม', 'ประเภท', 'คูปอง', 'ยอดบิล', 'สถานะบิล'];
-const PERSON_COLS = ['ลำดับ', 'เลขสมาชิก', 'ชื่อ-นามสกุล', 'อีเมล', 'โทรศัพท์', 'หลักสูตร', 'รูปแบบ', 'ส่วนลด', 'ยอดสุทธิ', 'สถานะเข้างาน'];
+const PERSON_COLS = ['ลำดับ', 'เลขสมาชิก', 'ชื่อ-นามสกุล', 'อีเมล', 'โทรศัพท์', 'หลักสูตร', 'รูปแบบ', 'ส่วนลด', 'ยอดสุทธิ', 'เหตุผลของราคา', 'สถานะเข้างาน'];
 
 const th = 'sticky top-0 z-10 bg-slate-100 border border-slate-300 px-2 py-1.5 text-[11px] font-bold text-slate-600 whitespace-nowrap text-left';
 const td = 'border border-slate-200 px-2 py-1 align-top whitespace-nowrap';
@@ -176,6 +171,7 @@ export default function SponsorRegistrationsSheet({ sponsors = [] }: { sponsors?
       r.format,
       r.discount,
       r.netPrice,
+      r.pricingKind ? PRICING_KIND_LABEL_TH[r.pricingKind] : '',
       r.attendanceStatus ? statusLabelTh(r.attendanceStatus) : '',
     ]);
     const sheet = XLSX.utils.aoa_to_sheet([[...BILL_COLS, ...PERSON_COLS], ...data]);
@@ -284,7 +280,7 @@ export default function SponsorRegistrationsSheet({ sponsors = [] }: { sponsors?
                           <td rowSpan={span} className={`${td} ${billBg} font-mono text-purple-700`}>{r.couponCode || '-'}</td>
                           <td rowSpan={span} className={`${td} ${billBg} text-right font-bold tabular-nums`}>{fmtMoney(r.billAmount)}</td>
                           <td rowSpan={span} className={`${td} ${billBg}`}>
-                            <span className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${STATUS_TONE[r.billStatus] || STATUS_TONE.pending}`}>
+                            <span className={`px-1.5 py-0.5 rounded border text-[11px] font-bold ${registrationStatusBadge(r.billRegStatus || 'pending')}`}>
                               {r.billStatusLabel}
                             </span>
                           </td>
@@ -311,7 +307,24 @@ export default function SponsorRegistrationsSheet({ sponsors = [] }: { sponsors?
                       <td className={td}>{r.format || '-'}</td>
                       <td className={`${td} text-right tabular-nums text-slate-600`}>{r.discount ? fmtMoney(r.discount) : '-'}</td>
                       <td className={`${td} text-right tabular-nums font-semibold`}>{fmtMoney(r.netPrice)}</td>
-                      <td className={td}>{r.attendanceStatus ? statusLabelTh(r.attendanceStatus) : '-'}</td>
+                      <td className={td} title={r.pricingReason || undefined}>
+                        {r.pricingKind ? (
+                          <span className={`px-1.5 py-0.5 rounded border text-[11px] font-bold whitespace-nowrap ${PRICING_TONE_CLASSES[getPricingTone(r.pricingKind)].badge}`}>
+                            {PRICING_KIND_LABEL_TH[r.pricingKind]}
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className={td}>
+                        {(() => {
+                          const key = normalizeRegistrationStatus(r.attendanceStatus);
+                          if (!key) return '-';
+                          return (
+                            <span className={`px-1.5 py-0.5 rounded border text-[11px] font-bold whitespace-nowrap ${registrationStatusBadge(key)}`}>
+                              {statusLabelTh(key)}
+                            </span>
+                          );
+                        })()}
+                      </td>
                     </tr>
                   );
                 })}
@@ -328,6 +341,7 @@ export default function SponsorRegistrationsSheet({ sponsors = [] }: { sponsors?
                   </td>
                   <td className="border border-slate-300 px-2 py-1.5 text-right tabular-nums">{fmtMoney(totals.discount)}</td>
                   <td className="border border-slate-300 px-2 py-1.5 text-right tabular-nums">{fmtMoney(totals.net)}</td>
+                  <td className="border border-slate-300 px-2 py-1.5"></td>
                   <td className="border border-slate-300 px-2 py-1.5"></td>
                 </tr>
               </tfoot>

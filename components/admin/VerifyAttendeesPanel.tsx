@@ -1,5 +1,6 @@
 'use client';
 
+import { registrationStatusLabel } from '@/lib/registrationStatus';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AdminPageHeader, HeaderButton } from './AdminPageHeader';
 import { Btn, IconBtn, EmptyState, ContextBar, StatGrid, StatCard, Toolbar, ToolbarGroup, SearchInput, Segmented, FilterSelect } from './ui';
@@ -36,6 +37,11 @@ import {
 } from 'lucide-react';
 
 /* ─── 5. VERIFY ATTENDEES PANEL (Light Theme with Round Filter) ───────────── */
+
+// paymentStatus ของผู้เข้าร่วมมาจากสถานะสลิป: paid = อนุมัติแล้ว, pending = ยังไม่อนุมัติ
+// ชื่อสถานะดึงจากสถานะกลาง (lib/registrationStatus.ts)
+const paymentGroupLabel = (g: 'paid' | 'pending' | 'rejected') =>
+  registrationStatusLabel(g === 'paid' ? 'registered' : g === 'rejected' ? 'rejected' : 'pending');
 
 // ประเภทสมาชิกเดียวกับที่ระบบใช้แสดงผลผู้เข้าร่วม (สามัญ / ตลอดชีพ / บุคคลทั่วไป)
 const ADMIN_REG_MEMBER_TYPES = ['บุคคลทั่วไป', 'สมาชิกสามัญ', 'สมาชิกตลอดชีพ'];
@@ -555,7 +561,7 @@ export function VerifyAttendeesPanel({
       'รหัสตั๋ว',
       'รอบการประชุม',
       'โปรแกรมที่ลงทะเบียน',
-      'สถานะชำระเงิน',
+      'สถานะการลงทะเบียน',
       'สถานะเช็คอิน',
       'เวลาเช็คอิน',
     ];
@@ -572,7 +578,7 @@ export function VerifyAttendeesPanel({
       a.ticketCode,
       `"${a.meetingTitle}"`,
       `"${getAttendeeProgramNames(a).join(', ')}"`,
-      a.paymentStatus === 'paid' ? 'ชำระแล้ว' : a.paymentStatus === 'rejected' ? 'สลิปถูกปฏิเสธ' : 'รอชำระ',
+      paymentGroupLabel(getPaymentGroup(a)),
       a.checkInStatus === 'checked_in' ? 'เช็คอินแล้ว' : 'ยังไม่เข้าร่วม',
       a.checkInTime || '-',
     ]);
@@ -747,14 +753,14 @@ export function VerifyAttendeesPanel({
             ]}
           />
           <FilterSelect
-            label="การชำระเงิน"
+            label="สถานะการลงทะเบียน"
             value={filterPayment}
             onChange={(v) => setFilterPayment(v as typeof filterPayment)}
             options={[
-              { value: 'all', label: `ทุกสถานะชำระเงิน · ${facetCounts.payment.all} คน` },
-              { value: 'paid', label: `ชำระแล้ว · ${facetCounts.payment.paid} คน` },
-              { value: 'pending', label: `รอชำระ · ${facetCounts.payment.pending} คน` },
-              { value: 'rejected', label: `สลิปถูกปฏิเสธ · ${facetCounts.payment.rejected} คน` },
+              { value: 'all', label: `ทุกสถานะการลงทะเบียน · ${facetCounts.payment.all} คน` },
+              { value: 'paid', label: `${paymentGroupLabel('paid')} · ${facetCounts.payment.paid} คน` },
+              { value: 'pending', label: `${paymentGroupLabel('pending')} · ${facetCounts.payment.pending} คน` },
+              { value: 'rejected', label: `${paymentGroupLabel('rejected')} · ${facetCounts.payment.rejected} คน` },
             ]}
           />
         </ToolbarGroup>
@@ -807,9 +813,9 @@ export function VerifyAttendeesPanel({
                     <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-[#0026b3]">ออนไซต์ {prog.onsite}</span>
                     <span className="px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-700">ออนไลน์ {prog.online}</span>
                     <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700">เช็คอิน {prog.checkedIn}</span>
-                    <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600">ชำระแล้ว {prog.paid}</span>
+                    <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600">{paymentGroupLabel('paid')} {prog.paid}</span>
                     {prog.pending > 0 && (
-                      <span className="px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">รอชำระ {prog.pending}</span>
+                      <span className="px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{paymentGroupLabel('pending')} {prog.pending}</span>
                     )}
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden mt-2">
@@ -912,15 +918,15 @@ export function VerifyAttendeesPanel({
                         >
                           {a.paymentStatus === 'paid' ? (
                             <>
-                              <CheckCircle2 className="w-3 h-3" /> ชำระแล้ว
+                              <CheckCircle2 className="w-3 h-3" /> {paymentGroupLabel('paid')}
                             </>
                           ) : a.paymentStatus === 'rejected' ? (
                             <>
-                              <XCircle className="w-3 h-3" /> สลิปถูกปฏิเสธ
+                              <XCircle className="w-3 h-3" /> {paymentGroupLabel('rejected')}
                             </>
                           ) : (
                             <>
-                              <Clock className="w-3 h-3" /> รอชำระ
+                              <Clock className="w-3 h-3" /> {paymentGroupLabel('pending')}
                             </>
                           )}
                         </span>
@@ -963,7 +969,7 @@ export function VerifyAttendeesPanel({
                         {onUpdatePaymentStatus && (
                           <IconBtn
                             icon={Pencil}
-                            label="แก้ไขสถานะการชำระเงิน"
+                            label="แก้ไขสถานะการลงทะเบียน"
                             tone="amber"
                             onClick={() => {
                               setEditingStatusAttendee(a);
@@ -1011,7 +1017,7 @@ export function VerifyAttendeesPanel({
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
                   <Pencil className="w-5 h-5 text-[#0026b3]" />
-                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900">แก้ไขสถานะการชำระเงิน</h3>
+                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900">แก้ไขสถานะการลงทะเบียน</h3>
                 </div>
                 <button
                   onClick={() => setEditingStatusAttendee(null)}
@@ -1052,7 +1058,7 @@ export function VerifyAttendeesPanel({
                       />
                       <div className="flex-1">
                         <div className="font-bold text-xs flex items-center gap-1.5 text-emerald-700">
-                          <CheckCircle2 className="w-4 h-4" /> ชำระเงินแล้ว
+                          <CheckCircle2 className="w-4 h-4" /> {paymentGroupLabel('paid')}
                         </div>
                         <div className="text-[11px] text-slate-500">
                           อนุมัติสิทธิ์การเข้าร่วมงานและสามารถออกใบเสร็จได้
@@ -1077,7 +1083,7 @@ export function VerifyAttendeesPanel({
                       />
                       <div className="flex-1">
                         <div className="font-bold text-xs flex items-center gap-1.5 text-amber-700">
-                          <Clock className="w-4 h-4" /> รอชำระเงิน
+                          <Clock className="w-4 h-4" /> {paymentGroupLabel('pending')}
                         </div>
                         <div className="text-[11px] text-slate-500">
                           อยู่ระหว่างรอแนบสลิปหรือรอเจ้าหน้าที่ตรวจสอบ
@@ -1233,7 +1239,7 @@ export function VerifyAttendeesPanel({
                     <span className="font-mono font-bold text-[#0026b3]">{selectedAttendee.ticketCode}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-500">สถานะการชำระเงิน:</span>
+                    <span className="text-slate-500">สถานะการลงทะเบียน:</span>
                     <div className="flex items-center gap-2">
                       <span
                         className={`font-bold text-xs px-2.5 py-0.5 rounded-full ${
@@ -1244,11 +1250,7 @@ export function VerifyAttendeesPanel({
                               : 'bg-amber-50 text-amber-700 border border-amber-200'
                         }`}
                       >
-                        {selectedAttendee.paymentStatus === 'paid'
-                          ? '✓ ชำระแล้ว'
-                          : selectedAttendee.paymentStatus === 'rejected'
-                            ? '✕ สลิปถูกปฏิเสธ'
-                            : '⏳ รอชำระ'}
+                        {paymentGroupLabel(getPaymentGroup(selectedAttendee))}
                       </span>
                       {onUpdatePaymentStatus && (
                         <button
@@ -1707,7 +1709,7 @@ export function VerifyAttendeesPanel({
                         onChange={() => setAdminRegData({ ...adminRegData, paymentStatus: 'paid' })}
                         className="accent-[#0026b3]"
                       />
-                      <span className="text-xs font-bold text-emerald-700">ชำระเงินแล้ว</span>
+                      <span className="text-xs font-bold text-emerald-700">{paymentGroupLabel('paid')}</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -1717,7 +1719,7 @@ export function VerifyAttendeesPanel({
                         onChange={() => setAdminRegData({ ...adminRegData, paymentStatus: 'pending' })}
                         className="accent-[#0026b3]"
                       />
-                      <span className="text-xs font-bold text-amber-700">รอชำระ</span>
+                      <span className="text-xs font-bold text-amber-700">{paymentGroupLabel('pending')}</span>
                     </label>
                   </div>
 

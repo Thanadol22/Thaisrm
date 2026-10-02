@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { deriveRegistrationStatus } from '@/lib/registrationStatus';
 
 // GET /api/sponsors/[id]/history - ดึงประวัติสมาชิกทั้งหมดที่บริษัทนี้เคยส่งลงทะเบียน
 export async function GET(
@@ -66,7 +67,7 @@ export async function GET(
         submittedByEmail: gm.submitted_by_email,
         status: gm.status,
         registeredAt: gm.created_at,
-        attendanceStatus: gm.attendance?.attendance_status || 'Registered',
+        attendanceStatus: gm.attendance?.attendance_status || null,
       }));
     } else {
       const rawSponsors: any[] = await prisma.$queryRaw`
@@ -116,9 +117,29 @@ export async function GET(
         submittedByEmail: gm.submitted_by_email,
         status: gm.status,
         registeredAt: gm.created_at,
-        attendanceStatus: gm.attendance_status || 'Registered',
+        attendanceStatus: gm.attendance_status || null,
       }));
     }
+
+    // สถานะกลาง: ยังไม่อนุมัติสลิป = รอตรวจสอบ, อนุมัติแล้ว = ลงทะเบียนสำเร็จ
+    // (รายชื่อในตารางนี้ถูกบันทึกเป็น confirmed ตั้งแต่ส่งรายการ จึงต้องดูสถานะสลิปจริง)
+    const ticketCodes = Array.from(new Set(history.map((h) => h.ticketCode).filter(Boolean))) as string[];
+    const slipStatusByTicket = new Map<string, string>();
+    if (ticketCodes.length > 0) {
+      const slips = await prisma.payment_slips.findMany({
+        where: { ticket_code: { in: ticketCodes } },
+        select: { ticket_code: true, status: true },
+        orderBy: { created_at: 'asc' },
+      });
+      for (const s of slips) if (s.ticket_code) slipStatusByTicket.set(s.ticket_code, s.status);
+    }
+    history = history.map((h) => ({
+      ...h,
+      registrationStatus: deriveRegistrationStatus({
+        slipStatus: (h.ticketCode && slipStatusByTicket.get(h.ticketCode)) || (h.status === 'confirmed' ? null : h.status),
+        attendanceStatus: h.attendanceStatus,
+      }),
+    }));
 
     return NextResponse.json({
       success: true,

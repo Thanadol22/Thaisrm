@@ -52,7 +52,7 @@ import { PaginationControls } from '@/components/PaginationControls';
 import { AdminCompanyMemberModal } from '@/components/AdminCompanyMemberModal';
 import SponsorRegistrationsSheet from '@/components/admin/SponsorRegistrationsSheet';
 
-import { statusLabelTh } from '@/lib/statusLabels';
+import { deriveRegistrationStatus, registrationStatusBadge, registrationStatusLabel } from '@/lib/registrationStatus';
 interface SponsorQuota {
   id?: string;
   sponsor_id?: string;
@@ -1309,8 +1309,8 @@ export default function AdminSponsorsPanel({
                               {new Date(row.registeredAt).toLocaleDateString('th-TH')}
                             </td>
                             <td className="py-3 px-3.5 text-center">
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                {statusLabelTh(row.attendanceStatus || 'Registered')}
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${registrationStatusBadge(row.registrationStatus || deriveRegistrationStatus({ attendanceStatus: row.attendanceStatus }))}`}>
+                                {registrationStatusLabel(row.registrationStatus || deriveRegistrationStatus({ attendanceStatus: row.attendanceStatus }))}
                               </span>
                             </td>
                           </tr>

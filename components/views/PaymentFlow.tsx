@@ -1,5 +1,6 @@
 'use client';
 
+import { registrationStatusLabel } from '@/lib/registrationStatus';
 import React, { useState } from 'react';
 import { PaymentView, type GroupAttendeeCategory } from '@/components/views/PaymentView';
 import { SlipUploadModal } from '@/components/SlipUploadModal';
@@ -812,24 +813,24 @@ export function PaymentFlow({
 
   const ADMIN_SUCCESS: Record<AdminSubmittedStatus, { title: string; message: string; badge: string }> = {
     paid: {
-      title: 'บันทึกรายการเรียบร้อย สถานะชำระแล้ว',
+      title: `บันทึกรายการเรียบร้อย สถานะ${registrationStatusLabel('registered')}`,
       message: 'ระบบอนุมัติรายการให้เรียบร้อยแล้ว',
-      badge: 'สถานะ: ชำระแล้ว',
+      badge: `สถานะ: ${registrationStatusLabel('registered')}`,
     },
     pending: {
-      title: 'บันทึกรายการเรียบร้อย สถานะรอชำระ',
+      title: `บันทึกรายการเรียบร้อย สถานะ${registrationStatusLabel('pending')}`,
       message: 'รายการอยู่ในเมนูตรวจสอบการชำระเงิน อนุมัติได้เมื่อได้รับชำระแล้ว',
-      badge: 'สถานะ: รอชำระ',
+      badge: `สถานะ: ${registrationStatusLabel('pending')}`,
     },
     free: {
       title: 'บันทึกรายการเรียบร้อย',
       message: 'ไม่มียอดที่ต้องชำระ ระบบอนุมัติรายการให้อัตโนมัติ',
-      badge: 'สถานะ: อนุมัติแล้ว',
+      badge: `สถานะ: ${registrationStatusLabel('registered')}`,
     },
     approve_failed: {
       title: 'บันทึกรายการแล้ว แต่ยังอนุมัติไม่สำเร็จ',
       message: 'กรุณาอนุมัติรายการนี้ที่เมนูตรวจสอบการชำระเงิน',
-      badge: 'สถานะ: รอชำระ',
+      badge: `สถานะ: ${registrationStatusLabel('pending')}`,
     },
   };
   const adminSuccess = adminMode && adminSubmittedStatus ? ADMIN_SUCCESS[adminSubmittedStatus] : null;

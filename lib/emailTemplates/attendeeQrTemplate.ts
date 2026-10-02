@@ -1,3 +1,5 @@
+import { statusLabelTh } from '@/lib/statusLabels';
+import { registrationStatusLabel } from '@/lib/registrationStatus';
 import { renderBaseEmailLayout } from './baseLayout';
 
 export interface AttendeeTicketEmailOptions {
@@ -41,7 +43,7 @@ export function renderAttendeeTicketEmail(options: AttendeeTicketEmailOptions): 
         ${options.ticketCode}
       </div>
       <div style="font-size: 12px; color: #cbd5e1; margin-top: 4px;">
-        ${options.memberNo ? `รหัสสมาชิก: ${options.memberNo} • ` : ''}สถานะ: ${options.attendanceStatus || 'ยืนยันแล้ว'}
+        ${options.memberNo ? `รหัสสมาชิก: ${options.memberNo} • ` : ''}สถานะ: ${statusLabelTh(options.attendanceStatus, registrationStatusLabel('registered'))}
       </div>
     </div>
 

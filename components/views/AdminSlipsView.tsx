@@ -45,6 +45,8 @@ import { buildZip, type ZipEntry } from '@/lib/zipStore';
 import { PaginationControls } from '@/components/PaginationControls';
 import { MemberDetailModal } from '@/components/MemberDetailModal';
 import { GroupAttendeeEditorModal, type GroupAttendeeEditorTarget } from '@/components/admin/GroupAttendeeEditorModal';
+import { registrationStatusBadge, registrationStatusLabel, type RegistrationStatusKey, type RegistrationStatusKind } from '@/lib/registrationStatus';
+import { getAttendeePricingReason, getPricingTone, PRICING_KIND_LABEL_TH, PRICING_TONE_CLASSES, type AttendeePricingKind } from '@/lib/attendeePricingReason';
 
 export interface SlipActivityItem {
   id?: string;
@@ -375,60 +377,39 @@ export function renderSlipStatusBadge(s: SlipRecord, lang: 'th' | 'en' = 'th') {
     <>
       {renderLifecycleBadge(s, lang)}
       <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-sky-100 text-sky-900 border border-sky-300 shadow-2xs">
-        {lang === 'th' ? '📎 แนบสลิปแล้ว - รออนุมัติการชำระเงิน' : '📎 Slip Attached - Awaiting Payment Approval'}
+        {lang === 'th' ? 'แอดมินแนบสลิปแล้ว รอตรวจสอบยอดเงิน' : 'Admin-attached slip, payment pending review'}
       </span>
     </>
   );
 }
 
-function renderLifecycleBadge(s: SlipRecord, lang: 'th' | 'en') {
-  const stage = getSlipLifecycleStage(s);
+/** ขั้นตอนของรายการ → สถานะกลางของทั้งระบบ (ชื่อและสีจาก lib/registrationStatus.ts) */
+const LIFECYCLE_TO_REGISTRATION_STATUS: Record<SlipLifecycleStage, RegistrationStatusKey> = {
+  awaiting_access_approval: 'pending_pay_later',
+  approved_awaiting_payment: 'registered_awaiting_payment',
+  pending_payment_review: 'pending_payment_review',
+  payment_approved: 'registered',
+  rejected: 'rejected',
+  cancelled: 'cancelled',
+  standard_pending: 'pending',
+};
 
-  switch (stage) {
-    case 'awaiting_access_approval':
-      return (
-        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
-          {lang === 'th' ? '⏳ รออนุมัติสิทธิ์' : '⏳ Awaiting Approval'}
-        </span>
-      );
-    case 'approved_awaiting_payment':
-      return (
-        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-sky-100 text-sky-900 border border-sky-300 shadow-2xs">
-          {lang === 'th' ? '✓ อนุมัติสิทธิ์แล้ว - รอชำระเงิน' : '✓ Access Approved - Awaiting Payment'}
-        </span>
-      );
-    case 'pending_payment_review':
-      return (
-        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-indigo-100 text-indigo-900 border border-indigo-300 shadow-2xs">
-          {lang === 'th' ? '⏳ แนบสลิปแล้ว - รอตรวจสอบยอดเงิน' : '⏳ Slip Uploaded - Awaiting Payment Review'}
-        </span>
-      );
-    case 'payment_approved':
-      return (
-        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
-          {lang === 'th' ? '✓ ชำระเงินเรียบร้อยแล้ว' : '✓ Payment Completed'}
-        </span>
-      );
-    case 'rejected':
-      return (
-        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
-          {lang === 'th' ? '✕ ปฏิเสธ' : '✕ Rejected'}
-        </span>
-      );
-    case 'cancelled':
-      return (
-        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-slate-200 text-slate-700 border border-slate-300 shadow-2xs">
-          {lang === 'th' ? '⊘ ยกเลิกรายการแล้ว' : '⊘ Cancelled'}
-        </span>
-      );
-    case 'standard_pending':
-    default:
-      return (
-        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
-          {lang === 'th' ? '⏳ รอตรวจสอบ' : '⏳ Pending'}
-        </span>
-      );
-  }
+export function getSlipRegistrationStatus(s: SlipRecord): RegistrationStatusKey {
+  return LIFECYCLE_TO_REGISTRATION_STATUS[getSlipLifecycleStage(s)];
+}
+
+/** ใบสมัครสมาชิกใช้คำ "สมัครสมาชิกสำเร็จ" แทน "ลงทะเบียนสำเร็จ" */
+export function getSlipStatusKind(s: SlipRecord): RegistrationStatusKind {
+  return s.isMembershipRegistration || s.isGroupMembership || Boolean(s.ticketCode?.startsWith('MEM')) ? 'membership' : 'registration';
+}
+
+function renderLifecycleBadge(s: SlipRecord, lang: 'th' | 'en') {
+  const key = getSlipRegistrationStatus(s);
+  return (
+    <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 border shadow-2xs ${registrationStatusBadge(key)}`}>
+      {registrationStatusLabel(key, lang, getSlipStatusKind(s))}
+    </span>
+  );
 }
 
 export function parseSlipActivities(raw?: SlipActivityItem[] | string | any, fallbackAmount?: number): SlipActivityItem[] {
@@ -738,7 +719,7 @@ export function AdminSlipsView() {
       setAttachPreviewUrl(null);
       showToast(
         json.data.awaitingApproval
-          ? '✓ แนบสลิปเรียบร้อยแล้ว สถานะจะเปลี่ยนเป็นชำระเงินเรียบร้อยเมื่อกดอนุมัติ'
+          ? `✓ แนบสลิปเรียบร้อยแล้ว สถานะจะเปลี่ยนเป็น${registrationStatusLabel('registered', 'th', getSlipStatusKind(attachingSlip))}เมื่อกดอนุมัติ`
           : '✓ เปลี่ยนรูปสลิปเรียบร้อยแล้ว'
       );
     } catch (err: any) {
@@ -1218,7 +1199,7 @@ export function AdminSlipsView() {
           <>
             <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 text-amber-950 text-xs sm:text-sm font-black shadow-sm">
               <Clock className="w-4 h-4" />
-              {lang === 'th' ? 'รอตรวจ' : 'Pending'} {allPendingCount}
+              {registrationStatusLabel('pending', lang)} {allPendingCount}
             </span>
             <HeaderButton icon={RotateCw} onClick={fetchSlips} disabled={loading} title="รีเฟรชข้อมูล">
               {lang === 'th' ? 'รีเฟรช' : 'Refresh'}
@@ -1249,7 +1230,7 @@ export function AdminSlipsView() {
           onClick={() => setStatusFilter('all')}
         />
         <StatCard
-          label={lang === 'th' ? 'รอตรวจสอบ' : 'Pending review'}
+          label={registrationStatusLabel('pending', lang)}
           value={categoryPendingCount}
           icon={Clock}
           tone="amber"
@@ -1265,7 +1246,7 @@ export function AdminSlipsView() {
           onClick={() => setStatusFilter('pay_later')}
         />
         <StatCard
-          label={lang === 'th' ? 'อนุมัติแล้ว' : 'Approved'}
+          label={registrationStatusLabel('registered', lang)}
           value={categoryApprovedCount}
           icon={CheckCircle2}
           tone="green"
@@ -1273,7 +1254,7 @@ export function AdminSlipsView() {
           onClick={() => setStatusFilter('approved')}
         />
         <StatCard
-          label={lang === 'th' ? 'ปฏิเสธหรือรอแก้ไข' : 'Rejected'}
+          label={registrationStatusLabel('rejected', lang)}
           value={categoryRejectedCount}
           icon={XCircle}
           tone="rose"
@@ -1281,7 +1262,7 @@ export function AdminSlipsView() {
           onClick={() => setStatusFilter('rejected')}
         />
         <StatCard
-          label={lang === 'th' ? 'ยกเลิกแล้ว' : 'Cancelled'}
+          label={registrationStatusLabel('cancelled', lang)}
           value={categoryCancelledCount}
           icon={Ban}
           tone="slate"
@@ -2290,6 +2271,27 @@ export function AdminSlipsView() {
                       )}
 
                       {(() => {
+                        const couponCode = selectedSlip.couponCode || selectedSlip.couponInfo?.code;
+                        const counts = new Map<AttendeePricingKind, number>();
+                        for (const a of selectedSlip.groupPayload.attendees) {
+                          const kind = getAttendeePricingReason(a, { discount: getGroupAttendeeDiscount(a, selectedSlip), couponCode }).kind;
+                          counts.set(kind, (counts.get(kind) || 0) + 1);
+                        }
+                        const kinds = (Object.keys(PRICING_KIND_LABEL_TH) as AttendeePricingKind[]).filter((k) => counts.has(k));
+                        if (kinds.length === 0) return null;
+                        return (
+                          <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                            <span className="font-bold text-slate-600">สรุปราคา:</span>
+                            {kinds.map((k) => (
+                              <span key={k} className={`font-bold border px-2 py-0.5 rounded-md ${PRICING_TONE_CLASSES[getPricingTone(k)].badge}`}>
+                                {`${PRICING_KIND_LABEL_TH[k]} ${counts.get(k)} ท่าน`}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })()}
+
+                      {(() => {
                         const totalAttendees = selectedSlip.groupPayload.attendees;
                         const displayedAttendees = showAllGroupAttendees ? totalAttendees : totalAttendees.slice(0, 2);
                         return (
@@ -2297,7 +2299,6 @@ export function AdminSlipsView() {
                             <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
                               {displayedAttendees.map((att: any, idx: number) => {
                                 const attName = att.nameTh || att.nameEn || `ผู้เข้าร่วมคนที่ ${idx + 1}`;
-                                const isAttMember = Boolean(att.isMember || att.memberNo);
                                 const attActivities = getAttendeeActivities(att);
 
                                 // ส่วนลดคูปองของผู้ลงทะเบียนรายนี้ (ผู้ลงเพิ่มเติมไม่ได้ใช้สิทธิ์คูปองของบริษัท)
@@ -2307,6 +2308,11 @@ export function AdminSlipsView() {
                                 const hasDiscount = attDiscount > 0;
                                 const originalPrice = Number(att.originalTotal || att.subtotal || ((Number(att.price) || 0) + attDiscount));
                                 const netPrice = hasDiscount && originalPrice > 0 ? Math.max(0, originalPrice - attDiscount) : (att.price !== undefined ? Number(att.price) : (Number(att.subtotal) || 0));
+                                const pricing = getAttendeePricingReason(att, {
+                                  discount: attDiscount,
+                                  couponCode: selectedSlip.couponCode || selectedSlip.couponInfo?.code,
+                                  lang: lang === 'th' ? 'th' : 'en',
+                                });
 
                                 return (
                                   <div
@@ -2369,6 +2375,7 @@ export function AdminSlipsView() {
                                                 hasDiscount,
                                                 originalPrice,
                                                 netPrice,
+                                                pricing,
                                               })
                                             }
                                             className="h-8 inline-flex items-center gap-1.5 px-2.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-bold text-[11px] transition cursor-pointer whitespace-nowrap"
@@ -2382,13 +2389,9 @@ export function AdminSlipsView() {
 
                                       {/* แถว 2: ป้ายสถานะเรียงแถวเดียว */}
                                       <div className="pl-8 flex flex-wrap items-center gap-1.5">
-                                        {isAttMember ? (
-                                          <span className="text-[10px] font-bold bg-blue-50 text-[#0026b3] border border-blue-200 px-2 py-0.5 rounded-md whitespace-nowrap">
-                                            {att.memberNo ? `สมาชิก #${att.memberNo}` : 'สมาชิกสมาคม'}
-                                          </span>
-                                        ) : (
-                                          <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-md whitespace-nowrap">
-                                            บุคคลทั่วไป
+                                        {pricing.kind !== 'add_on' && (
+                                          <span className={`text-[10px] font-bold border px-2 py-0.5 rounded-md whitespace-nowrap ${PRICING_TONE_CLASSES[pricing.tone].badge}`}>
+                                            {pricing.badge}
                                           </span>
                                         )}
 
@@ -2492,6 +2495,12 @@ export function AdminSlipsView() {
                                           )}
                                         </div>
                                       )}
+
+                                      {/* แถว 5: เหตุผลของราคา เพื่อให้ผู้ตรวจเข้าใจตรงกับระบบ */}
+                                      <div className={`ml-8 text-[11px] leading-relaxed font-medium border rounded-lg px-2.5 py-1.5 ${PRICING_TONE_CLASSES[pricing.tone].note}`}>
+                                        <span className="font-bold">{lang === 'th' ? 'เหตุผลของราคา: ' : 'Price reason: '}</span>
+                                        {pricing.reason}
+                                      </div>
                                     </div>
                                   </div>
                                 );
@@ -3133,7 +3142,7 @@ export function AdminSlipsView() {
 
               <p className="text-[11px] text-slate-500">
                 {lang === 'th'
-                  ? 'สถานะรายการจะคงเดิม เมื่อกดอนุมัติ ระบบจะปรับเป็นชำระเงินเรียบร้อย ออกใบเสร็จ และส่งอีเมลยืนยัน'
+                  ? `สถานะรายการจะคงเดิม เมื่อกดอนุมัติ ระบบจะปรับเป็น${registrationStatusLabel('registered', 'th', getSlipStatusKind(attachingSlip))} ออกใบเสร็จ และส่งอีเมลยืนยัน`
                   : 'The status stays the same. Approving marks it as paid, issues the receipt and sends confirmation.'}
               </p>
 
@@ -3468,7 +3477,11 @@ export function AdminSlipsView() {
                       <p className="text-xs text-slate-500 font-medium">({viewingAttendee.nameEn})</p>
                     )}
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      {Boolean(viewingAttendee.isMember || viewingAttendee.memberNo) ? (
+                      {viewingAttendee.pricing ? (
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${PRICING_TONE_CLASSES[viewingAttendee.pricing.tone as keyof typeof PRICING_TONE_CLASSES].badge}`}>
+                          {viewingAttendee.pricing.badge}
+                        </span>
+                      ) : Boolean(viewingAttendee.isMember || viewingAttendee.memberNo) ? (
                         <span className="text-[10px] font-black bg-blue-100 text-[#0026b3] px-2 py-0.5 rounded-md border border-blue-200">
                           {viewingAttendee.memberNo ? `สมาชิก (#${viewingAttendee.memberNo})` : 'สมาชิกสมาคม'}
                         </span>
@@ -3485,6 +3498,13 @@ export function AdminSlipsView() {
                     </div>
                   </div>
                 </div>
+
+                {viewingAttendee.pricing && (
+                  <div className={`text-xs leading-relaxed font-medium border rounded-2xl px-3.5 py-2.5 ${PRICING_TONE_CLASSES[viewingAttendee.pricing.tone as keyof typeof PRICING_TONE_CLASSES].note}`}>
+                    <span className="font-extrabold">{lang === 'th' ? 'เหตุผลของราคา: ' : 'Price reason: '}</span>
+                    {viewingAttendee.pricing.reason}
+                  </div>
+                )}
 
                 {/* Info Fields */}
                 <div className="bg-slate-50 rounded-2xl p-4 space-y-2.5 border border-slate-200 text-xs">

@@ -36,6 +36,7 @@ import { renderCustomBroadcastEmail } from '@/lib/emailTemplates/customTemplate'
 import { formatThaiDate, DailyProgramInfo, programSupportsFormat } from '@/lib/services/dailyCheckinService';
 
 import { statusLabelTh } from '@/lib/statusLabels';
+import { registrationStatusLabel } from '@/lib/registrationStatus';
 import { OnlineAttendeesPanel } from '@/components/admin/OnlineAttendeesPanel';
 import { EmailLogPanel } from '@/components/admin/EmailLogPanel';
 import { SponsorHistoryEmailPanel } from '@/components/admin/SponsorHistoryEmailPanel';
@@ -283,7 +284,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
       location: meeting?.location || 'โรงแรมสยาม เคมปินสกี้ กรุงเทพฯ',
       ticketCode: isDailyPassMode ? `TSRM-DAY-${selectedMeetingId.substring(0, 6) || '2026'}-0012` : 'TSRM-2026-8899',
       memberNo: '0123',
-      attendanceStatus: 'ยืนยันสิทธิ์เรียบร้อย',
+      attendanceStatus: 'Registered',
       qrCodeUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=TSRM-PASS:TSRM-DAY-SAMPLE-PASS',
       extraNote: extraNote || (isDailyPassMode ? `บัตรสำหรับเข้าร่วม: ${activeProg?.programName || 'Main Program'} • QR Code นี้ใช้ได้เฉพาะวันนี้ 1 ครั้งเท่านั้น` : 'กรุณาแสดง QR Code นี้แก่เจ้าหน้าที่ ณ จุดลงทะเบียนหน้างาน'),
     });
@@ -700,7 +701,7 @@ export function AdminEmailCenterPanel({ onShowToast }: AdminEmailCenterPanelProp
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
-                  { id: 'Registered', label: 'ลงทะเบียนแล้ว', desc: 'ผู้ที่ลงทะเบียนในงาน' },
+                  { id: 'Registered', label: registrationStatusLabel('registered'), desc: 'ผู้ที่ลงทะเบียนในงาน' },
                   { id: 'all', label: 'ทั้งหมด', desc: 'ทุกสถานะในงาน' },
                   { id: 'Checked_In', label: 'เช็คอินแล้ว', desc: 'ผู้ที่เช็คอินเข้างานแล้ว' },
                   { id: 'Non-Member', label: 'บุคคลทั่วไป', desc: 'ผู้เข้าร่วมที่ไม่ใช่สมาชิก' },

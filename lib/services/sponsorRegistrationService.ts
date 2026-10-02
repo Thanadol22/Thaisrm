@@ -1,6 +1,8 @@
 import prisma from '@/lib/prisma';
 import { attendeeBackdatedCharges, resolveAttendeeActivities } from '@/lib/services/sponsorCouponService';
 import { ADD_ON_MERGED_STATUS } from '@/lib/services/registrationAddOnService';
+import { getAttendeePricingReason, type AttendeePricingKind } from '@/lib/attendeePricingReason';
+import { deriveRegistrationStatus, registrationStatusLabel, type RegistrationStatusKey, type RegistrationStatusKind } from '@/lib/registrationStatus';
 
 // ประวัติการลงทะเบียนของบริษัท แตกทุกบิลเป็นรายผู้เข้าร่วม
 // ใช้ร่วมกันระหว่างหน้าประวัติการลงทะเบียนของบริษัทและการส่งอีเมลประวัติ/แจ้งค้างชำระ
@@ -16,6 +18,8 @@ export interface SponsorRegistrationRow {
   billCount: number;
   billStatus: string;
   billStatusLabel: string;
+  /** สถานะกลางของบิล (ใช้กำหนดสีป้าย) */
+  billRegStatus: RegistrationStatusKey;
   billType: string;
   company: string;
   /** อีเมลผู้ส่งบิล (ใช้จับคู่บิลกับบริษัทเหมือนหน้าพอร์ทัลบริษัท) */
@@ -44,11 +48,15 @@ export interface SponsorRegistrationRow {
   netPrice: number;
   attendanceStatus: string | null;
   ticketCode?: string | null;
+  /** เหตุผลของราคา เช่น สมาชิกหมดอายุ คิดราคาบุคคลทั่วไป (ไม่มีสำหรับการสมัครสมาชิก) */
+  pricingKind?: AttendeePricingKind | null;
+  pricingReason?: string | null;
 }
 
-/** สถานะการชำระเงินของบิล (ใช้เกณฑ์เดียวกับหน้าบริษัทสปอนเซอร์)
+/** สถานะการชำระเงินของบิล (ใช้เกณฑ์เดียวกับหน้าบริษัทสปอนเซอร์ ชื่อสถานะจาก lib/registrationStatus.ts)
  * outstanding: บิลชำระภายหลังที่ยังไม่แนบสลิป (ตรงกับรายการที่พอร์ทัลบริษัทขอให้แนบสลิป) */
-function billStatus(s: any): { key: string; label: string; outstanding: boolean } {
+function billStatus(s: any, kind: RegistrationStatusKind = 'registration'): { key: string; label: string; reg: RegistrationStatusKey; outstanding: boolean } {
+  const st = (key: string, reg: RegistrationStatusKey, outstanding: boolean) => ({ key, label: registrationStatusLabel(reg, 'th', kind), reg, outstanding });
   const url: string = s.slip_url || '';
   const hasActualSlip = Boolean(url) && !NO_SLIP_URLS.has(url) && !url.startsWith('TEMP_');
   const isPayLater =
@@ -56,21 +64,13 @@ function billStatus(s: any): { key: string; label: string; outstanding: boolean 
     url === 'pay_later_pending' ||
     (typeof s.bank === 'string' && (s.bank.includes('ชำระเงินภายหลัง') || s.bank.toLowerCase().includes('pay later')));
 
-  if (s.status === 'rejected') return { key: 'rejected', label: 'ถูกปฏิเสธ', outstanding: false };
-  if (Number(s.amount) === 0) return { key: 'free', label: s.status === 'approved' ? 'ฟรี อนุมัติแล้ว' : 'ฟรี รออนุมัติ', outstanding: false };
-  if (hasActualSlip) {
-    return s.status === 'approved'
-      ? { key: 'paid', label: 'ชำระเงินแล้ว', outstanding: false }
-      : { key: 'review', label: 'รอตรวจสลิป', outstanding: false };
-  }
-  if (isPayLater) {
-    return s.status === 'approved'
-      ? { key: 'awaiting', label: 'อนุมัติแล้ว รอชำระเงิน', outstanding: true }
-      : { key: 'pending', label: 'รออนุมัติสิทธิ์', outstanding: true };
-  }
-  return s.status === 'approved'
-    ? { key: 'paid', label: 'อนุมัติแล้ว', outstanding: false }
-    : { key: 'pending', label: 'รออนุมัติสิทธิ์', outstanding: false };
+  const approved = s.status === 'approved';
+
+  if (s.status === 'rejected') return st('rejected', 'rejected', false);
+  if (Number(s.amount) === 0) return st('free', approved ? 'registered' : 'pending', false);
+  if (hasActualSlip) return approved ? st('paid', 'registered', false) : st('review', 'pending_payment_review', false);
+  if (isPayLater) return approved ? st('awaiting', 'registered_awaiting_payment', true) : st('pending', 'pending_pay_later', true);
+  return approved ? st('paid', 'registered', false) : st('pending', 'pending', false);
 }
 
 function parsePayload(raw: unknown): any {
@@ -152,7 +152,7 @@ export async function getSponsorRegistrationRows(): Promise<SponsorRegistrationR
     if (people.length === 0) continue;
 
     if (s.ticket_code) coveredTickets.add(s.ticket_code);
-    const status = billStatus(s);
+    const status = billStatus(s, isMembership ? 'membership' : 'registration');
     const company = payload.companyName || s.guest_workplace || '-';
     const meetingActs = Array.isArray(s.meetings?.activities) ? (s.meetings!.activities as any[]) : [];
 
@@ -180,6 +180,8 @@ export async function getSponsorRegistrationRows(): Promise<SponsorRegistrationR
       const no = cleanNo(memberNo);
       if (no) coveredPeople.add(`${s.meeting_id}|m:${no}`);
       if (email) coveredPeople.add(`${s.meeting_id}|e:${email}`);
+      const couponCode = payload.couponCode || payload.couponData?.code || null;
+      const pricing = isMembership ? null : getAttendeePricingReason(att, { discount, couponCode, audience: 'sponsor' });
 
       rows.push({
         key: `${s.slip_id}_${idx}`,
@@ -190,12 +192,13 @@ export async function getSponsorRegistrationRows(): Promise<SponsorRegistrationR
         billCount: people.length,
         billStatus: status.key,
         billStatusLabel: status.label,
+        billRegStatus: status.reg,
         billType: isMembership ? 'สมัครสมาชิก' : 'ลงทะเบียนประชุม',
         company,
         guestEmail: (s.guest_email || '').trim().toLowerCase(),
         sponsorId: null,
         isOutstanding: status.outstanding,
-        couponCode: payload.couponCode || payload.couponData?.code || null,
+        couponCode,
         meetingId: s.meeting_id,
         meetingName: s.meetings?.meeting_name || s.meeting_id,
         seq: idx + 1,
@@ -211,7 +214,12 @@ export async function getSponsorRegistrationRows(): Promise<SponsorRegistrationR
         discount,
         originalPrice,
         netPrice,
-        attendanceStatus: isMembership ? null : attendanceOf(s.meeting_id, memberNo, email),
+        // สถานะของผู้ลงทะเบียน: ยังไม่อนุมัติ = รอตรวจสอบ แม้การเข้าร่วมจะบันทึกไว้แล้ว
+        attendanceStatus: isMembership
+          ? null
+          : deriveRegistrationStatus({ slipStatus: s.status, attendanceStatus: attendanceOf(s.meeting_id, memberNo, email) }),
+        pricingKind: pricing?.kind ?? null,
+        pricingReason: pricing?.reason ?? null,
       });
     });
   }
@@ -239,7 +247,8 @@ export async function getSponsorRegistrationRows(): Promise<SponsorRegistrationR
         billAmount: 0,
         billCount: list.length,
         billStatus: 'quota',
-        billStatusLabel: 'ใช้โควต้าบริษัท',
+        billStatusLabel: registrationStatusLabel('registered'),
+        billRegStatus: 'registered',
         billType: 'ลงทะเบียนประชุม',
         company: gm.sponsor?.name || '-',
         guestEmail: (gm.submitted_by_email || '').trim().toLowerCase(),
@@ -261,7 +270,7 @@ export async function getSponsorRegistrationRows(): Promise<SponsorRegistrationR
         discount: gm.discount_amount || 0,
         originalPrice: (gm.net_price || 0) + (gm.discount_amount || 0),
         netPrice: gm.net_price || 0,
-        attendanceStatus: attendanceOf(gm.meeting_id, gm.member_no, gm.attendee_email),
+        attendanceStatus: deriveRegistrationStatus({ attendanceStatus: attendanceOf(gm.meeting_id, gm.member_no, gm.attendee_email) }),
         // ใช้เลขบัตรของแต่ละคนเป็นข้อมูลประกอบ
         ticketCode: gm.ticket_code,
       });

@@ -1,5 +1,6 @@
 'use client';
 
+import { registrationStatusLabel } from '@/lib/registrationStatus';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -2321,8 +2322,8 @@ export function LoginView({
                                         : 'bg-emerald-100 text-emerald-700 border-emerald-200'
                                     }`}>
                                       {isRegistrationPending
-                                        ? (lang === 'th' ? 'ลงทะเบียนแล้ว รอตรวจสอบ' : 'Registered, pending review')
-                                        : (lang === 'th' ? 'ลงทะเบียนแล้ว' : 'Registered')}
+                                        ? registrationStatusLabel('pending', lang)
+                                        : registrationStatusLabel('registered', lang)}
                                     </span>
                                     <h4 className="text-sm sm:text-sm font-bold leading-snug" title={act.name}>
                                       {act.name}

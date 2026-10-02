@@ -1,5 +1,6 @@
 'use client';
 
+import { registrationStatusLabel } from '@/lib/registrationStatus';
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Building2 } from 'lucide-react';
@@ -179,9 +180,9 @@ export function AdminCompanyMemberModal({ isOpen, onClose, companies, onSuccess,
                     const action = pending.type === 'registration' ? 'ลงทะเบียนเข้าประชุม' : 'สมัครสมาชิก';
                     const statusText =
                       adminStatus === 'paid'
-                        ? ' สถานะชำระแล้ว'
+                        ? ` สถานะ${registrationStatusLabel('registered')}`
                         : adminStatus === 'pending'
-                        ? ' สถานะรอชำระ'
+                        ? ` สถานะ${registrationStatusLabel('pending')}`
                         : adminStatus === 'approve_failed'
                         ? ' แต่ยังอนุมัติไม่สำเร็จ กรุณาอนุมัติที่เมนูตรวจสอบการชำระเงิน'
                         : '';

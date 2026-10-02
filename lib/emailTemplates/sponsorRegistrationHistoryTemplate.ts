@@ -15,6 +15,8 @@ export interface SponsorHistoryEmailAttendee {
   /** ยอดก่อนหักส่วนลด */
   originalPrice?: number;
   netPrice: number;
+  /** เหตุผลของราคา เช่น สมาชิกหมดอายุ คิดราคาบุคคลทั่วไป */
+  pricingNote?: string | null;
 }
 
 export interface SponsorHistoryEmailBill {
@@ -103,6 +105,7 @@ function renderBill(bill: SponsorHistoryEmailBill): string {
           <div style="font-weight: 700;">${esc(a.name)}</div>
           ${a.memberNo ? `<div style="font-size: 12px; color: #64748b;">เลขสมาชิก ${esc(a.memberNo)}</div>` : ''}
           ${a.format ? `<div style="font-size: 12px; color: #64748b;">รูปแบบการเข้าร่วม ${esc(a.format)}</div>` : ''}
+          ${a.pricingNote ? `<div style="margin-top: 4px; font-size: 12px; color: #b45309;">${esc(a.pricingNote)}</div>` : ''}
         </td>
         <td style="padding: 8px 10px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #0f172a; text-align: right; white-space: nowrap; vertical-align: top;">
           ${(Number(a.discount) || 0) > 0 ? `<div style="font-size: 12px; color: #94a3b8; text-decoration: line-through;">${money(Number(a.originalPrice) || a.netPrice + Number(a.discount))}</div>` : ''}

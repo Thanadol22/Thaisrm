@@ -1,5 +1,6 @@
 'use client';
 
+import { registrationStatusLabel } from '@/lib/registrationStatus';
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -422,12 +423,12 @@ export function ParticipantSearchModal({ isOpen, onClose }: ParticipantSearchMod
                   {/* แสดงสถานะเฉพาะรอบล่าสุดที่มีการบันทึกสถานะ */}
                   {field?.registrationStatus === 'approved' && (
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded-md bg-emerald-100 text-emerald-850 border border-emerald-300/80 font-bold text-[10px] shrink-0">
-                      {lang === 'th' ? 'ลงทะเบียนแล้ว' : 'Registered'}
+                      {registrationStatusLabel('registered', lang)}
                     </span>
                   )}
                   {field?.registrationStatus === 'pending' && (
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-850 border border-amber-300/80 font-bold text-[10px] shrink-0">
-                      {lang === 'th' ? 'รอตรวจสอบ' : 'Pending'}
+                      {registrationStatusLabel('pending', lang)}
                     </span>
                   )}
                 </div>

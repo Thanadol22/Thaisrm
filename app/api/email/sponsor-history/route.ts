@@ -167,6 +167,8 @@ export async function POST(req: NextRequest) {
               discount: a.discount,
               originalPrice: a.originalPrice,
               netPrice: a.netPrice,
+              // แจ้งเหตุผลเฉพาะกรณีที่ไม่ได้ราคาสมาชิก/คูปอง ให้บริษัทเข้าใจที่มาของยอด
+              pricingNote: a.pricingKind === 'expired' || a.pricingKind === 'non_member' ? a.pricingReason : null,
             })),
           })),
           extraNote,
