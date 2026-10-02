@@ -230,7 +230,7 @@ export async function POST(
       // คูปองบริษัทใช้ได้เฉพาะสมาชิกสถานะปกติ: ผู้ที่ไม่ใช่สมาชิกลงทะเบียนได้ แต่ห้ามได้รับส่วนลด
       for (let i = 0; i < attendees.length; i++) {
         const att = attendees[i];
-        if (att.isAddOn || Number(att.discountTotal || att.discountAmount || 0) <= 0) continue;
+        if (Number(att.discountTotal || att.discountAmount || 0) <= 0) continue;
         const rawNo = att.memberNo ? String(att.memberNo).trim() : '';
         const discountedMember = rawNo
           ? await prisma.member.findFirst({
@@ -349,7 +349,6 @@ export async function POST(
       const couponCoveredAttendees = groupCoupon
         ? attendees.filter(
             (a: any) =>
-              !a.isAddOn &&
               Number(a.discountTotal || a.discountAmount || 0) > 0 &&
               isCouponApplicableToActivities(groupCoupon!, resolveAttendeeActivities(a, meeting.activities))
           )

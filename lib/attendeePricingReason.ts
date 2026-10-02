@@ -41,9 +41,13 @@ export function getAttendeePricingReason(
     return {
       kind: 'add_on',
       badge: th ? 'ลงเพิ่ม' : 'Add-on',
-      reason: th
-        ? 'ลงทะเบียนเพิ่มจากรายการเดิม คิดราคาเฉพาะรายการที่เพิ่ม และไม่ใช้สิทธิ์คูปองบริษัท'
-        : 'Add-on to an existing registration; only the added items are charged and the company coupon does not apply',
+      reason: discount > 0
+        ? (th
+          ? `ลงทะเบียนเพิ่มจากรายการเดิม คิดราคาเฉพาะรายการที่เพิ่ม และใช้สิทธิ์คูปองบริษัทกับการประชุมหลัก ลด ${discount.toLocaleString()} บาท`
+          : `Add-on to an existing registration; only the added items are charged, with the company coupon applied to the Main Program (-${discount.toLocaleString()} THB)`)
+        : (th
+          ? 'ลงทะเบียนเพิ่มจากรายการเดิม คิดราคาเฉพาะรายการที่เพิ่ม และไม่ใช้สิทธิ์คูปองบริษัท'
+          : 'Add-on to an existing registration; only the added items are charged and the company coupon does not apply'),
       tone: 'slate',
     };
   }

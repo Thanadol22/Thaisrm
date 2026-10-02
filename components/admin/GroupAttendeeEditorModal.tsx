@@ -322,7 +322,7 @@ export function GroupAttendeeEditorModal({
               </div>
             </div>
             {(() => {
-              const returnsCoupon = !target.attendee?.isAddOn && Number(target.attendee?.discountTotal ?? target.attendee?.discountAmount ?? 0) > 0;
+              const returnsCoupon = Number(target.attendee?.discountTotal ?? target.attendee?.discountAmount ?? 0) > 0;
               const seatActs = activities.filter((a) => a.maxSeats > 0 && form.programIds.includes(a.id));
               if (loadingActivities) {
                 return (

@@ -291,9 +291,12 @@ export function PaymentFlow({
         let attendeeDiscount = 0;
         let discountNotice: string | undefined = undefined;
 
+        // ลงเพิ่มที่มีการประชุมหลัก (ยังไม่เคยลง) ของสมาชิกสถานะปกติ: ใช้สิทธิ์คูปองบริษัทได้เหมือนผู้ลงทะเบียนใหม่
+        const addOnUsesCoupon = Boolean(att.isAddOn) && isMem && itemizedActs.some(a => a.type === 'main' || a.id === 'main');
+
         // Apply chronological coupon discount
-        if (att.isAddOn) {
-          // ลงทะเบียนเพิ่มเติมของผู้ที่ลงทะเบียนแล้ว: ไม่ใช้สิทธิ์คูปอง และไม่ตัดโควต้าฟรีของบริษัท
+        if (att.isAddOn && !addOnUsesCoupon) {
+          // ลงทะเบียนเพิ่มเติมเฉพาะเวิร์กช็อป: ไม่ใช้สิทธิ์คูปอง และไม่ตัดโควต้าฟรีของบริษัท
           discountNotice = lang === 'th'
             ? `➕ ลงทะเบียนเพิ่มเติม${att.addOnOriginalTicketCode ? ` สำหรับรายการ ${att.addOnOriginalTicketCode}` : ''} คิดเฉพาะกิจกรรมที่เพิ่ม`
             : `➕ Add-on${att.addOnOriginalTicketCode ? ` for ${att.addOnOriginalTicketCode}` : ''}: added activities only`;
@@ -383,10 +386,16 @@ export function PaymentFlow({
             ? '⚠️ เกินโควตาสิทธิ์ฟรีของคูปอง คิดราคาสมาชิกตามปกติ'
             : '⚠️ Exceeded free pass quota: member rate';
         }
+        if (addOnUsesCoupon) {
+          const addOnLabel = lang === 'th'
+            ? `➕ ลงทะเบียนเพิ่มเติม${att.addOnOriginalTicketCode ? ` สำหรับรายการ ${att.addOnOriginalTicketCode}` : ''}`
+            : `➕ Add-on${att.addOnOriginalTicketCode ? ` for ${att.addOnOriginalTicketCode}` : ''}`;
+          discountNotice = discountNotice ? `${addOnLabel} ${discountNotice}` : addOnLabel;
+        }
 
         const attendeeNetPrice = Math.max(0, attendeeOriginalTotal - attendeeDiscount);
         // ประเภทสำหรับสรุปยอดในหน้าชำระเงิน
-        const category: GroupAttendeeCategory = att.isAddOn
+        const category: GroupAttendeeCategory = att.isAddOn && attendeeDiscount <= 0
           ? 'addOn'
           : !isMem
             ? (att.isExpiredMember ? 'expired' : 'nonMember')

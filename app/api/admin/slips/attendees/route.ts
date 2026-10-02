@@ -294,7 +294,7 @@ interface CouponSyncResult {
 
 /** ผู้ลงทะเบียนใช้สิทธิ์คูปองบริษัทหรือไม่ (เกณฑ์เดียวกับตอนลงทะเบียน: ได้ส่วนลดจริง และลงโปรแกรมที่คูปองครอบคลุม) */
 function claimsCouponRight(att: any | null, coupon: { remarks?: string | null }, meetingActivities: unknown): boolean {
-  if (!att || att.isAddOn || attendeeDiscount(att) <= 0) return false;
+  if (!att || attendeeDiscount(att) <= 0) return false;
   return isCouponApplicableToActivities(coupon, resolveAttendeeActivities(att, meetingActivities));
 }
 

@@ -141,11 +141,17 @@ export async function POST(req: NextRequest) {
 
       if (existingAttendance) {
         alreadyRegistered = true;
+        // ลงไว้แล้วเฉพาะเวิร์กช็อป: แนะนำให้ลงการประชุมหลักเพิ่มผ่านฟอร์มลงทะเบียนแบบกลุ่ม (รองรับการลงเพิ่ม)
+        const registration = await getMemberRegistrationSummary(meetingId, member.member_no);
+        const hasMain = registration.registeredActivities.some((a) => a.type === 'main');
+        const registeredNames = registration.registeredActivities.map((a) => a.name).join(', ');
         return NextResponse.json({
           success: false,
           valid: false,
           alreadyRegistered: true,
-          message: `สมาชิกหมายเลข ${member.member_no} ได้ลงทะเบียนเข้าร่วมงานประชุมนี้แล้ว`,
+          message: registration.registered && !hasMain
+            ? `สมาชิกหมายเลข ${member.member_no} ลงทะเบียน ${registeredNames} ไว้แล้ว หากต้องการลงการประชุมหลักเพิ่ม กรุณาใช้ฟอร์มลงทะเบียนแบบกลุ่มที่หน้าแรกของระบบ`
+            : `สมาชิกหมายเลข ${member.member_no} ได้ลงทะเบียนเข้าร่วมงานประชุมนี้แล้ว`,
         });
       }
     }

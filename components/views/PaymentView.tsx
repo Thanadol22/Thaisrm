@@ -234,7 +234,7 @@ export function PaymentView({
       case 'addOn':
         return {
           title: th ? 'ลงทะเบียนกิจกรรมเพิ่มเติม' : 'Activity add-ons',
-          note: th ? 'คิดเฉพาะกิจกรรมที่เพิ่ม ไม่ใช้สิทธิ์คูปอง' : 'Added activities only, no coupon',
+          note: th ? 'คิดเฉพาะกิจกรรมที่เพิ่ม' : 'Added activities only',
         };
     }
   };

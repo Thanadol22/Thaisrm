@@ -138,7 +138,9 @@ function attendeeHasMainProgram(att: any): boolean {
  * ประมาณค่าเฉพาะรายการเก่าที่ไม่มีข้อมูลส่วนลด โดยคูปองครอบคลุมเฉพาะการประชุมหลักของสมาชิก
  */
 function estimateAttendeeCouponDiscount(att: any, couponRecord: any): number {
-  if (!att || att.isAddOn) return 0;
+  if (!att) return 0;
+  // ลงเพิ่ม: ได้ส่วนลดเฉพาะกรณีลงการประชุมหลักเพิ่มด้วยคูปองบริษัท (ใช้ค่าที่บันทึกไว้เท่านั้น)
+  if (att.isAddOn) return Number(att.discountTotal ?? att.discountAmount) || 0;
   const stored = att.discountTotal ?? att.discountAmount;
   if (stored !== undefined && stored !== null && stored !== '') return Number(stored) || 0;
 

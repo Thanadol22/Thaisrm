@@ -2284,8 +2284,8 @@ export function LoginView({
                           {currentAddOn && regMode === 'group' && (
                             <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-[13px] sm:text-sm font-semibold leading-relaxed">
                               {lang === 'th'
-                                ? `ผู้ลงทะเบียนท่านนี้ลงทะเบียนงานประชุมนี้ไว้แล้ว${currentAddOn.ticketCode ? ` รหัส ${currentAddOn.ticketCode}` : ''} เลือกเฉพาะกิจกรรมที่ต้องการลงเพิ่ม คิดค่าใช้จ่ายเฉพาะกิจกรรมที่เพิ่ม และไม่ใช้สิทธิ์คูปองของบริษัท เมื่อเจ้าหน้าที่อนุมัติ ระบบจะรวมกิจกรรมเข้ากับรายการลงทะเบียนเดิมของผู้ลงทะเบียนท่านนี้`
-                                : `This attendee is already registered${currentAddOn.ticketCode ? ` (${currentAddOn.ticketCode})` : ''}. Select only the activities to add; only those are charged and the company coupon is not applied. Once approved, they are merged into this attendee's existing registration.`}
+                                ? `ผู้ลงทะเบียนท่านนี้ลงทะเบียนงานประชุมนี้ไว้แล้ว${currentAddOn.ticketCode ? ` รหัส ${currentAddOn.ticketCode}` : ''} เลือกเฉพาะกิจกรรมที่ต้องการลงเพิ่ม คิดค่าใช้จ่ายเฉพาะกิจกรรมที่เพิ่ม หากลงการประชุมหลักเพิ่มจะใช้สิทธิ์คูปองของบริษัทได้ เมื่อเจ้าหน้าที่อนุมัติ ระบบจะรวมกิจกรรมเข้ากับรายการลงทะเบียนเดิมของผู้ลงทะเบียนท่านนี้`
+                                : `This attendee is already registered${currentAddOn.ticketCode ? ` (${currentAddOn.ticketCode})` : ''}. Select only the activities to add; only those are charged, and adding the Main Program can use the company coupon. Once approved, they are merged into this attendee's existing registration.`}
                             </div>
                           )}
                           {activeAddOn && (
