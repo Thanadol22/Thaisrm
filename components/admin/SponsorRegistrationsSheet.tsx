@@ -53,6 +53,8 @@ const PERSON_COLS = ['ลำดับ', 'เลขสมาชิก', 'ชื�
 
 const th = 'sticky top-0 z-10 bg-slate-100 border border-slate-300 px-2 py-1.5 text-[11px] font-bold text-slate-600 whitespace-nowrap text-left';
 const td = 'border border-slate-200 px-2 py-1 align-top whitespace-nowrap';
+/** ช่องข้อความยาว (หลักสูตร): ตัดบรรทัดได้ ไม่ล้นไปทับคอลัมน์ข้างเคียง */
+const tdWrap = 'border border-slate-200 px-2 py-1 align-top whitespace-normal min-w-[260px] max-w-[360px]';
 
 const TIER_WEIGHT: Record<string, number> = { Platinum: 1, Gold: 2, Silver: 3 };
 
@@ -296,13 +298,15 @@ export default function SponsorRegistrationsSheet({ sponsors = [] }: { sponsors?
                       </td>
                       <td className={`${td} text-slate-600`}>{r.email || '-'}</td>
                       <td className={`${td} text-slate-600 tabular-nums`}>{r.phone || '-'}</td>
-                      <td className={`${td} min-w-[220px] max-w-[320px] whitespace-normal`} title={r.isFellow ? `${r.programs} - ราคา fellow` : r.programs}>
-                        {r.isFellow && (
-                          <span className="mr-1.5 inline-block px-1.5 py-px rounded bg-lime-50 text-lime-800 border border-lime-200 text-[10px] font-bold align-middle">
-                            ราคา fellow
-                          </span>
-                        )}
-                        {r.programs || '-'}
+                      <td className={tdWrap} title={r.isFellow ? `${r.programs} - ราคา fellow` : r.programs}>
+                        <div className="flex items-start gap-1.5">
+                          {r.isFellow && (
+                            <span className="shrink-0 px-1.5 py-px rounded bg-lime-50 text-lime-800 border border-lime-200 text-[10px] font-bold whitespace-nowrap">
+                              ราคา fellow
+                            </span>
+                          )}
+                          <span className="min-w-0 break-words">{r.programs || '-'}</span>
+                        </div>
                       </td>
                       <td className={td}>{r.format || '-'}</td>
                       <td className={`${td} text-right tabular-nums text-slate-600`}>{r.discount ? fmtMoney(r.discount) : '-'}</td>
