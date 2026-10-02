@@ -109,7 +109,7 @@ export async function cancelRejectedSlip(slipId: string, reviewer: string, reaso
       returnedCouponRights = isGroup
         ? payload.attendees.filter(
             (att: any) =>
-              att && !att.isAddOn &&
+              att &&
               toInt(att.discountTotal ?? att.discountAmount) > 0 &&
               isCouponApplicableToActivities(coupon!, resolveAttendeeActivities(att, meeting?.activities))
           ).length

@@ -210,7 +210,8 @@ export async function priceSpecialFormAttendees(params: {
 
     let discountTotal = 0;
     // เหมือนหน้าชำระเงิน: สมาชิกที่ถึงลำดับใช้สิทธิ์ 1 สิทธิ์ ได้ฟรีเฉพาะค่าการประชุมหลัก
-    if (!att.isAddOn && isMem && freeLeft > 0) {
+    // ผู้ลงเพิ่มใช้สิทธิ์ได้เฉพาะเมื่อลงการประชุมหลักเพิ่ม (ลงเพิ่มเฉพาะเวิร์กช็อปไม่ใช้สิทธิ์)
+    if ((!att.isAddOn || mainPrice > 0) && isMem && freeLeft > 0) {
       discountTotal = mainPrice;
       freeLeft -= 1;
     }
