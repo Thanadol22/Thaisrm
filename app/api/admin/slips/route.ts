@@ -105,6 +105,7 @@ function tagGroupPaidActivities(activities: any, paid: Map<string, GroupPaidInfo
   });
 }
 import { assertSeatsForReactivatedSlip, SeatUnavailableError } from '@/lib/services/activitySeatService';
+import { isActiveMemberNo, ONLINE_MEMBERS_ONLY_MESSAGE } from '@/lib/services/onlineEligibilityService';
 
 // ส่งอีเมล (รวมงานใน after()) ทีละฉบับ — ให้เวลาพอสำหรับกลุ่มใหญ่
 export const maxDuration = 300;
@@ -1736,6 +1737,19 @@ export async function POST(request: NextRequest) {
       Boolean(slip.guest_workplace && (slip.ticket_code?.startsWith('GRP') || slip.slip_id?.includes('GRP')))
     );
 
+    // คำขอเปลี่ยนเป็นออนไลน์: ผู้ขอต้องเป็นสมาชิกสถานะปกติตามฐานข้อมูล
+    if (
+      action === 'approve' &&
+      isFormatChange &&
+      formatChangePayload?.targetFormat === 'online' &&
+      !(await isActiveMemberNo(slip.member_no))
+    ) {
+      return NextResponse.json(
+        { success: false, error: `ไม่สามารถอนุมัติได้: ${ONLINE_MEMBERS_ONLY_MESSAGE}`, code: 'ONLINE_MEMBERS_ONLY' },
+        { status: 400 }
+      );
+    }
+
     if (action === 'approve') {
       let assignedMemberNo = slip.member_no;
 
@@ -1974,6 +1988,11 @@ export async function POST(request: NextRequest) {
               if (attendeeIndex < 0) {
                 throw new Error(`ไม่พบผู้ขอเปลี่ยนรูปแบบในรายการกลุ่ม ${origSlip.ticket_code || origSlip.slip_id}`);
               }
+            }
+
+            const targetMemberNo = attendeeIndex !== null ? origActs.attendees[attendeeIndex]?.memberNo : origSlip.member_no;
+            if (targetFormat === 'online' && !(await isActiveMemberNo(targetMemberNo))) {
+              throw new Error(`รายการ ${origSlip.ticket_code || origSlip.slip_id}: ${ONLINE_MEMBERS_ONLY_MESSAGE}`);
             }
 
             await (prisma as any).payment_slips.update({

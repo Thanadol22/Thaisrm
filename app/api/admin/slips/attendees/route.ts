@@ -15,6 +15,8 @@ import {
   resolveAttendeeActivities,
   SPONSOR_TEST_COUPON_CODE,
 } from '@/lib/services/sponsorCouponService';
+import { attendeeFormatOf } from '@/lib/services/attendanceFormatService';
+import { ONLINE_MEMBERS_ONLY_MESSAGE, wantsOnlineMain } from '@/lib/services/onlineEligibilityService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -618,6 +620,15 @@ export async function POST(req: NextRequest) {
               ...(a.date ? { date: a.date } : {}),
             };
           });
+
+          // การประชุมหลักแบบออนไลน์เฉพาะสมาชิกสถานะปกติ — ผู้ที่เป็นออนไลน์อยู่แล้วคนเดิมแก้ไขข้อมูลอื่นต่อได้
+          const keepsExistingOnline =
+            Boolean(before) &&
+            attendeeFormatOf(before) === 'online' &&
+            (memberNo ? sameMember(before.memberNo, memberNo) : !before.memberNo && lower(before.email) === email);
+          if (wantsOnlineMain(requestedFormat, selectedActivities) && !(memberNo && isActiveMember) && !keepsExistingOnline) {
+            throw new EditError(ONLINE_MEMBERS_ONLY_MESSAGE);
+          }
 
           const originalTotal = toInt(input.originalTotal);
           const discountTotal = Math.min(toInt(input.discountTotal), originalTotal);

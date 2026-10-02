@@ -7,6 +7,7 @@ import {
   isGroupFormatPayload,
   type AttendanceFormat,
 } from '@/lib/services/attendanceFormatService';
+import { isActiveMemberNo, ONLINE_MEMBERS_ONLY_MESSAGE } from '@/lib/services/onlineEligibilityService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -104,6 +105,19 @@ export async function POST(req: NextRequest) {
     } else {
       previousFormat = parsed.memberPayload?.attendanceType || parsed.attendanceType || parsed.format || null;
     }
+    // เปลี่ยนเป็นออนไลน์ได้เฉพาะสมาชิกสถานะปกติ (ผู้ที่เป็นออนไลน์อยู่แล้วคงไว้ตามเดิม)
+    if (format === 'online' && previousFormat !== 'online') {
+      const targetMemberNo = isGroupFormatPayload(parsed)
+        ? parsed.attendees[attendeeIndex]?.memberNo
+        : slip.member_no || (!Array.isArray(parsed) ? parsed.memberNo : null);
+      if (!(await isActiveMemberNo(targetMemberNo))) {
+        return NextResponse.json(
+          { success: false, error: ONLINE_MEMBERS_ONLY_MESSAGE, code: 'ONLINE_MEMBERS_ONLY' },
+          { status: 400 }
+        );
+      }
+    }
+
     const updatedActivities = applyAttendanceFormat(
       parsed,
       format,

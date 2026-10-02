@@ -7,6 +7,7 @@ import {
   parseSlipPayload,
 } from '@/lib/services/registrationAddOnService';
 import { attendeeFormatOf, findGroupAttendeeIndex } from '@/lib/services/attendanceFormatService';
+import { isActiveMemberNo, ONLINE_MEMBERS_ONLY_MESSAGE } from '@/lib/services/onlineEligibilityService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -354,9 +355,10 @@ export async function POST(
       );
     }
 
-    if (targetFormat === 'online' && !isMember && !memberNo) {
+    // ตรวจสถานะสมาชิกจากฐานข้อมูล ไม่เชื่อค่า isMember ที่ส่งมา
+    if (targetFormat === 'online' && !(await isActiveMemberNo(memberNo))) {
       return NextResponse.json(
-        { success: false, error: 'การเข้าร่วมแบบ Online สงวนสิทธิ์เฉพาะสมาชิกสมาคมฯ เท่านั้น' },
+        { success: false, error: ONLINE_MEMBERS_ONLY_MESSAGE, code: 'ONLINE_MEMBERS_ONLY' },
         { status: 400 }
       );
     }
