@@ -22,6 +22,80 @@ import {
   parseSlipPayload,
   slipActivityList,
 } from '@/lib/services/registrationAddOnService';
+
+const normalizeMemberNo = (value: unknown) => String(value ?? '').trim().replace(/^0+/, '');
+
+type GroupPaidInfo = { slipId: string; ticketCode: string; companyName: string; price: number };
+
+/**
+ * กิจกรรมที่บริษัทลงทะเบียนเพิ่มให้สมาชิก (รวมเข้ารายการเดิมแต่ยอดเงินอยู่ในบิลกลุ่ม)
+ * อ่านจาก marker ใน addOnSlipIds รูปแบบ `${groupSlipId}:${memberNo}` → Map<originalSlipId, Map<activityId, ผู้ชำระ>>
+ */
+async function resolveGroupPaidActivities(slips: any[]): Promise<Map<string, Map<string, GroupPaidInfo>>> {
+  const result = new Map<string, Map<string, GroupPaidInfo>>();
+  try {
+    const markersBySlip = new Map<string, { groupSlipId: string; memberKey: string }[]>();
+    slips.forEach((s: any) => {
+      const ids = parseSlipPayload(s.selected_activities)?.addOnSlipIds;
+      if (!Array.isArray(ids)) return;
+      const markers = ids
+        .map((m: unknown) => String(m))
+        .filter((m: string) => m.includes(':'))
+        .map((m: string) => {
+          const i = m.lastIndexOf(':');
+          return { groupSlipId: m.slice(0, i), memberKey: normalizeMemberNo(m.slice(i + 1)) };
+        });
+      if (markers.length > 0) markersBySlip.set(s.slip_id, markers);
+    });
+    const groupSlipIds = Array.from(new Set(Array.from(markersBySlip.values()).flat().map((m) => m.groupSlipId)));
+    if (groupSlipIds.length === 0) return result;
+
+    const groupSlips = await prisma.payment_slips.findMany({
+      where: { slip_id: { in: groupSlipIds } },
+      select: { slip_id: true, ticket_code: true, guest_name: true, selected_activities: true },
+    });
+    const groupById = new Map(groupSlips.map((g) => [g.slip_id, g]));
+    markersBySlip.forEach((markers, originalId) => {
+      const paid = new Map<string, GroupPaidInfo>();
+      markers.forEach(({ groupSlipId, memberKey }) => {
+        const group = groupById.get(groupSlipId);
+        const payload = parseSlipPayload(group?.selected_activities);
+        if (!group || !Array.isArray(payload?.attendees)) return;
+        const att = payload.attendees.find((a: any) =>
+          a?.isAddOn &&
+          a.addOnOriginalSlipId === originalId &&
+          normalizeMemberNo(a.memberNo || a.member_no) === memberKey
+        );
+        if (!att) return;
+        const acts: any[] = Array.isArray(att.selectedActivities) && typeof att.selectedActivities[0] === 'object'
+          ? att.selectedActivities
+          : (att.selectedProgramIds || []).map((id: string) => ({ id }));
+        acts.forEach((a: any) => {
+          if (!a?.id) return;
+          paid.set(String(a.id), {
+            slipId: group.slip_id,
+            ticketCode: group.ticket_code || '',
+            companyName: payload.companyName || payload.groupContact?.coordinatorName || group.guest_name || '',
+            price: Number(a.price) || 0,
+          });
+        });
+      });
+      if (paid.size > 0) result.set(originalId, paid);
+    });
+  } catch (err) {
+    console.warn('Could not resolve group-paid add-on activities:', err);
+  }
+  return result;
+}
+
+/** ติดป้ายผู้ชำระ (บริษัท) ให้กิจกรรมที่ชำระในบิลกลุ่ม */
+function tagGroupPaidActivities(activities: any, paid: Map<string, GroupPaidInfo> | undefined) {
+  if (!paid || !Array.isArray(activities)) return activities;
+  return activities.map((a: any) => {
+    const by = a?.id ? paid.get(String(a.id)) : undefined;
+    return by ? { ...a, paidByGroup: by } : a;
+  });
+}
 import { assertSeatsForReactivatedSlip, SeatUnavailableError } from '@/lib/services/activitySeatService';
 
 // ส่งอีเมล (รวมงานใน after()) ทีละฉบับ — ให้เวลาพอสำหรับกลุ่มใหญ่
@@ -671,6 +745,8 @@ export async function GET(request: NextRequest) {
         console.warn('Could not query add-on registrations:', addOnErr);
       }
 
+      const groupPaidByOriginal = await resolveGroupPaidActivities(slips);
+
       formattedSlips = slips.map((s: any) => {
         const parsedAct = parseActivitiesData(s.selected_activities, s.amount);
         const addOnPayload = isAddOnPayload(s.selected_activities) ? parseSlipPayload(s.selected_activities) : null;
@@ -878,7 +954,7 @@ export async function GET(request: NextRequest) {
           status: s.status as 'pending' | 'approved' | 'rejected',
           notes: s.rejection_reason || undefined,
           resubmitToken: s.resubmit_token,
-          selectedActivities: parsedAct.activities,
+          selectedActivities: tagGroupPaidActivities(parsedAct.activities, groupPaidByOriginal.get(s.slip_id)),
           createdAt: s.created_at ? new Date(s.created_at).toISOString() : new Date().toISOString(),
           couponCode: couponCode || null,
           couponInfo: couponInfo || null,
@@ -1038,6 +1114,8 @@ export async function GET(request: NextRequest) {
       } catch (cErr) {
         console.warn('Could not query coupon data for fallback slips:', cErr);
       }
+
+      const groupPaidByOriginal = await resolveGroupPaidActivities(slips);
 
       formattedSlips = slips.map((s: any) => {
         const parsedAct = parseActivitiesData(s.selected_activities, s.amount);
@@ -1210,7 +1288,7 @@ export async function GET(request: NextRequest) {
           status: s.status as 'pending' | 'approved' | 'rejected',
           notes: s.rejection_reason || undefined,
           resubmitToken: s.resubmit_token,
-          selectedActivities: parsedAct.activities,
+          selectedActivities: tagGroupPaidActivities(parsedAct.activities, groupPaidByOriginal.get(s.slip_id)),
           createdAt: s.created_at ? new Date(s.created_at).toISOString() : new Date().toISOString(),
           couponCode: couponCode || null,
           couponInfo: couponInfo || null,

@@ -53,6 +53,8 @@ export interface SlipActivityItem {
   price?: number;
   rateBadgeTh?: string;
   rateBadgeEn?: string;
+  /** กิจกรรมที่บริษัทลงทะเบียนเพิ่มให้ ยอดเงินอยู่ในบิลกลุ่ม ไม่รวมในยอดของรายการนี้ */
+  paidByGroup?: { slipId: string; ticketCode: string; companyName: string; price: number };
 }
 
 export function getAttendeeActivities(att: any): { name: string; price?: number }[] {
@@ -1469,6 +1471,16 @@ export function AdminSlipsView() {
                     ฿{slip.amount.toLocaleString()}
                     <span className="ml-1 text-[11px] font-semibold text-slate-400">THB</span>
                   </p>
+                  {(() => {
+                    const groupPaid = parseSlipActivities(slip.selectedActivities)
+                      .reduce((sum, a) => sum + (a.paidByGroup ? Number(a.paidByGroup.price || a.price || 0) : 0), 0);
+                    if (groupPaid <= 0) return null;
+                    return (
+                      <p className="text-[10px] font-bold text-teal-700 whitespace-nowrap">
+                        {lang === 'th' ? `+ ฿${groupPaid.toLocaleString()} ชำระโดยบริษัท` : `+ ฿${groupPaid.toLocaleString()} paid by company`}
+                      </p>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -1516,6 +1528,29 @@ export function AdminSlipsView() {
                           {acts.map((act, i) => {
                             const rawPrice = act.price !== undefined ? Number(act.price) : 0;
                             const effectivePrice = rawPrice > 0 ? rawPrice : Number(slip.amount || 0);
+
+                            if (act.paidByGroup) {
+                              const by = act.paidByGroup;
+                              return (
+                                <span
+                                  key={act.id || i}
+                                  title={lang === 'th'
+                                    ? `ยอดนี้ชำระในบิลกลุ่ม ${by.ticketCode} ไม่รวมในยอดเงินของรายการนี้`
+                                    : `Paid in group bill ${by.ticketCode}, not included in this slip's amount`}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-teal-50 text-teal-900 border border-dashed border-teal-400"
+                                >
+                                  <Building2 className="w-3 h-3 shrink-0 text-teal-600" />
+                                  <span>{act.name}</span>
+                                  <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border font-mono text-teal-700 bg-white border-teal-200">
+                                    ฿{(by.price || rawPrice).toLocaleString()}
+                                  </span>
+                                  <span className="text-[10px] font-semibold text-teal-700">
+                                    {lang === 'th' ? 'ชำระโดย' : 'Paid by'} {by.companyName || (lang === 'th' ? 'บริษัท' : 'company')}
+                                    {by.ticketCode && <span className="font-mono"> · {by.ticketCode}</span>}
+                                  </span>
+                                </span>
+                              );
+                            }
 
                             return (
                               <span
@@ -2764,7 +2799,10 @@ export function AdminSlipsView() {
                           {acts.map((act, i) => (
                             <div
                               key={act.id || i}
-                              className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200/80 text-xs shadow-2xs hover:border-indigo-200 transition"
+                              className={`flex items-center justify-between p-3 rounded-xl text-xs shadow-2xs transition ${act.paidByGroup
+                                  ? 'bg-teal-50/60 border border-dashed border-teal-300'
+                                  : 'bg-white border border-slate-200/80 hover:border-indigo-200'
+                                }`}
                             >
                               <div className="space-y-0.5 min-w-0 pr-3">
                                 <div className="flex items-center gap-1.5">
@@ -2776,10 +2814,20 @@ export function AdminSlipsView() {
                                   <p className="font-bold text-slate-900 truncate text-xs">{act.name}</p>
                                 </div>
                                 {act.date && <p className="text-[10px] text-slate-500 font-medium">{act.date}</p>}
+                                {act.paidByGroup && (
+                                  <p className="flex flex-wrap items-center gap-1 text-[10px] font-bold text-teal-700">
+                                    <Building2 className="w-3 h-3 shrink-0" />
+                                    {lang === 'th' ? 'ชำระโดย' : 'Paid by'} {act.paidByGroup.companyName || (lang === 'th' ? 'บริษัท' : 'company')}
+                                    {act.paidByGroup.ticketCode && <span className="font-mono">· {act.paidByGroup.ticketCode}</span>}
+                                    <span className="font-medium text-teal-600/80">
+                                      {lang === 'th' ? '— ไม่รวมในยอดเงินของรายการนี้' : '— not included in this slip amount'}
+                                    </span>
+                                  </p>
+                                )}
                               </div>
                               <div className="text-right shrink-0">
-                                <span className="font-black text-indigo-700 font-mono text-xs sm:text-base">
-                                  ฿{Number((act.price && Number(act.price) > 0) ? act.price : (acts.length === 1 ? selectedSlip.amount : (act.price || 0))).toLocaleString()}
+                                <span className={`font-black font-mono text-xs sm:text-base ${act.paidByGroup ? 'text-teal-700' : 'text-indigo-700'}`}>
+                                  ฿{Number(act.paidByGroup?.price || ((act.price && Number(act.price) > 0) ? act.price : (acts.length === 1 ? selectedSlip.amount : (act.price || 0)))).toLocaleString()}
                                 </span>
                               </div>
                             </div>
