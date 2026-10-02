@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import crypto from 'crypto';
+import { ensureActiveSponsorCoupon, SPONSOR_TEST_COUPON_CODE } from '@/lib/services/sponsorCouponService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -156,6 +157,18 @@ export async function POST(req: NextRequest) {
       };
     });
 
+    // คูปองปัจจุบันของบริษัท (รหัสเดียวกับที่ส่งในอีเมล) เพื่อกรอกในฟอร์มให้อัตโนมัติ
+    let couponCode: string | undefined;
+    try {
+      const couponInfo = await ensureActiveSponsorCoupon({ id: sponsor.id, name: sponsor.name });
+      couponCode =
+        couponInfo.remainingQuota > 0 && email === 'test@sponsor.com'
+          ? SPONSOR_TEST_COUPON_CODE
+          : couponInfo.coupon?.code || undefined;
+    } catch (couponErr) {
+      console.error('[VerifyOTP] Failed to load sponsor coupon:', couponErr);
+    }
+
     // สร้าง session payload
     const sessionData = {
       sponsorId: sponsor.id,
@@ -164,6 +177,7 @@ export async function POST(req: NextRequest) {
       contactEmail: email,
       contactName: sponsor.contact_name,
       verifiedAt: new Date().toISOString(),
+      couponCode,
     };
 
     return NextResponse.json({

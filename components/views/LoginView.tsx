@@ -935,6 +935,16 @@ export function LoginView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminSponsorSession?.sponsorId, activeMeeting?.meeting_id]);
 
+  // ตัวแทนบริษัทเข้าสู่ระบบเอง: กรอกคูปองที่ส่งในอีเมลและตรวจสอบให้อัตโนมัติ
+  useEffect(() => {
+    if (isAdminMode || specialForm) return;
+    const code = sponsorSession?.couponCode;
+    if (!code || !activeMeeting?.meeting_id || couponState) return;
+    setCouponCodeInput(code);
+    handleApplyCoupon(code);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sponsorSession?.couponCode, activeMeeting?.meeting_id]);
+
   // ที่นั่งคงเหลือสำหรับผู้ลงทะเบียนที่กำลังแก้ไข (หักผู้ลงทะเบียนคนอื่นในฟอร์มกลุ่มที่เลือกกิจกรรมเดียวกันแล้ว)
   // null = ไม่จำกัดที่นั่ง
   const seatsLeftForCurrent = (act: MeetingActivity): number | null => {

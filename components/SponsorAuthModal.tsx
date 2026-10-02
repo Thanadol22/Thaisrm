@@ -23,6 +23,8 @@ export interface SponsorSessionData {
   contactEmail: string;
   contactName?: string;
   verifiedAt: string;
+  /** คูปองปัจจุบันของบริษัท (ได้หลังยืนยันรหัสผ่านชั่วคราว) สำหรับกรอกในฟอร์มอัตโนมัติ */
+  couponCode?: string;
   meetings: Array<{
     meeting_id: string;
     meeting_name: string;
