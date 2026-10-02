@@ -25,7 +25,7 @@ export function renderAttendeeTicketEmail(options: AttendeeTicketEmailOptions): 
     </div>
 
     <!-- Ticket Visual Card -->
-    <div style="background: linear-gradient(135deg, #0026b3 0%, #001768 100%); border-radius: 16px; padding: 24px; color: #ffffff; text-align: center; margin: 20px 0; box-shadow: 0 10px 20px -5px rgba(0, 38, 179, 0.3);">
+    <div class="m-pad" style="background: linear-gradient(135deg, #0026b3 0%, #001768 100%); border-radius: 16px; padding: 24px; color: #ffffff; text-align: center; margin: 20px 0; box-shadow: 0 10px 20px -5px rgba(0, 38, 179, 0.3);">
       <div style="font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: #93c5fd; margin-bottom: 4px;">
         CONFERENCE PASS
       </div>
@@ -51,19 +51,19 @@ export function renderAttendeeTicketEmail(options: AttendeeTicketEmailOptions): 
       </div>
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่องาน</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.meetingName}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่องาน</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.meetingName}</td>
         </tr>
         ${options.meetingDate ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">วันและเวลา</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.meetingDate}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">วันและเวลา</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.meetingDate}</td>
         </tr>
         ` : ''}
         ${options.location ? `
         <tr>
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">สถานที่จัดงาน</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.location}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">สถานที่จัดงาน</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.location}</td>
         </tr>
         ` : ''}
       </table>

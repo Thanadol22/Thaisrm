@@ -137,6 +137,87 @@ export function renderBaseEmailLayout({
       font-weight: bold;
       display: inline-block;
     }
+    .content-cell img {
+      max-width: 100%;
+    }
+    .kv-label,
+    .kv-value,
+    .item-name,
+    .item-meta {
+      vertical-align: top;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+
+    /* Mobile layout: inline styles win over <style> rules, so overrides need !important */
+    @media only screen and (max-width: 600px) {
+      .wrapper {
+        padding: 0 !important;
+      }
+      .main-table {
+        border-radius: 0 !important;
+        border-left: none !important;
+        border-right: none !important;
+        box-shadow: none !important;
+      }
+      .header-banner {
+        padding: 24px 16px !important;
+      }
+      .header-banner h1 {
+        font-size: 19px !important;
+      }
+      .content-cell {
+        padding: 24px 16px !important;
+        font-size: 14px !important;
+      }
+      .content-cell h2 {
+        font-size: 19px !important;
+      }
+      .footer {
+        padding: 20px 16px !important;
+      }
+      .info-card {
+        padding: 14px !important;
+        margin: 16px 0 !important;
+      }
+      .btn {
+        display: block !important;
+        padding: 14px 16px !important;
+      }
+      .m-pad {
+        padding-left: 14px !important;
+        padding-right: 14px !important;
+      }
+      /* Label/value rows stack: label on top, value below, both left-aligned */
+      .kv-label,
+      .kv-value,
+      .item-name,
+      .item-meta {
+        display: block !important;
+        width: auto !important;
+        text-align: left !important;
+      }
+      .kv-label {
+        padding-bottom: 0 !important;
+        font-size: 12.5px !important;
+      }
+      .kv-value {
+        padding-top: 2px !important;
+      }
+      .item-name {
+        padding-bottom: 0 !important;
+      }
+      .item-meta {
+        padding-top: 4px !important;
+        padding-left: 0 !important;
+        white-space: normal !important;
+      }
+      .summary-cell {
+        display: block !important;
+        width: auto !important;
+        padding: 8px 12px !important;
+      }
+    }
   </style>
 </head>
 <body>

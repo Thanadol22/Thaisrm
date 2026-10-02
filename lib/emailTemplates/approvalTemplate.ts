@@ -27,20 +27,20 @@ export function renderMembershipApprovedEmail(options: MembershipApprovalEmailOp
       </div>
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่อ-นามสกุล</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.recipientName}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่อ-นามสกุล</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.recipientName}</td>
         </tr>
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสสมาชิก</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 16px;">${options.memberNo}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสสมาชิก</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 16px;">${options.memberNo}</td>
         </tr>
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ยอดค่าบำรุงที่ชำระ</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">${options.amountPaid.toLocaleString()} บาท</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">ยอดค่าบำรุงที่ชำระ</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">${options.amountPaid.toLocaleString()} บาท</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">สถานะสมาชิก</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">ปกติ</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">สถานะสมาชิก</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">ปกติ</td>
         </tr>
       </table>
     </div>
@@ -242,71 +242,71 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
       </div>
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่องานประชุม</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.meetingName}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่องานประชุม</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.meetingName}</td>
         </tr>
         ${options.ticketCode ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสการลงทะเบียน</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 15px; font-family: monospace;">${options.ticketCode}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสการลงทะเบียน</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 15px; font-family: monospace;">${options.ticketCode}</td>
         </tr>
         ` : ''}
         ${options.meetingDate ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">กำหนดการจัดงาน</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.meetingDate}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">กำหนดการจัดงาน</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.meetingDate}</td>
         </tr>
         ` : ''}
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่อ-นามสกุล</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.recipientName}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่อ-นามสกุล</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.recipientName}</td>
         </tr>
         ${effectiveNameEn ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่อภาษาอังกฤษ</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${effectiveNameEn}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่อภาษาอังกฤษ</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${effectiveNameEn}</td>
         </tr>
         ` : ''}
         ${effectiveMemberNo ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสสมาชิก</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 14px;">#${effectiveMemberNo}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสสมาชิก</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 14px;">#${effectiveMemberNo}</td>
         </tr>
         ` : ''}
         ${effectivePosition ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ตำแหน่ง</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${effectivePosition}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">ตำแหน่ง</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${effectivePosition}</td>
         </tr>
         ` : ''}
         ${effectiveWorkplace ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">หน่วยงาน / โรงพยาบาล</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${effectiveWorkplace}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">หน่วยงาน / โรงพยาบาล</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${effectiveWorkplace}</td>
         </tr>
         ` : ''}
         ${effectiveEmail ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">อีเมล</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #0026b3; font-size: 13.5px; font-family: monospace;">${effectiveEmail}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">อีเมล</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 600; color: #0026b3; font-size: 13.5px; font-family: monospace;">${effectiveEmail}</td>
         </tr>
         ` : ''}
         ${effectivePhone ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">เบอร์โทรศัพท์</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${effectivePhone}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">เบอร์โทรศัพท์</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${effectivePhone}</td>
         </tr>
         ` : ''}
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ประเภทผู้เข้าร่วม</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: ${options.isMember ? '#0026b3' : '#b45309'}; font-size: 14px;">
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">ประเภทผู้เข้าร่วม</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: ${options.isMember ? '#0026b3' : '#b45309'}; font-size: 14px;">
             ${options.isMember ? 'สมาชิกสมาคม' : 'บุคคลทั่วไป'}
           </td>
         </tr>
         ${effectiveAttendanceType ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รูปแบบการเข้าร่วม</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">รูปแบบการเข้าร่วม</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">
             <span style="background-color: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 800;">
               ${effectiveAttendanceType}
             </span>
@@ -314,8 +314,8 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
         </tr>
         ` : ''}
         <tr>
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">สถานะการลงทะเบียน</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">ยืนยันสิทธิ์เรียบร้อย</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">สถานะการลงทะเบียน</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">ยืนยันสิทธิ์เรียบร้อย</td>
         </tr>
 
         ${items.length > 0 ? `
@@ -331,7 +331,7 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
                   if (itemFmt === 'both') itemFmt = effectiveAttendanceType || 'Onsite';
                   return `
                   <tr style="${idx < items.length - 1 ? 'border-bottom: 1px dashed #e2e8f0;' : ''}">
-                    <td style="padding: 8px 0; vertical-align: top;">
+                    <td class="item-name" style="padding: 8px 0; vertical-align: top;">
                       <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; line-height: 1.4;">
                         ${item.name}
                       </div>
@@ -341,7 +341,7 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
                         </div>
                       ` : ''}
                     </td>
-                    <td style="padding: 8px 0 8px 12px; text-align: right; vertical-align: top; white-space: nowrap;">
+                    <td class="item-meta" style="padding: 8px 0 8px 12px; text-align: right; vertical-align: top; white-space: nowrap;">
                       ${itemFmt ? `
                         <span style="font-size: 11px; font-weight: 700; color: #1e40af; background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 2px 6px; border-radius: 4px; margin-right: 6px;">
                           ${itemFmt}
@@ -368,7 +368,7 @@ export function renderMeetingApprovedEmail(options: MeetingApprovalEmailOptions)
 
         <tr style="border-top: 1px dashed #e2e8f0;">
           <td style="padding: 12px 0 4px 0; color: #0f172a; font-size: 14px; font-weight: 700;">ยอดเงินที่ชำระ</td>
-          <td style="padding: 12px 0 4px 0; text-align: right; font-weight: 800; color: #16a34a; font-size: 17px;">
+          <td style="padding: 12px 0 4px 0; text-align: right; font-weight: 800; color: #16a34a; font-size: 17px; white-space: nowrap;">
             ${options.amountPaid > 0 ? `${options.amountPaid.toLocaleString()} บาท` : '0 บาท (ได้รับสิทธิ์ฟรี)'}
           </td>
         </tr>
@@ -445,24 +445,24 @@ export function renderCompanyGroupMembershipApprovedEmail(options: CompanyGroupM
       </div>
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">บริษัท / หน่วยงาน</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.companyName}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">บริษัท / หน่วยงาน</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.companyName}</td>
         </tr>
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสอ้างอิง</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 15px; font-family: monospace;">${options.ticketCode}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสอ้างอิง</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 15px; font-family: monospace;">${options.ticketCode}</td>
         </tr>
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">จำนวนสมาชิกที่อนุมัติ</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.applicants.length} ท่าน</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">จำนวนสมาชิกที่อนุมัติ</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.applicants.length} ท่าน</td>
         </tr>
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ยอดรวมค่าบำรุง</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">${options.amountPaid.toLocaleString()} บาท</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">ยอดรวมค่าบำรุง</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">${options.amountPaid.toLocaleString()} บาท</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">สถานะการชำระเงิน</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; font-size: 14px; color: ${options.isPayLater ? '#d97706' : '#16a34a'};">
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">สถานะการชำระเงิน</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; font-size: 14px; color: ${options.isPayLater ? '#d97706' : '#16a34a'};">
             ${options.isPayLater ? 'รอชำระเงินภายหลัง' : 'ชำระเงินเรียบร้อยแล้ว'}
           </td>
         </tr>
@@ -551,44 +551,44 @@ export function renderAttendeeSponsoredRegistrationEmail(options: AttendeeSponso
       </div>
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่องานประชุม</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.meetingName}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่องานประชุม</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.meetingName}</td>
         </tr>
         ${options.ticketCode ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสการลงทะเบียน</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 14px; font-family: monospace;">${options.ticketCode}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสการลงทะเบียน</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 800; color: #0026b3; font-size: 14px; font-family: monospace;">${options.ticketCode}</td>
         </tr>
         ` : ''}
         ${options.meetingDate ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">กำหนดการจัดงาน</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.meetingDate}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">กำหนดการจัดงาน</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.meetingDate}</td>
         </tr>
         ` : ''}
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่อผู้เข้าร่วม</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.recipientName}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่อผู้เข้าร่วม</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.recipientName}</td>
         </tr>
         ${options.memberNo ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสสมาชิก</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0026b3; font-size: 14px;">${options.memberNo}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">รหัสสมาชิก</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #0026b3; font-size: 14px;">${options.memberNo}</td>
         </tr>
         ` : ''}
         ${options.workplace ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">หน่วยงาน / โรงพยาบาล</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.workplace}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">หน่วยงาน / โรงพยาบาล</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.workplace}</td>
         </tr>
         ` : ''}
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ผู้สนับสนุนการลงทะเบียน</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">${options.companyName}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">ผู้สนับสนุนการลงทะเบียน</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">${options.companyName}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">สถานะการลงทะเบียน</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">ยืนยันสิทธิ์เรียบร้อย</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">สถานะการลงทะเบียน</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">ยืนยันสิทธิ์เรียบร้อย</td>
         </tr>
 
         ${items.length > 0 ? `
@@ -607,7 +607,7 @@ export function renderAttendeeSponsoredRegistrationEmail(options: AttendeeSponso
                   }
                   return `
                   <tr style="${idx < items.length - 1 ? 'border-bottom: 1px dashed #e2e8f0;' : ''}">
-                    <td style="padding: 7px 0; vertical-align: top;">
+                    <td class="item-name" style="padding: 7px 0; vertical-align: top;">
                       <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; line-height: 1.4;">
                         ${item.name}
                       </div>
@@ -617,7 +617,7 @@ export function renderAttendeeSponsoredRegistrationEmail(options: AttendeeSponso
                         </div>
                       ` : ''}
                     </td>
-                    <td style="padding: 7px 0 7px 12px; text-align: right; vertical-align: top; white-space: nowrap;">
+                    <td class="item-meta" style="padding: 7px 0 7px 12px; text-align: right; vertical-align: top; white-space: nowrap;">
                       <span style="font-size: 12px; font-weight: 700; color: #15803d; background-color: #dcfce7; padding: 2px 8px; border-radius: 4px;">
                         ${itemFormat}
                       </span>

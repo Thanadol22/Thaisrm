@@ -115,7 +115,7 @@ export function renderSponsorHistoryEmail(options: SponsorHistoryEmailOptions): 
     : `สมาคมขอส่งสรุปประวัติการลงทะเบียนของ <strong>${esc(companyName)}</strong> ตามรายละเอียดด้านล่าง`;
 
   const summaryCell = (label: string, value: string, color = '#0f172a') => `
-    <td style="padding: 12px; text-align: center; vertical-align: top;">
+    <td class="summary-cell" style="padding: 12px; text-align: center; vertical-align: top;">
       <div style="font-size: 12px; color: #64748b;">${label}</div>
       <div style="font-size: 17px; font-weight: 800; color: ${color}; margin-top: 2px;">${value}</div>
     </td>`;

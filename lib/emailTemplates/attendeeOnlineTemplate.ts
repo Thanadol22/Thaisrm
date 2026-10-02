@@ -29,7 +29,7 @@ export function renderAttendeeOnlineEmail(options: AttendeeOnlineEmailOptions): 
     </div>
 
     <!-- Online Pass Visual Card (No Onsite QR Code) -->
-    <div style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 50%, #075985 100%); border-radius: 16px; padding: 26px 20px; color: #ffffff; text-align: center; margin: 20px 0; box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.35);">
+    <div class="m-pad" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 50%, #075985 100%); border-radius: 16px; padding: 26px 20px; color: #ffffff; text-align: center; margin: 20px 0; box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.35);">
       <div style="font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: #bae6fd; margin-bottom: 6px;">
         ONLINE ATTENDANCE PASS
       </div>
@@ -50,8 +50,8 @@ export function renderAttendeeOnlineEmail(options: AttendeeOnlineEmailOptions): 
     </div>
 
     <!-- Online Conference Access Box -->
-    <div style="background-color: #f0f9ff; border: 2px solid #bae6fd; border-radius: 16px; padding: 20px; margin: 24px 0;">
-      <div style="font-size: 15px; font-weight: 800; color: #0369a1; margin-bottom: 12px; display: flex; align-items: center; justify-content: center;">
+    <div class="m-pad" style="background-color: #f0f9ff; border: 2px solid #bae6fd; border-radius: 16px; padding: 20px; margin: 24px 0;">
+      <div style="font-size: 15px; font-weight: 800; color: #0369a1; margin-bottom: 12px; text-align: center;">
         💻 ข้อมูลการเข้าสู่ระบบประชุมออนไลน์
       </div>
 
@@ -71,14 +71,14 @@ export function renderAttendeeOnlineEmail(options: AttendeeOnlineEmailOptions): 
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 14px; background-color: #ffffff; border-radius: 10px; border: 1px solid #e0f2fe; overflow: hidden;">
           ${options.meetingIdCredentials ? `
             <tr style="border-bottom: 1px solid #f0f9ff;">
-              <td style="padding: 10px 14px; color: #64748b; font-size: 13.5px; font-weight: 600;">Meeting ID / ห้องประชุม</td>
-              <td style="padding: 10px 14px; text-align: right; font-weight: 800; color: #0f172a; font-size: 14px; font-family: monospace;">${options.meetingIdCredentials}</td>
+              <td class="kv-label" style="padding: 10px 14px; color: #64748b; font-size: 13.5px; font-weight: 600;">Meeting ID / ห้องประชุม</td>
+              <td class="kv-value" style="padding: 10px 14px; text-align: right; font-weight: 800; color: #0f172a; font-size: 14px; font-family: monospace;">${options.meetingIdCredentials}</td>
             </tr>
           ` : ''}
           ${options.passcode ? `
             <tr>
-              <td style="padding: 10px 14px; color: #64748b; font-size: 13.5px; font-weight: 600;">Passcode / รหัสผ่านเข้าห้อง</td>
-              <td style="padding: 10px 14px; text-align: right; font-weight: 800; color: #0369a1; font-size: 14px; font-family: monospace;">${options.passcode}</td>
+              <td class="kv-label" style="padding: 10px 14px; color: #64748b; font-size: 13.5px; font-weight: 600;">Passcode / รหัสผ่านเข้าห้อง</td>
+              <td class="kv-value" style="padding: 10px 14px; text-align: right; font-weight: 800; color: #0369a1; font-size: 14px; font-family: monospace;">${options.passcode}</td>
             </tr>
           ` : ''}
         </table>
@@ -92,18 +92,18 @@ export function renderAttendeeOnlineEmail(options: AttendeeOnlineEmailOptions): 
       </div>
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่องาน</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.meetingName}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">ชื่องาน</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${options.meetingName}</td>
         </tr>
         ${options.meetingDate ? `
         <tr style="border-bottom: 1px dashed #e2e8f0;">
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">วันและเวลา</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.meetingDate}</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">วันและเวลา</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 600; color: #334155; font-size: 14px;">${options.meetingDate}</td>
         </tr>
         ` : ''}
         <tr>
-          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">รูปแบบการเข้าร่วม</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0284c7; font-size: 14px;">ถ่ายทอดสดออนไลน์</td>
+          <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px;">รูปแบบการเข้าร่วม</td>
+          <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #0284c7; font-size: 14px;">ถ่ายทอดสดออนไลน์</td>
         </tr>
       </table>
     </div>

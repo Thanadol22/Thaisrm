@@ -40,8 +40,8 @@ function detailsTable(o: OnlineMeetingEmailOptions): string {
           .map(
             ([label, value], i) => `
           <tr${i < rows.length - 1 ? ' style="border-bottom: 1px dashed #e2e8f0;"' : ''}>
-            <td style="padding: 8px 0; color: #64748b; font-size: 14px; vertical-align: top;">${label}</td>
-            <td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${value}</td>
+            <td class="kv-label" style="padding: 8px 0; color: #64748b; font-size: 14px; vertical-align: top;">${label}</td>
+            <td class="kv-value" style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 14px;">${value}</td>
           </tr>`
           )
           .join('')}
@@ -64,7 +64,7 @@ export function renderOnlineReminderEmail(o: OnlineMeetingEmailOptions): string 
 
     ${detailsTable(o)}
 
-    <div style="background-color: #f0f9ff; border: 2px solid #bae6fd; border-radius: 16px; padding: 20px; margin: 24px 0; text-align: center;">
+    <div class="m-pad" style="background-color: #f0f9ff; border: 2px solid #bae6fd; border-radius: 16px; padding: 20px; margin: 24px 0; text-align: center;">
       <div style="font-size: 15px; font-weight: 800; color: #0369a1; margin-bottom: 8px;">📩 ลิงก์เข้าห้องประชุม</div>
       <p style="font-size: 14px; color: #0f172a; margin: 0; line-height: 1.6;">
         ระบบจะส่งลิงก์เข้าห้องประชุมเฉพาะของท่านมาที่อีเมลนี้<br>
@@ -103,7 +103,7 @@ export function renderOnlineLinkEmail(o: OnlineLinkEmailOptions): string {
       </p>
     </div>
 
-    <div style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 50%, #075985 100%); border-radius: 16px; padding: 26px 20px; text-align: center; margin: 20px 0;">
+    <div class="m-pad" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 50%, #075985 100%); border-radius: 16px; padding: 26px 20px; text-align: center; margin: 20px 0;">
       <div style="font-size: 14px; color: #e0f2fe; margin-bottom: 14px;">${esc(o.dateLabel)}${o.timeLabel ? ` · ${esc(o.timeLabel)}` : ''}</div>
       <a href="${link}" target="_blank" style="display: inline-block; background-color: #ffffff; color: #0369a1; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 900; font-size: 16px;">
         คลิกเพื่อเข้าห้องประชุม

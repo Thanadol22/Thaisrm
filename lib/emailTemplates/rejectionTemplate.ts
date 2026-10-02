@@ -71,49 +71,49 @@ export function renderSlipRejectionEmail(options: SlipRejectionEmailOptions): st
       </div>
       <table style="width: 100%; border-collapse: collapse; font-size: 13.5px; color: #334155;">
         <tr>
-          <td style="padding: 6px 0; color: #64748b; width: 35%;">รายการ / งานประชุม:</td>
-          <td style="padding: 6px 0; font-weight: 700; color: #0f172a;">${options.meetingName}</td>
+          <td class="kv-label" style="padding: 6px 0; color: #64748b; width: 35%;">รายการ / งานประชุม:</td>
+          <td class="kv-value" style="padding: 6px 0; font-weight: 700; color: #0f172a;">${options.meetingName}</td>
         </tr>
         ${options.ticketCode ? `
         <tr>
-          <td style="padding: 6px 0; color: #64748b;">รหัสอ้างอิง:</td>
-          <td style="padding: 6px 0; font-weight: 700; color: #0026b3; font-family: monospace;">${options.ticketCode}</td>
+          <td class="kv-label" style="padding: 6px 0; color: #64748b;">รหัสอ้างอิง:</td>
+          <td class="kv-value" style="padding: 6px 0; font-weight: 700; color: #0026b3; font-family: monospace;">${options.ticketCode}</td>
         </tr>` : ''}
         ${isCorporate ? `
         <tr>
-          <td style="padding: 6px 0; color: #64748b;">บริษัท / นิติบุคคล:</td>
-          <td style="padding: 6px 0; font-weight: 700; color: #0f172a;">${options.companyName || options.recipientName}</td>
+          <td class="kv-label" style="padding: 6px 0; color: #64748b;">บริษัท / นิติบุคคล:</td>
+          <td class="kv-value" style="padding: 6px 0; font-weight: 700; color: #0f172a;">${options.companyName || options.recipientName}</td>
         </tr>
         ${options.applicantEmail ? `
         <tr>
-          <td style="padding: 6px 0; color: #64748b;">อีเมลประสานงาน:</td>
-          <td style="padding: 6px 0;">${options.applicantEmail}</td>
+          <td class="kv-label" style="padding: 6px 0; color: #64748b;">อีเมลประสานงาน:</td>
+          <td class="kv-value" style="padding: 6px 0;">${options.applicantEmail}</td>
         </tr>` : ''}
         ` : `
         <tr>
-          <td style="padding: 6px 0; color: #64748b;">ชื่อ-นามสกุล:</td>
-          <td style="padding: 6px 0; font-weight: 700; color: #0f172a;">${options.recipientName}</td>
+          <td class="kv-label" style="padding: 6px 0; color: #64748b;">ชื่อ-นามสกุล:</td>
+          <td class="kv-value" style="padding: 6px 0; font-weight: 700; color: #0f172a;">${options.recipientName}</td>
         </tr>
         ${options.applicantEmail ? `
         <tr>
-          <td style="padding: 6px 0; color: #64748b;">อีเมล:</td>
-          <td style="padding: 6px 0;">${options.applicantEmail}</td>
+          <td class="kv-label" style="padding: 6px 0; color: #64748b;">อีเมล:</td>
+          <td class="kv-value" style="padding: 6px 0;">${options.applicantEmail}</td>
         </tr>` : ''}
         ${options.applicantPhone ? `
         <tr>
-          <td style="padding: 6px 0; color: #64748b;">เบอร์โทรศัพท์:</td>
-          <td style="padding: 6px 0;">${options.applicantPhone}</td>
+          <td class="kv-label" style="padding: 6px 0; color: #64748b;">เบอร์โทรศัพท์:</td>
+          <td class="kv-value" style="padding: 6px 0;">${options.applicantPhone}</td>
         </tr>` : ''}
         ${options.applicantWorkplace ? `
         <tr>
-          <td style="padding: 6px 0; color: #64748b;">หน่วยงาน / สถานที่ทำงาน:</td>
-          <td style="padding: 6px 0;">${options.applicantWorkplace}</td>
+          <td class="kv-label" style="padding: 6px 0; color: #64748b;">หน่วยงาน / สถานที่ทำงาน:</td>
+          <td class="kv-value" style="padding: 6px 0;">${options.applicantWorkplace}</td>
         </tr>` : ''}
         `}
         ${options.amount !== undefined ? `
         <tr>
-          <td style="padding: 6px 0; color: #64748b;">ยอดเงินที่ต้องชำระ:</td>
-          <td style="padding: 6px 0; font-weight: 800; color: #0026b3; font-size: 15px;">฿ ${options.amount.toLocaleString()}</td>
+          <td class="kv-label" style="padding: 6px 0; color: #64748b;">ยอดเงินที่ต้องชำระ:</td>
+          <td class="kv-value" style="padding: 6px 0; font-weight: 800; color: #0026b3; font-size: 15px;">฿ ${options.amount.toLocaleString()}</td>
         </tr>` : ''}
       </table>
     </div>

@@ -40,12 +40,25 @@ export function renderSponsorOtpEmail(options: SponsorOtpEmailOptions): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${pageTitle}</title>
+  <style>
+    /* Mobile layout: inline styles win over <style> rules, so overrides need !important */
+    @media only screen and (max-width: 600px) {
+      .otp-main { margin: 0 auto !important; border-radius: 0 !important; border-left: none !important; border-right: none !important; box-shadow: none !important; }
+      .otp-header { padding: 24px 16px !important; }
+      .otp-header h1 { font-size: 19px !important; }
+      .otp-body { padding: 24px 16px !important; }
+      .otp-code-box { padding: 14px 20px !important; }
+      .otp-code { font-size: 30px !important; letter-spacing: 6px !important; }
+      .otp-box { padding: 16px 14px !important; }
+      .otp-footer { padding: 16px !important; }
+    }
+  </style>
 </head>
 <body style="margin: 0; padding: 0; font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #1e293b;">
-  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 30px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+  <table class="otp-main" align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 30px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
     <!-- Header -->
     <tr>
-      <td style="background: linear-gradient(135deg, #0026b3 0%, #001773 100%); padding: 32px 30px; text-align: center;">
+      <td class="otp-header" style="background: linear-gradient(135deg, #0026b3 0%, #001773 100%); padding: 32px 30px; text-align: center;">
         <h1 style="color: #ffffff; margin: 0 0 6px 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px;">
           สมาคมเวชศาสตร์การเจริญพันธุ์ไทย (TSRM)
         </h1>
@@ -57,7 +70,7 @@ export function renderSponsorOtpEmail(options: SponsorOtpEmailOptions): string {
 
     <!-- Body Content -->
     <tr>
-      <td style="padding: 36px 32px;">
+      <td class="otp-body" style="padding: 36px 32px;">
         <p style="font-size: 16px; color: #334155; margin-top: 0; line-height: 1.6;">
           เรียน ตัวแทนผู้ประสานงาน <strong>${companyName}</strong>,
         </p>
@@ -67,8 +80,8 @@ export function renderSponsorOtpEmail(options: SponsorOtpEmailOptions): string {
 
         <!-- OTP Box -->
         <div style="margin: 24px 0; text-align: center;">
-          <div style="display: inline-block; background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%); border: 2px dashed #2563eb; border-radius: 12px; padding: 18px 36px;">
-            <span style="font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #1e40af;">
+          <div class="otp-code-box" style="display: inline-block; background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%); border: 2px dashed #2563eb; border-radius: 12px; padding: 18px 36px;">
+            <span class="otp-code" style="font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #1e40af;">
               ${otpCode}
             </span>
           </div>
@@ -81,7 +94,7 @@ export function renderSponsorOtpEmail(options: SponsorOtpEmailOptions): string {
           !isMembership && couponCode
             ? `
         <!-- Rotated Coupon Code Box (Anti-Impersonation) -->
-        <div style="margin: 28px 0; background: #faf5ff; border: 2px solid #d8b4fe; border-radius: 14px; padding: 20px 24px; text-align: center;">
+        <div class="otp-box" style="margin: 28px 0; background: #faf5ff; border: 2px solid #d8b4fe; border-radius: 14px; padding: 20px 24px; text-align: center;">
           <div style="font-size: 12px; font-weight: 800; color: #7e22ce; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">
             🎟️ รหัสคูปองสิทธิ์ฟรีสำหรับลงทะเบียน (สิทธิ์ปัจจุบัน)
           </div>
@@ -130,7 +143,7 @@ export function renderSponsorOtpEmail(options: SponsorOtpEmailOptions): string {
 
     <!-- Footer -->
     <tr>
-      <td style="background-color: #f8fafc; padding: 18px 30px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
+      <td class="otp-footer" style="background-color: #f8fafc; padding: 18px 30px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
         อีเมลนี้เป็นระบบอัตโนมัติ กรุณาอย่าตอบกลับอีเมลนี้โดยตรง
       </td>
     </tr>
