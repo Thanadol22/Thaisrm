@@ -33,6 +33,8 @@ import {
   Camera,
   FileCheck,
   Eye,
+  Users,
+  UserCheck,
 } from 'lucide-react';
 import { PositionSelect } from '@/components/PositionSelect';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
@@ -97,6 +99,20 @@ interface SponsorGroupMember {
   created_at: string;
   programs?: { name: string; type: string; format: 'onsite' | 'online'; price?: number; isFellow?: boolean }[];
   isMembershipOnly?: boolean;
+  statusKey?: PortalStatusKey;
+  registrations?: {
+    ticketCode: string;
+    slipId: string | null;
+    source: 'slip' | 'quota' | 'staff';
+    statusKey: PortalStatusKey;
+    price: number | null;
+    isAddOn: boolean;
+    rejectionReason: string | null;
+  }[];
+  notes?: string[];
+  checkedIn?: boolean;
+  checkinTime?: string | null;
+  hasPrice?: boolean;
 }
 
 interface SponsorSlip {
@@ -119,6 +135,9 @@ interface SponsorSlip {
   requiresSlipUpload?: boolean;
   rejection_reason?: string | null;
   attendeesCount?: number;
+  statusKey?: PortalStatusKey;
+  attendeeNames?: string[];
+  receipt_no?: string | null;
   created_at: string;
 }
 
@@ -136,6 +155,9 @@ interface SponsorData {
   outstandingAmount?: number;
   hasOutstanding: boolean;
   paymentStatus: 'approved' | 'approved_awaiting_payment' | 'pending_review' | 'pending_payment_review' | 'rejected' | 'unpaid' | 'free_quota';
+  peopleCounts?: Partial<Record<PortalStatusKey, number>>;
+  checkedInCount?: number;
+  generatedAt?: string;
 }
 
 interface ProfileAndSponsorUpdateModalProps {
@@ -146,6 +168,182 @@ interface ProfileAndSponsorUpdateModalProps {
 
 // จำนวนรายชื่อสมาชิกของบริษัทต่อหน้า
 const GROUP_MEMBERS_PAGE_SIZE = 5;
+
+/** สถานะที่แสดงให้บริษัท (ตรงกับ lib/services/sponsorPortalService) */
+type PortalStatusKey =
+  | 'confirmed'
+  | 'approved_awaiting_payment'
+  | 'pending_payment_review'
+  | 'awaiting_payment'
+  | 'pending_review'
+  | 'rejected';
+
+const PORTAL_STATUS_ORDER: PortalStatusKey[] = [
+  'confirmed',
+  'approved_awaiting_payment',
+  'pending_payment_review',
+  'awaiting_payment',
+  'pending_review',
+  'rejected',
+];
+
+const PORTAL_STATUS_INFO: Record<PortalStatusKey, { th: string; en: string; descTh: string; descEn: string; badge: string; dot: string }> = {
+  confirmed: {
+    th: 'ยืนยันสิทธิ์แล้ว',
+    en: 'Confirmed',
+    descTh: 'ชำระเงินหรือได้รับสิทธิ์เรียบร้อยแล้ว เข้าร่วมงานได้ตามรูปแบบที่ระบุ',
+    descEn: 'Payment or entitlement confirmed. Ready to attend in the stated format.',
+    badge: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    dot: 'bg-emerald-500',
+  },
+  approved_awaiting_payment: {
+    th: 'อนุมัติสิทธิ์แล้ว รอชำระเงิน',
+    en: 'Approved, awaiting payment',
+    descTh: 'เจ้าหน้าที่อนุมัติสิทธิ์และออกใบเสร็จให้แล้ว กรุณาชำระเงินและแนบสลิปตามยอดของรายการ',
+    descEn: 'Approved and receipt issued. Please pay and attach the slip for this item.',
+    badge: 'bg-sky-50 text-sky-800 border-sky-200',
+    dot: 'bg-sky-500',
+  },
+  pending_payment_review: {
+    th: 'แนบสลิปแล้ว รอตรวจสอบยอดเงิน',
+    en: 'Slip received, under review',
+    descTh: 'ได้รับสลิปแล้ว เจ้าหน้าที่กำลังตรวจสอบยอดเงิน บริษัทไม่ต้องดำเนินการเพิ่ม',
+    descEn: 'Slip received. Staff are verifying the payment. No action needed.',
+    badge: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+    dot: 'bg-indigo-500',
+  },
+  awaiting_payment: {
+    th: 'รออนุมัติสิทธิ์',
+    en: 'Awaiting approval',
+    descTh: 'ลงทะเบียนแบบชำระเงินภายหลัง รอเจ้าหน้าที่อนุมัติสิทธิ์ บริษัทแนบสลิปล่วงหน้าได้',
+    descEn: 'Pay-later registration awaiting approval. You may attach the slip in advance.',
+    badge: 'bg-amber-50 text-amber-800 border-amber-200',
+    dot: 'bg-amber-500',
+  },
+  pending_review: {
+    th: 'รอตรวจสอบ',
+    en: 'Under review',
+    descTh: 'เจ้าหน้าที่กำลังตรวจสอบรายการลงทะเบียน',
+    descEn: 'Staff are reviewing the registration.',
+    badge: 'bg-amber-50 text-amber-800 border-amber-200',
+    dot: 'bg-amber-500',
+  },
+  rejected: {
+    th: 'ต้องแก้ไข',
+    en: 'Needs correction',
+    descTh: 'เจ้าหน้าที่ส่งรายการกลับให้แก้ไข ดูเหตุผลแล้วแนบสลิปใหม่หรือแจ้งแก้ไขข้อมูล ระบบยังถือสิทธิ์ไว้ให้ระหว่างรอแก้ไข หากไม่มีการแก้ไข เจ้าหน้าที่อาจยกเลิกรายการและคืนสิทธิ์',
+    descEn: 'Returned for correction. Rights are held meanwhile; without a fix, staff may cancel the item.',
+    badge: 'bg-rose-50 text-rose-800 border-rose-200',
+    dot: 'bg-rose-500',
+  },
+};
+
+const OVERALL_STATUS_INFO: Record<
+  SponsorData['paymentStatus'],
+  { th: string; en: string; descTh: string; descEn: string; box: string; icon: string; Icon: React.ElementType }
+> = {
+  approved: {
+    th: 'ดำเนินการครบถ้วนแล้ว',
+    en: 'All set',
+    descTh: 'ทุกรายการได้รับการยืนยันแล้ว ไม่มีรายการที่บริษัทต้องดำเนินการเพิ่ม',
+    descEn: 'All registrations are confirmed. Nothing else is needed.',
+    box: 'bg-emerald-50/70 border-emerald-200 text-emerald-900',
+    icon: 'text-emerald-600',
+    Icon: CheckCircle2,
+  },
+  approved_awaiting_payment: {
+    th: 'อนุมัติสิทธิ์แล้ว รอชำระเงิน',
+    en: 'Approved, awaiting payment',
+    descTh: 'มีรายการที่อนุมัติสิทธิ์แล้ว กรุณาชำระเงินและแนบสลิปในส่วนรายการที่ต้องแนบสลิปด้านล่าง',
+    descEn: 'Some items are approved. Please pay and attach slips below.',
+    box: 'bg-sky-50/70 border-sky-200 text-sky-900',
+    icon: 'text-sky-600',
+    Icon: CreditCard,
+  },
+  unpaid: {
+    th: 'รอแนบสลิปการชำระเงิน',
+    en: 'Awaiting payment slip',
+    descTh: 'มีรายการชำระเงินภายหลังที่ยังไม่ได้แนบสลิป',
+    descEn: 'Some pay-later items have no slip yet.',
+    box: 'bg-sky-50/70 border-sky-200 text-sky-900',
+    icon: 'text-sky-600',
+    Icon: CreditCard,
+  },
+  pending_payment_review: {
+    th: 'ส่งสลิปแล้ว รอตรวจสอบยอดเงิน',
+    en: 'Slips under review',
+    descTh: 'เจ้าหน้าที่กำลังตรวจสอบยอดเงิน บริษัทไม่ต้องดำเนินการเพิ่ม',
+    descEn: 'Staff are verifying the payments. No action needed.',
+    box: 'bg-indigo-50/70 border-indigo-200 text-indigo-900',
+    icon: 'text-indigo-600',
+    Icon: Clock,
+  },
+  pending_review: {
+    th: 'รอเจ้าหน้าที่ตรวจสอบ',
+    en: 'Under review',
+    descTh: 'เจ้าหน้าที่กำลังตรวจสอบรายการลงทะเบียนของบริษัท',
+    descEn: 'Staff are reviewing your registrations.',
+    box: 'bg-amber-50/70 border-amber-200 text-amber-900',
+    icon: 'text-amber-600',
+    Icon: Clock,
+  },
+  rejected: {
+    th: 'มีรายการที่ต้องแก้ไข',
+    en: 'Action required',
+    descTh: 'เจ้าหน้าที่ส่งรายการกลับให้แก้ไข ดูเหตุผลและแนบสลิปใหม่ในส่วนด้านล่าง',
+    descEn: 'Some items were returned for correction. See the reasons below.',
+    box: 'bg-rose-50/70 border-rose-200 text-rose-900',
+    icon: 'text-rose-600',
+    Icon: AlertTriangle,
+  },
+  free_quota: {
+    th: 'ยังไม่มีรายการลงทะเบียน',
+    en: 'No registrations yet',
+    descTh: 'บริษัทยังไม่มีรายการลงทะเบียนหรือการชำระเงิน',
+    descEn: 'There are no registrations or payments yet.',
+    box: 'bg-slate-50 border-slate-200 text-slate-800',
+    icon: 'text-slate-500',
+    Icon: Info,
+  },
+};
+
+/** รายการที่บริษัทต้องแนบสลิป (ยังไม่ได้ส่งสลิป หรือถูกส่งกลับให้แก้ไข) */
+const needsSlipUpload = (s: SponsorSlip) => Boolean(s.requiresSlipUpload);
+
+function formatThaiDateTime(value?: string | null): string {
+  const d = value ? new Date(value) : new Date();
+  if (isNaN(d.getTime())) return '-';
+  return d.toLocaleString('th-TH', {
+    timeZone: 'Asia/Bangkok',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function PortalStatusBadge({ statusKey, lang }: { statusKey: PortalStatusKey; lang: 'th' | 'en' }) {
+  const info = PORTAL_STATUS_INFO[statusKey] || PORTAL_STATUS_INFO.pending_review;
+  return (
+    <span className={`inline-flex items-center gap-1.5 max-w-full px-2 py-0.5 rounded-full border text-[11px] font-bold leading-tight ${info.badge}`}>
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${info.dot}`} />
+      <span className="min-w-0">{lang === 'th' ? info.th : info.en}</span>
+    </span>
+  );
+}
+
+function CheckedInBadge({ lang, time }: { lang: 'th' | 'en'; time?: string | null }) {
+  return (
+    <span className="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-full border bg-teal-50 text-teal-800 border-teal-200 text-[11px] font-bold leading-tight">
+      <UserCheck className="w-3 h-3 shrink-0" />
+      <span className="min-w-0">
+        {lang === 'th' ? 'เช็กอินแล้ว' : 'Checked in'}
+        {time ? ` ${time}` : ''}
+      </span>
+    </span>
+  );
+}
 
 export function ProfileAndSponsorUpdateModal({
   isOpen,
@@ -204,6 +402,10 @@ export function ProfileAndSponsorUpdateModal({
     setSlipForms((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
   const [submittingAll, setSubmittingAll] = useState(false);
   const [allSlipsSuccess, setAllSlipsSuccess] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [portalError, setPortalError] = useState('');
+  const [memberSearch, setMemberSearch] = useState('');
+  const [memberFilter, setMemberFilter] = useState<'all' | 'confirmed' | 'in_progress' | 'rejected'>('all');
 
   useEffect(() => {
     setMounted(true);
@@ -222,15 +424,17 @@ export function ProfileAndSponsorUpdateModal({
       setSponsorData(null);
       setSlipForms({});
       setSaveSuccess(false);
+      setAllSlipsSuccess(false);
+      setPortalError('');
+      setMemberSearch('');
+      setMemberFilter('all');
     }
   }, [isOpen]);
 
   // Initialize slip forms when sponsor data loads
   useEffect(() => {
     if (sponsorData) {
-      const awaitingSlips = sponsorData.slips.filter(
-        (s) => s.requiresSlipUpload || s.itemStatus === 'approved_awaiting_payment' || s.itemStatus === 'awaiting_payment' || s.itemStatus === 'rejected'
-      );
+      const awaitingSlips = sponsorData.slips.filter(needsSlipUpload);
       setSlipForms((prev) => {
         const next = { ...prev };
         awaitingSlips.forEach((s) => {
@@ -513,9 +717,7 @@ export function ProfileAndSponsorUpdateModal({
   // 5. ส่งสลิปทุกรายการพร้อมกัน (ปุ่มเดียว)
   const handleSubmitAllSlips = async () => {
     if (!sponsorData) return;
-    const awaitingSlips = sponsorData.slips.filter(
-      (s) => s.requiresSlipUpload || s.itemStatus === 'approved_awaiting_payment' || s.itemStatus === 'awaiting_payment' || s.itemStatus === 'rejected'
-    );
+    const awaitingSlips = sponsorData.slips.filter(needsSlipUpload);
 
     // ตรวจสอบว่าทุกรายการมีไฟล์แนบ
     let hasError = false;
@@ -568,6 +770,32 @@ export function ProfileAndSponsorUpdateModal({
 
     setSubmittingAll(false);
     if (allOk) setAllSlipsSuccess(true);
+    // โหลดสถานะล่าสุดจากระบบหลังส่งสลิป
+    await refreshSponsorData(true);
+  };
+
+  // 6. โหลดข้อมูลหน้าบริษัทล่าสุดด้วยสิทธิ์เข้าใช้งานเดิม
+  const refreshSponsorData = async (silent = false) => {
+    if (!sessionToken) return;
+    setRefreshing(true);
+    if (!silent) setPortalError('');
+    try {
+      const res = await fetch('/api/sponsors/portal/overview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
+        body: JSON.stringify({ sessionToken }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        if (!silent) setPortalError(data.message || 'โหลดข้อมูลล่าสุดไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+        return;
+      }
+      setSponsorData(data.data);
+    } catch {
+      if (!silent) setPortalError('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   // Helper สำหรับเช็คฟิลด์ว่าง
@@ -602,7 +830,7 @@ export function ProfileAndSponsorUpdateModal({
                 {step === 'member_view'
                   ? `เลขที่สมาชิก: ${memberData?.member_no} • ${memberData?.fullNameTh}`
                   : step === 'sponsor_view'
-                  ? `บริษัท: ${sponsorData?.sponsorName} (${sponsorData?.tier})`
+                  ? `${lang === 'th' ? 'บริษัท' : 'Company'} ${sponsorData?.sponsorName || ''}${sponsorData?.tier ? ` · ${lang === 'th' ? 'ระดับ' : 'Tier'} ${sponsorData.tier}` : ''}`
                   : (lang === 'th' ? 'ยืนยันตัวตนด้วยรหัสชั่วคราว (OTP) ผ่านอีเมล' : 'Verify identity with OTP via email')}
               </p>
             </div>
@@ -1471,428 +1699,601 @@ export function ProfileAndSponsorUpdateModal({
           {/* ═══════════════════════════════════════════════════════════
               STEP 3B: SPONSOR PAYMENT & SLIP VERIFICATION VIEW
              ═══════════════════════════════════════════════════════════ */}
-          {step === 'sponsor_view' && sponsorData && (
-            <div className="space-y-6">
-              {/* Sponsor Profile Overview */}
-              <div className="p-4 bg-gradient-to-br from-indigo-50 to-blue-50/50 border border-indigo-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 bg-indigo-600 text-white text-xs font-bold rounded-lg shadow-2xs">
-                      Tier: {sponsorData.tier}
-                    </span>
-                    <span className="text-xs font-semibold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-lg">
-                      ตัวแทน: {sponsorData.contactEmail}
-                    </span>
-                  </div>
-                  <h4 className="font-extrabold text-slate-900 text-base sm:text-lg mt-1.5">
-                    {sponsorData.sponsorName}
-                  </h4>
-                </div>
+          {step === 'sponsor_view' && sponsorData && (() => {
+            const counts = sponsorData.peopleCounts || ({} as Partial<Record<PortalStatusKey, number>>);
+            const totalPeople = sponsorData.groupMembers.length;
+            const confirmedCount = counts.confirmed || 0;
+            const inProgressCount =
+              (counts.approved_awaiting_payment || 0) +
+              (counts.pending_payment_review || 0) +
+              (counts.awaiting_payment || 0) +
+              (counts.pending_review || 0);
+            const rejectedCount = counts.rejected || 0;
+            const awaitingItems = sponsorData.slips.filter(needsSlipUpload);
+            const historySlips = sponsorData.slips.filter((s) => !needsSlipUpload(s));
+            const overall = OVERALL_STATUS_INFO[sponsorData.paymentStatus] || OVERALL_STATUS_INFO.approved;
 
-                {/* Overall Financial Status Badge */}
-                <div className="shrink-0">
-                  {sponsorData.paymentStatus === 'approved_awaiting_payment' || sponsorData.paymentStatus === 'unpaid' ? (
-                    <div className="bg-sky-50 border-2 border-sky-300 px-3.5 py-2.5 rounded-2xl text-sky-900 text-xs flex items-center gap-2.5 shadow-xs">
-                      <CreditCard className="w-5 h-5 text-sky-700 shrink-0" />
-                      <div>
-                        <span className="font-black text-sky-900 block text-xs sm:text-sm">
-                          {lang === 'th' ? '✓ อนุมัติสิทธิ์แล้ว (รอชำระเงิน)' : '✓ Access Approved (Awaiting Payment)'}
+            const q = memberSearch.trim().toLowerCase();
+            const filteredMembers = sponsorData.groupMembers.filter((m) => {
+              const key = (m.statusKey || 'pending_review') as PortalStatusKey;
+              if (memberFilter === 'confirmed' && key !== 'confirmed') return false;
+              if (memberFilter === 'rejected' && key !== 'rejected') return false;
+              if (memberFilter === 'in_progress' && (key === 'confirmed' || key === 'rejected')) return false;
+              if (!q) return true;
+              return (
+                m.attendee_name?.toLowerCase().includes(q) ||
+                m.attendee_email?.toLowerCase().includes(q) ||
+                String(m.member_no || '').toLowerCase().includes(q) ||
+                String(m.ticket_code || '').toLowerCase().includes(q)
+              );
+            });
+            const pageCount = Math.max(1, Math.ceil(filteredMembers.length / GROUP_MEMBERS_PAGE_SIZE));
+            const currentPage = Math.min(groupMembersPage, pageCount);
+            const pagedMembers = filteredMembers.slice(
+              (currentPage - 1) * GROUP_MEMBERS_PAGE_SIZE,
+              currentPage * GROUP_MEMBERS_PAGE_SIZE
+            );
+            const filterOptions: { id: typeof memberFilter; label: string; count: number }[] = [
+              { id: 'all', label: lang === 'th' ? 'ทั้งหมด' : 'All', count: totalPeople },
+              { id: 'confirmed', label: lang === 'th' ? 'ยืนยันสิทธิ์แล้ว' : 'Confirmed', count: confirmedCount },
+              { id: 'in_progress', label: lang === 'th' ? 'อยู่ระหว่างดำเนินการ' : 'In progress', count: inProgressCount },
+              { id: 'rejected', label: lang === 'th' ? 'ต้องแก้ไข' : 'Needs fix', count: rejectedCount },
+            ];
+
+            return (
+            <div className="space-y-5 sm:space-y-6">
+              {/* ── ข้อมูลบริษัท และเวลาที่อัปเดตข้อมูล ── */}
+              <div className="p-4 bg-gradient-to-br from-indigo-50 to-blue-50/50 border border-indigo-100 rounded-2xl space-y-3">
+                <div className="flex flex-col min-[480px]:flex-row min-[480px]:items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {sponsorData.tier && (
+                        <span className="px-2.5 py-0.5 bg-indigo-600 text-white text-[11px] font-bold rounded-lg shadow-2xs">
+                          {lang === 'th' ? `ระดับ ${sponsorData.tier}` : `Tier ${sponsorData.tier}`}
                         </span>
-                        <span className="text-[11px] text-sky-700 font-bold">
-                          {lang === 'th'
-                            ? `มียอดรอชำระเงิน รวม ฿${(sponsorData.outstandingAmount || sponsorData.totalAmount).toLocaleString()} บาท`
-                            : `Total Awaiting Payment: ฿${(sponsorData.outstandingAmount || sponsorData.totalAmount).toLocaleString()}`}
-                        </span>
-                      </div>
+                      )}
+                      <span className="text-[11px] font-semibold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-lg break-all">
+                        {lang === 'th' ? 'ผู้ประสานงาน' : 'Coordinator'} {sponsorData.contactEmail}
+                      </span>
                     </div>
-                  ) : sponsorData.paymentStatus === 'pending_payment_review' ? (
-                    <div className="bg-blue-50 border-2 border-blue-300 px-3.5 py-2.5 rounded-2xl text-blue-900 text-xs flex items-center gap-2.5">
-                      <Clock className="w-5 h-5 text-blue-600 shrink-0" />
-                      <div>
-                        <span className="font-black text-blue-900 block text-xs sm:text-sm">ส่งสลิปเรียบร้อยแล้ว</span>
-                        <span className="text-[11px] text-blue-700 font-bold">เจ้าหน้าที่กำลังตรวจสอบการชำระเงิน</span>
-                      </div>
-                    </div>
-                  ) : sponsorData.paymentStatus === 'pending_review' ? (
-                    <div className="bg-amber-500/10 border border-amber-300 px-3 py-2 rounded-xl text-amber-800 text-xs flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-amber-600 shrink-0" />
-                      <div>
-                        <span className="font-bold block">รออนุมัติสิทธิ์</span>
-                        <span className="text-[11px] text-amber-700">เจ้าหน้าที่กำลังตรวจสอบคำขอ</span>
-                      </div>
-                    </div>
-                  ) : sponsorData.paymentStatus === 'rejected' ? (
-                    <div className="bg-red-500/10 border border-red-300 px-3 py-2 rounded-xl text-red-800 text-xs flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                      <div>
-                        <span className="font-bold block">สลิปไม่ผ่านการอนุมัติ</span>
-                        <span className="text-[11px] text-red-700">โปรดแนบหลักฐานสลิปใหม่</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-emerald-500/10 border border-emerald-300 px-3 py-2 rounded-xl text-emerald-800 text-xs flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <div>
-                        <span className="font-bold block">ชำระเงินเรียบร้อยแล้ว</span>
-                        <span className="text-[11px] text-emerald-700">ยืนยันการชำระเงินแล้ว</span>
-                      </div>
-                    </div>
-                  )}
+                    <h4 className="font-extrabold text-slate-900 text-base sm:text-lg break-words">{sponsorData.sponsorName}</h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => refreshSponsorData()}
+                    disabled={refreshing}
+                    className="shrink-0 self-start inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-indigo-200 hover:border-indigo-400 text-indigo-700 rounded-xl text-xs font-bold shadow-2xs transition cursor-pointer disabled:opacity-60 w-full min-[480px]:w-auto"
+                  >
+                    <RotateCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                    {refreshing
+                      ? (lang === 'th' ? 'กำลังโหลดข้อมูลล่าสุด...' : 'Refreshing...')
+                      : (lang === 'th' ? 'โหลดข้อมูลล่าสุด' : 'Refresh')}
+                  </button>
                 </div>
+                <p className="text-[11px] text-slate-500 flex items-start gap-1.5">
+                  <Clock className="w-3.5 h-3.5 shrink-0 mt-px" />
+                  <span>
+                    {lang === 'th' ? 'ข้อมูล ณ ' : 'As of '}
+                    {formatThaiDateTime(sponsorData.generatedAt)}
+                    {lang === 'th'
+                      ? ' สถานะทั้งหมดดึงจากรายการลงทะเบียนล่าสุดที่เจ้าหน้าที่ตรวจสอบ หากเจ้าหน้าที่แก้ไขข้อมูล กดโหลดข้อมูลล่าสุดเพื่อดูการเปลี่ยนแปลง'
+                      : ''}
+                  </span>
+                </p>
               </div>
 
-              {/* Quota Summary Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-                {sponsorData.quotas.map((q, idx) => (
-                  <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
-                    <span className="text-slate-500 font-medium truncate block">{q.meeting_name}</span>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-700 font-bold">โควต้าสิทธิ์:</span>
-                      <span className="font-extrabold text-blue-700">{q.quota_seats} ที่นั่ง</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-500">ใช้ไปแล้ว: {q.used_seats}</span>
-                      <span className="font-bold text-emerald-600">คงเหลือ: {q.remaining_seats}</span>
-                    </div>
+              {portalError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                  <span>{portalError}</span>
+                </div>
+              )}
+
+              {allSlipsSuccess && awaitingItems.length === 0 && (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-2xl flex items-start gap-2.5">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <div className="text-xs">
+                    <p className="font-extrabold text-emerald-800">ส่งสลิปทุกรายการเรียบร้อยแล้ว</p>
+                    <p className="text-emerald-700 mt-0.5">เจ้าหน้าที่จะตรวจสอบยอดเงินและยืนยันภายใน 1-2 วันทำการ</p>
                   </div>
-                ))}
+                </div>
+              )}
+
+              {/* ── สถานะภาพรวมและสรุปจำนวนผู้ลงทะเบียน ── */}
+              <div className={`p-3.5 sm:p-4 rounded-2xl border-2 ${overall.box} space-y-3`}>
+                <div className="flex items-start gap-2.5">
+                  <overall.Icon className={`w-5 h-5 shrink-0 mt-0.5 ${overall.icon}`} />
+                  <div className="min-w-0 text-xs">
+                    <p className="font-black text-sm">{lang === 'th' ? overall.th : overall.en}</p>
+                    <p className="mt-0.5 leading-relaxed opacity-90">
+                      {lang === 'th' ? overall.descTh : overall.descEn}
+                      {sponsorData.hasOutstanding && (sponsorData.outstandingAmount || 0) > 0 && (
+                        <span className="font-bold">
+                          {lang === 'th'
+                            ? ` ยอดที่ต้องแนบสลิป ฿${(sponsorData.outstandingAmount || 0).toLocaleString()}`
+                            : ` Amount due ฿${(sponsorData.outstandingAmount || 0).toLocaleString()}`}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { label: lang === 'th' ? 'ผู้ลงทะเบียน' : 'Registrants', value: totalPeople, tone: 'text-slate-900' },
+                    { label: lang === 'th' ? 'ยืนยันสิทธิ์แล้ว' : 'Confirmed', value: confirmedCount, tone: 'text-emerald-700' },
+                    { label: lang === 'th' ? 'ระหว่างดำเนินการ' : 'In progress', value: inProgressCount, tone: 'text-sky-700' },
+                    { label: lang === 'th' ? 'ต้องแก้ไข' : 'Needs fix', value: rejectedCount, tone: 'text-rose-700' },
+                  ].map((c) => (
+                    <div key={c.label} className="bg-white/80 border border-white rounded-xl px-3 py-2 min-w-0">
+                      <span className="block text-[11px] text-slate-500 font-semibold truncate">{c.label}</span>
+                      <span className={`block text-lg font-black tabular-nums ${c.tone}`}>
+                        {c.value}
+                        <span className="text-[11px] font-bold text-slate-400 ml-1">{lang === 'th' ? 'ท่าน' : ''}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {(sponsorData.checkedInCount || 0) > 0 && (
+                  <p className="text-[11px] font-semibold text-emerald-800 flex items-center gap-1.5">
+                    <UserCheck className="w-3.5 h-3.5" />
+                    {lang === 'th'
+                      ? `เช็กอินเข้างานแล้ว ${sponsorData.checkedInCount} ท่าน`
+                      : `${sponsorData.checkedInCount} checked in`}
+                  </p>
+                )}
               </div>
 
-              {/* ═══════════════════════════════════════════════════════════
-                  SECTION: รายการอนุมัติสิทธิ์รอชำระ — แสดงฟอร์มแนบสลิปในแต่ละรายการทันที
-                 ═══════════════════════════════════════════════════════════ */}
-              {(() => {
-                const awaitingItems = sponsorData.slips.filter(
-                  (s) => s.requiresSlipUpload || s.itemStatus === 'approved_awaiting_payment' || s.itemStatus === 'awaiting_payment' || s.itemStatus === 'rejected'
-                );
-                if (awaitingItems.length === 0) return null;
-                return (
-                  <div className="space-y-4 border-2 border-sky-300 bg-gradient-to-br from-sky-50/70 via-blue-50/40 to-white rounded-3xl p-4 sm:p-5 shadow-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-xl bg-sky-600 text-white flex items-center justify-center shadow-xs shrink-0">
-                        <CreditCard className="w-4 h-4" />
+              {/* ── โควต้าสิทธิ์ของบริษัท ── */}
+              {sponsorData.quotas.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                  {sponsorData.quotas.map((q, idx) => (
+                    <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1 min-w-0">
+                      <span className="text-slate-500 font-medium block break-words">{q.meeting_name}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-slate-700 font-bold">{lang === 'th' ? 'โควต้าสิทธิ์คูปองบริษัท' : 'Coupon quota'}</span>
+                        <span className="font-extrabold text-blue-700 whitespace-nowrap">{q.quota_seats} {lang === 'th' ? 'สิทธิ์' : 'seats'}</span>
                       </div>
-                      <div>
-                        <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">
-                          {lang === 'th' ? 'รายการอนุมัติสิทธิ์รอชำระเงิน' : 'Items Approved & Awaiting Payment'}
-                        </h4>
-                        <p className="text-xs text-sky-800 font-semibold">
-                          {lang === 'th'
-                            ? `กรุณาแนบสลิปโอนเงินสำหรับแต่ละรายการ (${awaitingItems.length} รายการ) บังคับแนบสลิปก่อนส่ง`
-                            : `Please upload the payment slip for each item (${awaitingItems.length} items)`}
-                        </p>
+                      <div className="flex items-center justify-between gap-2 text-[11px]">
+                        <span className="text-slate-500">{lang === 'th' ? 'ใช้ไปแล้ว' : 'Used'} {q.used_seats}</span>
+                        <span className="font-bold text-emerald-600">{lang === 'th' ? 'คงเหลือ' : 'Remaining'} {q.remaining_seats}</span>
                       </div>
                     </div>
+                  ))}
+                </div>
+              )}
 
-                    {/* Cards for each awaiting item with inline form */}
-                    <div className="space-y-4">
-                      {awaitingItems.map((slip, idx) => {
-                        const key = slip.slip_id || slip.ticket_code || String(idx);
-                        const form = slipForms[key] ?? initSlipForm(slip.amount || 0, slip.ticket_code || slip.slip_id || '');
-                        return (
-                          <div key={idx} className="bg-white border-2 border-sky-200 rounded-2xl shadow-xs overflow-hidden">
-                            {/* Item Header */}
-                            <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-sky-100 bg-sky-50/50">
-                              <div className="space-y-1.5 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-mono text-xs font-extrabold bg-white text-slate-800 px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs">
-                                    {slip.ticket_code || slip.slip_id}
-                                  </span>
-                                  <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-900 border border-sky-300 inline-flex items-center gap-1">
-                                    ✓ {lang === 'th' ? 'อนุมัติสิทธิ์แล้ว (รอชำระเงิน)' : 'Access Approved (Awaiting Payment)'}
-                                  </span>
-                                  {slip.ticket_code?.startsWith('MEMGRP') ? (
-                                    <span className="text-[10px] font-bold bg-purple-50 text-purple-800 px-2 py-0.5 rounded-md border border-purple-200 flex items-center gap-1">
-                                      <Sparkles className="w-3 h-3 text-purple-600" />
-                                      <span>คำขอสมัครสมาชิกใหม่</span>
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] font-bold bg-blue-50 text-blue-800 px-2 py-0.5 rounded-md border border-blue-200 flex items-center gap-1">
-                                      <Building2 className="w-3 h-3 text-blue-600" />
-                                      <span>กลุ่มสมาชิก ({slip.attendeesCount || 2} ท่าน)</span>
-                                    </span>
-                                  )}
-                                </div>
-                                <h5 className="font-bold text-xs sm:text-sm text-slate-800 leading-snug">
-                                  {slip.title || slip.meeting_name}
-                                </h5>
-                                <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
-                                  <span>{slip.meeting_name}</span>
-                                  <span>•</span>
-                                  <span>Ref: {slip.slip_id}</span>
-                                </div>
-                              </div>
-                              <div className="shrink-0 text-right">
-                                <span className="text-[10px] text-slate-500 block font-medium">ยอดเงินที่ต้องชำระ</span>
-                                <span className="text-xl font-black text-sky-700">฿{slip.amount.toLocaleString()}</span>
-                                <span className="text-xs font-bold text-slate-500 ml-1">THB</span>
-                              </div>
-                            </div>
+              {/* ── ความหมายของสถานะ ── */}
+              <details className="group rounded-2xl border border-slate-200 bg-white open:shadow-2xs">
+                <summary className="list-none cursor-pointer select-none px-4 py-3 flex items-center justify-between gap-2 text-xs font-bold text-slate-700">
+                  <span className="flex items-center gap-2">
+                    <Info className="w-4 h-4 text-blue-600" />
+                    {lang === 'th' ? 'ความหมายของสถานะและขั้นตอนการดำเนินการ' : 'What each status means'}
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-slate-400 transition-transform group-open:rotate-90" />
+                </summary>
+                <ul className="px-4 pb-4 space-y-2.5">
+                  {PORTAL_STATUS_ORDER.map((k) => (
+                    <li key={k} className="flex flex-col min-[480px]:flex-row min-[480px]:items-start gap-1.5 min-[480px]:gap-3 text-xs">
+                      <span className="min-[480px]:w-56 shrink-0">
+                        <PortalStatusBadge statusKey={k} lang={lang} />
+                      </span>
+                      <span className="text-slate-600 leading-relaxed">
+                        {lang === 'th' ? PORTAL_STATUS_INFO[k].descTh : PORTAL_STATUS_INFO[k].descEn}
+                      </span>
+                    </li>
+                  ))}
+                  <li className="flex flex-col min-[480px]:flex-row min-[480px]:items-start gap-1.5 min-[480px]:gap-3 text-xs">
+                    <span className="min-[480px]:w-56 shrink-0">
+                      <CheckedInBadge lang={lang} />
+                    </span>
+                    <span className="text-slate-600 leading-relaxed">
+                      {lang === 'th' ? 'ผู้ลงทะเบียนสแกนเข้างานเรียบร้อยแล้ว' : 'The attendee has checked in at the event.'}
+                    </span>
+                  </li>
+                  <li className="text-[11px] text-slate-500 leading-relaxed pt-1 border-t border-slate-100">
+                    {lang === 'th'
+                      ? 'ใบเสร็จออกให้เมื่อเจ้าหน้าที่อนุมัติสิทธิ์ของรายการ หากต้องการเอกสารใบเสร็จ หรือพบข้อมูลไม่ตรงกับที่บริษัทแจ้งไว้ กรุณาติดต่อเจ้าหน้าที่สมาคมฯ พร้อมแจ้งรหัสรายการ'
+                      : 'Receipts are issued when a registration is approved. Contact the association with the reference code for receipt documents or corrections.'}
+                  </li>
+                </ul>
+              </details>
 
-                            {/* Upload Zone */}
-                            <div className="p-4 bg-white space-y-3">
-                              {/* Per-item error */}
-                              {form.errorMsg && (
-                                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-start gap-2">
-                                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                                  <span>{form.errorMsg}</span>
-                                </div>
-                              )}
-                              {/* Per-item success */}
-                              {form.success ? (
-                                <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                                  <span className="font-bold">แนบสลิปเรียบร้อยแล้ว — รอเจ้าหน้าที่ตรวจสอบ</span>
-                                </div>
-                              ) : (
-                                <div>
-                                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                                    แนบรูปภาพสลิปโอนเงิน (JPG, PNG)
-                                    <span className="ml-1 text-red-500 font-extrabold">* บังคับแนบ</span>
-                                  </label>
-                                  <div
-                                    className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition relative ${
-                                      form.file ? 'border-emerald-400 bg-emerald-50/30' : 'border-blue-300 hover:border-blue-500 bg-white'
-                                    }`}
-                                  >
-                                    <input
-                                      type="file"
-                                      accept="image/*"
-                                      onChange={(e) => {
-                                        const f = e.target.files?.[0];
-                                        if (f) {
-                                          updateSlipForm(key, { file: f, preview: URL.createObjectURL(f), errorMsg: '' });
-                                        }
-                                      }}
-                                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                                    />
-                                    {form.preview ? (
-                                      <div className="flex flex-col items-center gap-2">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={form.preview} alt="Slip preview" className="max-h-48 rounded-lg object-contain border shadow-sm" />
-                                        <span className="text-xs text-blue-600 font-bold flex items-center gap-1">
-                                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                          ไฟล์สลิปพร้อมส่ง — คลิกเพื่อเปลี่ยนรูปภาพ
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <div className="flex flex-col items-center gap-1.5 text-slate-500">
-                                        <Upload className="w-8 h-8 text-blue-500" />
-                                        <span className="text-xs font-bold text-slate-700">คลิกหรือลากไฟล์ภาพสลิปโอนเงินมาวางที่นี่</span>
-                                        <span className="text-[11px] text-slate-400">รองรับไฟล์ JPG, PNG ขนาดไม่เกิน 10MB</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+              {/* ── รายการที่ต้องแนบสลิป หรือถูกส่งกลับให้แก้ไข ── */}
+              {awaitingItems.length > 0 && (
+                <div className="space-y-4 border-2 border-sky-300 bg-gradient-to-br from-sky-50/70 via-blue-50/40 to-white rounded-3xl p-3.5 sm:p-5 shadow-sm">
+                  <div className="flex items-start gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-sky-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                      <CreditCard className="w-4 h-4" />
                     </div>
-
-                    {/* ─── ปุ่มส่งสลิปทั้งหมด (ปุ่มเดียว ด้านล่าง section) ─── */}
-                    {allSlipsSuccess ? (
-                      <div className="mt-4 p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl flex items-center gap-3">
-                        <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
-                        <div>
-                          <p className="font-extrabold text-emerald-800 text-sm">ส่งสลิปทุกรายการเรียบร้อยแล้ว</p>
-                          <p className="text-xs text-emerald-700 mt-0.5">เจ้าหน้าที่จะตรวจสอบและยืนยันภายใน 1-2 วันทำการ</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="mt-4 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={handleSubmitAllSlips}
-                          disabled={submittingAll}
-                          className="px-6 py-3 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white text-sm font-extrabold rounded-xl shadow-md transition flex items-center gap-2 disabled:opacity-60 cursor-pointer"
-                        >
-                          {submittingAll ? (
-                            <>
-                              <RotateCw className="w-4 h-4 animate-spin" />
-                              <span>กำลังอัปโหลดสลิป...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Check className="w-4 h-4" />
-                              <span>ยืนยันการแนบสลิปการชำระเงิน</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    )}
+                    <div className="min-w-0">
+                      <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">
+                        {lang === 'th' ? 'รายการที่ต้องแนบสลิปการชำระเงิน' : 'Items awaiting payment slip'}
+                      </h4>
+                      <p className="text-xs text-sky-800 font-semibold">
+                        {lang === 'th'
+                          ? `แนบสลิปให้ครบทุกรายการ ${awaitingItems.length} รายการ แล้วกดยืนยันด้านล่าง`
+                          : `Attach a slip for each of the ${awaitingItems.length} items, then confirm below`}
+                      </p>
+                    </div>
                   </div>
-                );
-              })()}
 
-
-              {/* รายชื่อสมาชิกที่บริษัทส่งเข้าร่วม (Group Members List) */}
-              <div className="space-y-3 border-t border-slate-200 pt-4">
-                <h5 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                  <User className="w-4 h-4 text-blue-600" />
-                  <span>รายชื่อสมาชิกที่บริษัทลงทะเบียน ({sponsorData.groupMembers.length} ท่าน)</span>
-                </h5>
-
-                {sponsorData.groupMembers.length === 0 ? (
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500">
-                    ยังไม่มีรายชื่อสมาชิกที่ลงทะเบียนในนามบริษัทนี้
-                  </div>
-                ) : (
-                  <>
-                  <ul className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
-                    {sponsorData.groupMembers.slice((groupMembersPage - 1) * GROUP_MEMBERS_PAGE_SIZE, groupMembersPage * GROUP_MEMBERS_PAGE_SIZE).map((m, idx) => {
-                      const hasMemberNo = Boolean(m.member_no && m.member_no !== '-');
-                      const hasEmail = Boolean(m.attendee_email && m.attendee_email !== '-');
+                  <div className="space-y-4">
+                    {awaitingItems.map((slip, idx) => {
+                      const key = slip.slip_id || slip.ticket_code || String(idx);
+                      const form = slipForms[key] ?? initSlipForm(slip.amount || 0, slip.ticket_code || slip.slip_id || '');
+                      const statusKey = (slip.statusKey || 'pending_review') as PortalStatusKey;
+                      const names = slip.attendeeNames || [];
                       return (
-                        <li key={idx} className="p-3 sm:p-3.5 hover:bg-slate-50/60 space-y-2.5 text-xs">
-                          {/* ผู้ลงทะเบียน | ยอดสุทธิ + สถานะ */}
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0 space-y-0.5">
-                              <p className="font-bold text-slate-800 text-[13px] leading-snug break-words">{m.attendee_name}</p>
-                              {(hasMemberNo || hasEmail) && (
-                                <p className="text-slate-500 break-all leading-snug">
-                                  {hasMemberNo && <span className="font-bold text-blue-700">#{m.member_no}</span>}
-                                  {hasMemberNo && hasEmail && <span className="mx-1.5 text-slate-300">•</span>}
-                                  {hasEmail && m.attendee_email}
+                        <div key={key} className={`bg-white border-2 rounded-2xl shadow-xs overflow-hidden ${statusKey === 'rejected' ? 'border-rose-200' : 'border-sky-200'}`}>
+                          <div className={`p-3.5 sm:p-4 flex flex-col min-[480px]:flex-row min-[480px]:items-start justify-between gap-3 border-b ${statusKey === 'rejected' ? 'border-rose-100 bg-rose-50/40' : 'border-sky-100 bg-sky-50/50'}`}>
+                            <div className="space-y-1.5 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-mono text-xs font-extrabold bg-white text-slate-800 px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs">
+                                  {slip.ticket_code || slip.slip_id}
+                                </span>
+                                <PortalStatusBadge statusKey={statusKey} lang={lang} />
+                              </div>
+                              <h5 className="font-bold text-xs sm:text-sm text-slate-800 leading-snug break-words">
+                                {slip.title || slip.meeting_name}
+                              </h5>
+                              <p className="text-[11px] text-slate-500 break-words">
+                                {slip.meeting_name}
+                                {slip.receipt_no ? ` • ${lang === 'th' ? 'ใบเสร็จเลขที่' : 'Receipt'} ${slip.receipt_no}` : ''}
+                              </p>
+                              {names.length > 0 && (
+                                <p className="text-[11px] text-slate-600 break-words">
+                                  <span className="font-semibold">{lang === 'th' ? 'ผู้ลงทะเบียน: ' : 'Attendees: '}</span>
+                                  {names.slice(0, 3).join(', ')}
+                                  {names.length > 3 && (lang === 'th' ? ` และอีก ${names.length - 3} ท่าน` : ` and ${names.length - 3} more`)}
                                 </p>
                               )}
                             </div>
-                            <div className="shrink-0 flex flex-col-reverse sm:flex-row items-end sm:items-center gap-1 sm:gap-2">
-                              <span className="font-bold text-slate-700 whitespace-nowrap">
-                                {m.net_price > 0 ? `฿${m.net_price.toLocaleString()}` : 'ฟรี (โควต้า)'}
-                              </span>
-                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[11px] font-semibold whitespace-nowrap">
-                                {statusLabelTh(m.status)}
-                              </span>
+                            <div className="shrink-0 min-[480px]:text-right">
+                              <span className="text-[10px] text-slate-500 block font-medium">{lang === 'th' ? 'ยอดเงินที่ต้องชำระ' : 'Amount due'}</span>
+                              <span className="text-xl font-black text-sky-700">฿{slip.amount.toLocaleString()}</span>
                             </div>
                           </div>
 
-                          {/* รายการที่ลงทะเบียน */}
-                          <div className="rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-2">
-                            {m.programs && m.programs.length > 0 ? (
-                              <ul className="space-y-1.5">
-                                {m.programs.map((p, pIdx) => (
-                                  <li key={pIdx} className="flex items-start gap-2 text-slate-700">
-                                    <span
-                                      className={`shrink-0 w-[52px] text-center py-0.5 rounded text-[10px] font-bold border ${
-                                        p.format === 'online'
-                                          ? 'bg-blue-50 text-blue-800 border-blue-200'
-                                          : 'bg-amber-50 text-amber-800 border-amber-200'
-                                      }`}
-                                    >
-                                      {p.format === 'online'
-                                        ? (lang === 'th' ? 'ออนไลน์' : 'Online')
-                                        : (lang === 'th' ? 'ออนไซต์' : 'Onsite')}
-                                    </span>
-                                    <span className="leading-snug pt-px break-words min-w-0 flex-1">
-                                      {p.name}
-                                      {p.isFellow && (
-                                        <span className="ml-1.5 inline-block px-1.5 py-px rounded bg-lime-50 text-lime-800 border border-lime-200 text-[10px] font-bold align-middle">
-                                          {lang === 'th' ? 'ราคา fellow' : 'Fellow rate'}
+                          <div className="p-3.5 sm:p-4 bg-white space-y-3">
+                            {statusKey === 'rejected' && (
+                              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-1">
+                                <p className="font-bold flex items-center gap-1.5">
+                                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                                  {lang === 'th' ? 'เจ้าหน้าที่ส่งรายการนี้กลับให้แก้ไข' : 'Returned for correction'}
+                                </p>
+                                {slip.rejection_reason && (
+                                  <p className="break-words">
+                                    <span className="font-semibold">{lang === 'th' ? 'เหตุผล: ' : 'Reason: '}</span>
+                                    {slip.rejection_reason}
+                                  </p>
+                                )}
+                                <p className="text-rose-700/90">
+                                  {lang === 'th'
+                                    ? 'ระบบยังถือสิทธิ์และที่นั่งไว้ให้ระหว่างรอแก้ไข กรุณาแนบสลิปใหม่ หรือติดต่อเจ้าหน้าที่หากต้องแก้ไขรายชื่อ'
+                                    : 'Seats and rights are held while you fix this. Attach a new slip or contact staff to change attendees.'}
+                                </p>
+                              </div>
+                            )}
+                            {statusKey === 'awaiting_payment' && (
+                              <p className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                                {lang === 'th'
+                                  ? 'รายการนี้ยังรอเจ้าหน้าที่อนุมัติสิทธิ์ บริษัทแนบสลิปล่วงหน้าได้ เจ้าหน้าที่จะตรวจสอบพร้อมกัน'
+                                  : 'Awaiting approval. You may attach the slip in advance.'}
+                              </p>
+                            )}
+                            {form.errorMsg && (
+                              <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-start gap-2">
+                                <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                                <span>{form.errorMsg}</span>
+                              </div>
+                            )}
+                            {form.success ? (
+                              <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                <span className="font-bold">แนบสลิปเรียบร้อยแล้ว รอเจ้าหน้าที่ตรวจสอบ</span>
+                              </div>
+                            ) : (
+                              <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1">
+                                  แนบรูปภาพสลิปโอนเงิน
+                                  <span className="ml-1 text-red-500 font-extrabold">* บังคับแนบ</span>
+                                </label>
+                                <div
+                                  className={`border-2 border-dashed rounded-xl p-4 sm:p-5 text-center cursor-pointer transition relative ${
+                                    form.file ? 'border-emerald-400 bg-emerald-50/30' : 'border-blue-300 hover:border-blue-500 bg-white'
+                                  }`}
+                                >
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      const f = e.target.files?.[0];
+                                      if (f) {
+                                        updateSlipForm(key, { file: f, preview: URL.createObjectURL(f), errorMsg: '' });
+                                      }
+                                    }}
+                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                  />
+                                  {form.preview ? (
+                                    <div className="flex flex-col items-center gap-2">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={form.preview} alt="Slip preview" className="max-h-48 max-w-full rounded-lg object-contain border shadow-sm" />
+                                      <span className="text-xs text-blue-600 font-bold flex items-center gap-1">
+                                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                        ไฟล์สลิปพร้อมส่ง แตะเพื่อเปลี่ยนรูปภาพ
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex flex-col items-center gap-1.5 text-slate-500">
+                                      <Upload className="w-7 h-7 text-blue-500" />
+                                      <span className="text-xs font-bold text-slate-700">แตะหรือลากไฟล์ภาพสลิปมาวางที่นี่</span>
+                                      <span className="text-[11px] text-slate-400">รองรับไฟล์ JPG และ PNG ขนาดไม่เกิน 10MB</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleSubmitAllSlips}
+                      disabled={submittingAll}
+                      className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white text-sm font-extrabold rounded-xl shadow-md transition flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                    >
+                      {submittingAll ? (
+                        <>
+                          <RotateCw className="w-4 h-4 animate-spin" />
+                          <span>กำลังอัปโหลดสลิป...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span>ยืนยันการแนบสลิปการชำระเงิน</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── รายชื่อผู้ลงทะเบียนของบริษัท ── */}
+              <div className="space-y-3 border-t border-slate-200 pt-4">
+                <h5 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <Users className="w-4 h-4 text-blue-600" />
+                  <span>
+                    {lang === 'th' ? `รายชื่อผู้ลงทะเบียนในนามบริษัท ${totalPeople} ท่าน` : `Registrants ${totalPeople}`}
+                  </span>
+                </h5>
+
+                {totalPeople > 0 && (
+                  <div className="space-y-2">
+                    <input
+                      type="search"
+                      value={memberSearch}
+                      onChange={(e) => {
+                        setMemberSearch(e.target.value);
+                        setGroupMembersPage(1);
+                      }}
+                      placeholder={lang === 'th' ? 'ค้นหาชื่อ เลขสมาชิก อีเมล หรือรหัสรายการ' : 'Search name, member no, email or code'}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                    />
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+                      {filterOptions.map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => {
+                            setMemberFilter(f.id);
+                            setGroupMembersPage(1);
+                          }}
+                          className={`shrink-0 px-3 py-1.5 rounded-full border text-[11px] font-bold transition cursor-pointer whitespace-nowrap ${
+                            memberFilter === f.id
+                              ? 'bg-blue-600 border-blue-600 text-white'
+                              : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'
+                          }`}
+                        >
+                          {f.label} {f.count}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {totalPeople === 0 ? (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500">
+                    {lang === 'th' ? 'ยังไม่มีผู้ลงทะเบียนในนามบริษัทนี้' : 'No registrants yet'}
+                  </div>
+                ) : filteredMembers.length === 0 ? (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500">
+                    {lang === 'th' ? 'ไม่พบรายชื่อตามเงื่อนไขที่เลือก' : 'No matching registrants'}
+                  </div>
+                ) : (
+                  <>
+                    <ul className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
+                      {pagedMembers.map((m, idx) => {
+                        const hasMemberNo = Boolean(m.member_no && m.member_no !== '-');
+                        const hasEmail = Boolean(m.attendee_email && m.attendee_email !== '-');
+                        const statusKey = (m.statusKey || 'pending_review') as PortalStatusKey;
+                        const regs = m.registrations || [];
+                        const rejectedRegs = regs.filter((r) => r.statusKey === 'rejected' && r.rejectionReason);
+                        return (
+                          <li key={`${m.id}-${idx}`} className="p-3 sm:p-3.5 space-y-2.5 text-xs">
+                            <div className="flex flex-col min-[420px]:flex-row min-[420px]:items-start justify-between gap-2">
+                              <div className="min-w-0 space-y-0.5">
+                                <p className="font-bold text-slate-800 text-[13px] leading-snug break-words">{m.attendee_name}</p>
+                                <p className="text-slate-500 break-all leading-snug">
+                                  {hasMemberNo ? (
+                                    <span className="font-bold text-blue-700">{lang === 'th' ? 'สมาชิก' : 'Member'} #{m.member_no}</span>
+                                  ) : (
+                                    <span className="font-semibold text-slate-600">{lang === 'th' ? 'บุคคลทั่วไป' : 'Non-member'}</span>
+                                  )}
+                                  {hasEmail && <span className="mx-1.5 text-slate-300">•</span>}
+                                  {hasEmail && m.attendee_email}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5 min-[420px]:justify-end min-[420px]:max-w-[55%]">
+                                <PortalStatusBadge statusKey={statusKey} lang={lang} />
+                                {m.checkedIn && <CheckedInBadge lang={lang} time={m.checkinTime} />}
+                              </div>
+                            </div>
+
+                            <div className="rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-2 space-y-1.5">
+                              {m.programs && m.programs.length > 0 ? (
+                                <ul className="space-y-1.5">
+                                  {m.programs.map((p, pIdx) => (
+                                    <li key={pIdx} className="flex items-start gap-2 text-slate-700">
+                                      <span
+                                        className={`shrink-0 w-[52px] text-center py-0.5 rounded text-[10px] font-bold border ${
+                                          p.format === 'online'
+                                            ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                            : 'bg-amber-50 text-amber-800 border-amber-200'
+                                        }`}
+                                      >
+                                        {p.format === 'online' ? (lang === 'th' ? 'ออนไลน์' : 'Online') : (lang === 'th' ? 'ออนไซต์' : 'Onsite')}
+                                      </span>
+                                      <span className="leading-snug pt-px break-words min-w-0 flex-1">
+                                        {p.name}
+                                        {p.isFellow && (
+                                          <span className="ml-1.5 inline-block px-1.5 py-px rounded bg-lime-50 text-lime-800 border border-lime-200 text-[10px] font-bold align-middle">
+                                            {lang === 'th' ? 'ราคา fellow' : 'Fellow rate'}
+                                          </span>
+                                        )}
+                                      </span>
+                                      {typeof p.price === 'number' && (
+                                        <span className="shrink-0 pt-px font-semibold text-slate-600 whitespace-nowrap">
+                                          {p.price > 0 ? `฿${p.price.toLocaleString()}` : (lang === 'th' ? 'ฟรี' : 'Free')}
                                         </span>
                                       )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : m.isMembershipOnly ? (
+                                <span className="inline-flex items-center gap-1.5 text-purple-700 font-semibold">
+                                  <Sparkles className="w-3.5 h-3.5" />
+                                  {lang === 'th' ? 'สมัครสมาชิกใหม่' : 'New membership'}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400">{lang === 'th' ? 'ไม่พบรายการที่ลงทะเบียน' : 'No registered programs found'}</span>
+                              )}
+                              {(m.hasPrice || regs.length > 0) && (
+                                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-1.5 border-t border-slate-200/70 text-[11px]">
+                                  <span className="text-slate-500 break-all">
+                                    {lang === 'th' ? 'รายการ ' : 'Ref '}
+                                    {regs.map((r) => r.ticketCode).filter((c) => c && c !== '-').join(', ') || (lang === 'th' ? 'บันทึกโดยเจ้าหน้าที่' : 'Recorded by staff')}
+                                  </span>
+                                  {m.hasPrice && (
+                                    <span className="font-bold text-slate-700 whitespace-nowrap">
+                                      {lang === 'th' ? 'ยอดสุทธิ ' : 'Net '}
+                                      {m.net_price > 0 ? `฿${m.net_price.toLocaleString()}` : (lang === 'th' ? 'ฟรี' : 'Free')}
                                     </span>
-                                    {typeof p.price === 'number' && (
-                                      <span className="shrink-0 pt-px font-semibold text-slate-600 whitespace-nowrap">
-                                        {p.price > 0 ? `฿${p.price.toLocaleString()}` : (lang === 'th' ? 'ฟรี' : 'Free')}
-                                      </span>
-                                    )}
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            {rejectedRegs.map((r) => (
+                              <p key={r.ticketCode} className="px-2.5 py-2 rounded-lg bg-rose-50 border border-rose-100 text-rose-800 break-words">
+                                <span className="font-bold">{lang === 'th' ? `เหตุผลที่ต้องแก้ไข ${r.ticketCode}: ` : `Reason ${r.ticketCode}: `}</span>
+                                {r.rejectionReason}
+                              </p>
+                            ))}
+
+                            {m.notes && m.notes.length > 0 && (
+                              <ul className="space-y-1">
+                                {m.notes.map((note, nIdx) => (
+                                  <li key={nIdx} className="flex items-start gap-1.5 text-[11px] text-slate-600 leading-snug">
+                                    <Info className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-px" />
+                                    <span className="break-words min-w-0">{note}</span>
                                   </li>
                                 ))}
                               </ul>
-                            ) : m.isMembershipOnly ? (
-                              <span className="inline-flex items-center gap-1.5 text-purple-700 font-semibold">
-                                <Sparkles className="w-3.5 h-3.5" />
-                                {lang === 'th' ? 'สมัครสมาชิกใหม่' : 'New membership'}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">{lang === 'th' ? 'ไม่พบรายการที่ลงทะเบียน' : 'No registered programs found'}</span>
                             )}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  {sponsorData.groupMembers.length > GROUP_MEMBERS_PAGE_SIZE && (
-                    <PaginationControls
-                      currentPage={groupMembersPage}
-                      totalItems={sponsorData.groupMembers.length}
-                      pageSize={GROUP_MEMBERS_PAGE_SIZE}
-                      onPageChange={setGroupMembersPage}
-                      itemLabel="ท่าน"
-                    />
-                  )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {filteredMembers.length > GROUP_MEMBERS_PAGE_SIZE && (
+                      <PaginationControls
+                        currentPage={currentPage}
+                        totalItems={filteredMembers.length}
+                        pageSize={GROUP_MEMBERS_PAGE_SIZE}
+                        onPageChange={setGroupMembersPage}
+                        itemLabel="ท่าน"
+                      />
+                    )}
                   </>
                 )}
               </div>
 
-              {/* ประวัติสลิปที่เคยส่ง (Slip History) — ไม่แสดงรายการที่รอชำระ เพราะอยู่ด้านบนแล้ว */}
-              {(() => {
-                const historySlips = sponsorData.slips.filter(
-                  (s) => !s.requiresSlipUpload && s.itemStatus !== 'approved_awaiting_payment' && s.itemStatus !== 'awaiting_payment' && s.itemStatus !== 'rejected'
-                );
-                if (historySlips.length === 0) return null;
-                return (
-                  <div className="space-y-3 border-t border-slate-200 pt-4">
-                    <h5 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-blue-600" />
-                      <span>ประวัติรายการสลิปและการชำระเงิน ({historySlips.length} รายการ)</span>
-                    </h5>
-                    <div className="space-y-2">
-                      {historySlips.map((s, idx) => (
-                        <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
+              {/* ── ประวัติรายการชำระเงิน (ไม่รวมรายการที่ต้องแนบสลิป ซึ่งแสดงด้านบนแล้ว) ── */}
+              {historySlips.length > 0 && (
+                <div className="space-y-3 border-t border-slate-200 pt-4">
+                  <h5 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-blue-600" />
+                    <span>{lang === 'th' ? `รายการชำระเงินของบริษัท ${historySlips.length} รายการ` : `Payment records ${historySlips.length}`}</span>
+                  </h5>
+                  <div className="space-y-2">
+                    {historySlips.map((s, idx) => {
+                      const statusKey = (s.statusKey || 'pending_review') as PortalStatusKey;
+                      return (
+                        <div key={s.slip_id || idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col min-[480px]:flex-row min-[480px]:items-start justify-between text-xs gap-2.5">
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-mono font-bold text-slate-700">{s.ticket_code || s.slip_id}</span>
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                s.status === 'approved'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : s.status === 'rejected'
-                                  ? 'bg-red-100 text-red-800'
-                                  : 'bg-amber-100 text-amber-800'
-                              }`}>
-                                {s.status === 'approved' ? 'อนุมัติแล้ว' : s.status === 'rejected' ? 'ไม่อนุมัติ' : 'รอตรวจสอบสลิป'}
-                              </span>
+                              <PortalStatusBadge statusKey={statusKey} lang={lang} />
                             </div>
-                            <p className="text-slate-500 text-[11px] mt-0.5 truncate">
-                              {s.bank || 'ชำระเงินภายหลัง'} • ฿{s.amount.toLocaleString()}
+                            <p className="text-slate-600 break-words">{s.title || s.meeting_name}</p>
+                            <p className="text-slate-500 text-[11px] break-words">
+                              {s.isPayLater && !s.hasActualSlip ? 'ชำระเงินภายหลัง' : s.bank || '-'} • ฿{s.amount.toLocaleString()}
                               {s.transfer_date ? ` • ${s.transfer_date} ${s.transfer_time || ''}` : ''}
+                              {s.receipt_no ? ` • ${lang === 'th' ? 'ใบเสร็จเลขที่' : 'Receipt'} ${s.receipt_no}` : ''}
                             </p>
-                            {s.rejection_reason && (
-                              <p className="text-red-600 text-[11px] mt-0.5">เหตุผล: {s.rejection_reason}</p>
-                            )}
+                            <p className="text-slate-500 text-[11px] leading-relaxed">
+                              {lang === 'th' ? PORTAL_STATUS_INFO[statusKey].descTh : PORTAL_STATUS_INFO[statusKey].descEn}
+                            </p>
                           </div>
-                          {s.slip_url && s.slip_url !== 'PAY_LATER' && s.slip_url !== 'pay_later_pending' && s.slip_url !== '/placeholder-slip.png' && s.slip_url !== 'GROUP_REGISTRATION' && s.slip_url !== 'GROUP_MEMBERSHIP' && !s.slip_url.startsWith('TEMP_') && (
+                          {s.slip_url && (
                             <a
                               href={s.slip_url}
                               target="_blank"
                               rel="noreferrer"
-                              className="shrink-0 px-2.5 py-1 bg-white border border-slate-300 hover:border-blue-500 text-blue-600 rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs"
+                              className="shrink-0 self-start px-2.5 py-1.5 bg-white border border-slate-300 hover:border-blue-500 text-blue-600 rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs"
                             >
-                              <span>ดูสลิป</span>
+                              <span>{lang === 'th' ? 'ดูสลิป' : 'View slip'}</span>
                               <ExternalLink className="w-3 h-3" />
                             </a>
                           )}
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                );
-              })()}
+                </div>
+              )}
 
               {/* Bottom Actions */}
-              <div className="pt-3 border-t border-slate-200 flex justify-end">
+              <div className="pt-3 border-t border-slate-200 flex flex-col-reverse min-[480px]:flex-row min-[480px]:items-center justify-between gap-2">
+                <p className="text-[11px] text-slate-500">
+                  {lang === 'th'
+                    ? 'หากข้อมูลไม่ตรงกับที่บริษัทแจ้งไว้ กรุณาติดต่อเจ้าหน้าที่สมาคมฯ พร้อมรหัสรายการ'
+                    : 'If anything looks wrong, contact the association with the reference code.'}
+                </p>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-5 py-2 text-xs sm:text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  className="shrink-0 px-5 py-2 text-xs sm:text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer"
                 >
                   ปิดหน้าต่าง
                 </button>
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </div>,

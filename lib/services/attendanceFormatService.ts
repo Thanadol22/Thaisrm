@@ -49,12 +49,15 @@ function withActivityListsFormat(obj: any, format: AttendanceFormat, meetingActi
 // ผู้เข้าร่วมในกลุ่ม: เก็บรูปแบบไว้หลายชื่อฟิลด์ตามรุ่นของฟอร์ม จึงปรับทุกฟิลด์ที่มีอยู่ให้ตรงกัน
 function withAttendeeFormat(att: any, format: AttendanceFormat, meetingActivities: any[]): any {
   if (!att || typeof att !== 'object') return att;
+  const previous = (att.selectedFormat || att.attendanceType || att.format) === 'online' ? 'online' : 'onsite';
   return {
     ...att,
     attendanceType: format,
     ...(att.selectedFormat !== undefined ? { selectedFormat: format } : {}),
     ...(att.format !== undefined ? { format } : {}),
     ...withActivityListsFormat(att, format, meetingActivities),
+    // เวลาที่เปลี่ยนรูปแบบ (แสดงเป็นหมายเหตุในหน้าบริษัท)
+    ...(previous !== format ? { formatUpdatedAt: new Date().toISOString() } : {}),
   };
 }
 
