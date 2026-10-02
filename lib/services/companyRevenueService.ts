@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma';
-import { aggregateMeetingSlips, ProgramRevenueKind, SlipRow } from '@/lib/services/programRevenueService';
+import { aggregateMeetingSlips, buildGroupAddOnIndex, ProgramRevenueKind, SlipRow } from '@/lib/services/programRevenueService';
 import { getSponsorRegistrationRows, groupPeople } from '@/lib/services/sponsorRegistrationService';
 
 // ยอดรวมของแต่ละบริษัทแยกตามรอบประชุมและรายการที่ลงทะเบียน
@@ -111,6 +111,7 @@ export async function getCompanyRevenue(): Promise<CompanyRevenue[]> {
     c.quota.set(r.meetingId, (c.quota.get(r.meetingId) || 0) + 1);
   }
 
+  const addOnIndex = buildGroupAddOnIndex(slips);
   const result: CompanyRevenue[] = [];
   for (const c of companies.values()) {
     const meetingIds = new Set([...c.slips.keys(), ...c.quota.keys()]);
@@ -118,7 +119,7 @@ export async function getCompanyRevenue(): Promise<CompanyRevenue[]> {
     for (const meetingId of meetingIds) {
       const m = meetingById.get(meetingId);
       if (!m) continue;
-      const agg = aggregateMeetingSlips(m, c.slips.get(meetingId) || []);
+      const agg = aggregateMeetingSlips(m, c.slips.get(meetingId) || [], addOnIndex);
       const items: CompanyRevenueItem[] = agg.rows
         .filter((r) => r.approvedRevenue + r.pendingRevenue !== 0 || r.approvedPeople + r.pendingPeople > 0)
         .map((r) => {
@@ -142,9 +143,13 @@ export async function getCompanyRevenue(): Promise<CompanyRevenue[]> {
       }
       const sum = (f: 'received' | 'payLater' | 'review' | 'total') => items.reduce((acc, i) => acc + i[f], 0);
       // นับคนไม่ซ้ำ: คนเดียวลงหลายหลักสูตรนับครั้งเดียว
+      // ผู้ที่ลงเพิ่มต่อจากรายการเดิมในบิลของบริษัทเดียวกัน นับแล้วที่บิลเดิม
+      const meetingSlips = c.slips.get(meetingId) || [];
+      const slipIds = new Set(meetingSlips.map((s) => s.slip_id));
       const people =
-        (c.slips.get(meetingId) || []).reduce((acc, s) => {
-          return acc + groupPeople(parse(s.selected_activities)).length;
+        meetingSlips.reduce((acc, s) => {
+          const list = groupPeople(parse(s.selected_activities));
+          return acc + list.filter((a: any) => !(a?.isAddOn && slipIds.has(a.addOnOriginalSlipId))).length;
         }, 0) + quotaPeople;
       list.push({
         meetingId,

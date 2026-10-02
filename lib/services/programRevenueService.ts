@@ -108,8 +108,35 @@ export type SlipRow = {
   bank: string | null;
 };
 
+const memberKey = (v: unknown) => String(v ?? '').trim().replace(/^0+/, '');
+
+/**
+ * หลักสูตรที่ผู้เข้าร่วมลงเพิ่มผ่านบิลกลุ่มอื่น แล้วถูกรวมเข้ารายการเดิมของคนนั้น
+ * key = `${slip เดิม}:${เลขสมาชิก}` → id หลักสูตรที่ชำระในบิลเพิ่มเติม (ยอดอยู่ที่บิลเพิ่มเติม ไม่ใช่บิลเดิม)
+ */
+export function buildGroupAddOnIndex(slips: Pick<SlipRow, 'selected_activities'>[]): Map<string, Set<string>> {
+  const index = new Map<string, Set<string>>();
+  for (const s of slips) {
+    const payload = parse(s.selected_activities);
+    if (!payload || !Array.isArray(payload.attendees)) continue;
+    for (const att of payload.attendees) {
+      if (!att?.isAddOn || !att.addOnOriginalSlipId) continue;
+      const key = `${att.addOnOriginalSlipId}:${memberKey(att.memberNo || att.member_no)}`;
+      const ids = index.get(key) || new Set<string>();
+      for (const a of att.selectedActivities || att.activities || []) if (a?.id) ids.add(String(a.id));
+      for (const id of att.selectedProgramIds || []) ids.add(String(id));
+      index.set(key, ids);
+    }
+  }
+  return index;
+}
+
 /** รวมยอดของสลิปชุดหนึ่ง (ของรอบประชุมเดียวกัน) แจกลงหลักสูตร */
-export function aggregateMeetingSlips(m: MeetingRow, slips: SlipRow[]): MeetingProgramRevenue {
+export function aggregateMeetingSlips(
+  m: MeetingRow,
+  slips: SlipRow[],
+  addOnIndex: Map<string, Set<string>> = buildGroupAddOnIndex(slips)
+): MeetingProgramRevenue {
   const acts: any[] = Array.isArray(m.activities) ? (m.activities as any[]) : [];
   const tiers = (parse(m.pricing_tiers) || {}) as any;
   const mainAct = acts.find((a) => a?.type === 'main') || null;
@@ -254,7 +281,16 @@ export function aggregateMeetingSlips(m: MeetingRow, slips: SlipRow[]): MeetingP
           const listTotal = items.reduce((sum: number, it: any) => sum + (priceOrNull(it?.netPrice ?? it?.originalPrice ?? it?.price) ?? 0), 0);
           if (items.length === 0 || personNet - backdatedSum <= listTotal) personNet -= backdatedSum;
         }
-        lines.push(...personLines(resolveAttendeeActivities(att, acts), person, isMember, online, personNet));
+        let items = resolveAttendeeActivities(att, acts);
+        // หลักสูตรที่ลงเพิ่มผ่านบิลกลุ่มอื่นแล้วรวมเข้ามา: ยอดอยู่ที่บิลนั้น ไม่แจกยอดของบิลนี้ให้
+        // (ข้ามเมื่อยอดของคนครอบคลุมทุกรายการแล้ว เช่น แอดมินแก้ราคาให้รวมหลักสูตรนั้น)
+        const paidElsewhere = addOnIndex.get(`${s.slip_id}:${memberKey(att?.memberNo || att?.member_no)}`);
+        if (paidElsewhere && personNet !== null && items.length > 1) {
+          const gross = items.reduce((sum: number, it: any) => sum + (priceOrNull(it?.originalPrice ?? it?.price) ?? 0), 0);
+          const own = items.filter((it: any) => !paidElsewhere.has(String(it?.id)));
+          if (gross > personNet && own.length > 0) items = own;
+        }
+        lines.push(...personLines(items, person, isMember, online, personNet));
         backdated.forEach((c) => lines.push({ key: 'backdated', weight: c.amount, person, exact: c.amount }));
       });
     } else {
@@ -345,8 +381,9 @@ export async function getProgramRevenue(meetingIds?: string[]): Promise<Record<s
   });
 
   const result: Record<string, MeetingProgramRevenue> = {};
+  const addOnIndex = buildGroupAddOnIndex(slips);
   for (const m of meetings) {
-    result[m.meeting_id] = aggregateMeetingSlips(m, slips.filter((s) => s.meeting_id === m.meeting_id));
+    result[m.meeting_id] = aggregateMeetingSlips(m, slips.filter((s) => s.meeting_id === m.meeting_id), addOnIndex);
   }
   return result;
 }
