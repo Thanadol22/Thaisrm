@@ -3,6 +3,7 @@ import { IBM_Plex_Sans_Thai, Geist_Mono, Sarabun } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { SessionProvider } from "@/components/SessionProvider";
+import { Analytics } from "@vercel/analytics/next";
 
 const ibmPlexSansThai = IBM_Plex_Sans_Thai({
   weight: ["300", "400", "500", "600", "700"],
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
           </LanguageProvider>
         </SessionProvider>
+        <Analytics />
       </body>
     </html>
   );
