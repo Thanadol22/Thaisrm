@@ -4,8 +4,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Shield,
-  Globe,
-  Search,
   Ticket,
   UserPlus,
   User,
@@ -31,19 +29,15 @@ import {
   Trash2,
   Copy,
   Layers,
-  UserCheck,
   Lock,
   X,
   Receipt,
 } from 'lucide-react';
-import { TsrmLogo } from '@/components/TsrmLogo';
 import { GoogleIcon } from '@/components/GoogleIcon';
-import { ParticipantSearchModal } from '@/components/ParticipantSearchModal';
 import { ExpiredMemberModal } from '@/components/ExpiredMemberModal';
 import { ChangeFormatModal } from '@/components/ChangeFormatModal';
 import { SignupView } from '@/components/views/SignupView';
 import { SponsorAuthModal, SponsorSessionData } from '@/components/SponsorAuthModal';
-import { ProfileAndSponsorUpdateModal } from '@/components/ProfileAndSponsorUpdateModal';
 import { PositionSelect } from '@/components/PositionSelect';
 import { SmartEmailInput } from '@/components/SmartEmailInput';
 import { isPersonalEmail, personalEmailRequiredMessage } from '@/lib/validators/emailPolicy';
@@ -170,6 +164,8 @@ interface LoginViewProps {
   onAdminSubmit?: (type: 'registration' | 'membership', payload: unknown) => void;
   /** ฟอร์มเฉพาะ (เช่น ราคา fellow): ลงทะเบียนแบบกลุ่มในนามบริษัทที่ยืนยันตัวตนผ่านลิงก์ฟอร์ม ด้วยรายการและราคาของฟอร์ม */
   specialForm?: SpecialFormContext | null;
+  /** แจ้งการประชุมล่าสุดที่โหลดได้ (ใช้แสดงสถานที่/แผนที่ใน hero หน้า login) */
+  onActiveMeetingChange?: (meeting: { meeting_id?: string; meeting_name?: string; description?: string | null; meeting_time?: string | null; location?: string | null; start_date?: string; meeting_date?: string } | null) => void;
 }
 
 export interface SpecialFormContext {
@@ -188,7 +184,7 @@ export interface SpecialFormContext {
   onSessionEnd: () => void;
 }
 
-function formatMeetingDateDisplay(meetingOrDate?: any, lang: 'th' | 'en' = 'th'): string {
+export function formatMeetingDateDisplay(meetingOrDate?: any, lang: 'th' | 'en' = 'th'): string {
   if (!meetingOrDate) return '';
   if (typeof meetingOrDate === 'string' || meetingOrDate instanceof Date) {
     const d = new Date(meetingOrDate);
@@ -271,21 +267,24 @@ export function LoginView({
   adminSponsorSession = null,
   onAdminSubmit,
   specialForm = null,
+  onActiveMeetingChange,
 }: LoginViewProps) {
   const router = useRouter();
   const isAdminMode = Boolean(adminSponsorSession);
   const isSpecialForm = Boolean(specialForm);
   // แอดมินทำรายการแทน หรือฟอร์มเฉพาะ: ไม่แสดงส่วนหัว แท็บสมัครสมาชิก และส่วนท้ายของหน้าแรก
   const hidePublicChrome = isAdminMode || isSpecialForm;
-  const { lang, toggleLang, t } = useLanguage();
+  const { lang, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'conference' | 'membership'>(defaultTab);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [autofillSuccess, setAutofillSuccess] = useState(false);
 
   // Active Meeting state
   const [activeMeeting, setActiveMeeting] = useState<any | null>(null);
   const [loadingMeeting, setLoadingMeeting] = useState(true);
+
+  useEffect(() => {
+    onActiveMeetingChange?.(activeMeeting);
+  }, [activeMeeting, onActiveMeetingChange]);
 
   // Registration Mode: Individual vs Group
   const [regMode, setRegMode] = useState<'individual' | 'group'>(adminSponsorSession || specialForm ? 'group' : 'individual');
@@ -1628,94 +1627,38 @@ export function LoginView({
 
   return (
     <div className={`flex-1 flex flex-col justify-between animate-fade-in ${hidePublicChrome ? '' : 'min-h-[640px]'}`}>
-      {/* Header Blue Card Section */}
+      {/* Header Blue Card Section — ปุ่มอัปเดต/ค้นหา/ภาษาย้ายไปอยู่ใน LoginNavbar */}
       {!hidePublicChrome && (
-      <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-3.5 xs:px-5 sm:px-8 lg:px-12 pt-3.5 sm:pt-7 pb-5 sm:pb-8 rounded-b-[24px] sm:rounded-b-[36px] shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-b from-[#0026b3] via-[#0022a1] to-[#001c8c] text-white px-4 sm:px-8 lg:px-12 pt-6 sm:pt-9 pb-6 sm:pb-9 rounded-b-[24px] sm:rounded-b-[36px] shadow-xl relative overflow-hidden">
         <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute bottom-0 -left-12 w-40 h-40 bg-[#4ade80]/15 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="max-w-5xl xl:max-w-6xl mx-auto relative z-10 space-y-3">
-          {/* Top Bar: Brand & Quick Actions */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
-            <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-3 min-w-0">
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0 group hover:opacity-95 transition">
-                <TsrmLogo className="w-8 h-8 xs:w-9 xs:h-9 sm:w-11 sm:h-11 shrink-0 group-hover:scale-105 transition-transform" />
-                <div className="min-w-0">
-                  <span className="text-[10px] xs:text-xs sm:text-[13px] md:text-sm font-bold text-blue-200 block truncate leading-tight">
-                    {t.associationName}
-                  </span>
-                  <p className="text-xs xs:text-sm sm:text-base font-extrabold text-white leading-tight truncate">{t.brandName}</p>
-                </div>
-              </div>
-
-              {/* Language Switcher on mobile (top right) */}
-              <div className="sm:hidden shrink-0">
-                <button
-                  type="button"
-                  onClick={toggleLang}
-                  className="flex items-center gap-1 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-2.5 py-1.5 rounded-xl text-xs font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shadow-2xs min-h-[34px]"
-                  title="Switch Language / สลับภาษา"
-                >
-                  <Globe className="w-3.5 h-3.5 text-blue-200 shrink-0" />
-                  <span className={lang === 'th' ? 'text-white font-black' : 'text-blue-200/60'}>TH</span>
-                  <span className="text-white/40 font-normal">|</span>
-                  <span className={lang === 'en' ? 'text-white font-black' : 'text-blue-200/60'}>EN</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Quick Action Buttons (2 Clear Full Columns on Mobile, Inline on Desktop) */}
-            <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
-              <button
-                type="button"
-                onClick={() => setIsUpdateModalOpen(true)}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md rounded-xl text-xs sm:text-xs md:text-sm font-bold transition border border-white/20 cursor-pointer active:scale-95 shadow-2xs group min-h-[38px] sm:min-h-[36px]"
-                title={lang === 'th' ? 'อัปเดตข้อมูลสมาชิก / บริษัท' : 'Update Member / Sponsor Profile'}
-                aria-label={lang === 'th' ? 'อัปเดตข้อมูลสมาชิก / บริษัท' : 'Update Member / Sponsor Profile'}
-              >
-                <UserCheck className="w-4 h-4 text-blue-200 group-hover:scale-110 transition-transform shrink-0" />
-                <span className="font-semibold whitespace-nowrap">{lang === 'th' ? 'อัปเดตข้อมูล' : 'Update Info'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsSearchOpen(true)}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md rounded-xl text-xs sm:text-xs md:text-sm font-bold transition border border-white/20 cursor-pointer active:scale-95 shadow-2xs group min-h-[38px] sm:min-h-[36px]"
-                title={lang === 'th' ? 'ค้นหาข้อมูลสมาชิก' : 'Search Members'}
-                aria-label={lang === 'th' ? 'ค้นหาข้อมูลสมาชิก' : 'Search Members'}
-              >
-                <Search className="w-4 h-4 text-[#4ade80] group-hover:scale-110 transition-transform shrink-0" />
-                <span className="font-semibold whitespace-nowrap">{lang === 'th' ? 'ค้นหาข้อมูลสมาชิก' : 'Search Members'}</span>
-              </button>
-
-              {/* Language Switcher on Desktop */}
-              <div className="hidden sm:block shrink-0">
-                <button
-                  type="button"
-                  onClick={toggleLang}
-                  className="flex items-center gap-1 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md px-3 py-1.5 rounded-xl text-xs md:text-sm font-extrabold transition border border-white/20 cursor-pointer active:scale-95 shadow-2xs min-h-[36px]"
-                  title="Switch Language / สลับภาษา"
-                >
-                  <Globe className="w-3.5 h-3.5 text-blue-200 shrink-0" />
-                  <span className={lang === 'th' ? 'text-white font-black' : 'text-blue-200/60'}>TH</span>
-                  <span className="text-white/40 font-normal">|</span>
-                  <span className={lang === 'en' ? 'text-white font-black' : 'text-blue-200/60'}>EN</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Heading */}
-          <div className="pt-0.5">
-            <h1 className="text-lg xs:text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight">
+        <div className="max-w-5xl xl:max-w-6xl mx-auto relative z-10 space-y-4 sm:space-y-5">
+          <div>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight">
               {lang === 'th' ? 'ลงทะเบียนและสมัครสมาชิก TSRM' : 'TSRM Registration & Membership'}
-            </h1>
-            <p className="text-xs sm:text-sm lg:text-base text-blue-100/90 leading-relaxed mt-0.5 font-normal">
+            </h2>
+            <p className="text-base sm:text-lg text-blue-100 leading-relaxed mt-1.5 font-normal">
               {lang === 'th'
                 ? 'เลือกลงทะเบียนเข้าร่วมงานประชุมวิชาการ หรือ สมัครสมาชิกสมาคมฯ'
                 : 'Register for Conference Summit or apply for TSRM membership'}
             </p>
           </div>
+
+          {/* ขั้นตอนง่าย ๆ ให้ผู้ใช้รู้ว่าต้องทำอะไรต่อ */}
+          <ol className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+            {(lang === 'th'
+              ? ['เลือกเมนูด้านล่าง ลงทะเบียนงานประชุม หรือ สมัครสมาชิก', 'กรอกข้อมูลให้ครบทุกช่องที่มีเครื่องหมาย *', 'ชำระเงินและแนบหลักฐานการโอน']
+              : ['Choose below: register for the conference or apply for membership', 'Fill in every field marked with *', 'Pay and attach your transfer slip']
+            ).map((step, i) => (
+              <li key={i} className="flex items-center gap-3 bg-white/10 border border-white/15 rounded-2xl px-3.5 py-3">
+                <span className="w-9 h-9 rounded-full bg-[#4ade80] text-slate-950 text-lg font-black flex items-center justify-center shrink-0">
+                  {i + 1}
+                </span>
+                <span className="text-[15px] sm:text-base font-semibold text-white leading-snug">{step}</span>
+              </li>
+            ))}
+          </ol>
         </div>
       </div>
       )}
@@ -1737,7 +1680,7 @@ export function LoginView({
             <button
               type="button"
               onClick={() => handleTabChange('conference')}
-              className={`relative z-10 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 rounded-xl font-black text-xs sm:text-sm transition-colors duration-200 cursor-pointer active:scale-98 min-h-[44px] ${
+              className={`relative z-10 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 rounded-xl font-black text-sm sm:text-sm transition-colors duration-200 cursor-pointer active:scale-98 min-h-[44px] ${
                 activeTab === 'conference'
                   ? 'text-white'
                   : 'text-slate-600 hover:text-slate-900'
@@ -1754,7 +1697,7 @@ export function LoginView({
             <button
               type="button"
               onClick={() => handleTabChange('membership')}
-              className={`relative z-10 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 rounded-xl font-black text-xs sm:text-sm transition-colors duration-200 cursor-pointer active:scale-98 min-h-[44px] ${
+              className={`relative z-10 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 rounded-xl font-black text-sm sm:text-sm transition-colors duration-200 cursor-pointer active:scale-98 min-h-[44px] ${
                 activeTab === 'membership'
                   ? 'text-white'
                   : 'text-slate-600 hover:text-slate-900'
@@ -1776,7 +1719,7 @@ export function LoginView({
               {loadingMeeting ? (
                 <div className="flex flex-col items-center justify-center py-10 sm:py-14 space-y-3">
                   <div className="w-8 h-8 sm:w-10 sm:h-10 border-4 border-[#0026b3] border-t-transparent rounded-full animate-spin" />
-                  <p className="text-xs sm:text-sm font-bold text-slate-500">
+                  <p className="text-sm sm:text-sm font-bold text-slate-500">
                     {lang === 'th' ? 'กำลังโหลดข้อมูลการประชุมล่าสุด...' : 'Loading latest conference data...'}
                   </p>
                 </div>
@@ -1786,10 +1729,10 @@ export function LoginView({
                     <CalendarX className="w-5 h-5 sm:w-7 sm:h-7" />
                   </div>
                   <div className="space-y-1 sm:space-y-1.5 max-w-md mx-auto">
-                    <h3 className="text-xs xs:text-sm sm:text-lg font-black text-slate-900">
+                    <h3 className="text-sm xs:text-sm sm:text-lg font-black text-slate-900">
                       {lang === 'th' ? 'ยังไม่มีการประชุมที่เปิดรับลงทะเบียนในขณะนี้' : 'No Active Conference Open for Registration'}
                     </h3>
-                    <p className="text-[10px] xs:text-[11px] sm:text-sm text-slate-600 leading-relaxed font-normal">
+                    <p className="text-[13px] xs:text-[13px] sm:text-sm text-slate-600 leading-relaxed font-normal">
                       {lang === 'th'
                         ? 'ขณะนี้ยังไม่มีรอบการประชุมวิชาการที่เปิดรับลงทะเบียน กรุณาติดตามข่าวสารจากทางสมาคมฯ หรือเลือกสมัครสมาชิก TSRM เพื่อรับสิทธิประโยชน์ล่วงหน้า'
                         : 'There are currently no active conference registrations available. Please stay tuned for announcements or apply for TSRM membership to receive advance privileges.'}
@@ -1799,7 +1742,7 @@ export function LoginView({
                     <button
                       type="button"
                       onClick={() => handleTabChange('membership')}
-                      className="inline-flex items-center gap-1.5 sm:gap-2 bg-[#0026b3] hover:bg-[#001f94] text-white font-black text-xs sm:text-sm py-2.5 sm:py-3 px-4 sm:px-6 rounded-xl sm:rounded-2xl shadow-md transition active:scale-98 cursor-pointer"
+                      className="inline-flex items-center gap-1.5 sm:gap-2 bg-[#0026b3] hover:bg-[#001f94] text-white font-black text-sm sm:text-sm py-2.5 sm:py-3 px-4 sm:px-6 rounded-xl sm:rounded-2xl shadow-md transition active:scale-98 cursor-pointer"
                     >
                       <UserPlus className="w-4 h-4" />
                       <span>{lang === 'th' ? 'ไปยังหน้าสมัครสมาชิก TSRM' : 'Go to TSRM Membership'}</span>
@@ -1812,10 +1755,10 @@ export function LoginView({
                   <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-blue-50/90 border border-blue-100/90 rounded-xl sm:rounded-2xl p-3 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 shadow-2xs">
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                        <span className="bg-[#0026b3] text-white text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
+                        <span className="bg-[#0026b3] text-white text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
                           {specialForm ? specialForm.title : lang === 'th' ? 'การประชุมล่าสุด' : 'LATEST CONFERENCE'}
                         </span>
-                        <span className="bg-emerald-100 text-emerald-700 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                           {lang === 'th' ? 'เปิดรับลงทะเบียน' : 'Open for Registration'}
                         </span>
@@ -1823,7 +1766,7 @@ export function LoginView({
                       <h2 className="text-sm sm:text-base lg:text-lg font-black text-slate-900 tracking-tight leading-snug" title={activeMeeting.meeting_name}>
                         {activeMeeting.meeting_name}
                       </h2>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 pt-0.5">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600 pt-0.5">
                         {(activeMeeting.start_date || activeMeeting.meeting_date) && (
                           <span className="flex items-center gap-1 font-medium">
                             <Calendar className="w-3.5 h-3.5 text-[#0026b3] shrink-0" />
@@ -1850,7 +1793,7 @@ export function LoginView({
                           setRegMode('individual');
                           setActiveAttendeeIdx(0);
                         }}
-                        className={`flex items-center justify-center gap-1.5 py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer min-h-[42px] ${
+                        className={`flex items-center justify-center gap-1.5 py-2.5 px-3.5 rounded-xl text-sm sm:text-sm font-bold transition-all cursor-pointer min-h-[42px] ${
                           regMode === 'individual'
                             ? 'bg-[#0026b3] text-white shadow-sm ring-1 ring-blue-900'
                             : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
@@ -1870,7 +1813,7 @@ export function LoginView({
                             setRegMode('group');
                           }
                         }}
-                        className={`flex items-center justify-center gap-1.5 py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer min-h-[42px] ${
+                        className={`flex items-center justify-center gap-1.5 py-2.5 px-3.5 rounded-xl text-sm sm:text-sm font-bold transition-all cursor-pointer min-h-[42px] ${
                           regMode === 'group'
                             ? 'bg-[#0026b3] text-white shadow-sm ring-1 ring-blue-900'
                             : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
@@ -1892,7 +1835,7 @@ export function LoginView({
                         <button
                           type="button"
                           onClick={handleCopyWorkplaceToAll}
-                          className="text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 w-full sm:w-auto min-h-[38px]"
+                          className="text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 w-full sm:w-auto min-h-[38px]"
                           title="คัดลอกสถานที่ทำงานไปยังทุกคน"
                         >
                           <Copy className="w-3.5 h-3.5" />
@@ -1906,14 +1849,14 @@ export function LoginView({
                   {regMode === 'group' && sponsorSession && (
                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3 flex flex-col xs:flex-row items-start xs:items-center justify-between gap-2.5 animate-fade-in">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
                           🏢
                         </div>
                         <div className="min-w-0">
-                          <div className="text-xs font-bold text-slate-800 truncate">
+                          <div className="text-sm font-bold text-slate-800 truncate">
                             {isAdminMode ? 'แอดมินทำรายการในนาม:' : 'เข้าสู่ระบบในนาม:'} <span className="text-blue-700">{sponsorSession.sponsorName}</span> ({sponsorSession.tier} Sponsor)
                           </div>
-                          <div className="text-[11px] text-slate-500 truncate">
+                          <div className="text-[13px] text-slate-500 truncate">
                             ผู้ประสานงาน: {sponsorSession.contactEmail}
                             {isAdminMode && adminCouponQuota
                               ? ` • สิทธิ์คูปองคงเหลือ ${adminCouponQuota.remaining.toLocaleString()}/${adminCouponQuota.total.toLocaleString()} ที่นั่ง`
@@ -1925,7 +1868,7 @@ export function LoginView({
                         <button
                           type="button"
                           onClick={handleSponsorLogout}
-                          className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold px-2.5 py-1 bg-white hover:bg-rose-50 rounded-lg border border-rose-200 transition-colors cursor-pointer self-end xs:self-auto shrink-0"
+                          className="text-[13px] text-rose-600 hover:text-rose-700 font-semibold px-2.5 py-1 bg-white hover:bg-rose-50 rounded-lg border border-rose-200 transition-colors cursor-pointer self-end xs:self-auto shrink-0"
                         >
                           ออกจากระบบบริษัท
                         </button>
@@ -1938,10 +1881,10 @@ export function LoginView({
                     <div className="bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-blue-50/80 border border-blue-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-2 animate-fade-in">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-lg bg-[#0026b3] text-white flex items-center justify-center text-xs font-black">
+                          <span className="w-6 h-6 rounded-lg bg-[#0026b3] text-white flex items-center justify-center text-sm font-black">
                             🎟️
                           </span>
-                          <label className="text-xs sm:text-sm font-extrabold text-slate-800">
+                          <label className="text-sm sm:text-sm font-extrabold text-slate-800">
                             {lang === 'th' ? 'คูปองบริษัท' : 'Company Coupon'}
                           </label>
                         </div>
@@ -1949,7 +1892,7 @@ export function LoginView({
                           <button
                             type="button"
                             onClick={handleClearCoupon}
-                            className="text-[11px] text-rose-600 hover:text-rose-700 font-bold underline cursor-pointer"
+                            className="text-[13px] text-rose-600 hover:text-rose-700 font-bold underline cursor-pointer"
                           >
                             {lang === 'th' ? 'ยกเลิกคูปอง' : 'Remove Coupon'}
                           </button>
@@ -1968,14 +1911,14 @@ export function LoginView({
                               setCouponSuccessMsg('');
                             }}
                             placeholder={lang === 'th' ? 'กรอกคูปองบริษัท' : 'Enter company coupon'}
-                            className="w-full pl-9 pr-3 py-2.5 bg-white text-slate-900 rounded-xl border border-slate-300 text-xs sm:text-sm font-mono font-bold tracking-wider placeholder:font-sans placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400 focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition uppercase min-h-[42px]"
+                            className="w-full pl-9 pr-3 py-2.5 bg-white text-slate-900 rounded-xl border border-slate-300 text-sm sm:text-sm font-mono font-bold tracking-wider placeholder:font-sans placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400 focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition uppercase min-h-[42px]"
                           />
                         </div>
                         <button
                           type="button"
                           onClick={() => handleApplyCoupon()}
                           disabled={couponLoading || !couponCodeInput.trim()}
-                          className="py-2.5 px-4 rounded-xl bg-[#0026b3] hover:bg-[#001f94] text-white font-bold text-xs sm:text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0 shadow-xs flex items-center gap-1.5 min-h-[42px]"
+                          className="py-2.5 px-4 rounded-xl bg-[#0026b3] hover:bg-[#001f94] text-white font-bold text-sm sm:text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0 shadow-xs flex items-center gap-1.5 min-h-[42px]"
                         >
                           {couponLoading ? (
                             <>
@@ -1991,30 +1934,30 @@ export function LoginView({
                         </button>
                       </div>
 
-                      <p className="text-[10.5px] sm:text-[11px] text-slate-600 leading-relaxed">
+                      <p className="text-[13px] sm:text-sm text-slate-600 leading-relaxed">
                         {lang === 'th'
                           ? 'คูปองบริษัทใช้ได้เฉพาะผู้ลงทะเบียนที่เป็นสมาชิกสถานะปกติ ผู้ที่ไม่ใช่สมาชิกลงทะเบียนได้ แต่ชำระในอัตราบุคคลทั่วไป'
                           : 'Company coupons apply to active members only. Non-members can register but pay the non-member rate.'}
                       </p>
 
                       {couponError && (
-                        <div className="text-[11px] font-semibold text-rose-600 bg-rose-50 border border-rose-200/80 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 animate-fade-in">
+                        <div className="text-[13px] font-semibold text-rose-600 bg-rose-50 border border-rose-200/80 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 animate-fade-in">
                           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                           <span>{couponError}</span>
                         </div>
                       )}
 
                       {couponState && (
-                        <div className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/90 px-3 py-2 rounded-xl flex items-start gap-2 animate-fade-in">
+                        <div className="text-[13px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/90 px-3 py-2 rounded-xl flex items-start gap-2 animate-fade-in">
                           <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
                           <div className="space-y-0.5">
                             <div>
                               <span className="font-bold text-emerald-950">{couponState.companyName}</span>
-                              <span className="font-mono font-bold text-blue-800 ml-1.5 bg-blue-100/70 border border-blue-200 px-1.5 py-0.5 rounded text-[10px]">
+                              <span className="font-mono font-bold text-blue-800 ml-1.5 bg-blue-100/70 border border-blue-200 px-1.5 py-0.5 rounded text-[13px]">
                                 {couponState.code}
                               </span>
                             </div>
-                            <div className="text-emerald-700 text-[10.5px]">
+                            <div className="text-emerald-700 text-[13px]">
                               {couponState.description} • {lang === 'th' ? 'ระบบจะนำส่วนลดไปหักลบในขั้นตอนสรุปยอดชำระเงินอัตโนมัติ' : 'Discounts will be automatically calculated on the payment step.'}
                             </div>
                           </div>
@@ -2027,7 +1970,7 @@ export function LoginView({
                   {regMode === 'group' && (
                     <div className="space-y-2 pt-1 border-b border-slate-200/80 pb-3">
                       <div className="flex items-center justify-between flex-wrap gap-2">
-                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <span className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
                           <Layers className="w-3.5 h-3.5 text-[#0026b3]" />
                           <span>{lang === 'th' ? 'รายชื่อผู้ลงทะเบียน (แบ่งหน้าละฟอร์ม):' : 'Attendee Forms (Paginated):'}</span>
                         </span>
@@ -2036,7 +1979,7 @@ export function LoginView({
                           <button
                             type="button"
                             onClick={() => handleRemoveAttendee(activeAttendeeIdx)}
-                            className="text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer"
+                            className="text-sm font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                             <span>{lang === 'th' ? `ลบคนที่ ${activeAttendeeIdx + 1}` : `Remove #${activeAttendeeIdx + 1}`}</span>
@@ -2056,13 +1999,13 @@ export function LoginView({
                               key={att.id}
                               type="button"
                               onClick={() => triggerPersonSwitch(idx)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 border ${
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold transition-all cursor-pointer shrink-0 border ${
                                 isActive
                                   ? 'bg-gradient-to-r from-[#0026b3] to-[#001c8c] text-white border-blue-900 shadow-md ring-2 ring-blue-400/40 scale-105'
                                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
                               }`}
                             >
-                              <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black ${isActive ? 'bg-white text-[#0026b3]' : 'bg-slate-300 text-slate-700'}`}>
+                              <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[13px] font-black ${isActive ? 'bg-white text-[#0026b3]' : 'bg-slate-300 text-slate-700'}`}>
                                 {idx + 1}
                               </span>
                               <span className="truncate">{displayName}</span>
@@ -2077,7 +2020,7 @@ export function LoginView({
                         <button
                           type="button"
                           onClick={handleAddAttendee}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 border-dashed transition cursor-pointer shrink-0 active:scale-95 shadow-2xs"
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 border-dashed transition cursor-pointer shrink-0 active:scale-95 shadow-2xs"
                         >
                           <Plus className="w-3.5 h-3.5" />
                           <span>{lang === 'th' ? 'เพิ่มผู้ลงทะเบียน' : 'Add Person'}</span>
@@ -2091,7 +2034,7 @@ export function LoginView({
                     {/* Fast Switch Pulse & Flash Overlay */}
                     {isSwitchingPerson && (
                       <div className="absolute inset-0 z-40 bg-white/75 backdrop-blur-[2px] rounded-3xl flex items-center justify-center animate-fade-in pointer-events-none transition-all">
-                        <div className="bg-[#0026b3] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm font-black ring-4 ring-blue-300/50 scale-105 transition-transform animate-pulse">
+                        <div className="bg-[#0026b3] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-sm sm:text-sm font-black ring-4 ring-blue-300/50 scale-105 transition-transform animate-pulse">
                           <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-[#4ade80] animate-spin" />
                           <span>{lang === 'th' ? `สลับข้อมูลไปยัง ${switchingLabel}...` : `Switching to ${switchingLabel}...`}</span>
                         </div>
@@ -2100,12 +2043,12 @@ export function LoginView({
 
                     <form onSubmit={handleSubmitRegistration} key={`attendee-form-${currentAttendee.id}`} className="space-y-3 sm:space-y-4 animate-fade-in">
                       {regMode === 'group' && (
-                        <div className="flex items-center justify-between bg-blue-50/70 border border-blue-100 rounded-2xl px-3.5 py-2.5 text-xs text-blue-900 font-bold shadow-2xs">
+                        <div className="flex items-center justify-between bg-blue-50/70 border border-blue-100 rounded-2xl px-3.5 py-2.5 text-sm text-blue-900 font-bold shadow-2xs">
                           <span className="flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-[#0026b3] animate-pulse" />
                             {lang === 'th' ? `ข้อมูลคนที่ ${activeAttendeeIdx + 1} จากทั้งหมด ${attendees.length} ท่าน` : `Attendee #${activeAttendeeIdx + 1} of ${attendees.length}`}
                           </span>
-                          <span className="text-[11px] text-blue-700 font-medium truncate max-w-[140px] xs:max-w-xs">({currentAttendee.nameTh || (lang === 'th' ? 'ยังไม่ได้ระบุชื่อ' : 'No name')})</span>
+                          <span className="text-[13px] text-blue-700 font-medium truncate max-w-[140px] xs:max-w-xs">({currentAttendee.nameTh || (lang === 'th' ? 'ยังไม่ได้ระบุชื่อ' : 'No name')})</span>
                         </div>
                       )}
 
@@ -2113,13 +2056,13 @@ export function LoginView({
                         {/* 1. รหัสสมาชิก - ช่องแรกสุด พร้อมฟังก์ชันออโต้ฟิล */}
                         <div className="sm:col-span-2 bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-blue-50/80 border border-blue-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-1.5 sm:space-y-2">
                           <div className="flex items-center justify-between flex-wrap gap-1.5">
-                            <label className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
+                            <label className="text-sm sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
                               <Hash className="w-4 h-4 text-[#0026b3]" />
                               <span>
                                 {lang === 'th' ? 'รหัสสมาชิก TSRM' : 'TSRM Member No.'}
                               </span>
                             </label>
-                            <span className="text-[10px] sm:text-[11px] text-blue-700 font-extrabold bg-blue-100/90 border border-blue-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            <span className="text-[13px] sm:text-sm text-blue-700 font-extrabold bg-blue-100/90 border border-blue-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
                               <Sparkles className="w-3 h-3 text-blue-600" />
                               <span>{lang === 'th' ? 'กรอกเลขสมาชิกเพื่อดึงข้อมูลอัตโนมัติ' : 'Auto-fills profile from Member ID'}</span>
                             </span>
@@ -2156,7 +2099,7 @@ export function LoginView({
                           {/* Debounced Member Check Message below input */}
                           {currentAttendee.memberCheckStatus && currentAttendee.memberCheckStatus !== 'idle' && (
                             <div
-                              className={`mt-1.5 text-[11px] font-bold flex items-center gap-1.5 transition-all animate-fade-in ${
+                              className={`mt-1.5 text-[13px] font-bold flex items-center gap-1.5 transition-all animate-fade-in ${
                                 currentAttendee.memberCheckStatus === 'valid'
                                   ? 'text-emerald-800 bg-emerald-100/90 border border-emerald-300/80 px-2.5 py-1 rounded-lg'
                                   : currentAttendee.memberCheckStatus === 'checking'
@@ -2173,7 +2116,7 @@ export function LoginView({
 
                         {/* Member Data Lock Notice */}
                         {currentAttendee.memberCheckStatus === 'valid' && (
-                          <div className="sm:col-span-2 bg-emerald-50/90 border border-emerald-200/90 rounded-xl px-3 py-2 flex items-center justify-between text-xs text-emerald-900 font-semibold animate-fade-in shadow-2xs">
+                          <div className="sm:col-span-2 bg-emerald-50/90 border border-emerald-200/90 rounded-xl px-3 py-2 flex items-center justify-between text-sm text-emerald-900 font-semibold animate-fade-in shadow-2xs">
                             <div className="flex items-center gap-2">
                               <Lock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                               <span>{lang === 'th' ? 'ระบบล็อกข้อมูลที่ดึงจากฐานข้อมูลสมาชิกเพื่อความถูกต้อง ช่องที่ยังว่างสามารถกรอกเพิ่มเติมได้' : 'Fields filled from the member profile are locked. Empty fields can still be edited.'}</span>
@@ -2184,11 +2127,11 @@ export function LoginView({
                         {/* 2. ชื่อ-นามสกุล (ไทย) */}
                         <div>
                           <div className="flex items-center justify-between mb-1">
-                            <label className="text-[11px] sm:text-xs font-bold text-slate-700">
+                            <label className="text-[13px] sm:text-sm font-bold text-slate-700">
                               {lang === 'th' ? 'ชื่อ-นามสกุล' : 'Full Name (Thai)'} <span className="text-rose-500 font-bold">*</span>
                             </label>
                             {isMemberFieldLocked('nameTh') && (
-                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              <span className="inline-flex items-center gap-1 text-[13px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                                 <Lock className="w-2.5 h-2.5" />
                                 {lang === 'th' ? 'ข้อมูลสมาชิก' : 'Member DB'}
                               </span>
@@ -2214,11 +2157,11 @@ export function LoginView({
                         {/* 3. ชื่อ-นามสกุล (อังกฤษ) */}
                         <div>
                           <div className="flex items-center justify-between mb-1">
-                            <label className="text-[11px] sm:text-xs font-bold text-slate-700">
+                            <label className="text-[13px] sm:text-sm font-bold text-slate-700">
                               {lang === 'th' ? 'ชื่อ-นามสกุล ภาษาอังกฤษ' : 'Full Name (English)'} <span className="text-rose-500 font-bold">*</span>
                             </label>
                             {isMemberFieldLocked('nameEn') && (
-                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              <span className="inline-flex items-center gap-1 text-[13px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                                 <Lock className="w-2.5 h-2.5" />
                                 {lang === 'th' ? 'ข้อมูลสมาชิก' : 'Member DB'}
                               </span>
@@ -2250,7 +2193,7 @@ export function LoginView({
                               <span className="flex items-center justify-between w-full">
                                 <span>{lang === 'th' ? 'อีเมล' : 'Email Address'}</span>
                                 {isMemberFieldLocked('email') && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                  <span className="inline-flex items-center gap-1 text-[13px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                                     <Lock className="w-2.5 h-2.5" />
                                     {lang === 'th' ? 'ข้อมูลสมาชิก' : 'Member DB'}
                                   </span>
@@ -2272,7 +2215,7 @@ export function LoginView({
                         {/* 5. หน่วยงาน */}
                         <div>
                           <div className="flex items-center justify-between mb-1">
-                            <label className="text-[11px] sm:text-xs font-bold text-slate-700">
+                            <label className="text-[13px] sm:text-sm font-bold text-slate-700">
                               {lang === 'th' ? 'หน่วยงาน / บริษัท' : 'Organization / Workplace'} <span className="text-rose-500 font-bold">*</span>
                             </label>
                           </div>
@@ -2302,7 +2245,7 @@ export function LoginView({
                               <span className="flex items-center justify-between w-full">
                                 <span>{lang === 'th' ? 'ตำแหน่ง' : 'Position'}</span>
                                 {isMemberFieldLocked('position') && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                  <span className="inline-flex items-center gap-1 text-[13px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                                     <Lock className="w-2.5 h-2.5" />
                                     {lang === 'th' ? 'ข้อมูลสมาชิก' : 'Member DB'}
                                   </span>
@@ -2314,35 +2257,35 @@ export function LoginView({
                       </div>
 
                       {/* Program Selection Cards for Active Attendee */}
-                      <div className="space-y-2 pt-1 sm:pt-2">
+                      <div id="activity-list" className="space-y-2 pt-1 sm:pt-2 scroll-mt-36 lg:scroll-mt-24">
                         <div className="flex items-center justify-between">
-                          <label className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
+                          <label className="text-sm sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
                             <Award className="w-4 h-4 text-[#0026b3]" />
                             <span>{lang === 'th' ? 'เลือกหลักสูตรที่ต้องการเข้าร่วม' : 'Select Program / Courses'}</span>
                             <span className="text-rose-500 font-bold">*</span>
                           </label>
-                          <span className="text-[10px] xs:text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                          <span className="text-[13px] xs:text-[13px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
                             {lang === 'th' ? `เลือกแล้ว ${currentAttendee.selectedPrograms.length} รายการ` : `${currentAttendee.selectedPrograms.length} selected`}
                           </span>
                         </div>
 
                         <div className="grid grid-cols-1 gap-2">
                           {currentAddOn && regMode === 'group' && (
-                            <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-[11px] sm:text-xs font-semibold leading-relaxed">
+                            <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-[13px] sm:text-sm font-semibold leading-relaxed">
                               {lang === 'th'
                                 ? `ผู้ลงทะเบียนท่านนี้ลงทะเบียนงานประชุมนี้ไว้แล้ว${currentAddOn.ticketCode ? ` รหัส ${currentAddOn.ticketCode}` : ''} เลือกเฉพาะกิจกรรมที่ต้องการลงเพิ่ม คิดค่าใช้จ่ายเฉพาะกิจกรรมที่เพิ่ม และไม่ใช้สิทธิ์คูปองของบริษัท เมื่อเจ้าหน้าที่อนุมัติ ระบบจะรวมกิจกรรมเข้ากับรายการลงทะเบียนเดิมของผู้ลงทะเบียนท่านนี้`
                                 : `This attendee is already registered${currentAddOn.ticketCode ? ` (${currentAddOn.ticketCode})` : ''}. Select only the activities to add; only those are charged and the company coupon is not applied. Once approved, they are merged into this attendee's existing registration.`}
                             </div>
                           )}
                           {activeAddOn && (
-                            <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-[11px] sm:text-xs font-semibold leading-relaxed">
+                            <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-[13px] sm:text-sm font-semibold leading-relaxed">
                               {lang === 'th'
                                 ? `ท่านลงทะเบียนงานประชุมนี้ไว้แล้ว${activeAddOn.ticketCode ? ` รหัส ${activeAddOn.ticketCode}` : ''}${activeAddOn.originalStatus === 'pending' ? ' ซึ่งอยู่ระหว่างรอเจ้าหน้าที่ตรวจสอบ' : ''} เลือกเฉพาะกิจกรรมที่ต้องการเพิ่ม ยอดชำระคิดเฉพาะกิจกรรมที่เพิ่ม และระบบจะรวมเข้ากับรายการเดิมหลังเจ้าหน้าที่ตรวจสอบการชำระเงิน`
                                 : `You are already registered${activeAddOn.ticketCode ? ` (${activeAddOn.ticketCode})` : ''}${activeAddOn.originalStatus === 'pending' ? ', pending staff review' : ''}. Select only the activities you want to add; you pay only for those, and they will be merged into your registration after payment is verified.`}
                             </div>
                           )}
                           {activePriorReg && (
-                            <div className="p-3 rounded-xl border border-sky-200 bg-sky-50 text-sky-800 text-[11px] sm:text-xs font-semibold leading-relaxed">
+                            <div className="p-3 rounded-xl border border-sky-200 bg-sky-50 text-sky-800 text-[13px] sm:text-sm font-semibold leading-relaxed">
                               {lang === 'th'
                                 ? `สมาชิกท่านนี้ลงทะเบียนงานประชุมนี้ไว้แล้ว${activePriorReg.ticketCode ? ` รหัส ${activePriorReg.ticketCode}` : ''}${activePriorReg.originalKind === 'group' ? ' แบบกลุ่ม' : ''} เลือกกิจกรรมที่ยังไม่ได้ลงทะเบียน ระบบจะสร้างเป็นรายการลงทะเบียนใหม่แยกจากรายการเดิม`
                                 : `This member is already registered${activePriorReg.ticketCode ? ` (${activePriorReg.ticketCode})` : ''}. Select activities not yet registered; they will be submitted as a new, separate registration.`}
@@ -2362,7 +2305,7 @@ export function LoginView({
                                   className="p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 bg-slate-100/80 text-slate-500 flex items-center justify-between gap-3 cursor-not-allowed"
                                 >
                                   <div className="flex-1 min-w-0">
-                                    <span className={`inline-block text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded border mb-1 ${
+                                    <span className={`inline-block text-xs font-black px-2 py-0.5 rounded border mb-1 ${
                                       isRegistrationPending
                                         ? 'bg-amber-100 text-amber-700 border-amber-200'
                                         : 'bg-emerald-100 text-emerald-700 border-emerald-200'
@@ -2371,7 +2314,7 @@ export function LoginView({
                                         ? (lang === 'th' ? 'ลงทะเบียนแล้ว รอตรวจสอบ' : 'Registered, pending review')
                                         : (lang === 'th' ? 'ลงทะเบียนแล้ว' : 'Registered')}
                                     </span>
-                                    <h4 className="text-xs sm:text-sm font-bold leading-snug" title={act.name}>
+                                    <h4 className="text-sm sm:text-sm font-bold leading-snug" title={act.name}>
                                       {act.name}
                                     </h4>
                                   </div>
@@ -2399,7 +2342,7 @@ export function LoginView({
                               >
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                    <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded shrink-0 ${
+                                    <span className={`text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded shrink-0 ${
                                       act.type === 'main'
                                         ? (isSelected ? 'bg-[#0026b3] text-white' : 'bg-slate-200 text-slate-700')
                                         : (isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700')
@@ -2410,7 +2353,7 @@ export function LoginView({
                                     {(() => {
                                       const fmt = act.format || (act.type === 'workshop' ? 'onsite' : 'both');
                                       return (
-                                        <span className={`text-[9px] sm:text-[10px] font-extrabold px-2 py-0.5 rounded shrink-0 border ${
+                                        <span className={`text-xs font-extrabold px-2 py-0.5 rounded shrink-0 border ${
                                           fmt === 'online'
                                             ? (isSelected ? 'bg-blue-100 text-[#0026b3] border-blue-300' : 'bg-blue-50 text-blue-700 border-blue-200')
                                             : fmt === 'both'
@@ -2423,14 +2366,14 @@ export function LoginView({
                                     })()}
 
                                     {act.date && (
-                                      <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                                      <span className="text-[13px] text-slate-500 flex items-center gap-1">
                                         <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
                                         <span className="truncate">{act.date}</span>
                                       </span>
                                     )}
 
                                     {seatsLeft !== null && (
-                                      <span className={`text-[9px] sm:text-[10px] font-extrabold px-2 py-0.5 rounded shrink-0 border ${
+                                      <span className={`text-xs font-extrabold px-2 py-0.5 rounded shrink-0 border ${
                                         isFull
                                           ? 'bg-rose-50 text-rose-700 border-rose-200'
                                           : seatsLeft <= 10
@@ -2443,7 +2386,7 @@ export function LoginView({
                                       </span>
                                     )}
                                   </div>
-                                  <h4 className={`text-xs sm:text-sm font-extrabold leading-snug ${isFull ? 'text-slate-500' : 'text-slate-900'}`} title={act.name}>
+                                  <h4 className={`text-sm sm:text-sm font-extrabold leading-snug ${isFull ? 'text-slate-500' : 'text-slate-900'}`} title={act.name}>
                                     {act.name}
                                   </h4>
                                 </div>
@@ -2473,7 +2416,7 @@ export function LoginView({
 
                         return (
                           <div className="space-y-1.5 pt-1">
-                            <label className="text-xs sm:text-sm font-black text-slate-800 block">
+                            <label className="text-sm sm:text-sm font-black text-slate-800 block">
                               {lang === 'th' ? 'รูปแบบการเข้าร่วม' : 'Attendance Format'}
                             </label>
 
@@ -2484,7 +2427,7 @@ export function LoginView({
                                 onClick={() => {
                                   if (!hasOnlineOnly) setAttendanceTypeForCurrent('onsite');
                                 }}
-                                className={`py-3 px-3 sm:px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 min-h-[44px] ${
+                                className={`py-3 px-3 sm:px-4 rounded-xl border text-sm sm:text-sm font-bold transition-all flex items-center justify-center gap-2 min-h-[44px] ${
                                   hasOnlineOnly
                                     ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
                                     : currentAttendee.attendanceType === 'onsite'
@@ -2502,7 +2445,7 @@ export function LoginView({
                                 onClick={() => {
                                   if (!hasOnsiteOnly) setAttendanceTypeForCurrent('online');
                                 }}
-                                className={`py-3 px-3 sm:px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 min-h-[44px] ${
+                                className={`py-3 px-3 sm:px-4 rounded-xl border text-sm sm:text-sm font-bold transition-all flex items-center justify-center gap-2 min-h-[44px] ${
                                   hasOnsiteOnly
                                     ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
                                     : currentAttendee.attendanceType === 'online'
@@ -2516,7 +2459,7 @@ export function LoginView({
                             </div>
 
                             {hasOnsiteOnly && (
-                              <div className="flex items-start gap-1.5 p-2.5 rounded-xl bg-amber-50/90 border border-amber-200/70 text-amber-800 text-xs leading-relaxed">
+                              <div className="flex items-start gap-1.5 p-2.5 rounded-xl bg-amber-50/90 border border-amber-200/70 text-amber-800 text-sm leading-relaxed">
                                 <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                                 <span>
                                   {lang === 'th'
@@ -2527,7 +2470,7 @@ export function LoginView({
                             )}
 
                             {showMixedNotice && (
-                              <div className="flex items-start gap-1.5 p-2.5 rounded-xl bg-blue-50/90 border border-blue-200/70 text-blue-800 text-xs leading-relaxed">
+                              <div className="flex items-start gap-1.5 p-2.5 rounded-xl bg-blue-50/90 border border-blue-200/70 text-blue-800 text-sm leading-relaxed">
                                 <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                                 <span>
                                   {lang === 'th'
@@ -2538,7 +2481,7 @@ export function LoginView({
                             )}
 
                             {hasOnlineOnly && (
-                              <div className="flex items-start gap-1.5 p-2.5 rounded-xl bg-blue-50/90 border border-blue-200/70 text-blue-800 text-xs leading-relaxed">
+                              <div className="flex items-start gap-1.5 p-2.5 rounded-xl bg-blue-50/90 border border-blue-200/70 text-blue-800 text-sm leading-relaxed">
                                 <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                                 <span>
                                   {lang === 'th'
@@ -2569,14 +2512,14 @@ export function LoginView({
                               }
 
                               return (
-                                <div className="p-2.5 sm:p-3 rounded-xl bg-amber-50/90 border border-amber-200/90 text-amber-950 text-xs animate-fade-in shadow-2xs flex items-center gap-2">
+                                <div className="p-2.5 sm:p-3 rounded-xl bg-amber-50/90 border border-amber-200/90 text-amber-950 text-sm animate-fade-in shadow-2xs flex items-center gap-2">
                                   <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
                                   <div className="flex-1 flex flex-wrap items-center gap-x-2 gap-y-1.5 leading-relaxed">
                                     <span className="font-medium">{noticeText}</span>
                                     <button
                                       type="button"
                                       onClick={() => setIsChangeFormatOpen(true)}
-                                      className="inline-flex items-center gap-1 font-bold text-[#0026b3] hover:text-blue-900 bg-white hover:bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg transition-all active:scale-95 shadow-2xs text-[11px] sm:text-xs cursor-pointer shrink-0"
+                                      className="inline-flex items-center gap-1 font-bold text-[#0026b3] hover:text-blue-900 bg-white hover:bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg transition-all active:scale-95 shadow-2xs text-[13px] sm:text-sm cursor-pointer shrink-0"
                                     >
                                       <span>{lang === 'th' ? 'แจ้งเปลี่ยนรูปแบบ' : 'Change Format Request'}</span>
                                       <ExternalLink className="w-3 h-3 text-[#0026b3] shrink-0" />
@@ -2596,13 +2539,13 @@ export function LoginView({
                             type="button"
                             disabled={activeAttendeeIdx === 0}
                             onClick={() => setActiveAttendeeIdx(Math.max(0, activeAttendeeIdx - 1))}
-                            className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1 transition cursor-pointer min-h-[40px]"
+                            className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 text-slate-700 text-sm font-bold rounded-xl flex items-center gap-1 transition cursor-pointer min-h-[40px]"
                           >
                             <ArrowLeft className="w-3.5 h-3.5" />
                             <span>{lang === 'th' ? 'คนก่อนหน้า' : 'Previous Person'}</span>
                           </button>
 
-                          <span className="text-xs font-bold text-slate-500">
+                          <span className="text-sm font-bold text-slate-500">
                             {activeAttendeeIdx + 1} / {attendees.length}
                           </span>
 
@@ -2610,7 +2553,7 @@ export function LoginView({
                             <button
                               type="button"
                               onClick={() => setActiveAttendeeIdx(activeAttendeeIdx + 1)}
-                              className="px-3.5 py-2.5 bg-[#0026b3] hover:bg-[#001f94] text-white text-xs font-bold rounded-xl flex items-center gap-1 transition cursor-pointer shadow-xs min-h-[40px]"
+                              className="px-3.5 py-2.5 bg-[#0026b3] hover:bg-[#001f94] text-white text-sm font-bold rounded-xl flex items-center gap-1 transition cursor-pointer shadow-xs min-h-[40px]"
                             >
                               <span>{lang === 'th' ? 'คนถัดไป' : 'Next Person'}</span>
                               <ArrowRight className="w-3.5 h-3.5" />
@@ -2619,7 +2562,7 @@ export function LoginView({
                             <button
                               type="button"
                               onClick={handleAddAttendee}
-                              className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1 transition cursor-pointer shadow-xs min-h-[40px]"
+                              className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl flex items-center gap-1 transition cursor-pointer shadow-xs min-h-[40px]"
                             >
                               <Plus className="w-3.5 h-3.5" />
                               <span>{lang === 'th' ? 'เพิ่มคนถัดไป' : 'Add Next'}</span>
@@ -2632,7 +2575,7 @@ export function LoginView({
                       <button
                         type="submit"
                         disabled={verifyingMember}
-                        className={`w-full font-black py-3 sm:py-3.5 px-4 sm:px-6 rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl transition-all flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-base border border-blue-400/20 relative overflow-hidden mt-3 sm:mt-4 min-h-[48px] sm:min-h-[52px] ${
+                        className={`w-full font-black py-3 sm:py-3.5 px-4 sm:px-6 rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl transition-all flex items-center justify-center gap-2 sm:gap-3 text-sm sm:text-base border border-blue-400/20 relative overflow-hidden mt-3 sm:mt-4 min-h-[48px] sm:min-h-[52px] ${
                           verifyingMember
                             ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
                             : 'bg-gradient-to-r from-[#0026b3] via-[#0022a1] to-[#001c8c] hover:brightness-110 text-white shadow-blue-900/30 hover:shadow-blue-900/40 cursor-pointer active:scale-[0.99] group'
@@ -2681,7 +2624,7 @@ export function LoginView({
         {/* Security Badge */}
         <div className={`${isAdminMode ? 'hidden' : ''} text-center pt-4 sm:pt-6 pb-2 space-y-2`}>
           <div className="flex items-center justify-center gap-2">
-            <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-slate-500">
+            <span className="inline-flex items-center gap-1.5 text-[13px] sm:text-sm font-bold text-slate-500">
               <Shield className="w-3.5 h-3.5 text-[#0026b3]" />
               {t.login.securityBadge}
             </span>
@@ -2704,7 +2647,7 @@ export function LoginView({
               <p className="text-sm sm:text-base font-extrabold text-white leading-tight">
                 {lang === 'th' ? 'หากต้องการใบเสร็จรับเงิน' : 'Need an official receipt?'}
               </p>
-              <p className="text-xs sm:text-sm text-blue-100/90 leading-relaxed">
+              <p className="text-sm sm:text-sm text-blue-100/90 leading-relaxed">
                 {lang === 'th'
                   ? 'ขอเป็นรูปแบบการพิมพ์ ให้ออกใบเสร็จในนามใคร ที่อยู่ เลขประจำตัวผู้เสียภาษี เบอร์โทรศัพท์ กรุณาแจ้งที่'
                   : 'For a printed receipt, please send the name to issue it to, address, tax ID and phone number to'}
@@ -2723,7 +2666,7 @@ export function LoginView({
               window.open(gmailUrl, '_blank', 'noopener,noreferrer');
             }}
             title={lang === 'th' ? 'ส่งอีเมลขอใบเสร็จรับเงิน' : 'Email us to request a receipt'}
-            className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md rounded-xl text-xs sm:text-sm font-bold transition border border-white/20 active:scale-95 shadow-2xs group min-h-[38px] shrink-0"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md rounded-xl text-sm sm:text-sm font-bold transition border border-white/20 active:scale-95 shadow-2xs group min-h-[38px] shrink-0"
           >
             <Mail className="w-4 h-4 text-blue-200 group-hover:scale-110 transition-transform shrink-0" />
             <span className="font-semibold break-all">tsrmcongress@gmail.com</span>
@@ -2731,12 +2674,6 @@ export function LoginView({
         </div>
       </footer>
       )}
-
-      {/* Participant Search Modal */}
-      <ParticipantSearchModal
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-      />
 
       {/* Expired Member Status Feedback Modal */}
       <ExpiredMemberModal
@@ -2769,13 +2706,6 @@ export function LoginView({
           setSponsorSession(sessionData);
           setRegMode('group');
         }}
-      />
-
-      {/* Profile & Sponsor Update Modal */}
-      <ProfileAndSponsorUpdateModal
-        isOpen={isUpdateModalOpen}
-        onClose={() => setIsUpdateModalOpen(false)}
-        lang={lang}
       />
     </div>
   );

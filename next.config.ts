@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  images: {
+    // รูปตารางกิจกรรมที่แอดมินอัปโหลดเก็บบน Vercel Blob
+    remotePatterns: [
+      { protocol: 'https', hostname: '*.public.blob.vercel-storage.com', pathname: '/programs/**' },
+    ],
+  },
   experimental: {
     optimizePackageImports: ['lucide-react', 'html5-qrcode'],
   },

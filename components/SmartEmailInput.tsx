@@ -272,14 +272,14 @@ export function SmartEmailInput({
       {showLabel && (
         <label
           htmlFor={id}
-          className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1 flex items-center justify-between"
+          className="block text-[13px] sm:text-sm font-bold text-slate-700 mb-1 flex items-center justify-between"
         >
           <span className="flex items-center gap-1">
             {label || defaultLabel}
             {required && <span className="text-rose-500 font-bold">*</span>}
           </span>
           {personalOnly && (
-            <span className="text-[10px] text-slate-400 font-normal">
+            <span className="text-[13px] text-slate-400 font-normal">
               {lang === 'th' ? 'เฉพาะอีเมลส่วนตัว เช่น Gmail, Hotmail, Outlook' : 'Personal email only'}
             </span>
           )}
@@ -301,16 +301,16 @@ export function SmartEmailInput({
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
           onBlur={handleInputBlur}
-          className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 focus:outline-none transition ${inputClassName}`}
+          className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-sm sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:border-[#0026b3] focus:ring-2 focus:ring-[#0026b3]/20 focus:outline-none transition ${inputClassName}`}
         />
       </div>
 
       {/* Suggestion Dropdown เมื่อพิมพ์ @ */}
       {isOpen && filteredSuggestions.length > 0 && (
         <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-slate-200 shadow-xl z-50 overflow-hidden animate-fade-in divide-y divide-slate-100 max-h-56 overflow-y-auto">
-          <div className="px-3 py-1.5 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+          <div className="px-3 py-1.5 bg-slate-50 text-[13px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
             <span>{lang === 'th' ? 'เลือกโดเมนด่วน' : 'Quick Domain Select'}</span>
-            <span className="text-[9px] text-slate-400 font-normal">{lang === 'th' ? 'กด Tab หรือ Enter' : 'Tab/Enter to pick'}</span>
+            <span className="text-sm text-slate-400 font-normal">{lang === 'th' ? 'กด Tab หรือ Enter' : 'Tab/Enter to pick'}</span>
           </div>
           {filteredSuggestions.slice(0, 6).map((item, idx) => {
             const isSelected = idx === selectedIndex;
@@ -322,7 +322,7 @@ export function SmartEmailInput({
                   e.preventDefault();
                   handleSelectSuggestion(item);
                 }}
-                className={`w-full text-left px-3.5 py-2 text-xs transition flex items-center justify-between cursor-pointer ${
+                className={`w-full text-left px-3.5 py-2 text-sm transition flex items-center justify-between cursor-pointer ${
                   isSelected ? 'bg-blue-50 text-[#0026b3] font-bold' : 'hover:bg-slate-50 text-slate-700'
                 }`}
               >
@@ -339,7 +339,7 @@ export function SmartEmailInput({
 
       {/* Typo Correction Banner (ตรวจจับคำผิด เช่น gmali.com, hotmial.com ฯลฯ) */}
       {typoCorrection && typoCorrection !== value && (
-        <div className="mt-1.5 p-2 sm:p-2.5 bg-amber-50 border border-amber-300/90 rounded-xl text-[11px] sm:text-xs text-amber-900 flex items-center justify-between gap-2 animate-fade-in shadow-2xs">
+        <div className="mt-1.5 p-2 sm:p-2.5 bg-amber-50 border border-amber-300/90 rounded-xl text-[13px] sm:text-sm text-amber-900 flex items-center justify-between gap-2 animate-fade-in shadow-2xs">
           <div className="flex items-center gap-1.5 min-w-0">
             <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
             <span className="truncate">
@@ -351,7 +351,7 @@ export function SmartEmailInput({
           <button
             type="button"
             onClick={() => handleSelectSuggestion(typoCorrection)}
-            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[10.5px] sm:text-xs font-bold rounded-lg shadow-xs transition shrink-0 cursor-pointer active:scale-95"
+            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[13px] sm:text-sm font-bold rounded-lg shadow-xs transition shrink-0 cursor-pointer active:scale-95"
           >
             {lang === 'th' ? 'แก้ไขเป็นอันนี้' : 'Apply'}
           </button>
@@ -360,7 +360,7 @@ export function SmartEmailInput({
 
       {/* คำเตือนอีเมลองค์กร */}
       {showOrgEmailWarning && (
-        <div className="mt-1.5 p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-1.5 animate-fade-in font-medium">
+        <div className="mt-1.5 p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-start gap-1.5 animate-fade-in font-medium">
           <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
           <span>{personalEmailRequiredMessage(lang === 'th' ? 'th' : 'en')}</span>
         </div>
@@ -368,7 +368,7 @@ export function SmartEmailInput({
 
       {/* Guidance Helper Note */}
       {showHelperText && (
-        <div className="flex items-start gap-1.5 pt-1 text-[10px] sm:text-[11px] text-slate-500 leading-normal">
+        <div className="flex items-start gap-1.5 pt-1 text-[13px] sm:text-sm text-slate-500 leading-normal">
           <Info className="w-3.5 h-3.5 text-[#0026b3] shrink-0 mt-0.5" />
           <span>
             {helperText || (lang === 'th'

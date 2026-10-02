@@ -178,7 +178,7 @@ export function PositionSelect({
       {showLabel && (
         <label
           htmlFor={id}
-          className="block text-[11px] sm:text-xs font-bold text-slate-700 mb-1 flex items-center gap-1"
+          className="block text-[13px] sm:text-sm font-bold text-slate-700 mb-1 flex items-center gap-1"
         >
           <span>{label || defaultLabel}</span>
           {required && <span className="text-rose-500 font-bold">*</span>}
@@ -198,7 +198,7 @@ export function PositionSelect({
           value={normalizedVal}
           onChange={handleChange}
           disabled={disabled}
-          className={`w-full rounded-xl border border-slate-200 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent transition appearance-none cursor-pointer bg-slate-50 text-slate-900 disabled:opacity-60 disabled:cursor-not-allowed ${
+          className={`w-full rounded-xl border border-slate-200 text-sm sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0026b3] focus:border-transparent transition appearance-none cursor-pointer bg-slate-50 text-slate-900 disabled:opacity-60 disabled:cursor-not-allowed ${
             showIcon ? 'pl-9 sm:pl-10 pr-9 py-2 sm:py-2.5' : 'px-3.5 pr-9 py-2 sm:py-2.5'
           } ${selectClassName}`}
         >
@@ -223,7 +223,7 @@ export function PositionSelect({
       {showOtherInput && isOther && onOtherChange && (
         <div className="pt-1.5 animate-fade-in space-y-1">
           {otherLabel && (
-            <label className="block text-[11px] sm:text-xs font-bold text-slate-700">
+            <label className="block text-[13px] sm:text-sm font-bold text-slate-700">
               {otherLabel}
             </label>
           )}
@@ -233,7 +233,7 @@ export function PositionSelect({
             onChange={(e) => onOtherChange(e.target.value)}
             placeholder={defaultOtherPlaceholder}
             disabled={disabled}
-            className={`w-full px-3 sm:px-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition ${otherInputClassName}`}
+            className={`w-full px-3 sm:px-3.5 py-2 sm:py-2.5 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 text-sm sm:text-sm font-medium focus:bg-white focus:ring-2 focus:ring-[#0026b3] focus:outline-none transition ${otherInputClassName}`}
           />
         </div>
       )}

@@ -108,6 +108,7 @@ model meetings {
   sponsor_group_members sponsor_group_members[]
   online_meeting_links  online_meeting_links[]
   special_forms         special_forms[]
+  program_images        meeting_program_images[]
 }
 
 model meeting_daily_checkins {
@@ -420,4 +421,23 @@ model special_form_sponsors {
   @@unique([form_id, sponsor_id], map: "uq_special_form_sponsor")
   @@index([sponsor_id], map: "idx_special_form_sponsors_sponsor")
   @@map("special_form_sponsors")
+}
+
+/// รูปตารางกิจกรรม (โปรแกรม) ของแต่ละการประชุม แสดงในหน้าลงทะเบียน เรียงตามวัน แล้วตามหมายเลขเวิร์กช็อป
+model meeting_program_images {
+  id           BigInt   @id @default(autoincrement())
+  meeting_id   String   @db.VarChar(50)
+  program_date DateTime @db.Date
+  /// main = โปรแกรมหลัก, workshop = เวิร์กช็อป
+  kind         String   @default("main") @db.VarChar(20)
+  workshop_no  Int?
+  topic        String   @default("") @db.VarChar(255)
+  image_url    String   @db.VarChar(1000)
+  sort_order   Int      @default(0)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  meeting      meetings @relation(fields: [meeting_id], references: [meeting_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([meeting_id, program_date], map: "idx_program_images_meeting_date")
 }

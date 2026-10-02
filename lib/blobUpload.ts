@@ -17,7 +17,7 @@ export interface UploadImageResult {
  */
 export async function uploadImageToStorage(
   file: File,
-  folder: 'slips' | 'avatars' | 'documents' = 'slips'
+  folder: 'slips' | 'avatars' | 'documents' | 'programs' = 'slips'
 ): Promise<UploadImageResult> {
   const originalSize = file.size;
 
@@ -25,11 +25,13 @@ export async function uploadImageToStorage(
   const isImage = file.type.startsWith('image/') || (!isPdf && /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(file.name));
 
   // 1. Only compress image files to max 1280px and ~200-500 KB; keep PDFs and other documents intact
+  // รูปตารางกิจกรรมมีตัวอักษรเล็ก จึงเก็บความละเอียดสูงกว่าเพื่อให้ซูมอ่านได้
+  const maxDimension = folder === 'programs' ? 2400 : 1280;
   const fileToUpload = isImage
     ? await compressImage(file, {
-        maxWidth: 1280,
-        maxHeight: 1280,
-        quality: 0.82,
+        maxWidth: maxDimension,
+        maxHeight: maxDimension,
+        quality: folder === 'programs' ? 0.88 : 0.82,
         mimeType: 'image/jpeg',
       })
     : file;

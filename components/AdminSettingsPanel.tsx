@@ -19,12 +19,14 @@ import {
   MapPin,
   Sparkles,
   DollarSign,
-  Eye
+  Eye,
+  Images
 } from 'lucide-react';
 import { SystemSettings, DEFAULT_SYSTEM_SETTINGS } from '@/lib/services/settingsService';
 import { ReceiptModal } from '@/components/ReceiptModal';
 import { SlipRejectionPreviewModal } from '@/components/SlipRejectionPreviewModal';
 import { ReceiptData, DEFAULT_ASSOCIATION_INFO } from '@/types/receipt';
+import { ProgramImagesManager } from '@/components/admin/ProgramImagesManager';
 
 interface AdminSettingsPanelProps {
   onShowToast?: (message: string) => void;
@@ -306,6 +308,7 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
             { id: 'settings-slip', label: 'การตรวจสอบสลิป', icon: FileCheck },
             { id: 'settings-association', label: 'ข้อมูลสมาคม', icon: Building2 },
             { id: 'settings-receipt', label: 'รูปแบบใบเสร็จ', icon: Receipt },
+            { id: 'settings-program', label: 'รูปตารางกิจกรรม', icon: Images },
           ].map((item, idx) => (
             <a
               key={item.id}
@@ -902,6 +905,24 @@ export function AdminSettingsPanel({ onShowToast }: AdminSettingsPanelProps) {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Section 5: รูปตารางกิจกรรมของแต่ละการประชุม (บันทึกแยก ทันทีที่กด) */}
+        <div id="settings-program" className="scroll-mt-6 bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-5">
+          <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+            <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-700 flex items-center justify-center font-bold">
+              <Images className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-slate-900">
+                5. รูปตารางกิจกรรม
+              </h3>
+              <p className="text-xs text-slate-500">
+                แสดงเมื่อผู้ใช้กด &quot;ดูรายการกิจกรรม&quot; ในหน้าลงทะเบียน · บันทึกทันทีเมื่อเพิ่ม แก้ไข หรือลบ ไม่ต้องกดบันทึกการตั้งค่า
+              </p>
+            </div>
+          </div>
+          <ProgramImagesManager onShowToast={onShowToast} />
         </div>
 
         <FormActionBar note="การตั้งค่าจะมีผลกับหน้าชำระเงิน ใบเสร็จ และอีเมลอัตโนมัติทันทีหลังบันทึก">

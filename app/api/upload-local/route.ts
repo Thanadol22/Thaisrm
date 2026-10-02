@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 // Folders ที่อนุญาต (whitelist — ป้องกัน path traversal)
-const ALLOWED_FOLDERS = new Set(['slips', 'photos', 'docs', 'uploads', 'avatars', 'documents']);
+const ALLOWED_FOLDERS = new Set(['slips', 'photos', 'docs', 'uploads', 'avatars', 'documents', 'programs']);
 
 export async function POST(request: NextRequest) {
   // ─── Rate Limiting (สูงสุด 30 ไฟล์ / 1 นาที ต่อ IP) ──────────────────────
