@@ -33,10 +33,14 @@ export interface SponsorRegistrationRow {
   email: string;
   phone: string;
   programs: string;
+  /** หลักสูตรรายตัวพร้อมราคาเต็ม (ไม่มีราคาเมื่อรวมแล้วไม่ตรงกับยอดก่อนหักส่วนลด) */
+  programItems: { name: string; price?: number }[];
   format: string;
   isAddOn: boolean;
   isFellow: boolean;
   discount: number;
+  /** ยอดก่อนหักส่วนลด */
+  originalPrice: number;
   netPrice: number;
   attendanceStatus: string | null;
   ticketCode?: string | null;
@@ -156,12 +160,22 @@ export async function getSponsorRegistrationRows(): Promise<SponsorRegistrationR
       if (!att || typeof att !== 'object') return;
       const memberNo = att.memberNo || att.member_no || '';
       const email = String(att.email || att.attendee_email || '').trim().toLowerCase();
-      const programs = isMembership
+      const programItems: { name: string; price?: number }[] = isMembership
         ? []
         : [
-            ...resolveAttendeeActivities(att, meetingActs).map((a: any) => String(a?.name || '')),
-            ...attendeeBackdatedCharges(att).map((c) => c.label),
-          ].filter(Boolean);
+            ...resolveAttendeeActivities(att, meetingActs).map((a: any) => {
+              const listPrice = Number(a?.price);
+              return { name: String(a?.name || ''), price: Number.isFinite(listPrice) ? listPrice : undefined };
+            }),
+            ...attendeeBackdatedCharges(att).map((c) => ({ name: c.label, price: c.amount })),
+          ].filter((x) => x.name);
+      const programs = programItems.map((x) => x.name);
+      const discount = Number(att.discountTotal ?? att.discountAmount ?? 0) || 0;
+      const netPrice = Number(att.price ?? att.netPrice ?? 0) || 0;
+      const originalPrice = Number(att.originalTotal ?? att.subtotal) || netPrice + discount;
+      // ราคาแยกหลักสูตรต้องรวมได้เท่ายอดก่อนหักส่วนลด ไม่เช่นนั้นไม่แสดงราคาแยก (ข้อมูลเก่าที่คำนวณต่างกัน)
+      const sumPrograms = programItems.reduce((sum, x) => sum + (x.price ?? NaN), 0);
+      if (sumPrograms !== originalPrice) programItems.forEach((x) => delete x.price);
       const format = (att.selectedFormat || att.attendanceType || att.format) === 'online' ? 'ออนไลน์' : 'ออนไซต์';
       const no = cleanNo(memberNo);
       if (no) coveredPeople.add(`${s.meeting_id}|m:${no}`);
@@ -190,11 +204,13 @@ export async function getSponsorRegistrationRows(): Promise<SponsorRegistrationR
         email,
         phone: att.phone || att.mobile || '',
         programs: programs.join(', '),
+        programItems,
         format: isMembership ? '' : format,
         isAddOn: Boolean(att.isAddOn),
         isFellow: !isMembership && Boolean(payload.isFellow || payload.priceTier === 'fellow' || att.priceTier === 'fellow'),
-        discount: Number(att.discountTotal ?? att.discountAmount ?? 0) || 0,
-        netPrice: Number(att.price ?? att.netPrice ?? 0) || 0,
+        discount,
+        originalPrice,
+        netPrice,
         attendanceStatus: isMembership ? null : attendanceOf(s.meeting_id, memberNo, email),
       });
     });
@@ -238,10 +254,12 @@ export async function getSponsorRegistrationRows(): Promise<SponsorRegistrationR
         email: (gm.attendee_email || '').toLowerCase(),
         phone: gm.attendee_phone || '',
         programs: '',
+        programItems: [],
         format: 'ออนไซต์',
         isAddOn: false,
         isFellow: false,
         discount: gm.discount_amount || 0,
+        originalPrice: (gm.net_price || 0) + (gm.discount_amount || 0),
         netPrice: gm.net_price || 0,
         attendanceStatus: attendanceOf(gm.meeting_id, gm.member_no, gm.attendee_email),
         // ใช้เลขบัตรของแต่ละคนเป็นข้อมูลประกอบ

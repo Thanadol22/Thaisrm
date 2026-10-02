@@ -7,7 +7,13 @@ export interface SponsorHistoryEmailAttendee {
   name: string;
   memberNo: string;
   programs: string;
+  /** หลักสูตรรายตัวพร้อมราคาเต็ม (ไม่มีราคาเมื่อแยกราคาไม่ได้) */
+  programItems?: { name: string; price?: number }[];
   format: string;
+  /** ส่วนลดคูปองบริษัทของผู้เข้าร่วมคนนี้ */
+  discount?: number;
+  /** ยอดก่อนหักส่วนลด */
+  originalPrice?: number;
   netPrice: number;
 }
 
@@ -17,6 +23,7 @@ export interface SponsorHistoryEmailBill {
   billType: string;
   billStatusLabel: string;
   billAmount: number;
+  couponCode?: string | null;
   isOutstanding: boolean;
   meetingName: string;
   attendees: SponsorHistoryEmailAttendee[];
@@ -53,9 +60,43 @@ export function sponsorHistoryEmailSubject(kind: SponsorHistoryEmailKind, compan
     : `สรุปประวัติการลงทะเบียน ${companyName}`;
 }
 
+/** แจกแจงหลักสูตร ราคาเต็ม ส่วนลด และยอดสุทธิ ให้บริษัทเห็นที่มาของยอดแต่ละคน */
+function renderPriceBreakdown(a: SponsorHistoryEmailAttendee): string {
+  const items = a.programItems?.length ? a.programItems : a.programs ? [{ name: a.programs }] : [];
+  const discount = Number(a.discount) || 0;
+  const original = Number(a.originalPrice) || a.netPrice + discount;
+  const hasItemPrices = items.length > 0 && items.every((x) => typeof x.price === 'number');
+  if (items.length === 0 && discount <= 0) return '';
+
+  const line = (label: string, value: string, color = '#475569', bold = false) => `
+          <tr>
+            <td style="padding: 1px 0; font-size: 12px; color: ${color};${bold ? ' font-weight: 700;' : ''}">${label}</td>
+            <td style="padding: 1px 0 1px 12px; font-size: 12px; color: ${color}; text-align: right; white-space: nowrap;${bold ? ' font-weight: 700;' : ''}">${value}</td>
+          </tr>`;
+
+  const itemLines = items
+    .map((x) => line(`• ${esc(x.name)}`, hasItemPrices ? money(x.price!) : ''))
+    .join('');
+  const discountLines =
+    discount > 0
+      ? `${hasItemPrices && items.length > 1 ? '' : line('ราคาเต็ม', money(original))}${line('ส่วนลดคูปองบริษัท', `-${money(discount)}`, '#047857', true)}`
+      : '';
+  const formatLine = a.format ? `<div style="font-size: 12px; color: #64748b; margin-top: 2px;">รูปแบบการเข้าร่วม ${esc(a.format)}</div>` : '';
+
+  return `
+        ${formatLine}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 4px; padding: 6px 8px; background-color: #f8fafc; border-radius: 6px;">
+          ${items.length ? line(`หลักสูตรที่ลงทะเบียน ${items.length} รายการ`, '', '#334155', true) : ''}
+          ${itemLines}
+          ${discountLines}
+          ${discount > 0 || (hasItemPrices && items.length > 1) ? `<tr><td colspan="2" style="border-top: 1px dashed #cbd5e1; padding-top: 2px;"></td></tr>${line('ยอดสุทธิ', money(a.netPrice), '#0f172a', true)}` : ''}
+        </table>`;
+}
+
 function renderBill(bill: SponsorHistoryEmailBill): string {
   const statusColor = bill.isOutstanding ? '#c2410c' : '#047857';
   const statusBg = bill.isOutstanding ? '#fff7ed' : '#ecfdf5';
+  const billDiscount = bill.attendees.reduce((sum, a) => sum + (Number(a.discount) || 0), 0);
   const rows = bill.attendees
     .map(
       (a) => `
@@ -64,27 +105,31 @@ function renderBill(bill: SponsorHistoryEmailBill): string {
         <td style="padding: 8px 10px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #0f172a; vertical-align: top;">
           <div style="font-weight: 700;">${esc(a.name)}</div>
           ${a.memberNo ? `<div style="font-size: 12px; color: #64748b;">เลขสมาชิก ${esc(a.memberNo)}</div>` : ''}
-          ${a.programs ? `<div style="font-size: 12px; color: #475569; margin-top: 2px;">${esc(a.programs)}${a.format ? ` · ${esc(a.format)}` : ''}</div>` : ''}
+          ${renderPriceBreakdown(a)}
         </td>
-        <td style="padding: 8px 10px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #0f172a; text-align: right; white-space: nowrap; vertical-align: top;">${money(a.netPrice)}</td>
+        <td style="padding: 8px 10px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #0f172a; text-align: right; white-space: nowrap; vertical-align: top;">
+          ${(Number(a.discount) || 0) > 0 ? `<div style="font-size: 12px; color: #94a3b8; text-decoration: line-through;">${money(Number(a.originalPrice) || a.netPrice + Number(a.discount))}</div>` : ''}
+          <div style="font-weight: 700;">${money(a.netPrice)}</div>
+        </td>
       </tr>`
     )
     .join('');
 
   return `
     <div style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin: 0 0 16px 0;">
-      <div style="background-color: #f8fafc; padding: 12px 14px; border-bottom: 1px solid #e2e8f0;">
+      <div class="m-pad" style="background-color: #f8fafc; padding: 12px 14px; border-bottom: 1px solid #e2e8f0;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
           <tr>
-            <td style="font-size: 14px; font-weight: 800; color: #0f172a;">บิลเลขที่ ${esc(bill.billNo)}</td>
-            <td style="text-align: right;">
-              <span style="display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: ${statusColor}; background-color: ${statusBg};">${esc(bill.billStatusLabel)}</span>
+            <td class="kv-label" style="font-size: 14px; font-weight: 800; color: #0f172a; vertical-align: middle;">บิลเลขที่ <span style="white-space: nowrap;">${esc(bill.billNo)}</span></td>
+            <td class="kv-value" style="text-align: right; vertical-align: middle; padding-left: 8px;">
+              <span style="display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; color: ${statusColor}; background-color: ${statusBg};">${esc(bill.billStatusLabel)}</span>
             </td>
           </tr>
         </table>
         <div style="font-size: 12px; color: #64748b; margin-top: 4px; line-height: 1.6;">
           ${esc(bill.meetingName)} · ${esc(bill.billType)} · วันที่ ${thaiDate(bill.billDate)}
         </div>
+        ${bill.couponCode ? `<div style="font-size: 12px; color: #047857; margin-top: 2px; font-weight: 700;">ใช้คูปองบริษัท ${esc(bill.couponCode)}${billDiscount > 0 ? ` ส่วนลดรวม ${money(billDiscount)}` : ''}</div>` : ''}
       </div>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
@@ -93,6 +138,18 @@ function renderBill(bill: SponsorHistoryEmailBill): string {
           <th style="padding: 8px 10px; font-size: 12px; color: #64748b; font-weight: 700; text-align: right;">ยอดสุทธิ</th>
         </tr>
         ${rows}
+        ${
+          billDiscount > 0
+            ? `<tr>
+          <td colspan="2" style="padding: 8px 10px 0 10px; border-top: 2px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: right;">ราคาเต็มรวม</td>
+          <td style="padding: 8px 10px 0 10px; border-top: 2px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: right; white-space: nowrap;">${money(bill.billAmount + billDiscount)}</td>
+        </tr>
+        <tr>
+          <td colspan="2" style="padding: 2px 10px 0 10px; font-size: 12px; font-weight: 700; color: #047857; text-align: right;">หักส่วนลดคูปองบริษัท</td>
+          <td style="padding: 2px 10px 0 10px; font-size: 12px; font-weight: 700; color: #047857; text-align: right; white-space: nowrap;">-${money(billDiscount)}</td>
+        </tr>`
+            : ''
+        }
         <tr>
           <td colspan="2" style="padding: 10px; border-top: 2px solid #e2e8f0; font-size: 13px; font-weight: 800; color: #0f172a; text-align: right;">ยอดบิล ${bill.attendees.length} ท่าน</td>
           <td style="padding: 10px; border-top: 2px solid #e2e8f0; font-size: 14px; font-weight: 800; color: #0026b3; text-align: right; white-space: nowrap;">${money(bill.billAmount)}</td>

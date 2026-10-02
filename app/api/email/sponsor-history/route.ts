@@ -150,6 +150,7 @@ export async function POST(req: NextRequest) {
           scopeLabel: scopeLabelOf(scope, bills, bills[0].meetingName),
           bills: bills.map((b) => ({
             billNo: b.billNo,
+            couponCode: b.couponCode,
             billDate: b.billDate,
             billType: b.billType,
             billStatusLabel: b.billStatusLabel,
@@ -161,7 +162,10 @@ export async function POST(req: NextRequest) {
               name: a.name,
               memberNo: a.memberNo,
               programs: a.programs,
+              programItems: a.programItems,
               format: a.format,
+              discount: a.discount,
+              originalPrice: a.originalPrice,
               netPrice: a.netPrice,
             })),
           })),
