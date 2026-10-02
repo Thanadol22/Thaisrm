@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAdminSessionFromRequest } from '@/lib/security/adminAuth';
+import {
+  applyAttendanceFormat,
+  attendeeFormatOf,
+  isGroupFormatPayload,
+  type AttendanceFormat,
+} from '@/lib/services/attendanceFormatService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-type AttendanceFormat = 'onsite' | 'online';
 
 function parseActivities(raw: any): any {
   if (typeof raw !== 'string') return raw || null;
@@ -14,26 +18,6 @@ function parseActivities(raw: any): any {
   } catch {
     return null;
   }
-}
-
-function isGroupPayload(parsed: any): boolean {
-  return Boolean(
-    parsed &&
-      !Array.isArray(parsed) &&
-      (parsed.isGroup || parsed.type === 'conference_group_registration') &&
-      Array.isArray(parsed.attendees)
-  );
-}
-
-// ผู้เข้าร่วมในกลุ่ม: เก็บรูปแบบไว้หลายชื่อฟิลด์ตามรุ่นของฟอร์ม จึงปรับทุกฟิลด์ที่มีอยู่ให้ตรงกัน
-function withAttendeeFormat(att: any, format: AttendanceFormat): any {
-  if (!att || typeof att !== 'object') return att;
-  return {
-    ...att,
-    attendanceType: format,
-    ...(att.selectedFormat !== undefined ? { selectedFormat: format } : {}),
-    ...(att.format !== undefined ? { format } : {}),
-  };
 }
 
 /**
@@ -100,45 +84,32 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let updatedActivities: any;
+    const meeting = slip.meeting_id
+      ? await prisma.meetings.findUnique({ where: { meeting_id: slip.meeting_id }, select: { activities: true } })
+      : null;
+    const meetingActivities = Array.isArray(meeting?.activities) ? (meeting!.activities as any[]) : [];
+
     let previousFormat: string | null = null;
 
     if (Array.isArray(parsed)) {
-      // รูปแบบเก่า: รายการกิจกรรมแบบอาร์เรย์ ปรับที่โปรแกรมหลัก (ถ้าไม่มีโปรแกรมหลักให้ปรับทุกรายการ)
-      const hasMain = parsed.some((a: any) => a?.type !== 'workshop');
       previousFormat = parsed.some((a: any) => a?.format === 'online') ? 'online' : 'onsite';
-      updatedActivities = parsed.map((a: any) =>
-        a && typeof a === 'object' && (!hasMain || a.type !== 'workshop') ? { ...a, format } : a
-      );
-    } else if (isGroupPayload(parsed)) {
+    } else if (isGroupFormatPayload(parsed)) {
       if (!hasAttendeeIndex || !Number.isInteger(attendeeIndex) || attendeeIndex < 0 || attendeeIndex >= parsed.attendees.length) {
         return NextResponse.json(
           { success: false, error: 'กรุณาระบุผู้เข้าร่วมในกลุ่มที่ต้องการแก้ไข' },
           { status: 400 }
         );
       }
-      const target = parsed.attendees[attendeeIndex];
-      previousFormat = target?.selectedFormat || target?.attendanceType || target?.format || null;
-      updatedActivities = {
-        ...parsed,
-        attendees: parsed.attendees.map((att: any, idx: number) =>
-          idx === attendeeIndex ? withAttendeeFormat(att, format) : att
-        ),
-      };
+      previousFormat = attendeeFormatOf(parsed.attendees[attendeeIndex]);
     } else {
       previousFormat = parsed.memberPayload?.attendanceType || parsed.attendanceType || parsed.format || null;
-      updatedActivities = {
-        ...parsed,
-        attendanceType: format,
-        format,
-        ...(Array.isArray(parsed.attendees)
-          ? { attendees: parsed.attendees.map((att: any) => withAttendeeFormat(att, format)) }
-          : {}),
-        ...(parsed.memberPayload && typeof parsed.memberPayload === 'object'
-          ? { memberPayload: { ...parsed.memberPayload, attendanceType: format } }
-          : {}),
-      };
     }
+    const updatedActivities = applyAttendanceFormat(
+      parsed,
+      format,
+      meetingActivities,
+      isGroupFormatPayload(parsed) ? attendeeIndex : null
+    );
 
     await prisma.payment_slips.update({
       where: { id: slip.id },

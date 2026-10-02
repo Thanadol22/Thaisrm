@@ -37,6 +37,7 @@ import {
   Download,
   CalendarDays,
   Loader2,
+  Ban,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { uploadImageToStorage } from '@/lib/blobUpload';
@@ -211,7 +212,7 @@ export interface SlipRecord {
   transferDate: string;
   refNo: string;
   slipUrl: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
   notes?: string;
   resubmitToken?: string | null;
   selectedActivities?: SlipActivityItem[] | string;
@@ -334,10 +335,12 @@ export type SlipLifecycleStage =
   | 'pending_payment_review'     // แนบสลิปแล้ว - รอตรวจสอบยอดเงิน
   | 'payment_approved'           // ชำระเงินเรียบร้อยแล้ว
   | 'rejected'                   // ปฏิเสธ
+  | 'cancelled'                  // แอดมินยกเลิกรายการและคืนสิทธิ์แล้ว
   | 'standard_pending';          // รอตรวจสอบ
 
 export function getSlipLifecycleStage(s: SlipRecord): SlipLifecycleStage {
   if (s.status === 'rejected') return 'rejected';
+  if (s.status === 'cancelled') return 'cancelled';
 
   const hasSlip = hasActualSlip(s);
   const isPayLater = isRegisteredAsPayLater(s);
@@ -358,7 +361,7 @@ export function getSlipLifecycleStage(s: SlipRecord): SlipLifecycleStage {
 }
 
 export function renderSlipStatusBadge(s: SlipRecord, lang: 'th' | 'en' = 'th') {
-  if (s.isAdminLedger && s.status !== 'rejected') {
+  if (s.isAdminLedger && s.status !== 'rejected' && s.status !== 'cancelled') {
     return (
       <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-lime-100 text-lime-900 border border-lime-300 shadow-2xs">
         {lang === 'th'
@@ -367,7 +370,7 @@ export function renderSlipStatusBadge(s: SlipRecord, lang: 'th' | 'en' = 'th') {
       </span>
     );
   }
-  if (!s.adminAttachedSlip || s.status === 'rejected') return renderLifecycleBadge(s, lang);
+  if (!s.adminAttachedSlip || s.status === 'rejected' || s.status === 'cancelled') return renderLifecycleBadge(s, lang);
   return (
     <>
       {renderLifecycleBadge(s, lang)}
@@ -410,6 +413,12 @@ function renderLifecycleBadge(s: SlipRecord, lang: 'th' | 'en') {
       return (
         <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
           {lang === 'th' ? '✕ ปฏิเสธ' : '✕ Rejected'}
+        </span>
+      );
+    case 'cancelled':
+      return (
+        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 bg-slate-200 text-slate-700 border border-slate-300 shadow-2xs">
+          {lang === 'th' ? '⊘ ยกเลิกรายการแล้ว' : '⊘ Cancelled'}
         </span>
       );
     case 'standard_pending':
@@ -499,7 +508,7 @@ export function AdminSlipsView() {
   const [slips, setSlips] = useState<SlipRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'pay_later'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'cancelled' | 'pay_later'>('all');
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'individual' | 'corporate' | 'corporate_pay_later'>('all');
   const [meetingFilter, setMeetingFilter] = useState('all');
   const [selectedSlip, setSelectedSlip] = useState<SlipRecord | null>(null);
@@ -1008,6 +1017,43 @@ export function AdminSlipsView() {
     }
   };
 
+  // ยกเลิกรายการที่ถูกปฏิเสธแต่ไม่มีการแก้ไขกลับมา: คืนที่นั่ง สิทธิ์คูปอง โควต้าบริษัท และสิทธิ์เข้าร่วม
+  const handleCancelSlip = async (slip: SlipRecord, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const label = slip.ticketCode || slip.id;
+    const ok = confirm(
+      `ยืนยันยกเลิกรายการ ${label}\n\n` +
+      'ระบบจะคืนที่นั่งเวิร์กช็อป สิทธิ์คูปองและโควต้าของบริษัท และยกเลิกสิทธิ์เข้าร่วมของผู้ลงทะเบียนในรายการนี้\n' +
+      'ลิงก์แก้ไขสลิปที่ส่งไปจะใช้ไม่ได้อีก และย้อนกลับไม่ได้ หากต้องการเข้าร่วมต้องลงทะเบียนใหม่'
+    );
+    if (!ok) return;
+    try {
+      setIsProcessing(true);
+      setProcessingSlipId(slip.id);
+      const res = await fetch('/api/admin/slips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slipId: slip.id, action: 'cancel' }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        showToast(`✕ ${json.error || 'ยกเลิกรายการไม่สำเร็จ'}`);
+        return;
+      }
+      const patch = (s: SlipRecord): SlipRecord =>
+        s.id === slip.id ? { ...s, status: 'cancelled', resubmitToken: null } : s;
+      setSlips((prev) => prev.map(patch));
+      setSelectedSlip((prev) => (prev ? patch(prev) : prev));
+      const rights = Number(json.data?.returnedCouponRights || 0);
+      showToast(`✓ ยกเลิกรายการ ${label} แล้ว${rights > 0 ? ` คืนสิทธิ์คูปองให้บริษัท ${rights} สิทธิ์` : ''}`);
+    } catch (err: any) {
+      showToast(`✕ ${err.message || 'ยกเลิกรายการไม่สำเร็จ'}`);
+    } finally {
+      setIsProcessing(false);
+      setProcessingSlipId(null);
+    }
+  };
+
   const isCorporateSlip = (s: SlipRecord) =>
     Boolean(
       s.isGroupMembership ||
@@ -1079,8 +1125,12 @@ export function AdminSlipsView() {
     () => categorySlips.filter((s) => s.status === 'rejected').length,
     [categorySlips]
   );
+  const categoryCancelledCount = React.useMemo(
+    () => categorySlips.filter((s) => s.status === 'cancelled').length,
+    [categorySlips]
+  );
   const categoryPayLaterCount = React.useMemo(
-    () => categorySlips.filter((s) => isPayLaterSlip(s)).length,
+    () => categorySlips.filter((s) => s.status !== 'cancelled' && isPayLaterSlip(s)).length,
     [categorySlips]
   );
 
@@ -1095,7 +1145,7 @@ export function AdminSlipsView() {
     return categorySlips.filter((s) => {
       // Status filter
       if (statusFilter === 'pay_later') {
-        if (!isPayLaterSlip(s)) return false;
+        if (s.status === 'cancelled' || !isPayLaterSlip(s)) return false;
       } else if (statusFilter !== 'all' && s.status !== statusFilter) {
         return false;
       }
@@ -1189,7 +1239,7 @@ export function AdminSlipsView() {
       </AdminPageHeader>
 
       {/* สรุปสถานะในหมวดที่เลือก กดเพื่อกรอง */}
-      <StatGrid cols={5}>
+      <StatGrid cols={6}>
         <StatCard
           label={lang === 'th' ? 'ทั้งหมดในหมวดนี้' : 'All in category'}
           value={categoryTotalCount}
@@ -1229,6 +1279,14 @@ export function AdminSlipsView() {
           tone="rose"
           active={statusFilter === 'rejected'}
           onClick={() => setStatusFilter('rejected')}
+        />
+        <StatCard
+          label={lang === 'th' ? 'ยกเลิกแล้ว' : 'Cancelled'}
+          value={categoryCancelledCount}
+          icon={Ban}
+          tone="slate"
+          active={statusFilter === 'cancelled'}
+          onClick={() => setStatusFilter('cancelled')}
         />
       </StatGrid>
 
@@ -1336,12 +1394,15 @@ export function AdminSlipsView() {
                         ? 'bg-emerald-500 text-white'
                         : slip.status === 'pending'
                           ? 'bg-amber-500 text-white'
-                          : 'bg-rose-500 text-white'
+                          : slip.status === 'cancelled'
+                            ? 'bg-slate-500 text-white'
+                            : 'bg-rose-500 text-white'
                       }`}
                   >
                     {slip.status === 'approved' && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                     {slip.status === 'pending' && <Clock className="w-2.5 h-2.5" />}
                     {slip.status === 'rejected' && <X className="w-2.5 h-2.5 stroke-[3]" />}
+                    {slip.status === 'cancelled' && <Ban className="w-2.5 h-2.5 stroke-[3]" />}
                   </span>
                 </div>
 
@@ -1690,6 +1751,20 @@ export function AdminSlipsView() {
                     );
                   })()}
                 </div>
+
+                {slip.status === 'rejected' && (
+                  <div className="flex items-center gap-1.5 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/70">
+                    <button
+                      onClick={(e) => handleCancelSlip(slip, e)}
+                      disabled={isProcessing}
+                      className="h-9 px-3 flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition cursor-pointer active:scale-95 disabled:opacity-60"
+                      title={lang === 'th' ? 'ยกเลิกรายการและคืนสิทธิ์' : 'Cancel registration and release rights'}
+                    >
+                      {processingSlipId === slip.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
+                      <span>{lang === 'th' ? 'ยกเลิกรายการ' : 'Cancel'}</span>
+                    </button>
+                  </div>
+                )}
 
                 {canApproveSlip(slip) && (
                   <div className="flex items-center gap-1.5 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/70">
@@ -2875,6 +2950,18 @@ export function AdminSlipsView() {
                   >
                     <Upload className="w-4 h-4 text-sky-600 shrink-0" />
                     <span className="hidden sm:inline">{selectedSlip.adminAttachedSlip || hasActualSlip(selectedSlip) ? (lang === 'th' ? 'เปลี่ยนสลิป' : 'Replace Slip') : (lang === 'th' ? 'แนบสลิป' : 'Attach Slip')}</span>
+                  </button>
+                )}
+
+                {selectedSlip.status === 'rejected' && (
+                  <button
+                    onClick={() => handleCancelSlip(selectedSlip)}
+                    disabled={isProcessing}
+                    className="ml-auto px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap active:scale-95 disabled:opacity-60"
+                    title={lang === 'th' ? 'ยกเลิกรายการและคืนสิทธิ์' : 'Cancel registration and release rights'}
+                  >
+                    {processingSlipId === selectedSlip.id ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : <Ban className="w-4 h-4 shrink-0" />}
+                    <span>{lang === 'th' ? 'ยกเลิกรายการ' : 'Cancel'}</span>
                   </button>
                 )}
 

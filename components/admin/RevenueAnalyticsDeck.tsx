@@ -268,7 +268,7 @@ export function RevenueAnalyticsDeck({
   const series = useMemo(() => {
     const count = GRAN_OPTIONS.find((o) => o.id === gran)!.count;
     const dated = scopedSlips
-      .filter((s) => s.status !== 'rejected')
+      .filter((s) => s.status === 'approved' || s.status === 'pending')
       .map((s) => ({ s, d: slipDate(s) }))
       .filter((x): x is { s: SlipItem; d: Date } => x.d !== null);
 

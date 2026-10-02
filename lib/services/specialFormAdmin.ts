@@ -50,7 +50,7 @@ export async function serializeSpecialForm(form: any) {
     where: { selected_activities: { path: ['specialFormId'], equals: form.id } },
     select: { status: true, amount: true, selected_activities: true },
   });
-  const active = slips.filter((s) => s.status !== 'rejected');
+  const active = slips.filter((s) => s.status !== 'rejected' && s.status !== 'cancelled');
   return {
     id: form.id,
     slug: form.slug,

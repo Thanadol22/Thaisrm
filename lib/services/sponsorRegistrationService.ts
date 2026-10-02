@@ -95,7 +95,7 @@ export async function getSponsorRegistrationRows(): Promise<SponsorRegistrationR
   const [slips, groupMembers, attendances] = await Promise.all([
     prisma.payment_slips.findMany({
       where: {
-        status: { not: ADD_ON_MERGED_STATUS },
+        status: { notIn: [ADD_ON_MERGED_STATUS, 'cancelled'] },
         OR: [
           { ticket_code: { startsWith: 'GRP' } },
           { ticket_code: { startsWith: 'MEMGRP' } },

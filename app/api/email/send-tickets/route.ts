@@ -9,6 +9,8 @@ import {
   getMeetingProgramsAndDates,
   programSupportsFormat,
 } from '@/lib/services/dailyCheckinService';
+import { parseSlipPayload } from '@/lib/services/registrationAddOnService';
+import { attendeeFormatOf, isGroupFormatPayload } from '@/lib/services/attendanceFormatService';
 
 export const dynamic = 'force-dynamic';
 // ส่งอีเมลทีละฉบับต่อกัน — ให้เวลาพอสำหรับรายชื่อยาว
@@ -33,6 +35,34 @@ function parseAttendeeFormat(selectedActivities: any, refNo?: string | null): 'o
     }
   }
   return 'onsite';
+}
+
+const normalizeMemberNo = (value: unknown) => String(value ?? '').trim().replace(/^0+/, '');
+
+/**
+ * รูปแบบการเข้าร่วมของผู้ที่ลงทะเบียนผ่านรายการกลุ่ม (ระบุรายคนในรายการ)
+ * key: `m:<เลขสมาชิก>` หรือ `e:<อีเมล>` — รายการที่อนุมัติแล้วมีผลก่อนรายการที่รอตรวจสอบ
+ */
+async function loadGroupAttendeeFormats(meetingId: string): Promise<Map<string, 'onsite' | 'online'>> {
+  const map = new Map<string, 'onsite' | 'online'>();
+  const slips = await prisma.payment_slips.findMany({
+    where: { meeting_id: meetingId, status: { in: ['approved', 'pending'] } },
+    select: { status: true, selected_activities: true },
+  });
+  slips.sort((a, b) => Number(b.status === 'approved') - Number(a.status === 'approved'));
+  for (const slip of slips) {
+    const payload = parseSlipPayload(slip.selected_activities);
+    if (!isGroupFormatPayload(payload)) continue;
+    for (const att of payload.attendees) {
+      if (!att || typeof att !== 'object' || att.isAddOn) continue;
+      const format = attendeeFormatOf(att);
+      const no = normalizeMemberNo(att.memberNo || att.member_no);
+      const mail = String(att.email || '').trim().toLowerCase();
+      if (no && !map.has(`m:${no}`)) map.set(`m:${no}`, format);
+      if (mail && !map.has(`e:${mail}`)) map.set(`e:${mail}`, format);
+    }
+  }
+  return map;
 }
 
 export async function POST(req: NextRequest) {
@@ -204,13 +234,22 @@ export async function POST(req: NextRequest) {
         }
 
         const rows: any[] = await prisma.$queryRawUnsafe(query, ...params);
+        const groupFormats = await loadGroupAttendeeFormats(meetingId);
 
         targetList = rows.map((r) => {
           const name = r.member_name || r.attendee_name || 'ผู้เข้าร่วมประชุม';
           const email = r.member_email || r.attendee_email || '';
           const ticketCode = r.ticket_code || (r.member_no ? `TSRM-${r.member_no}` : `TSRM-ATTD-${r.attendance_id}`);
           const dailyRec = dailyRecordsMap.get(ticketCode);
-          const format = parseAttendeeFormat(r.selected_activities, r.ref_no);
+          // ผู้ที่มีรายการรายบุคคลใช้รูปแบบจากรายการนั้น ผู้ที่ลงผ่านรายการกลุ่มใช้รูปแบบของตนในรายการกลุ่ม
+          const matchedSlip = parseSlipPayload(r.selected_activities);
+          const hasIndividualSlip = r.selected_activities != null && !isGroupFormatPayload(matchedSlip);
+          const groupFormat =
+            groupFormats.get(`m:${normalizeMemberNo(r.member_no)}`) ||
+            groupFormats.get(`e:${String(email || r.attendee_email || '').trim().toLowerCase()}`);
+          const format = hasIndividualSlip || !groupFormat
+            ? parseAttendeeFormat(r.selected_activities, r.ref_no)
+            : groupFormat;
 
           return {
             name,

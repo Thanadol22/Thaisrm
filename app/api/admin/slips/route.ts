@@ -21,7 +21,15 @@ import {
   mergeGroupAddOnAttendees,
   parseSlipPayload,
   slipActivityList,
+  collectOtherActiveRegistrants,
+  getMemberRegistrationSummary,
 } from '@/lib/services/registrationAddOnService';
+import { cancelRejectedSlip, SlipCancelError, SLIP_CANCELLED_STATUS } from '@/lib/services/slipCancellationService';
+import {
+  applyAttendanceFormat,
+  findGroupAttendeeIndex,
+  isGroupFormatPayload,
+} from '@/lib/services/attendanceFormatService';
 
 const normalizeMemberNo = (value: unknown) => String(value ?? '').trim().replace(/^0+/, '');
 
@@ -951,7 +959,7 @@ export async function GET(request: NextRequest) {
           refNo: s.ref_no || s.slip_id,
           slipUrl: getAdminAttachedSlipUrl(s.slip_url) || s.slip_url,
           adminAttachedSlip: Boolean(getAdminAttachedSlipUrl(s.slip_url)),
-          status: s.status as 'pending' | 'approved' | 'rejected',
+          status: s.status as 'pending' | 'approved' | 'rejected' | 'cancelled',
           notes: s.rejection_reason || undefined,
           resubmitToken: s.resubmit_token,
           selectedActivities: tagGroupPaidActivities(parsedAct.activities, groupPaidByOriginal.get(s.slip_id)),
@@ -1285,7 +1293,7 @@ export async function GET(request: NextRequest) {
           refNo: s.ref_no || s.slip_id,
           slipUrl: getAdminAttachedSlipUrl(s.slip_url) || s.slip_url,
           adminAttachedSlip: Boolean(getAdminAttachedSlipUrl(s.slip_url)),
-          status: s.status as 'pending' | 'approved' | 'rejected',
+          status: s.status as 'pending' | 'approved' | 'rejected' | 'cancelled',
           notes: s.rejection_reason || undefined,
           resubmitToken: s.resubmit_token,
           selectedActivities: tagGroupPaidActivities(parsedAct.activities, groupPaidByOriginal.get(s.slip_id)),
@@ -1539,9 +1547,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { slipId, action, notes, reviewer, rejectType } = body;
 
-    if (!slipId || !action || !['approve', 'reject', 'reset'].includes(action)) {
+    if (!slipId || !action || !['approve', 'reject', 'reset', 'cancel'].includes(action)) {
       return NextResponse.json(
-        { success: false, error: 'slipId and valid action (approve/reject/reset) are required' },
+        { success: false, error: 'slipId and valid action (approve/reject/reset/cancel) are required' },
         { status: 400 }
       );
     }
@@ -1601,6 +1609,34 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'รายการนี้ถูกรวมเข้ากับรายการลงทะเบียนเดิมแล้ว ไม่สามารถเปลี่ยนสถานะได้' },
         { status: 400 }
       );
+    }
+
+    // ยกเลิกรายการแล้วคืนสิทธิ์ไปแล้ว: เปลี่ยนสถานะอีกไม่ได้ (ให้ลงทะเบียนใหม่)
+    if (slip.status === SLIP_CANCELLED_STATUS) {
+      return NextResponse.json(
+        { success: false, error: 'รายการนี้ถูกยกเลิกและคืนสิทธิ์แล้ว ไม่สามารถเปลี่ยนสถานะได้ กรุณาลงทะเบียนใหม่' },
+        { status: 400 }
+      );
+    }
+
+    // ยกเลิกรายการที่ถูกปฏิเสธแต่ไม่มีการแก้ไขกลับมา: คืนที่นั่ง สิทธิ์คูปอง โควต้า และสิทธิ์เข้าร่วม
+    if (action === 'cancel') {
+      try {
+        const result = await cancelRejectedSlip(slipId, reviewer || session.username || 'Admin', notes);
+        return NextResponse.json({
+          success: true,
+          data: {
+            status: SLIP_CANCELLED_STATUS,
+            ...result,
+            message: `ยกเลิกรายการ ${result.ticketCode || slipId} และคืนสิทธิ์เรียบร้อยแล้ว`,
+          },
+        });
+      } catch (cancelErr) {
+        if (cancelErr instanceof SlipCancelError) {
+          return NextResponse.json({ success: false, error: cancelErr.message }, { status: 400 });
+        }
+        throw cancelErr;
+      }
     }
 
     // รายการที่ถูกปฏิเสธคืนที่นั่งไปแล้ว: ก่อนกลับมาเป็นรอตรวจสอบ/อนุมัติ ต้องตรวจว่ายังมีที่นั่งเหลือ
@@ -1888,14 +1924,25 @@ export async function POST(request: NextRequest) {
       // 3. If this is a format change slip, update the original registration slip
       if (isFormatChange && formatChangePayload) {
         try {
-          const targetFormat = formatChangePayload.targetFormat;
+          const targetFormat: 'onsite' | 'online' = formatChangePayload.targetFormat === 'online' ? 'online' : 'onsite';
           const origSlipId = formatChangePayload.originalSlipId;
+          const requesterMemberNo = slip.member_no || assignedMemberNo || null;
 
           let origSlip = null;
           if (origSlipId) {
             origSlip = await (prisma as any).payment_slips.findUnique({
               where: { slip_id: origSlipId },
             });
+          }
+
+          // สมาชิกที่ลงทะเบียนผ่านรายการกลุ่ม: รายการเดิมคือรายการกลุ่มที่มีชื่อสมาชิกท่านนี้
+          if (!origSlip && slip.meeting_id && requesterMemberNo) {
+            const summary = await getMemberRegistrationSummary(slip.meeting_id, requesterMemberNo);
+            if (summary.originalSlipId) {
+              origSlip = await (prisma as any).payment_slips.findUnique({
+                where: { slip_id: summary.originalSlipId },
+              });
+            }
           }
 
           if (!origSlip && (slip.ticket_code || assignedMemberNo)) {
@@ -1912,28 +1959,25 @@ export async function POST(request: NextRequest) {
           }
 
           if (origSlip) {
-            let origActs = origSlip.selected_activities;
-            if (typeof origActs === 'string') {
-              try { origActs = JSON.parse(origActs); } catch { }
-            }
-
-            if (Array.isArray(origActs)) {
-              origActs = origActs.map((item: any) => ({
-                ...item,
-                format: targetFormat,
-              }));
-            } else if (origActs && typeof origActs === 'object') {
-              origActs = {
-                ...origActs,
-                format: targetFormat,
-                attendanceType: targetFormat,
-              };
+            const origActs = parseSlipPayload(origSlip.selected_activities);
+            const meetingActs = Array.isArray(slip.meetings?.activities)
+              ? (slip.meetings.activities as any[])
+              : [];
+            let attendeeIndex: number | null = null;
+            if (isGroupFormatPayload(origActs)) {
+              attendeeIndex = findGroupAttendeeIndex(origActs, {
+                memberNo: requesterMemberNo,
+                email: slip.members?.email || slip.guest_email,
+              });
+              if (attendeeIndex < 0) {
+                throw new Error(`ไม่พบผู้ขอเปลี่ยนรูปแบบในรายการกลุ่ม ${origSlip.ticket_code || origSlip.slip_id}`);
+              }
             }
 
             await (prisma as any).payment_slips.update({
               where: { slip_id: origSlip.slip_id },
               data: {
-                selected_activities: origActs as any,
+                selected_activities: applyAttendanceFormat(origActs, targetFormat, meetingActs, attendeeIndex),
               },
             });
           }
@@ -2050,6 +2094,14 @@ export async function POST(request: NextRequest) {
                 });
               }
             }
+          }
+          // รายชื่อในหน้าบริษัท: กลับมาเป็นยืนยันสิทธิ์ (กรณีเคยย้อนสถานะหรือถูกปฏิเสธแล้วอนุมัติใหม่)
+          if (slip.ticket_code) {
+            await prisma.$executeRaw`
+              UPDATE sponsor_group_members
+              SET status = 'confirmed', updated_at = NOW()
+              WHERE ticket_code = ${slip.ticket_code}
+            `.catch(() => {});
           }
         } else if (assignedMemberNo || slip.member_no) {
           const targetMemNo = (assignedMemberNo || slip.member_no).trim();
@@ -2447,9 +2499,12 @@ export async function POST(request: NextRequest) {
       }
 
       // Revert attendance status to pending if conference registration
-      if (!isMembershipRegistration) {
+      // ไม่แตะสิทธิ์ของผู้ที่ยังมีรายการอื่นที่รอตรวจสอบ/อนุมัติแล้ว (เช่น ลงซ้ำ หรือลงกิจกรรมเพิ่มเติมผ่านรายการนี้)
+      if (!isMembershipRegistration && slip.meeting_id) {
+        const otherRegistrants = await collectOtherActiveRegistrants(slip.meeting_id, slipId);
         if (isGroupConference && groupPayload?.attendees && Array.isArray(groupPayload.attendees)) {
           for (const att of groupPayload.attendees) {
+            if (att.isAddOn || otherRegistrants.has({ memberNo: att.memberNo, email: att.email })) continue;
             if (att.isMember && att.memberNo) {
               await prisma.$executeRaw`
                 UPDATE meeting_attendances
@@ -2471,6 +2526,8 @@ export async function POST(request: NextRequest) {
               WHERE ticket_code = ${slip.ticket_code}
             `.catch(() => {});
           }
+        } else if (otherRegistrants.has({ memberNo: slip.member_no, email: slip.guest_email })) {
+          // มีรายการลงทะเบียนอื่นที่ยังใช้สิทธิ์อยู่: คงสถานะสิทธิ์เข้าร่วมไว้
         } else if (slip.member_no) {
           await prisma.$executeRaw`
             UPDATE meeting_attendances
@@ -2538,11 +2595,14 @@ export async function POST(request: NextRequest) {
       }
 
       // Update attendance status to Rejected if conference registration
-      if (!isMembershipRegistration) {
+      // ไม่แตะสิทธิ์ของผู้ที่ยังมีรายการอื่นที่รอตรวจสอบ/อนุมัติแล้ว (เช่น ลงซ้ำ หรือลงกิจกรรมเพิ่มเติมผ่านรายการนี้)
+      if (!isMembershipRegistration && slip.meeting_id) {
+        const otherRegistrants = await collectOtherActiveRegistrants(slip.meeting_id, slipId);
         if (isGroupConference && groupPayload?.attendees && Array.isArray(groupPayload.attendees)) {
           for (const att of groupPayload.attendees) {
             const memNo = att.memberNo?.trim();
             const attEmail = att.email?.trim()?.toLowerCase();
+            if (att.isAddOn || otherRegistrants.has({ memberNo: memNo, email: attEmail })) continue;
             if (memNo) {
               await prisma.$executeRaw`
                 UPDATE meeting_attendances
@@ -2571,6 +2631,8 @@ export async function POST(request: NextRequest) {
               WHERE ticket_code = ${slip.ticket_code}
             `.catch(() => {});
           }
+        } else if (otherRegistrants.has({ memberNo: slip.member_no, email: slip.guest_email })) {
+          // มีรายการลงทะเบียนอื่นที่ยังใช้สิทธิ์อยู่: คงสถานะสิทธิ์เข้าร่วมไว้
         } else if (slip.member_no) {
           await prisma.$executeRaw`
             UPDATE meeting_attendances
@@ -2585,31 +2647,8 @@ export async function POST(request: NextRequest) {
           `;
         }
 
-        // Auto Rollback Coupon Quota if this slip was associated with a coupon
-        try {
-          const couponUsage = await (prisma as any).coupon_usages.findFirst({
-            where: {
-              OR: [
-                { slip_id: slip.slip_id },
-                { ticket_code: slip.ticket_code },
-              ],
-            },
-          });
-
-          if (couponUsage) {
-            await (prisma as any).coupons.update({
-              where: { id: couponUsage.coupon_id },
-              data: {
-                used_count: { decrement: 1 },
-              },
-            });
-            await (prisma as any).coupon_usages.delete({
-              where: { id: couponUsage.id },
-            });
-          }
-        } catch (couponRollbackErr) {
-          console.error('Failed to auto-rollback coupon quota on slip rejection:', couponRollbackErr);
-        }
+        // สิทธิ์คูปอง โควต้าบริษัท และที่นั่งยังถือไว้ระหว่างรอแก้ไข
+        // คืนสิทธิ์เมื่อแอดมินยกเลิกรายการ (action: 'cancel') เท่านั้น เพื่อไม่ให้รายการใหม่แทรกเข้ามาใช้สิทธิ์ของรายการนี้
       }
 
       // Determine if corporate/group registration

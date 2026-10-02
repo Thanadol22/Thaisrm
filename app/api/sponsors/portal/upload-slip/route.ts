@@ -53,6 +53,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // รายการที่แอดมินยกเลิกและคืนสิทธิ์แล้ว ส่งสลิปเพิ่มไม่ได้ (ต้องลงทะเบียนใหม่)
+    if (targetRecord?.status === 'cancelled') {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'รายการนี้ถูกยกเลิกโดยเจ้าหน้าที่แล้ว ไม่สามารถส่งสลิปได้ หากต้องการเข้าร่วมกรุณาลงทะเบียนใหม่',
+        },
+        { status: 409 }
+      );
+    }
+
     let updatedOrCreatedSlip: any = null;
 
     if (targetRecord) {

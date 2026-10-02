@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getSystemSettings } from '@/lib/services/settingsService';
-import { isAddOnPayload } from '@/lib/services/registrationAddOnService';
+import {
+  getMemberRegistrationSummary,
+  isAddOnPayload,
+  parseSlipPayload,
+} from '@/lib/services/registrationAddOnService';
+import { attendeeFormatOf, findGroupAttendeeIndex } from '@/lib/services/attendanceFormatService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -243,6 +248,22 @@ export async function GET(
       attendeePhone = attendanceRecord.members?.mobile || attendanceRecord.attendee_phone || '';
       attendeeWorkplace = attendanceRecord.members?.workplace || attendanceRecord.workplace || '';
       ticketCode = memberNo ? `TSRM-${effectiveMeetingId}-${memberNo}` : `M-${memberNo}`;
+    }
+
+    // สมาชิกที่ลงทะเบียนผ่านรายการกลุ่ม: ใช้รูปแบบของสมาชิกท่านนี้ในรายการกลุ่ม (ไม่ใช่ค่าระดับบนสุดของรายการ)
+    if (memberNo) {
+      const summary = await getMemberRegistrationSummary(effectiveMeetingId, memberNo);
+      if (summary.originalKind === 'group' && summary.originalSlipId) {
+        const groupSlip = await prisma.payment_slips.findUnique({ where: { slip_id: summary.originalSlipId } });
+        const groupPayload = parseSlipPayload(groupSlip?.selected_activities);
+        const idx = findGroupAttendeeIndex(groupPayload, { memberNo });
+        if (groupSlip && idx >= 0) {
+          slipId = groupSlip.slip_id;
+          ticketCode = groupSlip.ticket_code || ticketCode;
+          registrationStatus = groupSlip.status;
+          currentFormat = attendeeFormatOf(groupPayload.attendees[idx]);
+        }
+      }
     }
 
     // Get bank info from system settings

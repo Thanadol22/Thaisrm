@@ -243,8 +243,10 @@ export async function POST(req: NextRequest) {
     } catch (e) {
       console.error('[UnifiedVerifyOTP] Error fetching sponsor slips:', e);
     }
-    // บันทึกแยกสำหรับผู้ดูแลระบบ (เช่น รายการ fellow ที่รวมอยู่ในบิลเดิมแล้ว) ไม่แสดงให้บริษัท
-    sponsorSlipsRaw = sponsorSlipsRaw.filter((s: any) => !(s.selected_activities as any)?.adminOnly);
+    // บันทึกแยกสำหรับผู้ดูแลระบบ (เช่น รายการ fellow ที่รวมอยู่ในบิลเดิมแล้ว) และรายการที่แอดมินยกเลิกแล้ว ไม่แสดงให้บริษัท
+    sponsorSlipsRaw = sponsorSlipsRaw.filter(
+      (s: any) => !(s.selected_activities as any)?.adminOnly && s.status !== 'cancelled'
+    );
 
     // Process slips to determine actual payment & pay-later status
     const sponsorSlips = sponsorSlipsRaw.map((s: any) => {
@@ -389,6 +391,7 @@ export async function POST(req: NextRequest) {
     try {
       const attendances = await prisma.meeting_attendances.findMany({
         where: {
+          attendance_status: { not: 'Cancelled' },
           OR: [
             { sponsor_id: sponsor.id },
             { sponsor_company_name: { equals: sponsor.name, mode: 'insensitive' } },
@@ -489,9 +492,11 @@ export async function POST(req: NextRequest) {
         let discountLeft = Math.max(0, Number(att.discountTotal ?? att.discountAmount ?? 0) || 0);
         const isFellowAttendee = Boolean(payload.isFellow || payload.priceTier === 'fellow' || att.priceTier === 'fellow');
         const programs: ProgramEntry[] = acts.map((a: any) => {
-          // หลักสูตรที่กำหนดรูปแบบตายตัว (เช่น workshop ออนไซต์) คงตามนั้น ที่เหลือตามรูปแบบที่ผู้เข้าร่วมเลือก
-          const fixed = a?.format || (a?.type === 'workshop' ? 'onsite' : 'both');
+          // หลักสูตรที่งานประชุมกำหนดรูปแบบตายตัว (เช่น workshop ออนไซต์) คงตามนั้น ที่เหลือตามรูปแบบที่ผู้เข้าร่วมเลือก
+          // อ่านจากการตั้งค่างานประชุม ไม่ใช่ format ในรายการของผู้เข้าร่วม (เป็นรูปแบบที่เลือกตอนลงทะเบียน อาจถูกแก้ภายหลัง)
           const isMain = a?.type === 'main' || a?.id === 'main';
+          const def = meetingActs.find((m: any) => String(m?.id) === String(a?.id)) || a;
+          const fixed = isMain ? 'both' : def?.format || (def?.type === 'workshop' ? 'onsite' : 'both');
           const listPrice = Number(a?.price);
           let price: number | undefined;
           if (Number.isFinite(listPrice)) {

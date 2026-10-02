@@ -126,7 +126,8 @@ export async function GET(request: NextRequest) {
     const meetingId = searchParams.get('meetingId');
     const search = searchParams.get('search');
 
-    const whereClause: any = {};
+    // สิทธิ์ที่ถูกยกเลิกแล้ว (แอดมินยกเลิกรายการ / ยกเลิกสิทธิ์คูปอง) ไม่ใช่ผู้ลงทะเบียนอีกต่อไป
+    const whereClause: any = { attendance_status: { not: 'Cancelled' } };
     if (meetingId && meetingId !== 'all') {
       whereClause.meeting_id = meetingId;
     }
@@ -712,6 +713,8 @@ export async function PATCH(request: NextRequest) {
         ? await (prisma as any).payment_slips.findFirst({
             where: {
               meeting_id: existing.meeting_id,
+              // รายการที่ยกเลิกและคืนสิทธิ์แล้ว เปลี่ยนสถานะกลับไม่ได้
+              status: { not: 'cancelled' },
               OR: slipWhereOr,
             },
             orderBy: { created_at: 'desc' },

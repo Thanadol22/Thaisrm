@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
     const seatSlips = limitedMeetingIds.length > 0
       ? await prisma.payment_slips.findMany({
           where: { meeting_id: { in: limitedMeetingIds }, status: { in: SEAT_COUNTED_STATUSES } },
-          select: { slip_id: true, meeting_id: true, ticket_code: true, selected_activities: true },
+          select: { slip_id: true, meeting_id: true, status: true, ticket_code: true, selected_activities: true },
         })
       : [];
     const data = result.data.map((m: any) =>

@@ -164,7 +164,7 @@ export async function mergeAddOnSlip(
 
     const original = await tx.payment_slips.findUnique({ where: { slip_id: addOnPayload.originalSlipId } });
     if (!original) throw new AddOnMergeError('ไม่พบรายการลงทะเบียนเดิมที่ต้องการรวม');
-    if (original.status === 'rejected' || (original.status !== 'approved' && !options.allowPendingOriginal)) {
+    if (original.status === 'rejected' || original.status === 'cancelled' || (original.status !== 'approved' && !options.allowPendingOriginal)) {
       throw new AddOnMergeError(
         `รายการลงทะเบียนเดิม ${original.ticket_code || original.slip_id} ยังไม่ได้รับการอนุมัติ กรุณาตรวจสอบและอนุมัติรายการเดิมก่อน แล้วจึงอนุมัติรายการเพิ่มเติมนี้`
       );
@@ -369,6 +369,56 @@ export async function getMemberRegistrationSummary(
   return summary;
 }
 
+/**
+ * รายชื่อผู้ที่ยังมีรายการลงทะเบียนอื่นที่รอตรวจสอบ/อนุมัติแล้วในงานประชุม (ไม่นับรายการ excludeSlipId)
+ * ใช้ก่อนเปลี่ยนสถานะสิทธิ์เข้าร่วมตอนปฏิเสธ/ย้อนสถานะรายการหนึ่ง
+ * เพื่อไม่ให้กระทบผู้ที่มีสิทธิ์จากรายการอื่น (เช่น ลงซ้ำ หรือลงกิจกรรมเพิ่มเติมผ่านรายการกลุ่ม)
+ */
+export async function collectOtherActiveRegistrants(meetingId: string, excludeSlipId: string) {
+  const memberNos = new Set<string>();
+  const emails = new Set<string>();
+  const slips = await prisma.payment_slips.findMany({
+    where: { meeting_id: meetingId, status: { in: ['pending', 'approved'] }, slip_id: { not: excludeSlipId } },
+    select: { member_no: true, guest_email: true, ticket_code: true, selected_activities: true },
+  });
+  const addEmail = (value: unknown) => {
+    const mail = String(value ?? '').trim().toLowerCase();
+    if (mail) emails.add(mail);
+  };
+  for (const slip of slips) {
+    const payload = parseSlipPayload(slip.selected_activities);
+    if (
+      payload?.isFormatChange ||
+      payload?.type === 'membership_registration' ||
+      payload?.type === 'membership_group_registration'
+    ) {
+      continue;
+    }
+    const isGroup =
+      payload && !Array.isArray(payload) && Array.isArray(payload.attendees) &&
+      (payload.isGroup || slip.ticket_code?.startsWith('GRP'));
+    if (isGroup) {
+      // รายการกลุ่ม: guest_email เป็นอีเมลผู้ประสานงาน ใช้เฉพาะรายชื่อผู้เข้าร่วม
+      for (const att of payload.attendees) {
+        const no = normalizeMemberNo(att?.memberNo || att?.member_no);
+        if (no) memberNos.add(no);
+        addEmail(att?.email);
+      }
+      continue;
+    }
+    const no = normalizeMemberNo(slip.member_no);
+    if (no) memberNos.add(no);
+    addEmail(slip.guest_email);
+  }
+  return {
+    has: (person: { memberNo?: unknown; email?: unknown }) => {
+      const no = normalizeMemberNo(person.memberNo);
+      const mail = String(person.email ?? '').trim().toLowerCase();
+      return Boolean((no && memberNos.has(no)) || (mail && emails.has(mail)));
+    },
+  };
+}
+
 export interface GuestRegistrationMatch {
   ticketCode: string | null;
   approved: boolean;
@@ -460,7 +510,7 @@ export async function mergeGroupAddOnAttendees(groupSlipId: string): Promise<num
 
     await prisma.$transaction(async (tx) => {
       const original = await tx.payment_slips.findUnique({ where: { slip_id: att.addOnOriginalSlipId } });
-      if (!original || original.status === 'rejected') return;
+      if (!original || original.status === 'rejected' || original.status === 'cancelled') return;
       const origPayload = parseSlipPayload(original.selected_activities);
       const addOnSlipIds: string[] = Array.isArray(origPayload?.addOnSlipIds) ? origPayload.addOnSlipIds : [];
       const marker = `${groupSlipId}:${memberKey}`;

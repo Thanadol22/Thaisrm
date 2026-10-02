@@ -6,14 +6,22 @@ import { resolveAttendeeActivities } from '@/lib/services/sponsorCouponService';
  * ระบบตัดที่นั่งรายกิจกรรม (เวิร์กช็อปที่กำหนด maxSeats ไว้)
  *
  * - นับที่นั่งจาก payment_slips สถานะ pending และ approved (ตัดที่นั่งตั้งแต่ส่งรายการ ยังไม่ต้องรออนุมัติ)
- * - รายการที่ถูกปฏิเสธ (rejected) ไม่ถูกนับ = คืนที่นั่งอัตโนมัติ
+ * - รายการกลุ่มที่ถูกปฏิเสธ (rejected) ยังถือที่นั่งไว้ระหว่างรอบริษัทแก้ไข จนกว่าแอดมินจะยกเลิกรายการ (cancelled)
+ * - รายการรายบุคคลที่ถูกปฏิเสธไม่ถูกนับ = คืนที่นั่งอัตโนมัติ
  * - รายการเพิ่มเติมที่รวมเข้ารายการเดิมแล้ว (merged) นับผ่านรายการเดิมแทน
  * - การประชุมหลักไม่จำกัดที่นั่ง
  */
 
 type Db = Pick<typeof prisma, 'payment_slips' | 'meetings' | '$queryRaw'>;
 
-export const SEAT_COUNTED_STATUSES = ['pending', 'approved'];
+export const SEAT_COUNTED_STATUSES = ['pending', 'approved', 'rejected'];
+
+/** รายการนี้ยังถือที่นั่งอยู่หรือไม่ (รายการกลุ่มที่ถูกปฏิเสธยังถือที่นั่งไว้ รอบริษัทแก้ไข) */
+export function holdsSeats(slip: { status?: string | null; ticket_code?: string | null; selected_activities: unknown }): boolean {
+  if (!slip.status || slip.status === 'pending' || slip.status === 'approved') return true;
+  if (slip.status !== 'rejected') return false;
+  return isGroupPayload(parseSlipPayload(slip.selected_activities), slip.ticket_code);
+}
 
 export interface ActivitySeatUsage {
   id: string;
@@ -130,7 +138,7 @@ export async function getActivitySeatUsage(
       status: { in: SEAT_COUNTED_STATUSES },
       ...(options.excludeSlipId ? { slip_id: { not: options.excludeSlipId } } : {}),
     },
-    select: { slip_id: true, ticket_code: true, selected_activities: true },
+    select: { slip_id: true, status: true, ticket_code: true, selected_activities: true },
   });
 
   return summarizeSeatUsage(slips, meetingActivities);
@@ -138,11 +146,12 @@ export async function getActivitySeatUsage(
 
 /** รวมที่นั่งจากรายการลงทะเบียนที่ดึงมาแล้ว (ใช้ร่วมกับการคำนวณหลายงานประชุมพร้อมกัน) */
 export function summarizeSeatUsage(
-  slips: Array<{ slip_id: string; ticket_code: string | null; selected_activities: unknown }>,
+  allSlips: Array<{ slip_id: string; status?: string | null; ticket_code: string | null; selected_activities: unknown }>,
   meetingActivities: unknown
 ): ActivitySeatUsage[] {
   const limited = seatLimitedActivities(meetingActivities);
   if (limited.length === 0) return [];
+  const slips = allSlips.filter(holdsSeats);
 
   const mergedMarkers = new Set<string>();
   for (const slip of slips) {

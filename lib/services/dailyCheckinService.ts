@@ -294,7 +294,7 @@ export async function ensureDailyCheckinsForMeeting(
     await prisma.payment_slips.findMany({
       where: {
         meeting_id: meetingId,
-        status: { notIn: ['rejected', 'merged'] },
+        status: { notIn: ['rejected', 'merged', 'cancelled'] },
       },
     })
   ).filter((s) => !isAddOnPayload(s.selected_activities)); // บัตรเข้างานใช้รหัสของรายการหลักเท่านั้น
