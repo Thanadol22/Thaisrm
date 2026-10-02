@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Building2, CalendarDays, Check, Eye, FileText, Layers, Mail, ReceiptText, RefreshCw, Send } from 'lucide-react';
-import { Btn, EmptyState, Field, FilterSelect, Panel, Segmented, inputCls } from '@/components/admin/ui';
+import { Btn, EmptyState, Field, FilterSelect, Panel, SearchSelect, Segmented, inputCls } from '@/components/admin/ui';
 import { EmailPreviewModal } from '@/components/EmailPreviewModal';
 import { ThaiDatePicker } from '@/components/ThaiDatePicker';
 
@@ -220,7 +220,7 @@ export function SponsorHistoryEmailPanel({ notify }: { notify: (msg: string) => 
           />
 
           <Field label="บริษัท" hint={!isAllOverdue && sponsor ? `ส่งถึง ${sponsor.contactName ? `${sponsor.contactName} · ` : ''}${sponsor.contactEmail}` : isAllOverdue ? 'ส่งแยกถึงอีเมลผู้ติดต่อของแต่ละบริษัท' : undefined}>
-            <FilterSelect value={sponsorId} onChange={changeSponsor} options={companyOptions} icon={Building2} label="บริษัท" />
+            <SearchSelect value={sponsorId} onChange={changeSponsor} options={companyOptions} icon={Building2} label="บริษัท" placeholder="ค้นหาชื่อบริษัท..." />
           </Field>
 
           <div className="space-y-2">

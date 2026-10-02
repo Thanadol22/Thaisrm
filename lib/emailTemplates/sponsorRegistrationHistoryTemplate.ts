@@ -81,11 +81,8 @@ function renderPriceBreakdown(a: SponsorHistoryEmailAttendee): string {
     discount > 0
       ? `${hasItemPrices && items.length > 1 ? '' : line('ราคาเต็ม', money(original))}${line('ส่วนลดคูปองบริษัท', `-${money(discount)}`, '#047857', true)}`
       : '';
-  const formatLine = a.format ? `<div style="font-size: 12px; color: #64748b; margin-top: 2px;">รูปแบบการเข้าร่วม ${esc(a.format)}</div>` : '';
-
   return `
-        ${formatLine}
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 4px; padding: 6px 8px; background-color: #f8fafc; border-radius: 6px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="padding: 8px 10px; background-color: #f8fafc; border-radius: 8px;">
           ${items.length ? line(`หลักสูตรที่ลงทะเบียน ${items.length} รายการ`, '', '#334155', true) : ''}
           ${itemLines}
           ${discountLines}
@@ -105,13 +102,20 @@ function renderBill(bill: SponsorHistoryEmailBill): string {
         <td style="padding: 8px 10px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #0f172a; vertical-align: top;">
           <div style="font-weight: 700;">${esc(a.name)}</div>
           ${a.memberNo ? `<div style="font-size: 12px; color: #64748b;">เลขสมาชิก ${esc(a.memberNo)}</div>` : ''}
-          ${renderPriceBreakdown(a)}
+          ${a.format ? `<div style="font-size: 12px; color: #64748b;">รูปแบบการเข้าร่วม ${esc(a.format)}</div>` : ''}
         </td>
         <td style="padding: 8px 10px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #0f172a; text-align: right; white-space: nowrap; vertical-align: top;">
           ${(Number(a.discount) || 0) > 0 ? `<div style="font-size: 12px; color: #94a3b8; text-decoration: line-through;">${money(Number(a.originalPrice) || a.netPrice + Number(a.discount))}</div>` : ''}
           <div style="font-weight: 700;">${money(a.netPrice)}</div>
         </td>
-      </tr>`
+      </tr>
+      ${(() => {
+        // แจกแจงราคาเต็มความกว้างของตาราง ไม่บีบอยู่ในคอลัมน์ชื่อบนจอมือถือ
+        const breakdown = renderPriceBreakdown(a);
+        return breakdown
+          ? `<tr><td colspan="3" class="m-pad" style="padding: 0 10px 10px 10px;">${breakdown}</td></tr>`
+          : '';
+      })()}`
     )
     .join('');
 

@@ -5,8 +5,9 @@
  * ลำดับหน้า: AdminPageHeader → ContextBar → StatGrid → Toolbar → Panel
  */
 
-import React from 'react';
-import { Search, X, ChevronDown, Inbox } from 'lucide-react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Search, X, ChevronDown, Inbox, Check } from 'lucide-react';
 
 type Tone = 'blue' | 'green' | 'amber' | 'rose' | 'violet' | 'slate';
 
@@ -340,6 +341,180 @@ export function FilterSelect({
         ))}
       </select>
       <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+    </div>
+  );
+}
+
+/** ตัวเลือกแบบค้นหาได้ สำหรับรายการยาว (แสดงรายการใต้ช่องเลือก ไม่ล้นทั้งหน้าจอเหมือน select ของเบราว์เซอร์) */
+export function SearchSelect({
+  value,
+  onChange,
+  options,
+  icon: Icon,
+  label,
+  placeholder = 'ค้นหา...',
+  className = '',
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  icon?: React.ElementType;
+  label?: string;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [active, setActive] = useState(0);
+  const [pos, setPos] = useState<{ left: number; width: number; top?: number; bottom?: number; maxHeight: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  const selected = options.find((o) => o.value === value);
+  const q = query.trim().toLowerCase();
+  const filtered = q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options;
+
+  // วางรายการใต้ช่องเลือก ถ้าพื้นที่ด้านล่างไม่พอให้เปิดขึ้นด้านบน
+  const place = () => {
+    const r = triggerRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const gap = 6;
+    const below = window.innerHeight - r.bottom - gap - 8;
+    const above = r.top - gap - 8;
+    const openUp = below < 240 && above > below;
+    setPos({
+      left: r.left,
+      width: r.width,
+      maxHeight: Math.min(360, openUp ? above : below),
+      ...(openUp ? { bottom: window.innerHeight - r.top + gap } : { top: r.bottom + gap }),
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (open) place();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!popRef.current?.contains(t) && !triggerRef.current?.contains(t)) setOpen(false);
+    };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (open) listRef.current?.querySelector<HTMLElement>(`[data-idx="${active}"]`)?.scrollIntoView({ block: 'nearest' });
+  }, [active, open]);
+
+  const openList = () => {
+    setQuery('');
+    setActive(Math.max(0, options.findIndex((o) => o.value === value)));
+    setOpen(true);
+  };
+
+  const pick = (v: string) => {
+    onChange(v);
+    setOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActive((i) => Math.min(filtered.length - 1, i + 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActive((i) => Math.max(0, i - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (filtered[active]) pick(filtered[active].value);
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+      triggerRef.current?.focus();
+    }
+  };
+
+  return (
+    <div className={`relative ${className}`}>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => (open ? setOpen(false) : openList())}
+        onKeyDown={(e) => {
+          if (!open && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            openList();
+          }
+        }}
+        aria-label={label}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        title={selected?.label || label}
+        className={`w-full flex items-center bg-white border rounded-xl ${Icon ? 'pl-9' : 'pl-3.5'} pr-9 h-10 text-left text-xs sm:text-sm font-bold text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3] cursor-pointer transition ${
+          open ? 'border-[#0026b3] ring-2 ring-[#0026b3]/20' : 'border-slate-200'
+        }`}
+      >
+        <span className="truncate">{selected?.label || label || 'เลือก'}</span>
+      </button>
+      {Icon && <Icon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
+      <ChevronDown className={`w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none transition ${open ? 'rotate-180' : ''}`} />
+
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            ref={popRef}
+            style={{ position: 'fixed', left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight }}
+            className="z-[9999] flex flex-col bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden"
+          >
+            <div className="relative p-2 border-b border-slate-100 shrink-0">
+              <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setActive(0);
+                }}
+                onKeyDown={onKey}
+                placeholder={placeholder}
+                className="w-full h-9 pl-8 pr-3 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0026b3]/20 focus:border-[#0026b3]"
+              />
+            </div>
+            <ul ref={listRef} role="listbox" className="overflow-y-auto py-1 min-h-0">
+              {filtered.length === 0 && <li className="px-3.5 py-3 text-xs text-slate-500">ไม่พบรายการที่ค้นหา</li>}
+              {filtered.map((o, i) => {
+                const isSel = o.value === value;
+                return (
+                  <li
+                    key={o.value}
+                    data-idx={i}
+                    role="option"
+                    aria-selected={isSel}
+                    onMouseEnter={() => setActive(i)}
+                    onClick={() => pick(o.value)}
+                    className={`flex items-center gap-2 px-3.5 py-2 text-sm cursor-pointer ${
+                      i === active ? 'bg-blue-50 text-[#0026b3]' : 'text-slate-700'
+                    } ${isSel ? 'font-bold' : ''}`}
+                  >
+                    <span className="flex-1 min-w-0 break-words">{o.label}</span>
+                    {isSel && <Check className="w-4 h-4 shrink-0 text-[#0026b3]" />}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
