@@ -8,6 +8,7 @@ import {
   retireUsedSponsorCoupon,
 } from '@/lib/services/sponsorCouponService';
 import {
+  findGuestRegistration,
   getAddOnEligibility,
   getMemberRegistrationSummary,
   mergeAddOnSlip,
@@ -120,12 +121,50 @@ export async function POST(
         }
       }
 
+      // ห้ามใส่ผู้ลงทะเบียนคนเดียวกันซ้ำในรายการเดียว (เทียบเลขสมาชิก หรืออีเมลของบุคคลทั่วไป)
+      const seenAttendeeKeys = new Map<string, number>();
+      for (let i = 0; i < attendees.length; i++) {
+        const att = attendees[i];
+        const attMemberNo = att?.memberNo ? String(att.memberNo).trim().replace(/^0+/, '') : '';
+        const attEmail = att?.email ? String(att.email).trim().toLowerCase() : '';
+        const key = attMemberNo ? `m:${attMemberNo}` : attEmail ? `e:${attEmail}` : '';
+        if (!key) continue;
+        if (seenAttendeeKeys.has(key)) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `ผู้ลงทะเบียนลำดับที่ ${i + 1} ซ้ำกับลำดับที่ ${seenAttendeeKeys.get(key)! + 1} กรุณาตรวจสอบรายชื่ออีกครั้ง`,
+              code: 'DUPLICATE_REGISTRATION',
+            },
+            { status: 400 }
+          );
+        }
+        seenAttendeeKeys.set(key, i);
+      }
+
       // ผู้ที่ลงทะเบียนงานนี้แล้ว: ลงได้เฉพาะกิจกรรมเพิ่มเติม (isAddOn) และห้ามเลือกกิจกรรมที่ลงไว้แล้ว
       for (let i = 0; i < attendees.length; i++) {
         const att = attendees[i];
         const attMemberNo = att?.memberNo ? String(att.memberNo).trim() : '';
         if (!attMemberNo) {
           att.isAddOn = false;
+          // บุคคลทั่วไป: ตรวจจากอีเมล ทั้งรายการรายบุคคลและรายชื่อในรายการกลุ่มอื่น
+          const guestEmail = att?.email ? String(att.email).trim() : '';
+          const existing = guestEmail ? await findGuestRegistration(meetingId, guestEmail) : null;
+          if (existing) {
+            const label = `ผู้ลงทะเบียนลำดับที่ ${i + 1} ${att.nameTh || att.nameEn || ''}`.trim();
+            const ref = existing.ticketCode ? ` ${existing.ticketCode}` : '';
+            return NextResponse.json(
+              {
+                success: false,
+                error: existing.approved
+                  ? `${label}: อีเมล ${guestEmail} ได้ลงทะเบียนและได้รับการยืนยันเข้าร่วมงานประชุมนี้แล้ว${ref} ไม่สามารถลงทะเบียนซ้ำได้`
+                  : `${label}: อีเมล ${guestEmail} มีรายการลงทะเบียนงานประชุมนี้แล้ว${ref} กำลังรอเจ้าหน้าที่ตรวจสอบ ไม่สามารถลงทะเบียนซ้ำได้`,
+                code: 'DUPLICATE_REGISTRATION',
+              },
+              { status: 400 }
+            );
+          }
           continue;
         }
         const registration = await getMemberRegistrationSummary(meetingId, attMemberNo);
@@ -834,31 +873,11 @@ export async function POST(
         );
       }
 
-      // Duplicate registration check for non-member
-      const cleanGuestEmail = guestEmail.trim().toLowerCase();
-      const guestSlips = await prisma.$queryRaw<Array<{ slip_id: string; status: string }>>`
-        SELECT slip_id, status 
-        FROM payment_slips 
-        WHERE meeting_id = ${meetingId} 
-          AND is_member = false 
-          AND LOWER(guest_email) = ${cleanGuestEmail} 
-          AND status IN ('pending', 'approved') 
-        LIMIT 1
-      `;
-      const existingGuestSlip = guestSlips?.[0];
+      // Duplicate registration check for non-member (รวมรายชื่อในรายการกลุ่มด้วย)
+      const existingGuest = addOnToSlipId ? null : await findGuestRegistration(meetingId, guestEmail);
 
-      const guestAttendances = await prisma.$queryRaw<Array<{ attendance_id: any; attendance_status: string }>>`
-        SELECT attendance_id, attendance_status 
-        FROM meeting_attendances 
-        WHERE meeting_id = ${meetingId} 
-          AND LOWER(attendee_email) = ${cleanGuestEmail} 
-          AND attendance_status NOT IN ('Cancelled', 'Rejected') 
-        LIMIT 1
-      `;
-      const existingGuestAttendance = guestAttendances?.[0];
-
-      if (!addOnToSlipId && (existingGuestSlip || existingGuestAttendance)) {
-        const isApproved = existingGuestSlip?.status === 'approved' || existingGuestAttendance?.attendance_status === 'Registered';
+      if (existingGuest) {
+        const isApproved = existingGuest.approved;
         return NextResponse.json(
           {
             success: false,

@@ -369,6 +369,73 @@ export async function getMemberRegistrationSummary(
   return summary;
 }
 
+export interface GuestRegistrationMatch {
+  ticketCode: string | null;
+  approved: boolean;
+}
+
+/**
+ * หาการลงทะเบียนของบุคคลทั่วไปในงานประชุมจากอีเมล จากทุกช่องทาง
+ * (รายบุคคล, รายชื่อในรายการกลุ่มที่ยังรอตรวจสอบ/อนุมัติแล้ว, สิทธิ์เข้าร่วมที่บันทึกแล้ว)
+ * รายการกลุ่มเก็บอีเมลผู้เข้าร่วมไว้ใน selected_activities ส่วน guest_email เป็นอีเมลผู้ประสานงาน
+ */
+export async function findGuestRegistration(
+  meetingId: string,
+  email: string,
+  options: { excludeSlipId?: string } = {}
+): Promise<GuestRegistrationMatch | null> {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  if (!cleanEmail) return null;
+
+  const slips = await prisma.payment_slips.findMany({
+    where: {
+      meeting_id: meetingId,
+      status: { in: ['pending', 'approved'] },
+      ...(options.excludeSlipId ? { slip_id: { not: options.excludeSlipId } } : {}),
+    },
+    select: { slip_id: true, status: true, ticket_code: true, is_member: true, guest_email: true, selected_activities: true },
+    orderBy: { created_at: 'asc' },
+  });
+
+  for (const slip of slips) {
+    const payload = parseSlipPayload(slip.selected_activities);
+    if (
+      payload?.isFormatChange ||
+      payload?.type === 'membership_registration' ||
+      payload?.type === 'membership_group_registration'
+    ) {
+      continue;
+    }
+    const isGroup =
+      payload && !Array.isArray(payload) && Array.isArray(payload.attendees) &&
+      (payload.isGroup || slip.ticket_code?.startsWith('GRP'));
+
+    const matched = isGroup
+      ? payload.attendees.some(
+          (a: any) =>
+            !normalizeMemberNo(a?.memberNo || a?.member_no) &&
+            String(a?.email || '').trim().toLowerCase() === cleanEmail
+        )
+      : slip.is_member === false && String(slip.guest_email || '').trim().toLowerCase() === cleanEmail;
+
+    if (matched) return { ticketCode: slip.ticket_code, approved: slip.status === 'approved' };
+  }
+
+  const attendance = await prisma.meeting_attendances.findFirst({
+    where: {
+      meeting_id: meetingId,
+      attendee_email: { equals: cleanEmail, mode: 'insensitive' },
+      attendance_status: { notIn: ['Cancelled', 'Rejected'] },
+    },
+    select: { attendance_status: true },
+  });
+  if (attendance) {
+    return { ticketCode: null, approved: ['Registered', 'Attended'].includes(attendance.attendance_status || '') };
+  }
+
+  return null;
+}
+
 /**
  * รวมกิจกรรมของผู้เข้าร่วมที่ลงทะเบียนเพิ่มเติมในรายการกลุ่ม (อนุมัติแล้ว) เข้ากับรายการลงทะเบียนเดิมของแต่ละคน
  * ไม่ย้ายยอดเงิน เพราะผู้จ่ายคือบริษัท — รายการกลุ่มยังเป็นหลักฐานการชำระและใบเสร็จของบริษัท
